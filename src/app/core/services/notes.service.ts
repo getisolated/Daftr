@@ -1,5 +1,8 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Note, NotePreview } from '../models/note.model';
+import { OVERLAY_NOTE_TAG } from '../models/settings.model';
+import { joinBlocks, TimestampedBlock } from '../../shared/codemirror/note-timestamps';
+import { formatNoteTimestamp } from '../utils/note-timestamp.util';
 import { ElectronBridgeService } from './electron-bridge.service';
 
 const PREVIEW_MAX_LENGTH = 120;
@@ -24,6 +27,21 @@ export class NotesService {
   readonly notePreviews = computed<NotePreview[]>(() =>
     this._notes().map(toPreview)
   );
+
+  /** Notes sent from the quick-note overlay, oldest first. */
+  readonly overlayNotes = computed<Note[]>(() =>
+    this._notes()
+      .filter(n => n.tags.includes(OVERLAY_NOTE_TAG))
+      .sort((a, b) => a.id - b.id)
+  );
+
+  /** Overlay notes as the blocks of one document (trimmed text + timestamp label), oldest first. */
+  readonly overlayNoteBlocks = computed<TimestampedBlock[]>(() =>
+    this.overlayNotes().map(n => ({ text: n.content.trim(), label: formatNoteTimestamp(n.createdAt) }))
+  );
+
+  /** All overlay notes as one document: one blank line between two notes. */
+  readonly overlayNotesDocument = computed<string>(() => joinBlocks(this.overlayNoteBlocks()));
 
   async loadAll(): Promise<void> {
     const notes = await this.bridge.getAllNotes();
@@ -53,6 +71,14 @@ export class NotesService {
   async delete(id: number): Promise<void> {
     await this.bridge.deleteNote(id);
     this._notes.update(list => list.filter(n => n.id !== id));
+  }
+
+  /** Deletes the note when it has no content (cache is up to date: the editor flushes its saves first). */
+  async deleteIfEmpty(id: number): Promise<boolean> {
+    const note = this._notes().find(n => n.id === id);
+    if (!note || note.content.trim() !== '') return false;
+    await this.delete(id);
+    return true;
   }
 
   async search(query: string): Promise<NotePreview[]> {

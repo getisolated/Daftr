@@ -2,13 +2,15 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { OverlayBackdrop } from '../../core/models/overlay-backdrop.model';
+import { formatNoteTimestamp } from '../../core/utils/note-timestamp.util';
 import { Note } from '../../core/models/note.model';
 import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
 
-const MAX_DISPLAYED_NOTES = 100;
+const MAX_DISPLAYED_NOTES = 50;
 const MAX_INPUT_HEIGHT_PX = 140;
 
 interface OverlayMessage {
@@ -23,13 +25,20 @@ interface OverlayMessage {
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="overlay">
+    <div class="overlay" [class.has-backdrop]="backdrop() !== null">
+      @if (backdrop(); as backdrop) {
+        <!-- Desktop screenshot kept aligned with the screen while the window moves, then blurred by the CSS -->
+        <img class="backdrop" alt="" [src]="backdrop.dataUrl" [style.width.px]="backdrop.width" [style.height.px]="backdrop.height" [style.transform]="backdropTransform()" />
+      }
       <div class="drag-handle" title="Drag to move"><span class="grip"></span></div>
 
       <!-- column-reverse: newest message first in the DOM, rendered at the bottom, scroll anchored to the bottom -->
       <div class="messages">
         @for (message of reversedMessages(); track message.note.id) {
-          <div class="message" [class.enter]="message.fresh">{{ message.note.content }}</div>
+          <div class="message" [class.enter]="message.fresh">
+            <span>{{ message.note.content }}</span>
+            <span class="message-time">{{ formatTime(message.note.createdAt) }}</span>
+          </div>
         }
       </div>
 
@@ -53,6 +62,8 @@ export class OverlayComponent implements OnInit, OnDestroy {
 
   @ViewChild('input', { static: true }) inputRef!: ElementRef<HTMLTextAreaElement>;
 
+  readonly backdrop = signal<OverlayBackdrop | null>(null);
+  readonly backdropTransform = signal('');
   readonly messages = signal<OverlayMessage[]>([]);
   readonly reversedMessages = computed(() => [...this.messages()].reverse());
   // Lives in the component: the window is only hidden (never destroyed), so the draft survives hide/show
@@ -63,9 +74,11 @@ export class OverlayComponent implements OnInit, OnDestroy {
       : 'Write a note… (Ctrl+Enter to send)');
 
   private unsubscribers: (() => void)[] = [];
+  private trackingFrame = 0;
 
   async ngOnInit(): Promise<void> {
     this.unsubscribers.push(
+      this.bridge.onOverlayBackdrop(backdrop => this.onBackdrop(backdrop)),
       this.bridge.onOverlayShown(() => this.onShown()),
       this.bridge.onNotesChanged(() => this.loadMessages()),
     );
@@ -74,7 +87,12 @@ export class OverlayComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    cancelAnimationFrame(this.trackingFrame);
     this.unsubscribers.forEach(unsubscribe => unsubscribe());
+  }
+
+  protected formatTime(createdAt: string): string {
+    return formatNoteTimestamp(createdAt);
   }
 
   onDraftChange(value: string): void {
@@ -97,7 +115,27 @@ export class OverlayComponent implements OnInit, OnDestroy {
     }
   }
 
+  private onBackdrop(backdrop: OverlayBackdrop | null): void {
+    this.backdrop.set(backdrop);
+    this.alignBackdrop();
+  }
+
+  // The window is draggable and the screenshot is not: re-align it every frame while the overlay is visible
+  private alignBackdrop(): void {
+    cancelAnimationFrame(this.trackingFrame);
+    const backdrop = this.backdrop();
+    if (!backdrop || document.hidden) {
+      return;
+    }
+    const transform = `translate(${backdrop.x - window.screenX}px, ${backdrop.y - window.screenY}px)`;
+    if (transform !== this.backdropTransform()) {
+      this.backdropTransform.set(transform);
+    }
+    this.trackingFrame = requestAnimationFrame(() => this.alignBackdrop());
+  }
+
   private async onShown(): Promise<void> {
+    this.alignBackdrop();
     await this.loadMessages();
     this.focusInput();
   }

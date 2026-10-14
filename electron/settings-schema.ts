@@ -13,6 +13,8 @@ export interface AppSettings {
   /** true: Enter sends (Shift+Enter = new line). false: Enter = new line (Ctrl+Enter sends). */
   enterToSend: boolean;
   launchAtStartup: boolean;
+  /** In-app shortcuts changed by the user, by shortcut id; absent = default (the renderer owns the id list). */
+  appShortcuts: Record<string, string>;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -29,9 +31,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   globalShortcut: 'CommandOrControl+Alt+N',
   shortcutMode: 'overlay',
   overlayWidth: 250,
-  overlayHeight: 500,
+  overlayHeight: 350,
   enterToSend: true,
   launchAtStartup: false,
+  appShortcuts: {},
   overlayPosition: null,
 };
 
@@ -40,6 +43,23 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
     return fallback;
   }
   return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+const SHORTCUT_ID_PATTERN = /^[a-z0-9.-]{1,64}$/;
+const MAX_ACCELERATOR_LENGTH = 64;
+const MAX_APP_SHORTCUTS = 100;
+
+function sanitizeAppShortcuts(value: unknown, fallback: Record<string, string>): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return fallback;
+  }
+  const shortcuts: Record<string, string> = {};
+  for (const [id, accelerator] of Object.entries(value).slice(0, MAX_APP_SHORTCUTS)) {
+    if (SHORTCUT_ID_PATTERN.test(id) && typeof accelerator === 'string' && accelerator.trim() && accelerator.length <= MAX_ACCELERATOR_LENGTH) {
+      shortcuts[id] = accelerator.trim();
+    }
+  }
+  return shortcuts;
 }
 
 function sanitizePosition(value: unknown): OverlayPosition | null {
@@ -66,6 +86,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     overlayHeight: clampInt(raw['overlayHeight'], OVERLAY_MIN_HEIGHT, OVERLAY_MAX_HEIGHT, base.overlayHeight),
     enterToSend: typeof raw['enterToSend'] === 'boolean' ? raw['enterToSend'] : base.enterToSend,
     launchAtStartup: typeof raw['launchAtStartup'] === 'boolean' ? raw['launchAtStartup'] : base.launchAtStartup,
+    appShortcuts: sanitizeAppShortcuts(raw['appShortcuts'], base.appShortcuts),
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

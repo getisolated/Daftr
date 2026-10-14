@@ -1,4 +1,5 @@
 interface KeyEventLike {
+  key: string;
   code: string;
   ctrlKey: boolean;
   metaKey: boolean;
@@ -14,8 +15,22 @@ const NAMED_KEYS: Record<string, string> = {
   Semicolon: ';', Quote: "'", BracketLeft: '[', BracketRight: ']', Backquote: '`',
 };
 
-/** Electron accelerator key name for a physical key (layout independent), or null for modifiers/unsupported keys. */
-function keyName(code: string): string | null {
+const PUNCTUATION_KEYS = new Set(['-', '=', ',', '.', '/', '\\', ';', "'", '[', ']', '`']);
+
+/**
+ * Electron accelerator key name, or null for modifiers/unsupported keys.
+ * Letters follow the keyboard layout (`key`), because Electron resolves an accelerator letter through the
+ * active layout: on AZERTY the physical "Q" key (`code` KeyA) must be recorded as Q, not A. `key` is not a
+ * plain letter when AltGr produces a symbol; the physical key is the best remaining guess then.
+ */
+function keyName(key: string, code: string): string | null {
+  if (/^[a-zA-Z]$/.test(key)) {
+    return key.toUpperCase();
+  }
+  // Punctuation also follows the layout: on AZERTY the "," key is the physical M key (code KeyM)
+  if (PUNCTUATION_KEYS.has(key)) {
+    return key;
+  }
   const letter = /^Key(?<letter>[A-Z])$/.exec(code)?.groups?.['letter'];
   if (letter) {
     return letter;
@@ -36,7 +51,7 @@ function keyName(code: string): string | null {
  * shortcut (a bare key without modifier would hijack normal typing system-wide; F-keys are the exception).
  */
 export function keyEventToAccelerator(event: KeyEventLike): string | null {
-  const key = keyName(event.code);
+  const key = keyName(event.key, event.code);
   if (!key) {
     return null;
   }
@@ -65,4 +80,23 @@ export function keyEventToAccelerator(event: KeyEventLike): string | null {
 /** Human-readable form of an accelerator. */
 export function formatAccelerator(accelerator: string): string {
   return accelerator.replace(/CommandOrControl/g, 'Ctrl').replace(/Super/g, 'Win').replace(/Return/g, 'Enter');
+}
+
+const CODEMIRROR_KEY_NAMES: Record<string, string> = {
+  Return: 'Enter', Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight',
+};
+
+/**
+ * Converts an accelerator into a CodeMirror key name (`CommandOrControl+Shift+B` → `Mod-Shift-b`).
+ * Returns an empty string for an empty accelerator: CodeMirror then ignores the binding.
+ */
+export function acceleratorToCodeMirrorKey(accelerator: string): string {
+  if (!accelerator) {
+    return '';
+  }
+  const parts = accelerator.split('+');
+  const key = parts.pop() ?? '';
+  const modifiers = parts.map(part => (part === 'CommandOrControl' ? 'Mod' : part === 'Super' ? 'Meta' : part));
+  const name = CODEMIRROR_KEY_NAMES[key] ?? (key.length === 1 ? key.toLowerCase() : key);
+  return [...modifiers, name].join('-');
 }

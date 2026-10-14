@@ -7,10 +7,40 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  box-sizing: border-box;
   border-radius: 10px;
   overflow: hidden;
-  // Translucent, fading to fully transparent at the top so the window has no visible upper edge
-  background: linear-gradient(to bottom, rgba(30, 30, 30, 0) 0%, rgba(30, 30, 30, 0.78) 35%, rgba(30, 30, 30, 0.88) 100%);
+  // Crisp hairline edge + soft inner top highlight: gives the "glass pane" look
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+  // Fallback when there is neither acrylic nor a desktop capture to blur: a plain, mostly opaque panel
+  background: rgba(30, 30, 30, 0.9);
+
+  // Everything but the screenshot sits above it
+  > :not(.backdrop) {
+    position: relative;
+  }
+
+  // Blurred desktop capture standing in for the acrylic (no OS support, Battery Saver, transparency off)
+  &.has-backdrop {
+    background: transparent;
+  }
+}
+
+.backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  pointer-events: none;
+  // brightness() is the dark tint: a CSS background would sit beneath the image
+  filter: blur(22px) saturate(1.4) brightness(0.55);
+}
+
+// The OS paints the (rather light grey) acrylic behind the window: a flat anthracite tint darkens it
+:host-context(html.overlay-acrylic) .overlay {
+  background: rgba(22, 22, 24, 0.62);
 }
 
 .drag-handle {
@@ -40,13 +70,20 @@
   mask-image: linear-gradient(to bottom, transparent 0, #000 70px);
 }
 
+.message-time {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.45);
+  user-select: none;
+}
+
 .message {
   flex: none;
-  margin-top: 6px;
-  padding: 6px 9px;
-  border-radius: 8px;
-  background: rgba(60, 60, 60, 0.7);
-  color: #e0e0e0;
+  margin-top: 10px;
+  padding: 0 2px;
+  color: #e8e8e8;
   font-size: 13px;
   line-height: 1.4;
   white-space: pre-wrap;
@@ -80,9 +117,10 @@
   margin: 0 10px 10px;
   padding: 8px 10px;
   resize: none;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
-  background: rgba(37, 37, 38, 0.9);
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
   color: #e0e0e0;
   font-family: inherit;
   font-size: 13px;
@@ -90,6 +128,7 @@
   outline: none;
 
   &:focus {
-    border-color: #007acc;
+    border-color: #3b9dff;
+    box-shadow: 0 0 0 2px rgba(59, 157, 255, 0.25);
   }
 }

@@ -34,6 +34,7 @@ const api = {
 
   // Events pushed by the main process; each returns an unsubscribe function
   onOverlayShown: (callback: () => void) => subscribe('overlay:shown', callback),
+  onOverlayBackdrop: (callback: (backdrop: unknown) => void) => subscribe('overlay:backdrop', callback),
   onNotesChanged: (callback: () => void) => subscribe('notes:changed', callback),
   onSettingsChanged: (callback: (settings: unknown) => void) => subscribe('settings:changed', callback),
   onOpenSettings: (callback: () => void) => subscribe('settings:open', callback),

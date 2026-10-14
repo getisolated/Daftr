@@ -1,9 +1,12 @@
-import { AppSettings } from '../../core/models/settings.model';
+import { APP_SHORTCUTS } from '../../core/models/app-shortcuts.model';
 
 export type SettingControl = 'checkbox' | 'number' | 'select' | 'shortcut';
 
 export interface SettingDefinition {
-  key: keyof AppSettings;
+  /** AppSettings key, or `shortcut:<id>` for a rebindable in-app shortcut. */
+  key: string;
+  /** Set for in-app shortcuts: the APP_SHORTCUTS id this entry rebinds. */
+  shortcutId?: string;
   category: string;
   title: string;
   description: string;
@@ -20,6 +23,15 @@ export interface SettingsSection {
 }
 
 /** Single source of truth for the settings editor: adding a setting = adding an entry here. */
+const APP_SHORTCUT_DEFINITIONS: SettingDefinition[] = APP_SHORTCUTS.map(shortcut => ({
+  key: `shortcut:${shortcut.id}`,
+  shortcutId: shortcut.id,
+  category: 'Keyboard Shortcuts',
+  title: shortcut.label,
+  description: 'Click, then press the new key combination.',
+  control: 'shortcut' as const,
+}));
+
 export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     key: 'launchAtStartup',
@@ -73,6 +85,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     description: 'Enter sends the note (Shift+Enter inserts a new line). When unchecked, Enter inserts a new line and Ctrl+Enter sends.',
     control: 'checkbox',
   },
+  ...APP_SHORTCUT_DEFINITIONS,
 ];
 
 /** Case-insensitive match on category, title, description or key; every word of the query must match. */
@@ -80,7 +93,9 @@ export function filterSettings(definitions: SettingDefinition[], query: string):
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return definitions;
   return definitions.filter(def => {
-    const haystack = `${def.category} ${def.title} ${def.description} ${def.key}`.toLowerCase();
+    // Shortcut entries have synthetic keys (`shortcut:search.global`) that would only add false matches
+    const key = def.shortcutId ? '' : def.key;
+    const haystack = `${def.category} ${def.title} ${def.description} ${key}`.toLowerCase();
     return words.every(word => haystack.includes(word));
   });
 }

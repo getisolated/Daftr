@@ -1,0 +1,38 @@
+:host {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.box {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  box-sizing: border-box;
+  background: #313131;
+  border: 1px solid #3c3c3c;
+  border-radius: 3px;
+  color: #fff;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+:host(:hover) .box { border-color: #5a5a5a; }
+
+:host(.checked) .box {
+  background: #0078d4;
+  border-color: #0078d4;
+}
+
+:host(:focus-visible) .box {
+  outline: 1px solid #0078d4;
+  outline-offset: 2px;
+}
+
+.label { min-width: 0; }

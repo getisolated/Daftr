@@ -7,6 +7,7 @@ import { TabsService } from '../../core/services/tabs.service';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { PaletteService } from '../../core/services/palette.service';
 import { LayoutService } from '../../core/services/layout.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 
 @Component({
@@ -71,7 +72,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
                 class="tab-close"
                 (click)="closeTab($event, i)"
                 tabindex="-1"
-                title="Close (Ctrl+W)"
+                [title]="'Close (' + shortcutLabel('tab.close') + ')'"
               >×</button>
             }
           </div>
@@ -79,7 +80,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
       </div>
 
       <!-- Search icon -->
-      <button class="search-icon-btn" (click)="openSearch()" (dblclick)="$event.stopPropagation()" title="Search notes (Ctrl+Shift+F)">
+      <button class="search-icon-btn" (click)="openSearch()" (dblclick)="$event.stopPropagation()" [title]="'Search notes (' + shortcutLabel('search.global') + ')'">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
@@ -90,7 +91,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
         class="search-icon-btn"
         (click)="toggleWideMode()"
         (dblclick)="$event.stopPropagation()"
-        [title]="wideMode() ? 'Centered layout (Alt+Z)' : 'Full width layout (Alt+Z)'"
+        [title]="(wideMode() ? 'Centered layout (' : 'Full width layout (') + shortcutLabel('layout.toggle') + ')'"
       >
         @if (wideMode()) {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -107,6 +108,14 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
             <line x1="3" y1="21" x2="10" y2="14"/>
           </svg>
         }
+      </button>
+
+      <!-- Settings -->
+      <button class="search-icon-btn" (click)="openSettings()" (dblclick)="$event.stopPropagation()" [title]="'Settings (' + shortcutLabel('settings.open') + ')'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
       </button>
 
       <!-- Window controls -->
@@ -143,6 +152,7 @@ export class TabsBarComponent {
   private electron = inject(ElectronBridgeService);
   private palette = inject(PaletteService);
   private layout = inject(LayoutService);
+  private settings = inject(SettingsService);
 
   @ViewChild('tabsContainer') tabsContainer!: ElementRef<HTMLElement>;
 
@@ -165,6 +175,10 @@ export class TabsBarComponent {
   openSearch(): void { this.palette.open('search'); }
   selectTab(index: number): void { this.tabs$.setActiveIndex(index); }
   toggleWideMode(): void { this.layout.toggle(); }
+
+  openSettings(): void { this.settings.open(); }
+
+  protected shortcutLabel(id: string): string { return this.settings.shortcutLabel(id); }
 
   closeTab(event: MouseEvent, index: number): void {
     event.stopPropagation();
@@ -264,9 +278,9 @@ export class TabsBarComponent {
     const closeIcon = 'M18 6L6 18M6 6l12 12';
 
     const items: ContextMenuEntry[] = [
-      { id: 'pin', label: pinLabel, icon: pinIcon, shortcut: 'Alt+P' },
+      { id: 'pin', label: pinLabel, icon: pinIcon, shortcut: this.shortcutLabel('tab.pin') },
       { divider: true },
-      { id: 'close', label: 'Close Tab', icon: closeIcon, shortcut: 'Ctrl+W', disabled: tab.isPinned },
+      { id: 'close', label: 'Close Tab', icon: closeIcon, shortcut: this.shortcutLabel('tab.close'), disabled: tab.isPinned },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, tabIndex: index });

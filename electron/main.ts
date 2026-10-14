@@ -3,7 +3,7 @@ import { shell } from 'electron/common';
 import * as path from 'path';
 import { initDatabase, closeDatabase, noteOps } from './database';
 import { registerGlobalShortcut, unregisterGlobalShortcuts } from './global-shortcut';
-import { applyOverlaySize, broadcastToWindows, createOverlayWindow, hideOverlay, showOverlay, toggleOverlay } from './overlay';
+import { applyOverlaySize, broadcastToWindows, hideOverlay, prepareOverlay, showOverlay, toggleOverlay } from './overlay';
 import { loadRenderer } from './renderer-loader';
 import { getSettings, loadSettings, updateSettings } from './settings';
 import { sanitizeSettings, SettingsPatch } from './settings-schema';
@@ -97,7 +97,7 @@ app.whenReady().then(() => {
   initDatabase();
   const settings = loadSettings();
   createWindow(!launchedHidden());
-  createOverlayWindow();
+  void prepareOverlay();
   createTray({ openApp: showMainWindow, quickNote: showOverlay, openSettings, quit: quitApp });
   applyLaunchAtStartup(settings.launchAtStartup);
   if (!registerGlobalShortcut(settings.globalShortcut, onGlobalShortcut)) {

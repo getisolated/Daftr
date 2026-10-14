@@ -21,7 +21,20 @@ describe('sanitizeSettings', () => {
   });
 
   it('rejects non-finite or non-numeric sizes', () => {
-    expect(sanitizeSettings({ overlayWidth: NaN, overlayHeight: '500' })).toMatchObject({ overlayWidth: 250, overlayHeight: 500 });
+    expect(sanitizeSettings({ overlayWidth: NaN, overlayHeight: '500' })).toMatchObject({ overlayWidth: 250, overlayHeight: 350 });
+  });
+
+  it('keeps valid app shortcut overrides and drops malformed ones', () => {
+    const result = sanitizeSettings({
+      appShortcuts: { 'note.new': 'CommandOrControl+Alt+M', 'Bad Id!': 'Ctrl+X', 'tab.close': '', 'tab.pin': 42 },
+    });
+    expect(result.appShortcuts).toEqual({ 'note.new': 'CommandOrControl+Alt+M' });
+  });
+
+  it('falls back to the current app shortcuts when the value is not an object', () => {
+    const base = { ...DEFAULT_SETTINGS, appShortcuts: { 'note.new': 'Alt+M' } };
+    expect(sanitizeSettings({ appShortcuts: 'nope' }, base).appShortcuts).toEqual({ 'note.new': 'Alt+M' });
+    expect(sanitizeSettings({ appShortcuts: ['x'] }, base).appShortcuts).toEqual({ 'note.new': 'Alt+M' });
   });
 
   it('rejects an unknown shortcut mode and an empty shortcut', () => {

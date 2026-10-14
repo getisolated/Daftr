@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Tab } from '../models/note.model';
+import { OVERLAY_NOTES_TAB_ID, Tab } from '../models/note.model';
 
 const SESSION_KEY = 'evnote-session';
 
@@ -22,6 +22,10 @@ export class TabsService {
     return this.activeTab()?.noteId ?? null;
   });
 
+  isOpen(noteId: number): boolean {
+    return this._tabs().some(t => t.noteId === noteId);
+  }
+
   /** Number of pinned tabs (always at the start of the array). */
   readonly pinnedCount = computed(() =>
     this._tabs().filter(t => t.isPinned).length
@@ -35,7 +39,7 @@ export class TabsService {
       if (raw) {
         const parsed = JSON.parse(raw) as { tabs: Tab[]; activeIndex: number };
         const validTabs = parsed.tabs
-          .filter(t => validNoteIds.has(t.noteId))
+          .filter(t => validNoteIds.has(t.noteId) || t.noteId === OVERLAY_NOTES_TAB_ID)
           .map(t => ({ ...t, isPinned: t.isPinned ?? false }));
         if (validTabs.length > 0) {
           this._tabs.set(validTabs);
@@ -71,6 +75,10 @@ export class TabsService {
       this._activeIndex.set(this._tabs().length - 1);
     }
     this.persist();
+  }
+
+  openOverlayNotes(): void {
+    this.openNote(OVERLAY_NOTES_TAB_ID, 'Overlay notes');
   }
 
   closeTab(index: number): void {

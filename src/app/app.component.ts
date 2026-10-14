@@ -113,37 +113,39 @@ export class AppComponent implements OnInit, OnDestroy {
       this.unregisterFns.push(this.shortcutsService.register(def));
     };
 
+    const bind = (id: string, handler: () => void): void => {
+      this.unregisterFns.push(this.shortcutsService.bindAction(id, handler));
+    };
+
     // Prevent Ctrl+R from reloading the app
     reg({ key: 'r', ctrl: true, handler: () => { /* noop — block browser reload */ } });
 
-    reg({ key: 'F1', handler: () => this.paletteService.toggle('command') });
-    reg({ key: 'n', ctrl: true, handler: () => this.createNote() });
-    reg({ key: 'w', ctrl: true, handler: () => this.tabsService.closeActiveTab() });
-    reg({ key: 'Tab', ctrl: true, handler: () => this.tabsService.nextTab(), preventDefault: true });
-    reg({ key: 'Tab', ctrl: true, shift: true, handler: () => this.tabsService.prevTab(), preventDefault: true });
-    reg({ key: 'f', ctrl: true, shift: true, handler: () => this.paletteService.open('search') });
-    reg({
-      key: 'f', ctrl: true,
-      handler: () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(); }
-    });
+    // Rebindable shortcuts: the key combination comes from the settings (see APP_SHORTCUTS)
+    bind('palette.commands', () => this.paletteService.toggle('command'));
+    bind('note.new', () => this.createNote());
+    bind('tab.close', () => this.tabsService.closeActiveTab());
+    bind('tab.next', () => this.tabsService.nextTab());
+    bind('tab.prev', () => this.tabsService.prevTab());
+    bind('search.global', () => this.paletteService.open('search'));
+    bind('editor.find', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(); });
+    bind('settings.open', () => this.settingsService.open());
+    bind('layout.toggle', () => this.layoutService.toggle());
+    bind('tab.pin', () => this.tabsService.togglePinActiveTab());
+    for (let i = 1; i <= 9; i++) {
+      bind(`tab.goto.${i}`, () => this.tabsService.setActiveIndex(i - 1));
+    }
+
     reg({
       key: 'Escape', preventDefault: false,
       handler: () => {
+        // Escape belongs to an open drop-down first
+        if (document.querySelector('[data-select-open]')) return;
         if (this.settingsService.isOpen()) this.settingsService.close();
         else if (this.paletteService.isOpen()) this.paletteService.close();
         else this.editorRef?.closeSearch();
       }
     });
 
-    reg({ key: ',', ctrl: true, handler: () => this.settingsService.open() });
-    reg({ key: 'z', alt: true, handler: () => this.layoutService.toggle() });
-    reg({ key: 'p', alt: true, handler: () => this.tabsService.togglePinActiveTab() });
-
-    // Alt+Ctrl+1-9: switch to tab by index
-    for (let i = 1; i <= 9; i++) {
-      const idx = i - 1;
-      reg({ key: String(i), ctrl: true, alt: true, handler: () => this.tabsService.setActiveIndex(idx) });
-    }
   }
 
   private async createNote(): Promise<void> {

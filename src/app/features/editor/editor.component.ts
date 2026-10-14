@@ -1,12 +1,12 @@
 import {
   Component, OnDestroy, OnChanges, Input, SimpleChanges,
-  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal
+  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, effect, untracked
 } from '@angular/core';
 
 
 // CodeMirror
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
-import { EditorState, Extension } from '@codemirror/state';
+import { Compartment, EditorState, Extension } from '@codemirror/state';
 import {
   defaultKeymap, history, historyKeymap, indentWithTab,
 } from '@codemirror/commands';
@@ -18,10 +18,13 @@ import { bracketMatching, syntaxTree } from '@codemirror/language';
 
 import { vscodeDarkModern } from '../../shared/codemirror/vscode-dark-modern';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
+import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { NotesService } from '../../core/services/notes.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { TabsService } from '../../core/services/tabs.service';
-import { Note } from '../../core/models/note.model';
+import { acceleratorToCodeMirrorKey } from '../../core/utils/accelerator.util';
+import { Note, OVERLAY_NOTES_TAB_ID } from '../../core/models/note.model';
 
 @Component({
   selector: 'app-editor',
@@ -46,8 +49,8 @@ import { Note } from '../../core/models/note.model';
             </div>
             <p class="empty-title">No note open</p>
             <p class="empty-hint">
-              Press <kbd>Ctrl+N</kbd> to create a new note<br>
-              or <kbd>F1</kbd> to search existing notes
+              Press <kbd>{{ shortcutLabel('note.new') }}</kbd> to create a new note<br>
+              or <kbd>{{ shortcutLabel('palette.commands') }}</kbd> to search existing notes
             </p>
           </div>
         </div>
@@ -62,13 +65,34 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
+  private settingsService = inject(SettingsService);
 
   readonly activeNote = signal<Note | null>(null);
 
   private editorView: EditorView | null = null;
+  private readonly shortcutsCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
   private loadGeneration = 0;
+
+  protected shortcutLabel(id: string): string {
+    return this.settingsService.shortcutLabel(id);
+  }
+
+  constructor() {
+    // The overlay notes document follows new notes sent from the overlay while it is open
+    effect(() => {
+      const document = this.notes.overlayNotesDocument();
+      untracked(() => this.refreshOverlayNotesView(document));
+    });
+
+    effect(() => {
+      this.settingsService.appShortcuts();
+      untracked(() => {
+        this.editorView?.dispatch({ effects: this.shortcutsCompartment.reconfigure(this.buildShortcutsKeymap()) });
+      });
+    });
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['noteId']) {
@@ -83,12 +107,18 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   private async loadNote(id: number | null): Promise<void> {
     const generation = ++this.loadGeneration;
+    const previousId = this.activeNote()?.id ?? null;
 
     // Always flush pending save before switching notes
     await this.flushPendingSave();
 
     // Abort if a newer load was started while flushing
     if (generation !== this.loadGeneration) return;
+
+    // A note whose tab was just closed while still empty (e.g. Ctrl+N then Ctrl+W) is not worth keeping
+    if (previousId !== null && previousId !== id && previousId !== OVERLAY_NOTES_TAB_ID && !this.tabs.isOpen(previousId)) {
+      await this.notes.deleteIfEmpty(previousId);
+    }
 
     if (id === null) {
       this.activeNote.set(null);
@@ -97,14 +127,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
 
     try {
-      const note = await this.notes.getById(id);
+      const note = id === OVERLAY_NOTES_TAB_ID ? this.buildOverlayNotesDocument() : await this.notes.getById(id);
       // Abort if a newer load was started while fetching
       if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
       // Wait for DOM to update
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
-        this.initEditor(note?.content ?? '');
+        this.initEditor(note?.content ?? '', id === OVERLAY_NOTES_TAB_ID);
       }, 0);
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
@@ -127,7 +157,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.editorView = null;
   }
 
-  private initEditor(content: string): void {
+  private initEditor(content: string, readOnly = false): void {
     this.destroyEditor();
     if (!this.editorHost?.nativeElement) return;
 
@@ -246,60 +276,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
             return true;
           }
         },
-        // Bold: Ctrl+B
-        {
-          key: 'Ctrl-b',
-          run(view) {
-            const sel = view.state.selection.main;
-            const selected = view.state.sliceDoc(sel.from, sel.to);
-            view.dispatch({
-              changes: { from: sel.from, to: sel.to, insert: `**${selected}**` },
-              selection: { anchor: sel.from + 2, head: sel.to + 2 },
-            });
-            return true;
-          }
-        },
-        // Italic: Ctrl+I
-        {
-          key: 'Ctrl-i',
-          run(view) {
-            const sel = view.state.selection.main;
-            const selected = view.state.sliceDoc(sel.from, sel.to);
-            view.dispatch({
-              changes: { from: sel.from, to: sel.to, insert: `*${selected}*` },
-              selection: { anchor: sel.from + 1, head: sel.to + 1 },
-            });
-            return true;
-          }
-        },
-        // Insert link: Ctrl+K
-        {
-          key: 'Ctrl-k',
-          run(view) {
-            const sel = view.state.selection.main;
-            const selected = view.state.sliceDoc(sel.from, sel.to);
-            const insert = selected ? `[${selected}](url)` : '[text](url)';
-            view.dispatch({
-              changes: { from: sel.from, to: sel.to, insert },
-              selection: { anchor: sel.from + insert.length - 4, head: sel.from + insert.length - 1 },
-            });
-            return true;
-          }
-        },
-        // Save: Ctrl+S
-        {
-          key: 'Ctrl-s',
-          run: (view) => {
-            const note = this.activeNote();
-            if (!note) return true;
-            if (this.saveDebounce) clearTimeout(this.saveDebounce);
-            this.saveNote(note.id, view.state.doc.toString());
-            return true;
-          }
-        },
       ]),
+      this.shortcutsCompartment.of(this.buildShortcutsKeymap()),
       updateListener,
       EditorView.lineWrapping,
+      // The concatenated overlay notes cannot be mapped back to their individual notes
+      ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme] : []),
     ];
 
     const state = EditorState.create({ doc: content, extensions });
@@ -308,11 +290,83 @@ export class EditorComponent implements OnDestroy, OnChanges {
       parent: this.editorHost.nativeElement,
     });
 
+    if (readOnly) {
+      this.editorView.dispatch({ effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()) });
+    }
+
     // Focus the editor
     setTimeout(() => this.editorView?.focus(), 50);
   }
 
+  private buildOverlayNotesDocument(): Note {
+    const now = new Date().toISOString();
+    return {
+      id: OVERLAY_NOTES_TAB_ID, title: 'Overlay notes', content: this.notes.overlayNotesDocument(),
+      tags: [], createdAt: now, updatedAt: now,
+    };
+  }
+
+  private refreshOverlayNotesView(document: string): void {
+    const view = this.editorView;
+    if (!view || this.activeNote()?.id !== OVERLAY_NOTES_TAB_ID || view.state.doc.toString() === document) {
+      return;
+    }
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: document },
+      effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()),
+    });
+  }
+
+  /** Formatting/save bindings use the accelerators configured in the settings (reconfigured live, see constructor). */
+  private buildShortcutsKeymap(): Extension {
+    const keyFor = (id: string): string => acceleratorToCodeMirrorKey(this.settingsService.appShortcuts()[id] ?? '');
+    return keymap.of([
+      {
+        key: keyFor('editor.bold'),
+        run: (view) => this.wrapSelection(view, '**', '**'),
+      },
+      {
+        key: keyFor('editor.italic'),
+        run: (view) => this.wrapSelection(view, '*', '*'),
+      },
+      {
+        key: keyFor('editor.link'),
+        run: (view) => {
+          const sel = view.state.selection.main;
+          const selected = view.state.sliceDoc(sel.from, sel.to);
+          const insert = selected ? `[${selected}](url)` : '[text](url)';
+          view.dispatch({
+            changes: { from: sel.from, to: sel.to, insert },
+            selection: { anchor: sel.from + insert.length - 4, head: sel.from + insert.length - 1 },
+          });
+          return true;
+        },
+      },
+      {
+        key: keyFor('editor.save'),
+        run: (view) => {
+          const note = this.activeNote();
+          if (!note) return true;
+          if (this.saveDebounce) clearTimeout(this.saveDebounce);
+          this.saveNote(note.id, view.state.doc.toString());
+          return true;
+        },
+      },
+    ]);
+  }
+
+  private wrapSelection(view: EditorView, before: string, after: string): boolean {
+    const sel = view.state.selection.main;
+    const selected = view.state.sliceDoc(sel.from, sel.to);
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert: `${before}${selected}${after}` },
+      selection: { anchor: sel.from + before.length, head: sel.to + before.length },
+    });
+    return true;
+  }
+
   private async saveNote(id: number, content: string): Promise<void> {
+    if (id === OVERLAY_NOTES_TAB_ID) return;
     try {
       const title = this.notes.extractTitle(content);
       await this.notes.update(id, { content, title });

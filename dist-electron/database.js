@@ -43,12 +43,12 @@ exports.sanitizeFtsQuery = sanitizeFtsQuery;
 exports.escapeLike = escapeLike;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path = __importStar(require("path"));
-const electron_1 = require("electron");
+const main_1 = require("electron/main");
 let db;
 // Cached prepared statements (initialized after DB open)
 let stmts;
 function initDatabase() {
-    const dbPath = path.join(electron_1.app.getPath('userData'), 'evnote.db');
+    const dbPath = path.join(main_1.app.getPath('userData'), 'evnote.db');
     db = new better_sqlite3_1.default(dbPath);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
@@ -86,7 +86,7 @@ function initDatabase() {
     stmts = {
         getAll: db.prepare('SELECT * FROM notes ORDER BY updated_at DESC'),
         getById: db.prepare('SELECT * FROM notes WHERE id = ?'),
-        create: db.prepare("INSERT INTO notes (title, content, tags) VALUES (?, ?, '[]')"),
+        create: db.prepare("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)"),
         delete: db.prepare('DELETE FROM notes WHERE id = ?'),
         search: db.prepare(`
       SELECT notes.* FROM notes
@@ -126,8 +126,8 @@ exports.noteOps = {
     getById(id) {
         return stmts.getById.get(id);
     },
-    create(title, content) {
-        const result = stmts.create.run(title, content);
+    create(title, content, tags = []) {
+        const result = stmts.create.run(title, content, JSON.stringify(tags));
         return this.getById(result.lastInsertRowid);
     },
     update(id, data) {

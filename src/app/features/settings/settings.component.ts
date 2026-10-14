@@ -1,12 +1,16 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { SettingsService } from '../../core/services/settings.service';
+import { APP_SHORTCUTS, findShortcutConflict } from '../../core/models/app-shortcuts.model';
 import { DEFAULT_SETTINGS, SettingsPatch } from '../../core/models/settings.model';
 import { formatAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
+import { CheckboxComponent } from '../../shared/ui/checkbox.component';
+import { SelectComponent } from '../../shared/ui/select.component';
 import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory } from './settings-definitions';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
+  imports: [CheckboxComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isOpen()) {
@@ -56,10 +60,9 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
 
                       @switch (def.control) {
                         @case ('checkbox') {
-                          <label class="checkbox">
-                            <input type="checkbox" [checked]="settings()[def.key] === true" (change)="onCheckboxChange(def, $event)" />
+                          <app-checkbox [checked]="valueOf(def) === true" (checkedChange)="onCheckboxChange(def, $event)">
                             <span class="description">{{ def.description }}</span>
-                          </label>
+                          </app-checkbox>
                         }
                         @case ('number') {
                           <div class="description">{{ def.description }}</div>
@@ -69,30 +72,26 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
                             [min]="def.min ?? null"
                             [max]="def.max ?? null"
                             [step]="def.step ?? 1"
-                            [value]="settings()[def.key]"
+                            [value]="valueOf(def)"
                             (change)="onNumberChange(def, $event)"
                           />
                         }
                         @case ('select') {
                           <div class="description">{{ def.description }}</div>
-                          <select class="control" [value]="settings()[def.key]" (change)="onSelectChange(def, $event)">
-                            @for (option of def.options ?? []; track option.value) {
-                              <option [value]="option.value">{{ option.label }}</option>
-                            }
-                          </select>
+                          <app-select [value]="stringValueOf(def)" [options]="def.options ?? []" (valueChange)="onSelectChange(def, $event)" />
                         }
                         @case ('shortcut') {
                           <div class="description">{{ def.description }}</div>
                           <button
                             class="control shortcut"
                             data-shortcut-recorder
-                            [class.recording]="recording()"
-                            (click)="startRecording()"
-                            (keydown)="onShortcutKeydown($event)"
-                            (blur)="recording.set(false)"
-                          >{{ recording() ? 'Press the new shortcut… (Esc to cancel)' : shortcutLabel() }}</button>
-                          @if (shortcutError()) {
-                            <div class="error">{{ shortcutError() }}</div>
+                            [class.recording]="recording() === def.key"
+                            (click)="startRecording(def)"
+                            (keydown)="onShortcutKeydown(def, $event)"
+                            (blur)="recording.set(null)"
+                          >{{ recording() === def.key ? 'Press the new shortcut… (Esc to cancel)' : shortcutLabel(def) }}</button>
+                          @if (shortcutError()?.key === def.key) {
+                            <div class="error">{{ shortcutError()?.message }}</div>
                           }
                         }
                       }
@@ -119,8 +118,9 @@ export class SettingsComponent {
   readonly isOpen = this.settingsService.isOpen;
   readonly settings = this.settingsService.settings;
   readonly query = signal('');
-  readonly recording = signal(false);
-  readonly shortcutError = signal('');
+  /** Key of the shortcut setting waiting for a key combination. */
+  readonly recording = signal<string | null>(null);
+  readonly shortcutError = signal<{ key: string; message: string } | null>(null);
   readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query())));
   private readonly scrolledCategory = signal<string | null>(null);
   // Falls back to the first visible section when the scrolled one has been filtered out
@@ -141,23 +141,39 @@ export class SettingsComponent {
       // Fresh state on every opening, search focused like VS Code
       this.query.set('');
       this.scrolledCategory.set(null);
-      this.shortcutError.set('');
+      this.shortcutError.set(null);
       setTimeout(() => this.searchRef?.nativeElement.focus());
     });
   }
 
   close(): void { this.settingsService.close(); }
 
-  shortcutLabel(): string {
-    return formatAccelerator(this.settings().globalShortcut);
+  valueOf(def: SettingDefinition): unknown {
+    return (this.settings() as unknown as Record<string, unknown>)[def.key];
+  }
+
+  stringValueOf(def: SettingDefinition): string {
+    return String(this.valueOf(def));
+  }
+
+  shortcutLabel(def: SettingDefinition): string {
+    const accelerator = def.shortcutId ? this.settingsService.appShortcuts()[def.shortcutId] : this.settings().globalShortcut;
+    return formatAccelerator(accelerator ?? '');
   }
 
   isModified(def: SettingDefinition): boolean {
-    return this.settings()[def.key] !== DEFAULT_SETTINGS[def.key];
+    if (def.shortcutId) {
+      return def.shortcutId in this.settings().appShortcuts;
+    }
+    return this.valueOf(def) !== (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[def.key];
   }
 
   async reset(def: SettingDefinition): Promise<void> {
-    await this.save(def, DEFAULT_SETTINGS[def.key]);
+    if (def.shortcutId) {
+      await this.setAppShortcut(def.shortcutId, null);
+      return;
+    }
+    await this.save(def, (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[def.key]);
   }
 
   scrollToCategory(category: string): void {
@@ -177,8 +193,8 @@ export class SettingsComponent {
     this.scrolledCategory.set(current);
   }
 
-  async onCheckboxChange(def: SettingDefinition, event: Event): Promise<void> {
-    await this.save(def, (event.target as HTMLInputElement).checked);
+  async onCheckboxChange(def: SettingDefinition, checked: boolean): Promise<void> {
+    await this.save(def, checked);
   }
 
   async onNumberChange(def: SettingDefinition, event: Event): Promise<void> {
@@ -186,36 +202,58 @@ export class SettingsComponent {
     const value = Number(input.value);
     if (input.value !== '' && Number.isFinite(value)) await this.save(def, value);
     // Re-sync with the value actually applied (the main process clamps to its bounds)
-    input.value = String(this.settings()[def.key]);
+    input.value = String(this.valueOf(def));
   }
 
-  async onSelectChange(def: SettingDefinition, event: Event): Promise<void> {
-    await this.save(def, (event.target as HTMLSelectElement).value);
+  async onSelectChange(def: SettingDefinition, value: string): Promise<void> {
+    await this.save(def, value);
   }
 
-  startRecording(): void {
-    this.shortcutError.set('');
-    this.recording.set(true);
+  startRecording(def: SettingDefinition): void {
+    this.shortcutError.set(null);
+    this.recording.set(def.key);
   }
 
-  async onShortcutKeydown(event: KeyboardEvent): Promise<void> {
-    if (!this.recording()) return;
+  async onShortcutKeydown(def: SettingDefinition, event: KeyboardEvent): Promise<void> {
+    if (this.recording() !== def.key) return;
     event.preventDefault();
     event.stopPropagation();
 
     if (event.key === 'Escape') {
-      this.recording.set(false);
+      this.recording.set(null);
       return;
     }
 
     const accelerator = keyEventToAccelerator(event);
     if (!accelerator) return;
-    this.recording.set(false);
+    this.recording.set(null);
+
+    if (def.shortcutId) {
+      const conflict = findShortcutConflict(def.shortcutId, accelerator, this.settingsService.appShortcuts());
+      if (conflict) {
+        this.shortcutError.set({ key: def.key, message: `${formatAccelerator(accelerator)} is already used by "${conflict.label}".` });
+        return;
+      }
+      await this.setAppShortcut(def.shortcutId, accelerator);
+      return;
+    }
 
     const result = await this.settingsService.update({ globalShortcut: accelerator });
     if (result && !result.ok) {
-      this.shortcutError.set(`${formatAccelerator(accelerator)} is unavailable (already used by another application?).`);
+      this.shortcutError.set({ key: def.key, message: `${formatAccelerator(accelerator)} is unavailable (already used by another application?).` });
     }
+  }
+
+  /** Stores an override, or drops it (null / same as the default) so the default keeps applying. */
+  private async setAppShortcut(id: string, accelerator: string | null): Promise<void> {
+    const overrides = { ...this.settings().appShortcuts };
+    const defaultAccelerator = APP_SHORTCUTS.find(shortcut => shortcut.id === id)?.defaultAccelerator;
+    if (accelerator === null || accelerator === defaultAccelerator) {
+      delete overrides[id];
+    } else {
+      overrides[id] = accelerator;
+    }
+    await this.settingsService.update({ appShortcuts: overrides });
   }
 
   private async save(def: SettingDefinition, value: unknown): Promise<void> {

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Note } from '../models/note.model';
+import { OverlayBackdrop } from '../models/overlay-backdrop.model';
 import { AppSettings, SettingsPatch, SettingsUpdateResult } from '../models/settings.model';
 
 /** Raw row shape returned by the Electron main process (snake_case from SQLite). */
@@ -32,6 +33,7 @@ interface ElectronAPI {
   setSettings: (patch: SettingsPatch) => Promise<SettingsUpdateResult>;
   hideOverlay: () => Promise<void>;
   onOverlayShown: (callback: () => void) => () => void;
+  onOverlayBackdrop: (callback: (backdrop: OverlayBackdrop | null) => void) => () => void;
   onNotesChanged: (callback: () => void) => () => void;
   onSettingsChanged: (callback: (settings: AppSettings) => void) => () => void;
   onOpenSettings: (callback: () => void) => () => void;
@@ -128,6 +130,10 @@ export class ElectronBridgeService {
   /** Event subscriptions return an unsubscribe function (no-op outside Electron). */
   onOverlayShown(callback: () => void): () => void {
     return this.api?.onOverlayShown(callback) ?? (() => undefined);
+  }
+
+  onOverlayBackdrop(callback: (backdrop: OverlayBackdrop | null) => void): () => void {
+    return this.api?.onOverlayBackdrop(callback) ?? (() => undefined);
   }
 
   onNotesChanged(callback: () => void): () => void {

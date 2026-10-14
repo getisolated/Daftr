@@ -5,7 +5,10 @@ import {
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { PaletteService } from '../../core/services/palette.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { NotePreview } from '../../core/models/note.model';
+import { parseNoteDate } from '../../core/utils/note-timestamp.util';
+import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 
 @Component({
@@ -28,13 +31,13 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
           <h1 class="home-title">Everything Note</h1>
         </div>
         <div class="home-actions">
-          <button class="search-btn" (click)="openSearch()" title="Search (Ctrl+Shift+F)">
+          <button class="search-btn" (click)="openSearch()" [title]="'Search (' + shortcutLabel('search.global') + ')'">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
             Search
           </button>
-          <button class="new-btn" (click)="createNote()" title="New note (Ctrl+N)">
+          <button class="new-btn" (click)="createNote()" [title]="'New note (' + shortcutLabel('note.new') + ')'">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
@@ -61,13 +64,21 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
       }
 
       <div class="notes-list">
-        @if (filteredNotes().length === 0) {
+        @if (overlayNotesCount() > 0 && activeTag() === null) {
+          <div class="note-row" (click)="openOverlayNotes()" tabindex="0" (keydown.enter)="openOverlayNotes()">
+            <div class="note-main">
+              <span class="note-title">Overlay notes</span>
+              <div class="note-tags"><span class="tag-bubble">{{ overlayNotesCount() }} notes</span></div>
+            </div>
+          </div>
+        }
+        @if (filteredNotes().length === 0 && overlayNotesCount() === 0) {
           <div class="empty-state">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
             </svg>
-            <p>No notes yet. Press <kbd>Ctrl+N</kbd> to create one.</p>
+            <p>No notes yet. Press <kbd>{{ shortcutLabel('note.new') }}</kbd> to create one.</p>
           </div>
         }
         @for (note of filteredNotes(); track note.id) {
@@ -114,6 +125,7 @@ export class HomeComponent implements OnInit {
   private notesService = inject(NotesService);
   private tabsService = inject(TabsService);
   private paletteService = inject(PaletteService);
+  private settingsService = inject(SettingsService);
 
   readonly allTags = signal<string[]>([]);
   readonly activeTag = signal<string | null>(null);
@@ -121,20 +133,32 @@ export class HomeComponent implements OnInit {
   readonly filteredNotes = computed<NotePreview[]>(() => {
     const tag = this.activeTag();
     const previews = this.notesService.notePreviews();
-    if (!tag) return previews;
-    return previews.filter(n => n.tags.includes(tag));
+    // Overlay notes are not listed one by one: they live together in the "Overlay notes" document
+    const listed = previews.filter(n => !n.tags.includes(OVERLAY_NOTE_TAG));
+    if (!tag) return listed;
+    return listed.filter(n => n.tags.includes(tag));
   });
+
+  readonly overlayNotesCount = computed(() => this.notesService.overlayNotes().length);
 
   // ── Context menu ───────────────────────────────────────────────────────────
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number; noteId: number } | null>(null);
 
   async ngOnInit(): Promise<void> {
     const tags = await this.notesService.getAllTags();
-    this.allTags.set(tags);
+    this.allTags.set(tags.filter(tag => tag !== OVERLAY_NOTE_TAG));
   }
 
   openNote(note: NotePreview): void {
     this.tabsService.openNote(note.id, note.title || 'Untitled');
+  }
+
+  protected shortcutLabel(id: string): string {
+    return this.settingsService.shortcutLabel(id);
+  }
+
+  openOverlayNotes(): void {
+    this.tabsService.openOverlayNotes();
   }
 
   openSearch(): void {
@@ -176,7 +200,7 @@ export class HomeComponent implements OnInit {
 
   formatDate(isoDate: string): string {
     if (!isoDate) return '';
-    const d = new Date(isoDate);
+    const d = parseNoteDate(isoDate);
     if (isNaN(d.getTime())) return '';
     const now = new Date();
     const isToday =

@@ -134,56 +134,67 @@ export class PaletteComponent implements OnDestroy {
     }
   });
 
-  private readonly commands: PaletteResult[] = [
-    {
-      type: 'command',
-      command: {
-        id: 'new-note', label: 'New Note', shortcut: 'Ctrl+N',
-        description: 'Create a new empty note', category: 'note',
-        action: () => this.createNote(),
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'global-search', label: 'Search Notes', shortcut: 'Ctrl+Shift+F',
-        description: 'Search across all notes', category: 'note',
-        action: () => { this.palette.open('search'); }
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'close-tab', label: 'Close Tab', shortcut: 'Ctrl+W',
-        description: 'Close the current tab', category: 'action',
-        action: () => this.tabs.closeActiveTab(),
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'next-tab', label: 'Next Tab', shortcut: 'Ctrl+Tab',
-        description: 'Switch to next tab', category: 'action',
-        action: () => this.tabs.nextTab(),
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'prev-tab', label: 'Previous Tab', shortcut: 'Ctrl+Shift+Tab',
-        description: 'Switch to previous tab', category: 'action',
-        action: () => this.tabs.prevTab(),
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'settings', label: 'Settings', shortcut: 'Ctrl+,',
-        description: 'Global shortcut and quick-note overlay', category: 'settings',
-        action: () => this.settings.open(),
-      }
-    },
-  ];
+  // A getter: the displayed shortcuts follow the user's bindings
+  private get commands(): PaletteResult[] {
+    return [
+      {
+        type: 'command',
+        command: {
+          id: 'new-note', label: 'New Note', shortcut: this.settings.shortcutLabel('note.new'),
+          description: 'Create a new empty note', category: 'note',
+          action: () => this.createNote(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'global-search', label: 'Search Notes', shortcut: this.settings.shortcutLabel('search.global'),
+          description: 'Search across all notes', category: 'note',
+          action: () => { this.palette.open('search'); }
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'overlay-notes', label: 'Overlay Notes',
+          description: 'Open every quick note in a single document', category: 'note',
+          action: () => this.tabs.openOverlayNotes(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'close-tab', label: 'Close Tab', shortcut: this.settings.shortcutLabel('tab.close'),
+          description: 'Close the current tab', category: 'action',
+          action: () => this.tabs.closeActiveTab(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'next-tab', label: 'Next Tab', shortcut: this.settings.shortcutLabel('tab.next'),
+          description: 'Switch to next tab', category: 'action',
+          action: () => this.tabs.nextTab(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'prev-tab', label: 'Previous Tab', shortcut: this.settings.shortcutLabel('tab.prev'),
+          description: 'Switch to previous tab', category: 'action',
+          action: () => this.tabs.prevTab(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'settings', label: 'Settings', shortcut: this.settings.shortcutLabel('settings.open'),
+          description: 'Global shortcut and quick-note overlay', category: 'settings',
+          action: () => this.settings.open(),
+        }
+      },
+    ];
+  }
 
   constructor() {
     // React to open/close state changes via Angular effect (replaces setInterval polling)

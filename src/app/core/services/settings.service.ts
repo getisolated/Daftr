@@ -1,4 +1,6 @@
-import { Injectable, OnDestroy, inject, signal } from '@angular/core';
+import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
+import { formatAccelerator } from '../utils/accelerator.util';
+import { resolveAppShortcuts } from '../models/app-shortcuts.model';
 import { AppSettings, DEFAULT_SETTINGS, SettingsPatch, SettingsUpdateResult } from '../models/settings.model';
 import { ElectronBridgeService } from './electron-bridge.service';
 
@@ -11,6 +13,8 @@ export class SettingsService implements OnDestroy {
 
   readonly settings = this._settings.asReadonly();
   readonly isOpen = this._isOpen.asReadonly();
+  /** Accelerator in effect for every rebindable in-app shortcut, by shortcut id. */
+  readonly appShortcuts = computed(() => resolveAppShortcuts(this._settings().appShortcuts));
 
   constructor() {
     this.load();
@@ -20,6 +24,11 @@ export class SettingsService implements OnDestroy {
       // "Settings..." from the tray menu
       this.bridge.onOpenSettings(() => this.open()),
     ];
+  }
+
+  /** Human-readable shortcut currently bound to an in-app action, for hints and tooltips. */
+  shortcutLabel(id: string): string {
+    return formatAccelerator(this.appShortcuts()[id] ?? '');
   }
 
   async load(): Promise<void> {

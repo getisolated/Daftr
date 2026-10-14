@@ -39,3 +39,6 @@ export interface PaletteResult {
   note?: NotePreview;
   tag?: string;
 }
+
+/** Pseudo note id of the read-only tab that concatenates every note sent from the quick-note overlay. */
+export const OVERLAY_NOTES_TAB_ID = -1;

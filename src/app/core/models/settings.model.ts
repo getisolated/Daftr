@@ -8,6 +8,8 @@ export interface AppSettings {
   /** true: Enter sends (Shift+Enter = new line). false: Enter = new line (Ctrl+Enter sends). */
   enterToSend: boolean;
   launchAtStartup: boolean;
+  /** In-app shortcuts changed by the user, by shortcut id (see APP_SHORTCUTS); absent = default. */
+  appShortcuts: Record<string, string>;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -22,9 +24,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   globalShortcut: 'CommandOrControl+Alt+N',
   shortcutMode: 'overlay',
   overlayWidth: 250,
-  overlayHeight: 500,
+  overlayHeight: 350,
   enterToSend: true,
   launchAtStartup: false,
+  appShortcuts: {},
 };
 
 export const OVERLAY_NOTE_TAG = 'overlay';
