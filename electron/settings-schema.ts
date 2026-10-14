@@ -4,6 +4,14 @@ export type ThemePreference = 'dark' | 'light' | 'system';
 
 const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system'];
 
+export type FormattingBarMode = 'full' | 'compact';
+export type FormattingBarStyle = 'pinned' | 'floating';
+export type FormattingBarPosition = 'top' | 'bottom';
+
+const FORMATTING_BAR_MODES: readonly FormattingBarMode[] = ['full', 'compact'];
+const FORMATTING_BAR_STYLES: readonly FormattingBarStyle[] = ['pinned', 'floating'];
+const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom'];
+
 export interface OverlayPosition {
   x: number;
   y: number;
@@ -23,6 +31,10 @@ export interface AppSettings {
   autoUpdate: boolean;
   /** In-app shortcuts changed by the user, by shortcut id; absent = default (the renderer owns the id list). */
   appShortcuts: Record<string, string>;
+  formattingBarEnabled: boolean;
+  formattingBarMode: FormattingBarMode;
+  formattingBarStyle: FormattingBarStyle;
+  formattingBarPosition: FormattingBarPosition;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -45,6 +57,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   autoUpdate: false,
   appShortcuts: {},
+  formattingBarEnabled: true,
+  formattingBarMode: 'full',
+  formattingBarStyle: 'pinned',
+  formattingBarPosition: 'top',
   overlayPosition: null,
 };
 
@@ -99,6 +115,10 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     launchAtStartup: typeof raw['launchAtStartup'] === 'boolean' ? raw['launchAtStartup'] : base.launchAtStartup,
     autoUpdate: typeof raw['autoUpdate'] === 'boolean' ? raw['autoUpdate'] : base.autoUpdate,
     appShortcuts: sanitizeAppShortcuts(raw['appShortcuts'], base.appShortcuts),
+    formattingBarEnabled: typeof raw['formattingBarEnabled'] === 'boolean' ? raw['formattingBarEnabled'] : base.formattingBarEnabled,
+    formattingBarMode: FORMATTING_BAR_MODES.find(mode => mode === raw['formattingBarMode']) ?? base.formattingBarMode,
+    formattingBarStyle: FORMATTING_BAR_STYLES.find(style => style === raw['formattingBarStyle']) ?? base.formattingBarStyle,
+    formattingBarPosition: FORMATTING_BAR_POSITIONS.find(position => position === raw['formattingBarPosition']) ?? base.formattingBarPosition,
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

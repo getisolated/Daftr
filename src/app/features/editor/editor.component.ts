@@ -25,6 +25,7 @@ import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { FormattingBarService } from '../../core/services/formatting-bar.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { acceleratorToCodeMirrorKey } from '../../core/utils/accelerator.util';
@@ -80,6 +81,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private tabs = inject(TabsService);
   private settingsService = inject(SettingsService);
   private themeService = inject(ThemeService);
+  private formattingBar = inject(FormattingBarService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
@@ -178,6 +180,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private destroyEditor(): void {
     this.editorView?.destroy();
     this.editorView = null;
+    this.formattingBar.attach(null);
   }
 
   private initEditor(content: string, readOnly = false): void {
@@ -185,6 +188,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
     if (!this.editorHost?.nativeElement) return;
 
     const updateListener = EditorView.updateListener.of(update => {
+      if (update.docChanged || update.selectionSet) {
+        this.formattingBar.refresh(update.state);
+      }
       if (update.docChanged && !this.isUpdatingFromModel) {
         const content = update.state.doc.toString();
         const note = this.activeNote();
@@ -317,6 +323,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
       state,
       parent: this.editorHost.nativeElement,
     });
+
+    this.formattingBar.attach(this.editorView, readOnly);
 
     if (readOnly) {
       this.editorView.dispatch({ effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()) });

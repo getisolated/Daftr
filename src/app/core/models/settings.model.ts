@@ -1,3 +1,5 @@
+import { FormattingBarMode, FormattingBarPosition, FormattingBarStyle } from './formatting-bar.model';
+
 export type ShortcutMode = 'overlay' | 'app';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
@@ -19,6 +21,11 @@ export interface AppSettings {
   autoUpdate: boolean;
   /** In-app shortcuts changed by the user, by shortcut id (see APP_SHORTCUTS); absent = default. */
   appShortcuts: Record<string, string>;
+  /** false: the formatting bar is hidden for good (Alt+T flips it). */
+  formattingBarEnabled: boolean;
+  formattingBarMode: FormattingBarMode;
+  formattingBarStyle: FormattingBarStyle;
+  formattingBarPosition: FormattingBarPosition;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -39,6 +46,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   autoUpdate: false,
   appShortcuts: {},
+  formattingBarEnabled: true,
+  formattingBarMode: 'full',
+  formattingBarStyle: 'pinned',
+  formattingBarPosition: 'top',
 };
 
 export const OVERLAY_NOTE_TAG = 'overlay';

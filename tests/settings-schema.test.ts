@@ -16,6 +16,14 @@ describe('sanitizeSettings', () => {
     });
   });
 
+  it('keeps valid formatting bar preferences and falls back to the current ones otherwise', () => {
+    const valid = { formattingBarEnabled: false, formattingBarMode: 'compact', formattingBarStyle: 'floating', formattingBarPosition: 'bottom' };
+    expect(sanitizeSettings(valid)).toMatchObject(valid);
+    expect(sanitizeSettings({ formattingBarEnabled: 'no', formattingBarMode: 'huge', formattingBarStyle: 1, formattingBarPosition: 'left' })).toMatchObject({
+      formattingBarEnabled: true, formattingBarMode: 'full', formattingBarStyle: 'pinned', formattingBarPosition: 'top',
+    });
+  });
+
   it('keeps a valid theme and falls back to the current one otherwise', () => {
     expect(sanitizeSettings({ theme: 'light' }).theme).toBe('light');
     expect(sanitizeSettings({ theme: 'system' }).theme).toBe('system');

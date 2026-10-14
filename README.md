@@ -24,6 +24,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **Auto-update** — the app checks the latest GitHub release at startup then hourly (packaged Windows build only) and offers the update in a popup, with an entry in the sidebar above Settings; the installer is SHA-512 verified. The `Automatic Updates` setting downloads in the background and installs when the app closes. Releases (tags `v*`) publish a `latest.json` manifest next to the installer
 - **Settings editor** — VS Code-like modal (`Ctrl+,`) with search, categories and reset to default
 - **Light & dark themes** — dark by default; **Settings → Appearance → Theme** (Dark / Light / System, following the OS) or the `Ctrl+K Ctrl+T` chord to flip. Every color is a CSS variable `--evn-*` defined per `data-theme` in `src/styles.scss` (the editor syntax colors too, so CodeMirror needs no per-theme extension): a new theme = a new `:root[data-theme='…']` block. The choice lives in `settings.json` and is mirrored in localStorage so an inline script in `index.html` applies it before the first paint. The quick-note overlay keeps its own dark translucent look
+- **Formatting bar** — Word-like toolbar (styles, bold/italic/strike/code, blocks, lists) between the tabs and the editor, buttons reflect the formatting under the caret (read from the syntax tree) and never steal the editor focus. `Alt+T` toggles it; **Settings → Formatting Bar** turns it off for good and sets its size (Full / Compact), style (Pinned / Floating) and position (Top / Bottom)
 - **Keyboard-first** — every action has a shortcut (see below)
 - **Local storage** — all data stays on your machine in a SQLite database
 
@@ -92,6 +93,7 @@ Every in-app shortcut below is a default and can be rebound in **Settings → Ke
 | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+K` | Bold / italic / link |
 | `Alt+P` | Pin/unpin tab |
 | `Alt+Z` | Toggle wide mode |
+| `Alt+T` | Toggle formatting bar |
 | `Alt+Ctrl+1-9` | Jump to tab by index |
 | `Ctrl+,` | Settings |
 | `Ctrl+Alt+N` (global, configurable) | Toggle the quick-note overlay (or show the app, see settings) |

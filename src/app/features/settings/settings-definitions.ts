@@ -60,6 +60,46 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     ],
   },
   {
+    key: 'formattingBarEnabled',
+    category: 'Formatting Bar',
+    title: 'Show Formatting Bar',
+    description: 'Toolbar with the main formatting actions (headings, bold, lists…). Uncheck to hide it for good; the shortcut toggles it too.',
+    control: 'checkbox',
+  },
+  {
+    key: 'formattingBarMode',
+    category: 'Formatting Bar',
+    title: 'Size',
+    description: 'Full shows separators between groups; Compact is smaller, with tighter spacing.',
+    control: 'select',
+    options: [
+      { value: 'full', label: 'Full' },
+      { value: 'compact', label: 'Compact' },
+    ],
+  },
+  {
+    key: 'formattingBarStyle',
+    category: 'Formatting Bar',
+    title: 'Style',
+    description: 'Pinned is attached to the window edges; Floating is detached from them, with rounded corners.',
+    control: 'select',
+    options: [
+      { value: 'pinned', label: 'Pinned' },
+      { value: 'floating', label: 'Floating' },
+    ],
+  },
+  {
+    key: 'formattingBarPosition',
+    category: 'Formatting Bar',
+    title: 'Position',
+    description: 'Above or below the editing area.',
+    control: 'select',
+    options: [
+      { value: 'top', label: 'Top' },
+      { value: 'bottom', label: 'Bottom' },
+    ],
+  },
+  {
     key: 'globalShortcut',
     category: 'Global Shortcut',
     title: 'Shortcut',

@@ -5,6 +5,10 @@ import {
 import { StateField, StateEffect, EditorState, Transaction } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { createEmptyTable } from './markdown-table';
+import { FormatId } from '../../core/models/formatting-bar.model';
+import {
+  FORMAT_ACTIONS, ICONS, insertCodeBlock, insertHorizontalRule, insertLinePrefix, insertWrap,
+} from './formatting-commands';
 
 // ─── Slash Command Definitions ───────────────────────────────────────────────
 
@@ -27,51 +31,6 @@ export function isInCodeBlock(state: EditorState, pos: number): boolean {
   return false;
 }
 
-/** Replaces the slash range (from `/` to end of query) with a line prefix */
-function insertLinePrefix(view: EditorView, range: { from: number; to: number }, prefix: string) {
-  const line = view.state.doc.lineAt(range.from);
-  const beforeSlash = view.state.sliceDoc(line.from, range.from);
-  const afterQuery = view.state.sliceDoc(range.to, line.to);
-  const newText = beforeSlash.replace(/^(\s*).*/, '$1') + prefix + afterQuery.trimStart();
-  view.dispatch({
-    changes: { from: line.from, to: line.to, insert: newText },
-    selection: { anchor: line.from + newText.length },
-  });
-  view.focus();
-}
-
-/** Wraps selection or inserts placeholder with wrap markers */
-function insertWrap(view: EditorView, range: { from: number; to: number }, before: string, after: string, placeholder: string) {
-  const insert = `${before}${placeholder}${after}`;
-  view.dispatch({
-    changes: { from: range.from, to: range.to, insert },
-    selection: { anchor: range.from + before.length, head: range.from + before.length + placeholder.length },
-  });
-  view.focus();
-}
-
-/** Inserts a code block */
-function insertCodeBlock(view: EditorView, range: { from: number; to: number }) {
-  const line = view.state.doc.lineAt(range.from);
-  const insert = '```\n\n```';
-  view.dispatch({
-    changes: { from: line.from, to: line.to, insert },
-    selection: { anchor: line.from + 4 },
-  });
-  view.focus();
-}
-
-/** Inserts a horizontal rule */
-function insertHorizontalRule(view: EditorView, range: { from: number; to: number }) {
-  const line = view.state.doc.lineAt(range.from);
-  const insert = '---\n';
-  view.dispatch({
-    changes: { from: line.from, to: line.to, insert },
-    selection: { anchor: line.from + insert.length },
-  });
-  view.focus();
-}
-
 /** Replaces the slash line with an empty 2×2 table, the caret in its first header cell */
 function insertTable(view: EditorView, range: { from: number; to: number }) {
   const line = view.state.doc.lineAt(range.from);
@@ -87,111 +46,37 @@ function insertTable(view: EditorView, range: { from: number; to: number }) {
   view.focus();
 }
 
-// SVG icon paths (24x24 viewBox)
-const ICONS = {
-  paragraph: '<path d="M13 4a4 4 0 0 1 0 8H7v8m6-16v16m4-16v16" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-  h1: '<path d="M4 12h6M4 6v12M10 6v12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><text x="15" y="18" font-size="12" font-weight="700" fill="currentColor">1</text>',
-  h2: '<path d="M4 12h6M4 6v12M10 6v12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><text x="15" y="18" font-size="12" font-weight="700" fill="currentColor">2</text>',
-  h3: '<path d="M4 12h6M4 6v12M10 6v12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><text x="15" y="18" font-size="12" font-weight="700" fill="currentColor">3</text>',
-  h4: '<path d="M4 12h6M4 6v12M10 6v12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><text x="15" y="18" font-size="12" font-weight="700" fill="currentColor">4</text>',
-  bulletList: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-  orderedList: '<path d="M10 6h11M10 12h11M10 18h11" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><text x="1" y="8" font-size="9" fill="currentColor">1.</text><text x="1" y="14" font-size="9" fill="currentColor">2.</text><text x="1" y="20" font-size="9" fill="currentColor">3.</text>',
-  quote: '<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 .001 0 1.003 1 1.003z" fill="none" stroke="currentColor" stroke-width="1.5"/>',
-  codeBlock: '<polyline points="16 18 22 12 16 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="8 6 2 12 8 18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-  bold: '<path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6zM6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-  italic: '<line x1="19" y1="4" x2="10" y2="4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="14" y1="20" x2="5" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="15" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
-  strikethrough: '<path d="M16 4a4 4 0 0 0-4.37-.37 4.95 4.95 0 0 0-3.39 2.87M4 12h16M12 12c5 0 5 8-1 8a3.5 3.5 0 0 1-3.5-3.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-  code: '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-  table: '<rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M3 10h18M3 15h18M9 4v16" stroke="currentColor" stroke-width="1.8" fill="none"/>',
-  hr: '<path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="12" r="1" fill="currentColor"/>',
-  taskList: '<rect x="3" y="5" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M3.5 14.5h5v5h-5z" stroke="currentColor" stroke-width="1.8" fill="none" rx="1"/><path d="M11 8h10M11 17h10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M4.5 8l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-};
-
 export const slashCommands: SlashCommand[] = [
   // ── Style ──
-  {
-    id: 'paragraph', label: 'Paragraphe', group: 'Style', icon: ICONS.paragraph,
-    description: 'Texte normal',
-    execute: (view, range) => insertLinePrefix(view, range, ''),
-  },
-  {
-    id: 'h1', label: 'Titre 1', group: 'Style', icon: ICONS.h1,
-    description: 'Titre principal',
-    execute: (view, range) => insertLinePrefix(view, range, '# '),
-  },
-  {
-    id: 'h2', label: 'Titre 2', group: 'Style', icon: ICONS.h2,
-    description: 'Sous-titre',
-    execute: (view, range) => insertLinePrefix(view, range, '## '),
-  },
-  {
-    id: 'h3', label: 'Titre 3', group: 'Style', icon: ICONS.h3,
-    description: 'Sous-section',
-    execute: (view, range) => insertLinePrefix(view, range, '### '),
-  },
-  {
-    id: 'h4', label: 'Titre 4', group: 'Style', icon: ICONS.h4,
-    description: 'Sous-sous-section',
-    execute: (view, range) => insertLinePrefix(view, range, '#### '),
-  },
-  {
-    id: 'bulletList', label: 'Liste à puces', group: 'Style', icon: ICONS.bulletList,
-    description: 'Liste non ordonnée',
-    execute: (view, range) => insertLinePrefix(view, range, '- '),
-  },
-  {
-    id: 'orderedList', label: 'Liste numérotée', group: 'Style', icon: ICONS.orderedList,
-    description: 'Liste ordonnée',
-    execute: (view, range) => insertLinePrefix(view, range, '1. '),
-  },
-  {
-    id: 'taskList', label: 'Liste de tâches', group: 'Style', icon: ICONS.taskList,
-    description: 'Case à cocher',
-    execute: (view, range) => insertLinePrefix(view, range, '- [ ] '),
-  },
-  {
-    id: 'quote', label: 'Citation', group: 'Style', icon: ICONS.quote,
-    description: 'Bloc de citation',
-    execute: (view, range) => insertLinePrefix(view, range, '> '),
-  },
-  {
-    id: 'codeBlock', label: 'Bloc de code', group: 'Style', icon: ICONS.codeBlock,
-    description: 'Bloc de code multi-ligne',
-    execute: (view, range) => insertCodeBlock(view, range),
-  },
+  slashCommand('paragraph', 'Style', (view, range) => insertLinePrefix(view, range, '')),
+  slashCommand('h1', 'Style', (view, range) => insertLinePrefix(view, range, '# ')),
+  slashCommand('h2', 'Style', (view, range) => insertLinePrefix(view, range, '## ')),
+  slashCommand('h3', 'Style', (view, range) => insertLinePrefix(view, range, '### ')),
+  slashCommand('h4', 'Style', (view, range) => insertLinePrefix(view, range, '#### ')),
+  slashCommand('bulletList', 'Style', (view, range) => insertLinePrefix(view, range, '- ')),
+  slashCommand('orderedList', 'Style', (view, range) => insertLinePrefix(view, range, '1. ')),
+  slashCommand('taskList', 'Style', (view, range) => insertLinePrefix(view, range, '- [ ] ')),
+  slashCommand('quote', 'Style', (view, range) => insertLinePrefix(view, range, '> ')),
+  slashCommand('codeBlock', 'Style', (view, range) => insertCodeBlock(view, range)),
   // ── Formatage ──
-  {
-    id: 'bold', label: 'Gras', group: 'Formatage', icon: ICONS.bold,
-    description: 'Texte en gras',
-    execute: (view, range) => insertWrap(view, range, '**', '**', 'texte'),
-  },
-  {
-    id: 'italic', label: 'Italique', group: 'Formatage', icon: ICONS.italic,
-    description: 'Texte en italique',
-    execute: (view, range) => insertWrap(view, range, '*', '*', 'texte'),
-  },
-  {
-    id: 'strikethrough', label: 'Barré', group: 'Formatage', icon: ICONS.strikethrough,
-    description: 'Texte barré',
-    execute: (view, range) => insertWrap(view, range, '~~', '~~', 'texte'),
-  },
-  {
-    id: 'inlineCode', label: 'Code', group: 'Formatage', icon: ICONS.code,
-    description: 'Code en ligne',
-    execute: (view, range) => insertWrap(view, range, '`', '`', 'code'),
-  },
+  slashCommand('bold', 'Formatage', (view, range) => insertWrap(view, range, '**', '**', 'texte')),
+  slashCommand('italic', 'Formatage', (view, range) => insertWrap(view, range, '*', '*', 'texte')),
+  slashCommand('strikethrough', 'Formatage', (view, range) => insertWrap(view, range, '~~', '~~', 'texte')),
+  slashCommand('inlineCode', 'Formatage', (view, range) => insertWrap(view, range, '`', '`', 'code')),
   // ── Insérer ──
-  {
-    id: 'hr', label: 'Séparateur', group: 'Insérer', icon: ICONS.hr,
-    description: 'Ligne horizontale',
-    execute: (view, range) => insertHorizontalRule(view, range),
-  },
+  slashCommand('hr', 'Insérer', (view, range) => insertHorizontalRule(view, range)),
   {
     id: 'table', label: 'Tableau', group: 'Insérer', icon: ICONS.table,
     description: 'Tableau 2×2',
     execute: (view, range) => insertTable(view, range),
   },
 ];
+
+/** Label, icon and description come from the shared formatting actions, so the slash menu and the toolbar never drift. */
+function slashCommand(id: FormatId, group: string, execute: SlashCommand['execute']): SlashCommand {
+  const { label, icon, description } = FORMAT_ACTIONS[id];
+  return { id, label, group, icon, description, execute };
+}
 
 // ─── State Management ────────────────────────────────────────────────────────
 

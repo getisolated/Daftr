@@ -7,6 +7,7 @@ import { EditorComponent } from './features/editor/editor.component';
 import { PaletteComponent } from './features/palette/palette.component';
 import { HomeComponent } from './features/home/home.component';
 import { SettingsComponent } from './features/settings/settings.component';
+import { FormattingBarComponent } from './features/formatting-bar/formatting-bar.component';
 import { SidebarComponent } from './features/sidebar/sidebar.component';
 import { NotesService } from './core/services/notes.service';
 import { TabsService } from './core/services/tabs.service';
@@ -18,6 +19,7 @@ import { SettingsService } from './core/services/settings.service';
 import { FoldersService } from './core/services/folders.service';
 import { SidebarStateService } from './core/services/sidebar-state.service';
 import { UpdateService } from './core/services/update.service';
+import { FormattingBarService } from './core/services/formatting-bar.service';
 import { ThemeService } from './core/services/theme.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
 import { GETTING_STARTED_FOLDER_NAME } from './core/models/folder.model';
@@ -27,7 +29,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, ConfirmDialogComponent],
+  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, FormattingBarComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-shell">
@@ -36,14 +38,20 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
         @if (sidebarVisible()) {
           <app-sidebar />
         }
-        <div class="app-content" [class.wide]="wideMode()">
-          <!-- Always keep both in DOM to avoid editor teardown on home navigation -->
-          <app-home [style.display]="activeNoteId() !== null ? 'none' : 'flex'" />
-          <app-editor
-            #editor
-            [noteId]="activeNoteId()"
-            [style.display]="activeNoteId() === null ? 'none' : 'flex'"
-          />
+        <div class="app-main">
+          <!-- Placed above or below the editor by its own CSS order -->
+          @if (formattingBarShown()) {
+            <app-formatting-bar />
+          }
+          <div class="app-content" [class.wide]="wideMode()">
+            <!-- Always keep both in DOM to avoid editor teardown on home navigation -->
+            <app-home [style.display]="activeNoteId() !== null ? 'none' : 'flex'" />
+            <app-editor
+              #editor
+              [noteId]="activeNoteId()"
+              [style.display]="activeNoteId() === null ? 'none' : 'flex'"
+            />
+          </div>
         </div>
       </div>
       <app-palette />
@@ -74,6 +82,14 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       overflow: hidden;
       min-height: 0;
     }
+    .app-main {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+      min-width: 0;
+    }
     .app-content {
       display: flex;
       flex: 1;
@@ -103,10 +119,13 @@ export class AppComponent implements OnInit, OnDestroy {
   private sidebarState = inject(SidebarStateService);
   private updateService = inject(UpdateService);
   private themeService = inject(ThemeService);
+  private formattingBar = inject(FormattingBarService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
   readonly sidebarVisible = this.sidebarState.visible;
+  /** Only worth its room when there is a note to format (not on the home page). */
+  readonly formattingBarShown = computed(() => this.formattingBar.visible() && this.activeNoteId() !== null);
 
   /** Popup offering the update found by the main process; null when closed. */
   readonly updateDialog = computed<{ title: string; message: string; actions: ConfirmDialogAction[] } | null>(() => {
@@ -225,6 +244,7 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('settings.open', () => this.settingsService.open());
     bind('layout.toggle', () => this.layoutService.toggle());
     bind('theme.toggle', () => { void this.themeService.toggle(); });
+    bind('formattingBar.toggle', () => this.formattingBar.toggle());
     bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
     bind('tab.pin', () => this.tabsService.togglePinActiveTab());
     for (let i = 1; i <= 9; i++) {
