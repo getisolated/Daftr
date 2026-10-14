@@ -316,7 +316,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const now = new Date().toISOString();
     return {
       id: OVERLAY_NOTES_TAB_ID, title: 'Overlay notes', content: this.notes.overlayNotesDocument(),
-      tags: [], createdAt: now, updatedAt: now,
+      tags: [], folderId: null, sortOrder: null, createdAt: now, updatedAt: now,
     };
   }
 

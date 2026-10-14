@@ -1,10 +1,11 @@
 import {
-  Component, inject, OnInit, signal, computed, ChangeDetectionStrategy
+  Component, inject, signal, computed, ChangeDetectionStrategy
 } from '@angular/core';
 
+import { FoldersService } from '../../core/services/folders.service';
+import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
-import { PaletteService } from '../../core/services/palette.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { NotePreview } from '../../core/models/note.model';
 import { parseNoteDate } from '../../core/utils/note-timestamp.util';
@@ -28,57 +29,18 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
               <path d="M6650 3784 c0 -760 2 -1383 4 -1385 2 -2 433 -3 956 -1 753 2 951 5 947 15 -2 6 -256 374 -562 817 -307 443 -597 861 -645 930 -333 482 -684 987 -691 995 -5 5 -9 -573 -9 -1371z"/>
             </g>
           </svg>
-          <h1 class="home-title">Everything Note</h1>
-        </div>
-        <div class="home-actions">
-          <button class="search-btn" (click)="openSearch()" [title]="'Search (' + shortcutLabel('search.global') + ')'">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            Search
-          </button>
-          <button class="new-btn" (click)="createNote()" [title]="'New note (' + shortcutLabel('note.new') + ')'">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            New note
-          </button>
+          <h1 class="home-title">{{ title() }}</h1>
         </div>
       </div>
 
-      @if (allTags().length > 0) {
-        <div class="tag-filters">
-          <button
-            class="tag-filter"
-            [class.active]="activeTag() === null"
-            (click)="setActiveTag(null)"
-          >All</button>
-          @for (tag of allTags(); track tag) {
-            <button
-              class="tag-filter"
-              [class.active]="activeTag() === tag"
-              (click)="setActiveTag(tag)"
-            >#{{ tag }}</button>
-          }
-        </div>
-      }
-
       <div class="notes-list">
-        @if (overlayNotesCount() > 0 && activeTag() === null) {
-          <div class="note-row" (click)="openOverlayNotes()" tabindex="0" (keydown.enter)="openOverlayNotes()">
-            <div class="note-main">
-              <span class="note-title">Overlay notes</span>
-              <div class="note-tags"><span class="tag-bubble">{{ overlayNotesCount() }} notes</span></div>
-            </div>
-          </div>
-        }
-        @if (filteredNotes().length === 0 && overlayNotesCount() === 0) {
+        @if (filteredNotes().length === 0) {
           <div class="empty-state">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
             </svg>
-            <p>No notes yet. Press <kbd>{{ shortcutLabel('note.new') }}</kbd> to create one.</p>
+            <p>No notes here. Press <kbd>{{ shortcutLabel('note.new') }}</kbd> to create one.</p>
           </div>
         }
         @for (note of filteredNotes(); track note.id) {
@@ -121,33 +83,36 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
   `,
   styleUrls: ['./home.component.scss'],
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent {
   private notesService = inject(NotesService);
-  private tabsService = inject(TabsService);
-  private paletteService = inject(PaletteService);
   private settingsService = inject(SettingsService);
+  private tabsService = inject(TabsService);
+  private foldersService = inject(FoldersService);
+  private sidebarState = inject(SidebarStateService);
 
-  readonly allTags = signal<string[]>([]);
-  readonly activeTag = signal<string | null>(null);
+  /** The folder (and the tag) selected in the sidebar drive what is listed here. */
+  readonly title = computed(() => {
+    const folderId = this.sidebarState.selectedFolderId();
+    const tag = this.sidebarState.activeTag();
+    const base = folderId === null ? 'All notes' : (this.foldersService.getById(folderId)?.name ?? 'All notes');
 
-  readonly filteredNotes = computed<NotePreview[]>(() => {
-    const tag = this.activeTag();
-    const previews = this.notesService.notePreviews();
-    // Overlay notes are not listed one by one: they live together in the "Overlay notes" document
-    const listed = previews.filter(n => !n.tags.includes(OVERLAY_NOTE_TAG));
-    if (!tag) return listed;
-    return listed.filter(n => n.tags.includes(tag));
+    return tag ? `${base} · #${tag}` : base;
   });
 
-  readonly overlayNotesCount = computed(() => this.notesService.overlayNotes().length);
+  readonly filteredNotes = computed<NotePreview[]>(() => {
+    const tag = this.sidebarState.activeTag();
+    const folderId = this.sidebarState.selectedFolderId();
+    const previews = this.notesService.notePreviews();
+    // Overlay notes are not listed one by one: they live together in the "Overlay notes" document
+    return previews.filter(n =>
+      !n.tags.includes(OVERLAY_NOTE_TAG)
+      && (folderId === null || n.folderId === folderId)
+      && (!tag || n.tags.includes(tag))
+    );
+  });
 
   // ── Context menu ───────────────────────────────────────────────────────────
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number; noteId: number } | null>(null);
-
-  async ngOnInit(): Promise<void> {
-    const tags = await this.notesService.getAllTags();
-    this.allTags.set(tags.filter(tag => tag !== OVERLAY_NOTE_TAG));
-  }
 
   openNote(note: NotePreview): void {
     this.tabsService.openNote(note.id, note.title || 'Untitled');
@@ -155,23 +120,6 @@ export class HomeComponent implements OnInit {
 
   protected shortcutLabel(id: string): string {
     return this.settingsService.shortcutLabel(id);
-  }
-
-  openOverlayNotes(): void {
-    this.tabsService.openOverlayNotes();
-  }
-
-  openSearch(): void {
-    this.paletteService.open('search');
-  }
-
-  async createNote(): Promise<void> {
-    const note = await this.notesService.create();
-    this.tabsService.openNote(note.id, 'Untitled');
-  }
-
-  setActiveTag(tag: string | null): void {
-    this.activeTag.set(tag);
   }
 
   onNoteContextMenu(event: MouseEvent, note: NotePreview): void {

@@ -16,6 +16,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **Full-text search** — SQLite FTS5 for instant search across all notes
 - **Command palette** — `F1` to search notes, commands, and tags
 - **Tabs** — drag & drop reordering, pinning, session restore
+- **Folders** — nested folders in a VS Code-like tree sidebar (collapsible, resizable, `Ctrl+Shift+E` to toggle): create / rename / delete, drag & drop notes and folders (drop on a folder to move into it, between two rows to position it: an insertion line shows where), note count per folder. Notes created on the fly land in the undeletable `Inbox` folder; the first-launch sample notes live in `Getting started`. 3-4 levels deep are recommended (a warning is shown beyond)
 - **Tag system** — organize notes with tags, filter from the sidebar
 - **Quick-note overlay** — a global shortcut (default `Ctrl+Alt+N`, configurable) pops a small translucent, always-on-top chat-like window anywhere on screen; notes sent from it are tagged `overlay` and appear in the app
 - **System tray** — closing the window keeps the app running in the tray (right-click > Quit to exit); optional launch at Windows startup
@@ -47,15 +48,17 @@ electron/
   tray.ts            # System tray icon & menu
   startup.ts         # Launch at startup (login item, started hidden with --hidden)
   preload.ts         # Context bridge (electronAPI)
-  database.ts        # SQLite schema, FTS5 triggers, CRUD operations
+  database.ts        # SQLite schema + migration (folders, notes.folder_id), FTS5 triggers, CRUD operations
 
 src/app/
   core/
-    services/        # NotesService, TabsService, PaletteService, ShortcutsService
-    models/          # TypeScript interfaces (Note, Tab, PaletteItem)
+    services/        # NotesService, FoldersService, SidebarStateService (persisted in localStorage), TabsService, PaletteService, ShortcutsService
+    models/          # TypeScript interfaces (Note, Folder, Tab, PaletteItem)
+    utils/           # Pure helpers (folder-tree.util: tree building, move validation, sidebar width)
   features/
     editor/          # CodeMirror markdown editor with auto-save
-    home/            # Note list with tag filtering & context menu
+    sidebar/         # Folder tree (drag & drop, inline rename, context menu), overlay notes, tags, settings button
+    home/            # Note list of the selected folder / tag, context menu
     tabs/            # Tab bar with drag & drop, pinning, window controls
     palette/         # Command/search/tag palette (F1 / Ctrl+Shift+F)
     overlay/         # Quick-note overlay root component (bootstrapped on #overlay)
@@ -63,6 +66,7 @@ src/app/
   shared/
     codemirror/      # VS Code Dark Modern theme, markdown decorations, widgets
     context-menu/    # Reusable context menu component
+    ui/              # Themed checkbox, select, confirm dialog, focus-select directive
 ```
 
 ## Keyboard Shortcuts
@@ -73,6 +77,7 @@ Every in-app shortcut below is a default and can be rebound in **Settings → Ke
 |----------|--------|
 | `F1` | Command palette |
 | `Ctrl+N` | New note |
+| `Ctrl+Shift+E` | Toggle sidebar |
 | `Ctrl+W` | Close tab |
 | `Ctrl+F` | Find in editor |
 | `Ctrl+Shift+F` | Search all notes |

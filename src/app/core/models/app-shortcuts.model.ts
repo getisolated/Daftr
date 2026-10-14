@@ -12,6 +12,8 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'palette.commands', label: 'Command Palette', defaultAccelerator: 'F1' },
   { id: 'settings.open', label: 'Open Settings', defaultAccelerator: 'CommandOrControl+,' },
   { id: 'layout.toggle', label: 'Toggle Full Width Layout', defaultAccelerator: 'Alt+Z' },
+  // Not Ctrl+B: it is Bold in the editor
+  { id: 'sidebar.toggle', label: 'Toggle Sidebar', defaultAccelerator: 'CommandOrControl+Shift+E' },
   { id: 'tab.close', label: 'Close Tab', defaultAccelerator: 'CommandOrControl+W' },
   { id: 'tab.next', label: 'Next Tab', defaultAccelerator: 'CommandOrControl+Tab' },
   { id: 'tab.prev', label: 'Previous Tab', defaultAccelerator: 'CommandOrControl+Shift+Tab' },

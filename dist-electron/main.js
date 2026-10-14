@@ -171,17 +171,32 @@ safeHandle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
 // ── Notes CRUD ───────────────────────────────────────────────────────────────
 safeHandle('notes:getAll', () => database_1.noteOps.getAll());
 safeHandle('notes:getById', (_e, id) => database_1.noteOps.getById(id) ?? null);
-safeHandle('notes:create', (e, title, content, tags) => {
-    const note = database_1.noteOps.create(title, content, Array.isArray(tags) ? tags.filter(t => typeof t === 'string') : []);
+safeHandle('notes:create', (e, title, content, tags, folderId) => {
+    const note = database_1.noteOps.create(title, content, Array.isArray(tags) ? tags.filter(t => typeof t === 'string') : [], typeof folderId === 'number' ? folderId : null);
     // Lets the other window (overlay <-> main app) refresh its list
     (0, overlay_1.broadcastToWindows)('notes:changed', undefined, e.sender);
     return note;
 });
 safeHandle('notes:update', (_e, id, data) => database_1.noteOps.update(id, data) ?? null);
+safeHandle('notes:move', (_e, id, folderId) => database_1.noteOps.moveToFolder(id, typeof folderId === 'number' ? folderId : null) ?? null);
 safeHandle('notes:delete', (_e, id) => { database_1.noteOps.delete(id); return true; });
 safeHandle('notes:search', (_e, query) => database_1.noteOps.search(query));
 safeHandle('notes:byTag', (_e, tag) => database_1.noteOps.getByTag(tag));
 safeHandle('notes:allTags', () => database_1.noteOps.getAllTags());
+// ── Folders ──────────────────────────────────────────────────────────────────
+function parseParentId(value) {
+    return typeof value === 'number' ? value : null;
+}
+safeHandle('folders:getAll', () => database_1.folderOps.getAll());
+safeHandle('folders:create', (_e, name, parentId) => database_1.folderOps.create(name, parseParentId(parentId)) ?? null);
+safeHandle('folders:rename', (_e, id, name) => database_1.folderOps.rename(id, name) ?? null);
+safeHandle('folders:move', (_e, id, parentId) => database_1.folderOps.move(id, parseParentId(parentId)) ?? null);
+safeHandle('folders:delete', (e, id, mode) => {
+    // Anything but an explicit "deleteAll" keeps the notes: the safe choice if the payload is malformed
+    const deletedNoteIds = database_1.folderOps.delete(id, mode === 'deleteAll' ? 'deleteAll' : 'moveToRoot');
+    (0, overlay_1.broadcastToWindows)('notes:changed', undefined, e.sender);
+    return deletedNoteIds;
+});
 // ── Settings & overlay ───────────────────────────────────────────────────────
 safeHandle('settings:get', () => (0, settings_1.getSettings)());
 safeHandle('settings:set', (e, patch) => {

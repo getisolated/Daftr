@@ -16,14 +16,26 @@ const api = {
   // Notes
   getAllNotes: () => ipcRenderer.invoke('notes:getAll'),
   getNoteById: (id: number) => ipcRenderer.invoke('notes:getById', id),
-  createNote: (title: string, content: string, tags?: string[]) =>
-    ipcRenderer.invoke('notes:create', title, content, tags),
+  createNote: (title: string, content: string, tags?: string[], folderId?: number | null) =>
+    ipcRenderer.invoke('notes:create', title, content, tags, folderId),
   updateNote: (id: number, data: { title?: string; content?: string; tags?: string }) =>
     ipcRenderer.invoke('notes:update', id, data),
+  moveNote: (id: number, folderId: number | null) => ipcRenderer.invoke('notes:move', id, folderId),
+  placeNote: (id: number, folderId: number | null, orderedIds: number[]) =>
+    ipcRenderer.invoke('notes:place', id, folderId, orderedIds),
   deleteNote: (id: number) => ipcRenderer.invoke('notes:delete', id),
   searchNotes: (query: string) => ipcRenderer.invoke('notes:search', query),
   getNotesByTag: (tag: string) => ipcRenderer.invoke('notes:byTag', tag),
   getAllTags: () => ipcRenderer.invoke('notes:allTags'),
+
+  // Folders
+  getAllFolders: () => ipcRenderer.invoke('folders:getAll'),
+  createFolder: (name: string, parentId?: number | null) => ipcRenderer.invoke('folders:create', name, parentId),
+  renameFolder: (id: number, name: string) => ipcRenderer.invoke('folders:rename', id, name),
+  moveFolder: (id: number, parentId: number | null) => ipcRenderer.invoke('folders:move', id, parentId),
+  placeFolder: (id: number, parentId: number | null, orderedIds: number[]) =>
+    ipcRenderer.invoke('folders:place', id, parentId, orderedIds),
+  deleteFolder: (id: number, mode: 'moveToRoot' | 'deleteAll') => ipcRenderer.invoke('folders:delete', id, mode),
 
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),

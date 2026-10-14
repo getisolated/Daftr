@@ -1,0 +1,81 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.dialog {
+  position: relative;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  padding: 18px 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.message {
+  margin: 0 0 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #a0a0a0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn {
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid #0e639c;
+  background: #0e639c;
+  color: #fff;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: #1177bb;
+  }
+
+  &.danger {
+    border-color: #a1260d;
+    background: #a1260d;
+
+    &:hover {
+      background: #c0301a;
+    }
+  }
+
+  &.cancel {
+    background: transparent;
+    border-color: #454545;
+    color: #cccccc;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}

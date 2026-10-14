@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron/main';
 import { shell } from 'electron/common';
 import * as path from 'path';
-import { initDatabase, closeDatabase, noteOps } from './database';
+import { initDatabase, closeDatabase, noteOps, folderOps, FolderDeleteMode } from './database';
 import { registerGlobalShortcut, unregisterGlobalShortcuts } from './global-shortcut';
 import { applyOverlaySize, broadcastToWindows, hideOverlay, prepareOverlay, showOverlay, toggleOverlay } from './overlay';
 import { loadRenderer } from './renderer-loader';
@@ -145,8 +145,13 @@ safeHandle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
 // ── Notes CRUD ───────────────────────────────────────────────────────────────
 safeHandle('notes:getAll', () => noteOps.getAll());
 safeHandle('notes:getById', (_e, id: number) => noteOps.getById(id) ?? null);
-safeHandle('notes:create', (e, title: string, content: string, tags?: string[]) => {
-  const note = noteOps.create(title, content, Array.isArray(tags) ? tags.filter(t => typeof t === 'string') : []);
+safeHandle('notes:create', (e, title: string, content: string, tags?: string[], folderId?: number | null) => {
+  const note = noteOps.create(
+    title,
+    content,
+    Array.isArray(tags) ? tags.filter(t => typeof t === 'string') : [],
+    typeof folderId === 'number' ? folderId : null,
+  );
   // Lets the other window (overlay <-> main app) refresh its list
   broadcastToWindows('notes:changed', undefined, e.sender);
   return note;
@@ -154,10 +159,43 @@ safeHandle('notes:create', (e, title: string, content: string, tags?: string[]) 
 safeHandle('notes:update', (_e, id: number, data: { title?: string; content?: string; tags?: string }) =>
   noteOps.update(id, data) ?? null
 );
+safeHandle('notes:move', (_e, id: number, folderId: number | null) =>
+  noteOps.moveToFolder(id, typeof folderId === 'number' ? folderId : null) ?? null
+);
+safeHandle('notes:place', (_e, id: number, folderId: number | null, orderedIds: number[]) =>
+  noteOps.place(id, typeof folderId === 'number' ? folderId : null, parseIds(orderedIds)) ?? null
+);
 safeHandle('notes:delete', (_e, id: number) => { noteOps.delete(id); return true; });
 safeHandle('notes:search', (_e, query: string) => noteOps.search(query));
 safeHandle('notes:byTag', (_e, tag: string) => noteOps.getByTag(tag));
 safeHandle('notes:allTags', () => noteOps.getAllTags());
+
+// ── Folders ──────────────────────────────────────────────────────────────────
+function parseParentId(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
+
+function parseIds(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((id): id is number => typeof id === 'number') : [];
+}
+
+safeHandle('folders:getAll', () => folderOps.getAll());
+safeHandle('folders:create', (_e, name: string, parentId?: number | null) =>
+  folderOps.create(name, parseParentId(parentId)) ?? null
+);
+safeHandle('folders:rename', (_e, id: number, name: string) => folderOps.rename(id, name) ?? null);
+safeHandle('folders:move', (_e, id: number, parentId: number | null) =>
+  folderOps.move(id, parseParentId(parentId)) ?? null
+);
+safeHandle('folders:place', (_e, id: number, parentId: number | null, orderedIds: number[]) =>
+  folderOps.place(id, parseParentId(parentId), parseIds(orderedIds)) ?? null
+);
+safeHandle('folders:delete', (e, id: number, mode: FolderDeleteMode) => {
+  // Anything but an explicit "deleteAll" keeps the notes: the safe choice if the payload is malformed
+  const deletedNoteIds = folderOps.delete(id, mode === 'deleteAll' ? 'deleteAll' : 'moveToRoot');
+  broadcastToWindows('notes:changed', undefined, e.sender);
+  return deletedNoteIds;
+});
 
 // ── Settings & overlay ───────────────────────────────────────────────────────
 safeHandle('settings:get', () => getSettings());

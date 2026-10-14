@@ -1,5 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { OVERLAY_NOTES_TAB_ID, Tab } from '../models/note.model';
+import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
 
 const SESSION_KEY = 'evnote-session';
 
@@ -110,6 +111,24 @@ export class TabsService {
   closeByNoteId(noteId: number): void {
     const idx = this._tabs().findIndex(t => t.noteId === noteId);
     if (idx >= 0) this.closeTab(idx);
+  }
+
+  /** Closes every tab but the one at `index` (pinned tabs stay), which becomes the active one when needed. */
+  closeOthers(index: number): void {
+    const kept = this._tabs()[index];
+    if (!kept) return;
+    this.applyClosing(closeTabsWhere(this._tabs(), this.activeNoteId(), t => t.noteId !== kept.noteId, kept.noteId));
+  }
+
+  /** Closes every tab except the pinned ones. */
+  closeAll(): void {
+    this.applyClosing(closeTabsWhere(this._tabs(), this.activeNoteId(), () => true));
+  }
+
+  private applyClosing(result: TabsAfterClosing): void {
+    this._tabs.set(result.tabs);
+    this._activeIndex.set(result.activeIndex);
+    this.persist();
   }
 
   nextTab(): void {
