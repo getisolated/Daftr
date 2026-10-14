@@ -1,5 +1,9 @@
 export type ShortcutMode = 'overlay' | 'app';
 
+export type ThemePreference = 'dark' | 'light' | 'system';
+
+const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system'];
+
 export interface OverlayPosition {
   x: number;
   y: number;
@@ -13,6 +17,8 @@ export interface AppSettings {
   /** true: Enter sends (Shift+Enter = new line). false: Enter = new line (Ctrl+Enter sends). */
   enterToSend: boolean;
   launchAtStartup: boolean;
+  /** 'system' follows the OS color scheme. */
+  theme: ThemePreference;
   /** true: updates download in the background and install when the app quits. false: the user is asked first. */
   autoUpdate: boolean;
   /** In-app shortcuts changed by the user, by shortcut id; absent = default (the renderer owns the id list). */
@@ -36,6 +42,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   overlayHeight: 350,
   enterToSend: true,
   launchAtStartup: false,
+  theme: 'dark',
   autoUpdate: false,
   appShortcuts: {},
   overlayPosition: null,
@@ -88,6 +95,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     overlayWidth: clampInt(raw['overlayWidth'], OVERLAY_MIN_WIDTH, OVERLAY_MAX_WIDTH, base.overlayWidth),
     overlayHeight: clampInt(raw['overlayHeight'], OVERLAY_MIN_HEIGHT, OVERLAY_MAX_HEIGHT, base.overlayHeight),
     enterToSend: typeof raw['enterToSend'] === 'boolean' ? raw['enterToSend'] : base.enterToSend,
+    theme: THEME_PREFERENCES.find(theme => theme === raw['theme']) ?? base.theme,
     launchAtStartup: typeof raw['launchAtStartup'] === 'boolean' ? raw['launchAtStartup'] : base.launchAtStartup,
     autoUpdate: typeof raw['autoUpdate'] === 'boolean' ? raw['autoUpdate'] : base.autoUpdate,
     appShortcuts: sanitizeAppShortcuts(raw['appShortcuts'], base.appShortcuts),

@@ -16,6 +16,13 @@ describe('sanitizeSettings', () => {
     });
   });
 
+  it('keeps a valid theme and falls back to the current one otherwise', () => {
+    expect(sanitizeSettings({ theme: 'light' }).theme).toBe('light');
+    expect(sanitizeSettings({ theme: 'system' }).theme).toBe('system');
+    expect(sanitizeSettings({ theme: 'solarized' }).theme).toBe('dark');
+    expect(sanitizeSettings({ theme: 42 }, { ...DEFAULT_SETTINGS, theme: 'light' }).theme).toBe('light');
+  });
+
   it('clamps the overlay size to its bounds', () => {
     expect(sanitizeSettings({ overlayWidth: 10, overlayHeight: 99999 })).toMatchObject({ overlayWidth: 200, overlayHeight: 1200 });
   });

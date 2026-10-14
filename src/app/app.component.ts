@@ -18,6 +18,7 @@ import { SettingsService } from './core/services/settings.service';
 import { FoldersService } from './core/services/folders.service';
 import { SidebarStateService } from './core/services/sidebar-state.service';
 import { UpdateService } from './core/services/update.service';
+import { ThemeService } from './core/services/theme.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
 import { GETTING_STARTED_FOLDER_NAME } from './core/models/folder.model';
 import { SAMPLE_NOTES } from './core/data/sample-notes';
@@ -65,7 +66,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
-      background: #1e1e1e;
+      background: var(--evn-bg);
     }
     .app-body {
       display: flex;
@@ -101,6 +102,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private foldersService = inject(FoldersService);
   private sidebarState = inject(SidebarStateService);
   private updateService = inject(UpdateService);
+  private themeService = inject(ThemeService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
@@ -222,6 +224,7 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('editor.find', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(); });
     bind('settings.open', () => this.settingsService.open());
     bind('layout.toggle', () => this.layoutService.toggle());
+    bind('theme.toggle', () => { void this.themeService.toggle(); });
     bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
     bind('tab.pin', () => this.tabsService.togglePinActiveTab());
     for (let i = 1; i <= 9; i++) {

@@ -38,6 +38,12 @@ describe('findShortcutConflict', () => {
     expect(findShortcutConflict('note.new', 'CommandOrControl+Alt+M', resolved)).toBeNull();
   });
 
+  it('refuses the first key of an existing chord, and a chord starting with an existing shortcut', () => {
+    expect(findShortcutConflict('note.new', 'CommandOrControl+K', resolved)?.id).toBe('theme.toggle');
+    const custom = resolveAppShortcuts({ 'tab.close': 'Alt+Q' });
+    expect(findShortcutConflict('note.new', 'Alt+Q, Alt+R', custom)?.id).toBe('tab.close');
+  });
+
   it('takes overrides into account', () => {
     const custom = resolveAppShortcuts({ 'tab.close': 'Alt+Q' });
     expect(findShortcutConflict('note.new', 'CommandOrControl+W', custom)).toBeNull();

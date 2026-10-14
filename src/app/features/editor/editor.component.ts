@@ -16,7 +16,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { bracketMatching, syntaxTree } from '@codemirror/language';
 
-import { vscodeDarkModern } from '../../shared/codemirror/vscode-dark-modern';
+import { editorHighlight } from '../../shared/codemirror/editor-highlight';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
@@ -24,6 +24,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { acceleratorToCodeMirrorKey } from '../../core/utils/accelerator.util';
 import { Note, OVERLAY_NOTES_TAB_ID } from '../../core/models/note.model';
@@ -77,12 +78,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
   private settingsService = inject(SettingsService);
+  private themeService = inject(ThemeService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
 
   private editorView: EditorView | null = null;
   private readonly shortcutsCompartment = new Compartment();
+  private readonly themeCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
   private loadGeneration = 0;
@@ -96,6 +99,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
     effect(() => {
       const document = this.notes.overlayNotesDocument();
       untracked(() => this.refreshOverlayNotesView(document));
+    });
+
+    effect(() => {
+      this.themeService.theme();
+      untracked(() => {
+        this.editorView?.dispatch({ effects: this.themeCompartment.reconfigure(this.buildThemeMode()) });
+      });
     });
 
     effect(() => {
@@ -195,15 +205,15 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const evnoteTheme = EditorView.theme({
       '&': {
         height: '100%',
-        background: '#1e1e1e',
-        color: '#cccccc',
+        background: 'var(--evn-bg)',
+        color: 'var(--evn-text)',
         fontSize: '14px',
         fontFamily: 'Consolas, "Courier New", monospace',
       },
       '.cm-content': {
         padding: '32px 48px',
         minHeight: '100%',
-        caretColor: '#aeafad',
+        caretColor: 'var(--evn-caret)',
         maxWidth: '780px',
         margin: '0 auto',
       },
@@ -216,21 +226,21 @@ export class EditorComponent implements OnDestroy, OnChanges {
         padding: '0',
       },
       '&.cm-focused .cm-cursor': {
-        borderLeftColor: '#aeafad',
+        borderLeftColor: 'var(--evn-caret)',
       },
       '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-        background: '#264f78',
+        background: 'var(--evn-selection)',
       },
       '.cm-activeLine': {
-        background: 'rgba(255,255,255,0.02)',
+        background: 'rgba(var(--evn-hover-rgb), 0.02)',
       },
       '.cm-gutters': { display: 'none' },
       '.cm-search': {
-        background: '#2d2d2d',
-        border: '1px solid #454545',
+        background: 'var(--evn-bg-chip)',
+        border: '1px solid var(--evn-border)',
         borderRadius: '4px',
       },
-    }, { dark: true });
+    });
 
     // Returns true if cursor is inside a fenced code block
     function isInCodeBlock(view: EditorView): boolean {
@@ -250,8 +260,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
         base: markdownLanguage,
         codeLanguages: languages,
       }),
-      vscodeDarkModern,
+      editorHighlight,
       evnoteTheme,
+      // Colors follow the CSS variables; only CodeMirror's own light/dark base styles (search panel, tooltips…) need swapping
+      this.themeCompartment.of(this.buildThemeMode()),
       markdownDecorationTheme,
       markdownDecorationPlugin,
       ...slashCommandExtensions,
@@ -350,6 +362,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
       toggleDraft(view);
       view.focus();
     }
+  }
+
+  private buildThemeMode(): Extension {
+    return EditorView.darkTheme.of(this.themeService.theme() === 'dark');
   }
 
   /** Formatting/save bindings use the accelerators configured in the settings (reconfigured live, see constructor). */

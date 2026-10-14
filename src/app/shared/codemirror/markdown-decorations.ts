@@ -203,74 +203,74 @@ export const markdownDecorationPlugin = ViewPlugin.fromClass(
 );
 
 // Theme for markdown decorations
-// VS Code "Default Dark Modern" token colors
+// Colors come from the theme tokens (see styles.scss)
 export const markdownDecorationTheme = EditorView.baseTheme({
   '.cm-md-h1': {
     fontSize: '1.6em',
     fontWeight: '700',
     lineHeight: '1.3',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-h2': {
     fontSize: '1.35em',
     fontWeight: '700',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-h3': {
     fontSize: '1.15em',
     fontWeight: '600',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-h4': {
     fontSize: '1em',
     fontWeight: '600',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-mark-hidden': {
-    color: '#3e4a57 !important',
+    color: 'var(--evn-syntax-mark-hidden) !important',
     fontSize: '0.75em',
   },
   '.cm-md-mark-dim': {
-    color: '#4a5568 !important',
+    color: 'var(--evn-syntax-mark-dim) !important',
     opacity: '0.5',
   },
   '.cm-md-bold': {
     fontWeight: '700',
-    color: '#569cd6',
+    color: 'var(--evn-syntax-bold)',
   },
   '.cm-md-italic': {
     fontStyle: 'italic',
-    color: '#569cd6',
+    color: 'var(--evn-syntax-italic)',
   },
   '.cm-md-strike': {
     textDecoration: 'line-through',
-    color: '#6a6a6a',
+    color: 'var(--evn-syntax-strike)',
   },
   '.cm-md-inline-code': {
     fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: '0.88em',
-    background: '#2d2d2d',
+    background: 'var(--evn-bg-chip)',
     borderRadius: '3px',
     padding: '0 3px',
-    color: '#ce9178',
+    color: 'var(--evn-syntax-code)',
   },
   '.cm-md-code-block': {
     fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: '0.88em',
   },
   '.cm-md-hr': {
-    color: '#3e3e3e',
-    borderBottom: '1px solid #3e3e3e',
+    color: 'var(--evn-border-soft)',
+    borderBottom: '1px solid var(--evn-border-soft)',
     display: 'block',
   },
   '.cm-md-blockquote': {
-    borderLeft: '3px solid #6a9955',
+    borderLeft: '3px solid var(--evn-syntax-quote)',
     paddingLeft: '8px',
-    color: '#6a9955',
+    color: 'var(--evn-syntax-quote)',
     fontStyle: 'italic',
   },
   '.cm-md-link': {
-    color: '#3794ff',
+    color: 'var(--evn-syntax-link)',
     textDecoration: 'underline',
   },
   '.cm-checkbox-wrap': {
@@ -280,23 +280,23 @@ export const markdownDecorationTheme = EditorView.baseTheme({
     marginRight: '4px',
   },
   '.cm-task-checkbox': {
-    accentColor: '#007acc',
+    accentColor: 'var(--evn-accent)',
     width: '14px',
     height: '14px',
     cursor: 'pointer',
     margin: '0',
   },
   '.cm-bullet-todo': {
-    color: '#858585',
+    color: 'var(--evn-text-dimmed)',
     cursor: 'pointer',
     fontFamily: 'monospace',
-    '&:hover': { color: '#cccccc' },
+    '&:hover': { color: 'var(--evn-text)' },
   },
   '.cm-bullet-done': {
-    color: '#6a9955',
+    color: 'var(--evn-syntax-comment)',
     cursor: 'pointer',
     fontFamily: 'monospace',
-    '&:hover': { color: '#cccccc' },
+    '&:hover': { color: 'var(--evn-text)' },
   },
   '.cm-hidden-mark': {
     display: 'none',

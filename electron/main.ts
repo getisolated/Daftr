@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron/main';
+import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron/main';
 import { shell } from 'electron/common';
 import * as path from 'path';
 import { initDatabase, closeDatabase, noteOps, folderOps, FolderDeleteMode } from './database';
@@ -16,6 +16,13 @@ let mainWindow: BrowserWindow | null = null;
 // Closing the window only hides it to the tray; a real quit comes from the tray menu (or the OS)
 let isQuitting = false;
 
+/** Window color shown before the renderer paints: matches the theme so a light theme does not flash dark. */
+function windowBackgroundColor(): string {
+  const { theme } = getSettings();
+  const isDark = theme === 'system' ? nativeTheme.shouldUseDarkColors : theme === 'dark';
+  return isDark ? '#1e1e1e' : '#ffffff';
+}
+
 function createWindow(showOnReady = true): void {
   mainWindow = new BrowserWindow({
     show: false,
@@ -24,7 +31,7 @@ function createWindow(showOnReady = true): void {
     minWidth: 600,
     minHeight: 400,
     frame: false,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: windowBackgroundColor(),
     titleBarStyle: 'hidden',
     icon: path.join(__dirname, '../assets/logo.ico'),
     webPreferences: {

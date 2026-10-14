@@ -48,6 +48,18 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'theme',
+    category: 'Appearance',
+    title: 'Theme',
+    description: 'Color theme of the app. System follows the Windows light/dark setting.',
+    control: 'select',
+    options: [
+      { value: 'dark', label: 'Dark' },
+      { value: 'light', label: 'Light' },
+      { value: 'system', label: 'System' },
+    ],
+  },
+  {
     key: 'globalShortcut',
     category: 'Global Shortcut',
     title: 'Shortcut',

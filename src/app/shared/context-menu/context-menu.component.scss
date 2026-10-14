@@ -14,13 +14,13 @@
   position: fixed;
   min-width: 180px;
   max-width: 280px;
-  background: #2d2d2d;
-  border: 1px solid #454545;
+  background: var(--evn-bg-menu);
+  border: 1px solid var(--evn-border);
   border-radius: 8px;
   padding: 4px 0;
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
+    0 0 0 1px rgba(var(--evn-hover-rgb), 0.04);
   animation: ctxIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: 'Segoe UI', system-ui, sans-serif;
   z-index: 2001;
@@ -39,7 +39,7 @@
 
 .ctx-divider {
   height: 1px;
-  background: #454545;
+  background: var(--evn-border);
   margin: 4px 8px;
 }
 
@@ -51,7 +51,7 @@
   padding: 6px 12px;
   border: none;
   background: transparent;
-  color: #cccccc;
+  color: var(--evn-text);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
@@ -61,14 +61,14 @@
   outline: none;
 
   &:hover:not(.disabled) {
-    background: #094771;
+    background: var(--evn-bg-selected);
   }
 
   &.danger {
-    color: #f14c4c;
+    color: var(--evn-danger);
 
     .ctx-icon {
-      color: #f14c4c;
+      color: var(--evn-danger);
     }
 
     &:hover:not(.disabled) {
@@ -77,17 +77,17 @@
   }
 
   &.disabled {
-    color: #5a5a5a;
+    color: var(--evn-text-faint);
     cursor: default;
 
     .ctx-icon {
-      color: #5a5a5a;
+      color: var(--evn-text-faint);
     }
   }
 }
 
 .ctx-icon {
-  color: #858585;
+  color: var(--evn-text-dimmed);
   flex-shrink: 0;
   pointer-events: none;
 }
@@ -106,7 +106,7 @@
 
 .ctx-shortcut {
   font-size: 11px;
-  color: #6a6a6a;
+  color: var(--evn-text-disabled);
   background: transparent;
   border: none;
   font-family: 'Consolas', monospace;
@@ -115,7 +115,7 @@
 }
 
 .ctx-chevron {
-  color: #6a6a6a;
+  color: var(--evn-text-disabled);
   flex-shrink: 0;
   margin-left: 4px;
 }
@@ -127,12 +127,12 @@
   left: 100%;
   top: -4px;
   min-width: 160px;
-  background: #2d2d2d;
-  border: 1px solid #454545;
+  background: var(--evn-bg-menu);
+  border: 1px solid var(--evn-border);
   border-radius: 8px;
   padding: 4px 0;
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
+    0 0 0 1px rgba(var(--evn-hover-rgb), 0.04);
   animation: ctxIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }

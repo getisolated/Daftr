@@ -9,10 +9,13 @@ export class SettingsService implements OnDestroy {
   private bridge = inject(ElectronBridgeService);
   private readonly _settings = signal<AppSettings>(DEFAULT_SETTINGS);
   private readonly _isOpen = signal(false);
+  private readonly _loaded = signal(false);
   private readonly unsubscribers: (() => void)[];
 
   readonly settings = this._settings.asReadonly();
   readonly isOpen = this._isOpen.asReadonly();
+  /** False until the main process answered: before that, `settings` only holds the defaults. */
+  readonly loaded = this._loaded.asReadonly();
   /** Accelerator in effect for every rebindable in-app shortcut, by shortcut id. */
   readonly appShortcuts = computed(() => resolveAppShortcuts(this._settings().appShortcuts));
 
@@ -33,7 +36,10 @@ export class SettingsService implements OnDestroy {
 
   async load(): Promise<void> {
     const settings = await this.bridge.getSettings();
-    if (settings) this._settings.set(settings);
+    if (settings) {
+      this._settings.set(settings);
+      this._loaded.set(true);
+    }
   }
 
   /** Applies a change; when the main process refuses it (e.g. shortcut already taken), the signal is left untouched. */

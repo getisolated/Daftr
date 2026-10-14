@@ -22,6 +22,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **System tray** — closing the window keeps the app running in the tray (right-click > Quit to exit); optional launch at Windows startup
 - **Auto-update** — the app checks the latest GitHub release at startup then hourly (packaged Windows build only) and offers the update in a popup, with an entry in the sidebar above Settings; the installer is SHA-512 verified. The `Automatic Updates` setting downloads in the background and installs when the app closes. Releases (tags `v*`) publish a `latest.json` manifest next to the installer
 - **Settings editor** — VS Code-like modal (`Ctrl+,`) with search, categories and reset to default
+- **Light & dark themes** — dark by default; **Settings → Appearance → Theme** (Dark / Light / System, following the OS) or the `Ctrl+K Ctrl+T` chord to flip. Every color is a CSS variable `--evn-*` defined per `data-theme` in `src/styles.scss` (the editor syntax colors too, so CodeMirror needs no per-theme extension): a new theme = a new `:root[data-theme='…']` block. The choice lives in `settings.json` and is mirrored in localStorage so an inline script in `index.html` applies it before the first paint. The quick-note overlay keeps its own dark translucent look
 - **Keyboard-first** — every action has a shortcut (see below)
 - **Local storage** — all data stays on your machine in a SQLite database
 
@@ -55,7 +56,7 @@ electron/
 
 src/app/
   core/
-    services/        # NotesService, FoldersService, SidebarStateService (persisted in localStorage), TabsService, PaletteService, ShortcutsService
+    services/        # NotesService, FoldersService, SidebarStateService (persisted in localStorage), TabsService, PaletteService, ShortcutsService, ThemeService (applies `data-theme`)
     models/          # TypeScript interfaces (Note, Folder, Tab, PaletteItem)
     utils/           # Pure helpers (folder-tree.util: tree building, move validation, sidebar width)
   features/
@@ -67,7 +68,7 @@ src/app/
     overlay/         # Quick-note overlay root component (bootstrapped on #overlay)
     settings/        # VS Code-like settings modal (Ctrl+,), driven by settings-definitions.ts
   shared/
-    codemirror/      # VS Code Dark Modern theme, markdown decorations, widgets
+    codemirror/      # Editor highlight style (colors from theme tokens), markdown decorations, widgets
     context-menu/    # Reusable context menu component
     ui/              # Themed checkbox, select, confirm dialog, focus-select directive
 ```
@@ -81,12 +82,13 @@ Every in-app shortcut below is a default and can be rebound in **Settings → Ke
 | `F1` | Command palette |
 | `Ctrl+N` | New note |
 | `Ctrl+Shift+E` | Toggle sidebar |
+| `Ctrl+K` `Ctrl+T` (chord) | Toggle light / dark theme |
 | `Ctrl+W` | Close tab |
 | `Ctrl+F` | Find in editor |
 | `Ctrl+Shift+F` | Search all notes |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+S` | Save note |
-| `Ctrl+B` / `Ctrl+I` / `Ctrl+K` | Bold / italic / link |
+| `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+K` | Bold / italic / link |
 | `Alt+P` | Pin/unpin tab |
 | `Alt+Z` | Toggle wide mode |
 | `Alt+Ctrl+1-9` | Jump to tab by index |

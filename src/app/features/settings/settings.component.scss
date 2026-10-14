@@ -15,12 +15,12 @@
   flex-direction: column;
   width: min(960px, calc(100vw - 48px));
   height: min(680px, calc(100vh - 48px));
-  background: #1f1f1f;
-  border: 1px solid #2b2b2b;
+  background: var(--evn-bg-modal);
+  border: 1px solid var(--evn-border-subtle);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-  color: #cccccc;
+  color: var(--evn-text);
   font-size: 13px;
   // Labels and descriptions are not content to select; text fields stay selectable (see below)
   user-select: none;
@@ -40,7 +40,7 @@
 .header {
   flex: none;
   padding: 10px 20px 12px;
-  border-bottom: 1px solid #2b2b2b;
+  border-bottom: 1px solid var(--evn-border-subtle);
 }
 
 .title-row {
@@ -55,7 +55,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #9d9d9d;
+  color: var(--evn-text-soft);
 }
 
 .icon-btn {
@@ -63,10 +63,10 @@
   border: none;
   border-radius: 4px;
   padding: 2px 6px;
-  color: #9d9d9d;
+  color: var(--evn-text-soft);
   cursor: pointer;
 
-  &:hover { background: rgba(255, 255, 255, 0.08); color: #ccc; }
+  &:hover { background: rgba(var(--evn-hover-rgb), 0.08); color: var(--evn-text); }
 }
 
 .search {
@@ -75,16 +75,16 @@
   input {
     width: 100%;
     padding: 7px 130px 7px 10px;
-    background: #313131;
-    border: 1px solid #3c3c3c;
+    background: var(--evn-bg-input);
+    border: 1px solid var(--evn-border-soft);
     border-radius: 4px;
-    color: #ccc;
+    color: var(--evn-text);
     font: inherit;
     font-size: 14px;
     outline: none;
 
-    &:focus { border-color: #0078d4; }
-    &::placeholder { color: #8b8b8b; }
+    &:focus { border-color: var(--evn-accent); }
+    &::placeholder { color: var(--evn-text-dimmed); }
   }
 }
 
@@ -94,7 +94,7 @@
   top: 50%;
   transform: translateY(-50%);
   font-size: 12px;
-  color: #8b8b8b;
+  color: var(--evn-text-dimmed);
 }
 
 .body {
@@ -107,7 +107,7 @@
   flex: none;
   width: 200px;
   padding: 12px 0;
-  border-right: 1px solid #2b2b2b;
+  border-right: 1px solid var(--evn-border-subtle);
   overflow-y: auto;
 }
 
@@ -118,12 +118,12 @@
   background: none;
   border: none;
   text-align: left;
-  color: #9d9d9d;
+  color: var(--evn-text-soft);
   font: inherit;
   cursor: pointer;
 
-  &:hover { color: #ccc; background: rgba(255, 255, 255, 0.04); }
-  &.active { color: #fff; font-weight: 600; }
+  &:hover { color: var(--evn-text); background: rgba(var(--evn-hover-rgb), 0.04); }
+  &.active { color: var(--evn-text-bright); font-weight: 600; }
 }
 
 .list {
@@ -137,7 +137,7 @@ h2 {
   margin: 18px 0 6px 14px;
   font-size: 20px;
   font-weight: 600;
-  color: #e7e7e7;
+  color: var(--evn-text-strong);
 }
 
 .setting {
@@ -146,9 +146,9 @@ h2 {
   border-left: 2px solid transparent;
   border-radius: 0 4px 4px 0;
 
-  &:hover { background: rgba(255, 255, 255, 0.04); }
+  &:hover { background: rgba(var(--evn-hover-rgb), 0.04); }
   // VS Code's "modified" indicator
-  &.modified { border-left-color: #0078d4; }
+  &.modified { border-left-color: var(--evn-accent); }
   &:hover .reset { opacity: 1; }
 }
 
@@ -157,27 +157,27 @@ h2 {
   align-items: center;
   gap: 2px;
   margin-bottom: 4px;
-  color: #e7e7e7;
+  color: var(--evn-text-strong);
 
-  .category { color: #b4b4b4; }
+  .category { color: var(--evn-text); }
 }
 
 .reset {
   margin-left: 8px;
   background: none;
   border: none;
-  color: #9d9d9d;
+  color: var(--evn-text-soft);
   cursor: pointer;
   font-size: 13px;
   opacity: 0;
   transition: opacity 0.1s;
 
-  &:hover { color: #ccc; }
+  &:hover { color: var(--evn-text); }
   &:focus-visible { opacity: 1; }
 }
 
 .description {
-  color: #9d9d9d;
+  color: var(--evn-text-soft);
   line-height: 1.45;
   margin-bottom: 8px;
 }
@@ -191,14 +191,14 @@ input { user-select: text; }
 .control {
   min-width: 240px;
   padding: 4px 8px;
-  background: #313131;
-  border: 1px solid #3c3c3c;
+  background: var(--evn-bg-input);
+  border: 1px solid var(--evn-border-soft);
   border-radius: 2px;
-  color: #ccc;
+  color: var(--evn-text);
   font: inherit;
   outline: none;
 
-  &:focus { border-color: #0078d4; }
+  &:focus { border-color: var(--evn-accent); }
 }
 
 input.control { width: 120px; min-width: 0; }
@@ -207,16 +207,16 @@ input.control { width: 120px; min-width: 0; }
   cursor: pointer;
   text-align: left;
 
-  &.recording { border-color: #0078d4; color: #75beff; }
+  &.recording { border-color: var(--evn-accent); color: var(--evn-accent-text); }
 }
 
 .error {
   margin-top: 6px;
-  color: #f48771;
+  color: var(--evn-danger);
   font-size: 12px;
 }
 
 .empty {
   padding: 24px 14px;
-  color: #9d9d9d;
+  color: var(--evn-text-soft);
 }

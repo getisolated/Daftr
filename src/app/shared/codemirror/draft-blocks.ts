@@ -176,12 +176,12 @@ export const draftBlocksTheme = EditorView.theme({
     borderRadius: '3px',
     background: 'transparent',
     cursor: 'pointer',
-    color: '#cccccc',
-    border: '1px solid #454545',
+    color: 'var(--evn-text)',
+    border: '1px solid var(--evn-border)',
   },
   '.cm-draft-actions .cm-draft-confirm': { borderColor: DRAFT_BORDER, color: GIT_ADDED_GREEN },
   '.cm-draft-actions .cm-draft-confirm:hover': { borderColor: GIT_ADDED_GREEN, background: 'rgba(46, 160, 67, 0.12)' },
-  '.cm-draft-actions .cm-draft-discard:hover': { borderColor: '#f14c4c', color: '#f14c4c' },
+  '.cm-draft-actions .cm-draft-discard:hover': { borderColor: 'var(--evn-danger)', color: 'var(--evn-danger)' },
 });
 
 export const draftBlocks: Extension = [draftField, draftBlocksTheme];
