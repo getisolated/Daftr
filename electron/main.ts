@@ -1,12 +1,22 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import { initDatabase, closeDatabase, noteOps } from './database';
+import { registerGlobalShortcut, unregisterGlobalShortcuts } from './global-shortcut';
+import { applyOverlaySize, broadcastToWindows, createOverlayWindow, hideOverlay, showOverlay, toggleOverlay } from './overlay';
+import { loadRenderer } from './renderer-loader';
+import { getSettings, loadSettings, updateSettings } from './settings';
+import { sanitizeSettings, SettingsPatch } from './settings-schema';
+import { applyLaunchAtStartup, launchedHidden } from './startup';
+import { createTray, destroyTray } from './tray';
 
 const isDev = process.env['NODE_ENV'] === 'development';
 let mainWindow: BrowserWindow | null = null;
+// Closing the window only hides it to the tray; a real quit comes from the tray menu (or the OS)
+let isQuitting = false;
 
-function createWindow(): void {
+function createWindow(showOnReady = true): void {
   mainWindow = new BrowserWindow({
+    show: false,
     width: 1280,
     height: 800,
     minWidth: 600,
@@ -23,32 +33,91 @@ function createWindow(): void {
     },
   });
 
+  loadRenderer(mainWindow);
   if (isDev) {
-    mainWindow.loadURL('http://localhost:4200');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
-  } else {
-    mainWindow.loadFile(
-      path.join(__dirname, '../dist/browser/index.html')
-    );
   }
 
+  if (showOnReady) {
+    mainWindow.once('ready-to-show', () => mainWindow?.show());
+  }
+
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+  // Windows logoff/shutdown: let the window really close instead of blocking the session end
+  mainWindow.on('session-end', () => { isQuitting = true; });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+function showMainWindow(): void {
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function openSettings(): void {
+  showMainWindow();
+  mainWindow?.webContents.send('settings:open');
+}
+
+function quitApp(): void {
+  isQuitting = true;
+  app.quit();
+}
+
+function onGlobalShortcut(): void {
+  if (getSettings().shortcutMode === 'overlay') {
+    toggleOverlay();
+  } else {
+    hideOverlay();
+    showMainWindow();
+  }
+}
+
+// A second launch (start menu, login item...) just brings the running instance forward
+const isPrimaryInstance = app.requestSingleInstanceLock();
+if (!isPrimaryInstance) {
+  app.quit();
+} else {
+  app.on('second-instance', () => showMainWindow());
+}
+
 app.whenReady().then(() => {
+  // app.quit() is asynchronous: the duplicate instance must not create its windows/tray meanwhile
+  if (!isPrimaryInstance) return;
   initDatabase();
-  createWindow();
+  const settings = loadSettings();
+  createWindow(!launchedHidden());
+  createOverlayWindow();
+  createTray({ openApp: showMainWindow, quickNote: showOverlay, openSettings, quit: quitApp });
+  applyLaunchAtStartup(settings.launchAtStartup);
+  if (!registerGlobalShortcut(settings.globalShortcut, onGlobalShortcut)) {
+    console.error(`[Shortcut] Unable to register ${settings.globalShortcut}`);
+  }
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (!mainWindow) createWindow();
   });
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+// Never quit on window close: the app lives in the tray
+app.on('window-all-closed', () => { /* keep running */ });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   closeDatabase();
+});
+
+app.on('will-quit', () => {
+  unregisterGlobalShortcuts();
+  destroyTray();
 });
 
 // Wraps an IPC handler with try-catch to prevent unhandled exceptions
@@ -75,9 +144,12 @@ safeHandle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
 // ── Notes CRUD ───────────────────────────────────────────────────────────────
 safeHandle('notes:getAll', () => noteOps.getAll());
 safeHandle('notes:getById', (_e, id: number) => noteOps.getById(id) ?? null);
-safeHandle('notes:create', (_e, title: string, content: string) =>
-  noteOps.create(title, content)
-);
+safeHandle('notes:create', (e, title: string, content: string, tags?: string[]) => {
+  const note = noteOps.create(title, content, Array.isArray(tags) ? tags.filter(t => typeof t === 'string') : []);
+  // Lets the other window (overlay <-> main app) refresh its list
+  broadcastToWindows('notes:changed', undefined, e.sender);
+  return note;
+});
 safeHandle('notes:update', (_e, id: number, data: { title?: string; content?: string; tags?: string }) =>
   noteOps.update(id, data) ?? null
 );
@@ -85,6 +157,28 @@ safeHandle('notes:delete', (_e, id: number) => { noteOps.delete(id); return true
 safeHandle('notes:search', (_e, query: string) => noteOps.search(query));
 safeHandle('notes:byTag', (_e, tag: string) => noteOps.getByTag(tag));
 safeHandle('notes:allTags', () => noteOps.getAllTags());
+
+// ── Settings & overlay ───────────────────────────────────────────────────────
+safeHandle('settings:get', () => getSettings());
+safeHandle('settings:set', (e, patch: SettingsPatch) => {
+  const before = getSettings();
+  // The position is owned by the main process: never take it from the renderer
+  const candidate = sanitizeSettings({ ...before, ...patch, overlayPosition: before.overlayPosition }, before);
+
+  if (candidate.globalShortcut !== before.globalShortcut &&
+      !registerGlobalShortcut(candidate.globalShortcut, onGlobalShortcut)) {
+    return { ok: false, error: 'shortcut-unavailable', settings: before };
+  }
+
+  const next = updateSettings(candidate);
+  applyOverlaySize(before, next);
+  if (next.launchAtStartup !== before.launchAtStartup) {
+    applyLaunchAtStartup(next.launchAtStartup);
+  }
+  broadcastToWindows('settings:changed', getSettings(), e.sender);
+  return { ok: true, settings: getSettings() };
+});
+safeHandle('overlay:hide', () => hideOverlay());
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 safeHandle('shell:openExternal', (_e, url: string) => {

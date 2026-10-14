@@ -65,7 +65,7 @@ export function initDatabase(): void {
   stmts = {
     getAll: db.prepare('SELECT * FROM notes ORDER BY updated_at DESC'),
     getById: db.prepare('SELECT * FROM notes WHERE id = ?'),
-    create: db.prepare("INSERT INTO notes (title, content, tags) VALUES (?, ?, '[]')"),
+    create: db.prepare("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)"),
     delete: db.prepare('DELETE FROM notes WHERE id = ?'),
     search: db.prepare(`
       SELECT notes.* FROM notes
@@ -111,8 +111,8 @@ export const noteOps = {
     return stmts.getById.get(id) as NoteRow | undefined;
   },
 
-  create(title: string, content: string): NoteRow {
-    const result = stmts.create.run(title, content);
+  create(title: string, content: string, tags: string[] = []): NoteRow {
+    const result = stmts.create.run(title, content, JSON.stringify(tags));
     return this.getById(result.lastInsertRowid as number)!;
   },
 

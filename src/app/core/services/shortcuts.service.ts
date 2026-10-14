@@ -30,6 +30,9 @@ export class ShortcutsService implements OnDestroy {
   }
 
   private handleKeydown(event: KeyboardEvent): void {
+    // Let shortcut recorders (settings) receive raw key combos instead of triggering app actions
+    if (event.target instanceof Element && event.target.closest('[data-shortcut-recorder]')) return;
+
     for (const shortcut of this.shortcuts) {
       const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase() ||
                        event.code.toLowerCase() === shortcut.key.toLowerCase();

@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { PaletteService } from '../../core/services/palette.service';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { PaletteResult } from '../../core/models/note.model';
 
 @Component({
@@ -110,6 +111,7 @@ export class PaletteComponent implements OnDestroy {
   private palette = inject(PaletteService);
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
+  private settings = inject(SettingsService);
 
   @ViewChild('inputEl') inputEl!: ElementRef<HTMLInputElement>;
 
@@ -171,6 +173,14 @@ export class PaletteComponent implements OnDestroy {
         id: 'prev-tab', label: 'Previous Tab', shortcut: 'Ctrl+Shift+Tab',
         description: 'Switch to previous tab', category: 'action',
         action: () => this.tabs.prevTab(),
+      }
+    },
+    {
+      type: 'command',
+      command: {
+        id: 'settings', label: 'Settings', shortcut: 'Ctrl+,',
+        description: 'Global shortcut and quick-note overlay', category: 'settings',
+        action: () => this.settings.open(),
       }
     },
   ];

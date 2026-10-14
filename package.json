@@ -68,7 +68,8 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "assets/logo.ico"
     ],
     "win": {
       "target": "nsis",

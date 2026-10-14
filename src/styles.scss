@@ -15,6 +15,12 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
+// Quick-note overlay window is transparent: the page itself must not paint a background
+html.overlay-mode,
+html.overlay-mode body {
+  background: transparent;
+}
+
 // Scrollbar (minimal, dark)
 ::-webkit-scrollbar {
   width: 6px;

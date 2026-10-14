@@ -6,18 +6,20 @@ import { TabsBarComponent } from './features/tabs/tabs-bar.component';
 import { EditorComponent } from './features/editor/editor.component';
 import { PaletteComponent } from './features/palette/palette.component';
 import { HomeComponent } from './features/home/home.component';
+import { SettingsComponent } from './features/settings/settings.component';
 import { NotesService } from './core/services/notes.service';
 import { TabsService } from './core/services/tabs.service';
 import { PaletteService } from './core/services/palette.service';
 import { ShortcutsService } from './core/services/shortcuts.service';
 import { ElectronBridgeService } from './core/services/electron-bridge.service';
 import { LayoutService } from './core/services/layout.service';
+import { SettingsService } from './core/services/settings.service';
 import { SAMPLE_NOTES } from './core/data/sample-notes';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent],
+  imports: [CommonModule, TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-shell">
@@ -32,6 +34,7 @@ import { SAMPLE_NOTES } from './core/data/sample-notes';
         />
       </div>
       <app-palette />
+      <app-settings />
     </div>
   `,
   styles: [`
@@ -66,11 +69,13 @@ export class AppComponent implements OnInit, OnDestroy {
   private shortcutsService = inject(ShortcutsService);
   private bridge = inject(ElectronBridgeService);
   private layoutService = inject(LayoutService);
+  private settingsService = inject(SettingsService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
 
   private unregisterFns: (() => void)[] = [];
+  private unsubscribeNotesChanged: () => void = () => undefined;
 
   async ngOnInit(): Promise<void> {
     try {
@@ -86,6 +91,8 @@ export class AppComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('[App] Failed to load notes:', err);
     }
+    // Notes sent from the quick-note overlay show up without restarting the app
+    this.unsubscribeNotesChanged = this.bridge.onNotesChanged(() => { this.notesService.loadAll(); });
     this.registerShortcuts();
   }
 
@@ -98,6 +105,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.unregisterFns.forEach(fn => fn());
+    this.unsubscribeNotesChanged();
   }
 
   private registerShortcuts(): void {
@@ -121,11 +129,13 @@ export class AppComponent implements OnInit, OnDestroy {
     reg({
       key: 'Escape', preventDefault: false,
       handler: () => {
-        if (this.paletteService.isOpen()) this.paletteService.close();
+        if (this.settingsService.isOpen()) this.settingsService.close();
+        else if (this.paletteService.isOpen()) this.paletteService.close();
         else this.editorRef?.closeSearch();
       }
     });
 
+    reg({ key: ',', ctrl: true, handler: () => this.settingsService.open() });
     reg({ key: 'z', alt: true, handler: () => this.layoutService.toggle() });
     reg({ key: 'p', alt: true, handler: () => this.tabsService.togglePinActiveTab() });
 
