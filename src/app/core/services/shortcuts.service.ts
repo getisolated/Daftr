@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy, NgZone, inject } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 
 type ShortcutHandler = (event: KeyboardEvent) => void;
 
@@ -13,7 +13,6 @@ interface ShortcutDef {
 
 @Injectable({ providedIn: 'root' })
 export class ShortcutsService implements OnDestroy {
-  private zone = inject(NgZone);
   private shortcuts: ShortcutDef[] = [];
   private boundListener: (e: KeyboardEvent) => void;
 
@@ -42,7 +41,7 @@ export class ShortcutsService implements OnDestroy {
 
       if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
         if (shortcut.preventDefault !== false) event.preventDefault();
-        this.zone.run(() => shortcut.handler(event));
+        shortcut.handler(event);
         break;
       }
     }

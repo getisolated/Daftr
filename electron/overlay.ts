@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron';
+import { BrowserWindow, screen } from 'electron/main';
 import * as path from 'path';
 import { anchorBottomRight, resolveOverlayPosition, Size } from './overlay-geometry';
 import { loadRenderer } from './renderer-loader';

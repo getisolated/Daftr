@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron/main';
+import { shell } from 'electron/common';
 import * as path from 'path';
 import { initDatabase, closeDatabase, noteOps } from './database';
 import { registerGlobalShortcut, unregisterGlobalShortcuts } from './global-shortcut';

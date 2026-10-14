@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app } from 'electron/main';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppSettings, DEFAULT_SETTINGS, sanitizeSettings } from './settings-schema';

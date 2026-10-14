@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app } from 'electron/main';
 
 /** Passed when Windows starts the app at login: start silently in the tray instead of opening the window. */
 export const HIDDEN_ARG = '--hidden';

@@ -2,7 +2,7 @@ import {
   Component, Input, Output, EventEmitter, HostListener,
   ChangeDetectionStrategy, signal, ElementRef, inject, OnInit, OnDestroy
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 
 export interface ContextMenuItem {
   id: string;
@@ -27,7 +27,7 @@ export function isDivider(entry: ContextMenuEntry): entry is ContextMenuDivider 
 @Component({
   selector: 'app-context-menu',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div

@@ -1,4 +1,4 @@
-import { app, Menu, Tray } from 'electron';
+import { app, Menu, Tray } from 'electron/main';
 import * as path from 'path';
 
 export interface TrayActions {

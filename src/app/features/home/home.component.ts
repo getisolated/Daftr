@@ -1,7 +1,7 @@
 import {
   Component, inject, OnInit, signal, computed, ChangeDetectionStrategy
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { PaletteService } from '../../core/services/palette.service';
@@ -11,7 +11,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, ContextMenuComponent],
+  imports: [ContextMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="home">

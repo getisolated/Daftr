@@ -2,7 +2,7 @@ import {
   Component, inject, ElementRef, ViewChild,
   ChangeDetectionStrategy, HostListener, signal
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { TabsService } from '../../core/services/tabs.service';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { PaletteService } from '../../core/services/palette.service';
@@ -12,7 +12,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
 @Component({
   selector: 'app-tabs-bar',
   standalone: true,
-  imports: [CommonModule, ContextMenuComponent],
+  imports: [ContextMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="tabs-bar" (dblclick)="onTitleBarDblClick()">

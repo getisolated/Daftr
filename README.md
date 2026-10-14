@@ -27,9 +27,9 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Angular 19 (standalone components, signals, OnPush) |
+| Frontend | Angular 22 (standalone components, signals, OnPush) |
 | Editor | CodeMirror 6 with custom markdown decorations |
-| Desktop | Electron 32 (frameless window, custom title bar) |
+| Desktop | Electron 44 (frameless window, custom title bar) |
 | Database | better-sqlite3 with FTS5, WAL mode, cached prepared statements |
 | Build | electron-builder (NSIS installer), GitHub Actions CI/CD |
 

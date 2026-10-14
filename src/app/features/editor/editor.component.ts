@@ -1,8 +1,8 @@
 import {
   Component, OnDestroy, OnChanges, Input, SimpleChanges,
-  ElementRef, ViewChild, inject, ChangeDetectionStrategy, NgZone, signal
+  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 
 // CodeMirror
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
@@ -26,7 +26,7 @@ import { Note } from '../../core/models/note.model';
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="editor-wrapper">
@@ -62,7 +62,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
-  private zone = inject(NgZone);
 
   readonly activeNote = signal<Note | null>(null);
 
@@ -146,7 +145,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         // Debounce auto-save (1s)
         if (this.saveDebounce) clearTimeout(this.saveDebounce);
         this.saveDebounce = setTimeout(() => {
-          this.zone.run(() => this.saveNote(note.id, content));
+          this.saveNote(note.id, content);
         }, 1000);
       }
     });
@@ -294,7 +293,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
             const note = this.activeNote();
             if (!note) return true;
             if (this.saveDebounce) clearTimeout(this.saveDebounce);
-            this.zone.run(() => this.saveNote(note.id, view.state.doc.toString()));
+            this.saveNote(note.id, view.state.doc.toString());
             return true;
           }
         },

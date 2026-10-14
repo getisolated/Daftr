@@ -1,4 +1,4 @@
-import { ApplicationConfig, provideZoneChangeDetection, ErrorHandler, Injectable } from '@angular/core';
+import { ApplicationConfig, ErrorHandler, Injectable } from '@angular/core';
 
 @Injectable()
 class GlobalErrorHandler implements ErrorHandler {
@@ -9,7 +9,6 @@ class GlobalErrorHandler implements ErrorHandler {
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZoneChangeDetection({ eventCoalescing: true }),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
   ]
 };

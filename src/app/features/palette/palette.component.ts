@@ -2,7 +2,7 @@ import {
   Component, inject, OnDestroy, signal, computed, effect,
   ViewChild, ElementRef, ChangeDetectionStrategy
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { PaletteService } from '../../core/services/palette.service';
 import { NotesService } from '../../core/services/notes.service';
@@ -13,7 +13,7 @@ import { PaletteResult } from '../../core/models/note.model';
 @Component({
   selector: 'app-palette',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isOpen()) {

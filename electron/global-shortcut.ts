@@ -1,4 +1,4 @@
-import { globalShortcut } from 'electron';
+import { globalShortcut } from 'electron/main';
 
 let registered: string | null = null;
 

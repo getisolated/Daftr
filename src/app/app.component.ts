@@ -1,7 +1,7 @@
 import {
   Component, OnInit, OnDestroy, ViewChild, inject, ChangeDetectionStrategy
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { TabsBarComponent } from './features/tabs/tabs-bar.component';
 import { EditorComponent } from './features/editor/editor.component';
 import { PaletteComponent } from './features/palette/palette.component';
@@ -19,7 +19,7 @@ import { SAMPLE_NOTES } from './core/data/sample-notes';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent],
+  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-shell">

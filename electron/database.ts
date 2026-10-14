@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
-import { app } from 'electron';
+import { app } from 'electron/main';
 
 export interface NoteRow {
   id: number;
