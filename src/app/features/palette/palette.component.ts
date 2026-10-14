@@ -8,7 +8,8 @@ import { PaletteService } from '../../core/services/palette.service';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { SettingsService } from '../../core/services/settings.service';
-import { PaletteResult } from '../../core/models/note.model';
+import { LayoutService } from '../../core/services/layout.service';
+import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.model';
 
 @Component({
   selector: 'app-palette',
@@ -112,6 +113,7 @@ export class PaletteComponent implements OnDestroy {
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
   private settings = inject(SettingsService);
+  private layout = inject(LayoutService);
 
   @ViewChild('inputEl') inputEl!: ElementRef<HTMLInputElement>;
 
@@ -159,6 +161,22 @@ export class PaletteComponent implements OnDestroy {
           id: 'overlay-notes', label: 'Overlay Notes',
           description: 'Open every quick note in a single document', category: 'note',
           action: () => this.tabs.openOverlayNotes(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'graph-view', label: 'Graph View',
+          description: 'Show the links between notes on the home page', category: 'note',
+          action: () => this.openGraphView(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'copy-note-link', label: 'Copy Note Link',
+          description: 'Copy the note:// link to the current note', category: 'note',
+          action: () => { void this.copyNoteLink(); },
         }
       },
       {
@@ -306,6 +324,19 @@ export class PaletteComponent implements OnDestroy {
         event.stopPropagation();
         this.close();
         break;
+    }
+  }
+
+  private openGraphView(): void {
+    this.layout.setHomeView('graph');
+    this.tabs.goHome();
+  }
+
+  private async copyNoteLink(): Promise<void> {
+    const noteId = this.tabs.activeNoteId();
+
+    if (noteId !== null && noteId !== OVERLAY_NOTES_TAB_ID) {
+      await navigator.clipboard.writeText(`note://${noteId}`);
     }
   }
 

@@ -8,6 +8,7 @@ import { PaletteComponent } from './features/palette/palette.component';
 import { HomeComponent } from './features/home/home.component';
 import { SettingsComponent } from './features/settings/settings.component';
 import { FormattingBarComponent } from './features/formatting-bar/formatting-bar.component';
+import { BacklinksPanelComponent } from './features/backlinks/backlinks-panel.component';
 import { SidebarComponent } from './features/sidebar/sidebar.component';
 import { NotesService } from './core/services/notes.service';
 import { TabsService } from './core/services/tabs.service';
@@ -22,6 +23,7 @@ import { UpdateService } from './core/services/update.service';
 import { FormattingBarService } from './core/services/formatting-bar.service';
 import { ThemeService } from './core/services/theme.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
+import { OVERLAY_NOTES_TAB_ID } from './core/models/note.model';
 import { GETTING_STARTED_FOLDER_NAME } from './core/models/folder.model';
 import { SAMPLE_NOTES } from './core/data/sample-notes';
 import { findSampleNotesToGather } from './core/utils/sample-notes.util';
@@ -29,7 +31,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, FormattingBarComponent, ConfirmDialogComponent],
+  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, FormattingBarComponent, BacklinksPanelComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-shell">
@@ -52,6 +54,9 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
               [style.display]="activeNoteId() === null ? 'none' : 'flex'"
             />
           </div>
+          @if (backlinksShown()) {
+            <app-backlinks-panel />
+          }
         </div>
       </div>
       <app-palette />
@@ -126,6 +131,12 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly sidebarVisible = this.sidebarState.visible;
   /** Only worth its room when there is a note to format (not on the home page). */
   readonly formattingBarShown = computed(() => this.formattingBar.visible() && this.activeNoteId() !== null);
+
+  /** The read-only overlay notes document has no identity of its own to be linked to. */
+  readonly backlinksShown = computed(() => {
+    const id = this.activeNoteId();
+    return id !== null && id !== OVERLAY_NOTES_TAB_ID;
+  });
 
   /** Popup offering the update found by the main process; null when closed. */
   readonly updateDialog = computed<{ title: string; message: string; actions: ConfirmDialogAction[] } | null>(() => {

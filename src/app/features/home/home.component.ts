@@ -6,19 +6,21 @@ import { FoldersService } from '../../core/services/folders.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
+import { HomeView, LayoutService } from '../../core/services/layout.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { NotePreview } from '../../core/models/note.model';
 import { parseNoteDate } from '../../core/utils/note-timestamp.util';
 import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
+import { GraphViewComponent } from '../graph/graph-view.component';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [ContextMenuComponent],
+  imports: [ContextMenuComponent, GraphViewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="home">
+    <div class="home" [class.graph-mode]="view() === 'graph'">
       <div class="home-inner">
       <div class="home-header">
         <div class="home-brand">
@@ -31,8 +33,15 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
           </svg>
           <h1 class="home-title">{{ title() }}</h1>
         </div>
+        <div class="view-switch" role="group" aria-label="Home view">
+          <button type="button" class="view-btn" [class.active]="view() === 'graph'" (click)="setView('graph')">Graph</button>
+          <button type="button" class="view-btn" [class.active]="view() === 'list'" (click)="setView('list')">List</button>
+        </div>
       </div>
 
+      @if (view() === 'graph') {
+        <app-graph-view />
+      } @else {
       <div class="notes-list">
         @if (filteredNotes().length === 0) {
           <div class="empty-state">
@@ -68,6 +77,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
           </div>
         }
       </div>
+      }
       </div>
     </div>
 
@@ -89,6 +99,9 @@ export class HomeComponent {
   private tabsService = inject(TabsService);
   private foldersService = inject(FoldersService);
   private sidebarState = inject(SidebarStateService);
+  private layout = inject(LayoutService);
+
+  readonly view = this.layout.homeView;
 
   /** The folder (and the tag) selected in the sidebar drive what is listed here. */
   readonly title = computed(() => {
@@ -113,6 +126,10 @@ export class HomeComponent {
 
   // ── Context menu ───────────────────────────────────────────────────────────
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number; noteId: number } | null>(null);
+
+  setView(view: HomeView): void {
+    this.layout.setHomeView(view);
+  }
 
   openNote(note: NotePreview): void {
     this.tabsService.openNote(note.id, note.title || 'Untitled');
