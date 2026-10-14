@@ -4,6 +4,7 @@ import {
 } from '@codemirror/view';
 import { StateField, StateEffect, EditorState, Transaction } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
+import { createEmptyTable } from './markdown-table';
 
 // ─── Slash Command Definitions ───────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ export interface SlashCommand {
 }
 
 // Returns true if cursor is inside a fenced code block
-function isInCodeBlock(state: EditorState, pos: number): boolean {
+export function isInCodeBlock(state: EditorState, pos: number): boolean {
   let node = syntaxTree(state).resolveInner(pos, -1);
   while (node.parent) {
     if (node.name === 'FencedCode' || node.name === 'InlineCode') return true;
@@ -71,6 +72,21 @@ function insertHorizontalRule(view: EditorView, range: { from: number; to: numbe
   view.focus();
 }
 
+/** Replaces the slash line with an empty 2×2 table, the caret in its first header cell */
+function insertTable(view: EditorView, range: { from: number; to: number }) {
+  const line = view.state.doc.lineAt(range.from);
+  // A table cannot interrupt a paragraph: keep a blank line before it
+  const needsBlankLine = line.number > 1 && view.state.doc.line(line.number - 1).text.trim() !== '';
+  const prefix = needsBlankLine ? '\n' : '';
+  const { text, cells } = createEmptyTable();
+
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: `${prefix}${text}` },
+    selection: { anchor: line.from + prefix.length + cells[0]![0]!.from },
+  });
+  view.focus();
+}
+
 // SVG icon paths (24x24 viewBox)
 const ICONS = {
   paragraph: '<path d="M13 4a4 4 0 0 1 0 8H7v8m6-16v16m4-16v16" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -86,6 +102,7 @@ const ICONS = {
   italic: '<line x1="19" y1="4" x2="10" y2="4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="14" y1="20" x2="5" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="15" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   strikethrough: '<path d="M16 4a4 4 0 0 0-4.37-.37 4.95 4.95 0 0 0-3.39 2.87M4 12h16M12 12c5 0 5 8-1 8a3.5 3.5 0 0 1-3.5-3.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   code: '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  table: '<rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M3 10h18M3 15h18M9 4v16" stroke="currentColor" stroke-width="1.8" fill="none"/>',
   hr: '<path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="12" r="1" fill="currentColor"/>',
   taskList: '<rect x="3" y="5" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M3.5 14.5h5v5h-5z" stroke="currentColor" stroke-width="1.8" fill="none" rx="1"/><path d="M11 8h10M11 17h10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M4.5 8l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
 };
@@ -168,6 +185,11 @@ export const slashCommands: SlashCommand[] = [
     id: 'hr', label: 'Séparateur', group: 'Insérer', icon: ICONS.hr,
     description: 'Ligne horizontale',
     execute: (view, range) => insertHorizontalRule(view, range),
+  },
+  {
+    id: 'table', label: 'Tableau', group: 'Insérer', icon: ICONS.table,
+    description: 'Tableau 2×2',
+    execute: (view, range) => insertTable(view, range),
   },
 ];
 

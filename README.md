@@ -16,6 +16,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **Full-text search** — SQLite FTS5 for instant search across all notes
 - **Command palette** — `F1` to search notes, commands, and tags
 - **Tabs** — drag & drop reordering, pinning, session restore
+- **Tables** — GFM tables render as real tables when the caret is elsewhere, and show their aligned markdown when it is inside: `Tab` / `Shift+Tab` jump between cells (`Tab` on the last cell adds a row), pipes are re-aligned on save and on blur, `/table` inserts an empty 2×2 table, and the right-click menu adds / deletes rows and columns and aligns a column. Spreadsheet (TSV) pastes become tables
 - **Folders** — nested folders in a VS Code-like tree sidebar (collapsible, resizable, `Ctrl+Shift+E` to toggle): create / rename / delete, drag & drop notes and folders (drop on a folder to move into it, between two rows to position it: an insertion line shows where), note count per folder. Notes created on the fly land in the undeletable `Inbox` folder; the first-launch sample notes live in `Getting started`. 3-4 levels deep are recommended (a warning is shown beyond)
 - **Tag system** — organize notes with tags, filter from the sidebar
 - **Quick-note overlay** — a global shortcut (default `Ctrl+Alt+N`, configurable) pops a small translucent, always-on-top chat-like window anywhere on screen; notes sent from it are tagged `overlay` and appear in the app

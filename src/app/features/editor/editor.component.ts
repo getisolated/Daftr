@@ -22,6 +22,7 @@ import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../s
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
+import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -267,6 +268,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       markdownDecorationTheme,
       markdownDecorationPlugin,
       ...slashCommandExtensions,
+      ...tableExtensions,
       drawSelection(),
       dropCursor(),
       highlightActiveLine(),
@@ -350,6 +352,22 @@ export class EditorComponent implements OnDestroy, OnChanges {
         const items: ContextMenuEntry[] = [
           { id: 'draft', label: 'Toggle draft', shortcut: this.shortcutLabel('editor.draft') },
         ];
+        const table = this.editorView ? describeTableAtCursor(this.editorView.state) : null;
+
+        if (table) {
+          items.push(
+            { divider: true },
+            { id: 'table:addRow', label: 'Insert row below' },
+            { id: 'table:deleteRow', label: 'Delete row', disabled: table.row === 0 },
+            { id: 'table:addColumn', label: 'Insert column right' },
+            { id: 'table:deleteColumn', label: 'Delete column', disabled: table.columnCount <= 1 },
+            { divider: true },
+            { id: 'table:alignLeft', label: 'Align column left' },
+            { id: 'table:alignCenter', label: 'Align column center' },
+            { id: 'table:alignRight', label: 'Align column right' },
+          );
+        }
+
         this.ctxMenu.set({ items, x: event.clientX, y: event.clientY });
         return true;
       },
@@ -361,6 +379,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
     if (id === 'draft' && view) {
       toggleDraft(view);
       view.focus();
+    } else if (id.startsWith('table:') && view) {
+      applyTableAction(view, id.slice('table:'.length) as TableAction);
     }
   }
 
@@ -404,6 +424,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
           const note = this.activeNote();
           if (!note) return true;
           if (this.saveDebounce) clearTimeout(this.saveDebounce);
+          formatTableAtCursor(view);
           this.saveNote(note.id, view.state.doc.toString());
           return true;
         },
