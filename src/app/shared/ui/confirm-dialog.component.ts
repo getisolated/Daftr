@@ -23,7 +23,7 @@ export interface ConfirmDialogAction {
         @for (action of actions(); track action.id) {
           <button class="btn" [class.danger]="action.danger" (click)="chosen.emit(action.id)">{{ action.label }}</button>
         }
-        <button class="btn cancel" (click)="chosen.emit(null)">Cancel</button>
+        <button class="btn cancel" (click)="chosen.emit(null)">{{ cancelLabel() }}</button>
       </div>
     </div>
   `,
@@ -33,5 +33,6 @@ export class ConfirmDialogComponent {
   readonly title = input.required<string>();
   readonly message = input.required<string>();
   readonly actions = input.required<ConfirmDialogAction[]>();
+  readonly cancelLabel = input('Cancel');
   readonly chosen = output<string | null>();
 }

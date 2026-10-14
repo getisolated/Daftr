@@ -41,6 +41,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'autoUpdate',
+    category: 'General',
+    title: 'Automatic Updates',
+    description: 'Download new versions in the background and install them when the app closes. When unchecked, you are asked before anything is downloaded.',
+    control: 'checkbox',
+  },
+  {
     key: 'globalShortcut',
     category: 'Global Shortcut',
     title: 'Shortcut',

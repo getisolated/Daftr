@@ -8,6 +8,8 @@ export interface AppSettings {
   /** true: Enter sends (Shift+Enter = new line). false: Enter = new line (Ctrl+Enter sends). */
   enterToSend: boolean;
   launchAtStartup: boolean;
+  /** true: updates download in the background and install when the app quits. false: the user is asked first. */
+  autoUpdate: boolean;
   /** In-app shortcuts changed by the user, by shortcut id (see APP_SHORTCUTS); absent = default. */
   appShortcuts: Record<string, string>;
 }
@@ -27,6 +29,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   overlayHeight: 350,
   enterToSend: true,
   launchAtStartup: false,
+  autoUpdate: false,
   appShortcuts: {},
 };
 

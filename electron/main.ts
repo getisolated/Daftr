@@ -9,6 +9,7 @@ import { getSettings, loadSettings, updateSettings } from './settings';
 import { sanitizeSettings, SettingsPatch } from './settings-schema';
 import { applyLaunchAtStartup, launchedHidden } from './startup';
 import { createTray, destroyTray } from './tray';
+import { applyUpdate, getUpdateInfo, onAutoUpdateChanged, startUpdater, stopUpdater } from './updater';
 
 const isDev = process.env['NODE_ENV'] === 'development';
 let mainWindow: BrowserWindow | null = null;
@@ -103,6 +104,7 @@ app.whenReady().then(() => {
   if (!registerGlobalShortcut(settings.globalShortcut, onGlobalShortcut)) {
     console.error(`[Shortcut] Unable to register ${settings.globalShortcut}`);
   }
+  startUpdater();
   app.on('activate', () => {
     if (!mainWindow) createWindow();
   });
@@ -117,6 +119,7 @@ app.on('before-quit', () => {
 });
 
 app.on('will-quit', () => {
+  stopUpdater();
   unregisterGlobalShortcuts();
   destroyTray();
 });
@@ -214,10 +217,17 @@ safeHandle('settings:set', (e, patch: SettingsPatch) => {
   if (next.launchAtStartup !== before.launchAtStartup) {
     applyLaunchAtStartup(next.launchAtStartup);
   }
+  if (next.autoUpdate !== before.autoUpdate) {
+    onAutoUpdateChanged();
+  }
   broadcastToWindows('settings:changed', getSettings(), e.sender);
   return { ok: true, settings: getSettings() };
 });
 safeHandle('overlay:hide', () => hideOverlay());
+
+// ── Updates ──────────────────────────────────────────────────────────────────
+safeHandle('update:getInfo', () => getUpdateInfo());
+safeHandle('update:apply', () => applyUpdate());
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 safeHandle('shell:openExternal', (_e, url: string) => {

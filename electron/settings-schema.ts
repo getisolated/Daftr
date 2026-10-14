@@ -13,6 +13,8 @@ export interface AppSettings {
   /** true: Enter sends (Shift+Enter = new line). false: Enter = new line (Ctrl+Enter sends). */
   enterToSend: boolean;
   launchAtStartup: boolean;
+  /** true: updates download in the background and install when the app quits. false: the user is asked first. */
+  autoUpdate: boolean;
   /** In-app shortcuts changed by the user, by shortcut id; absent = default (the renderer owns the id list). */
   appShortcuts: Record<string, string>;
   /** Last position chosen by the user; null until the overlay has been moved once. */
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   overlayHeight: 350,
   enterToSend: true,
   launchAtStartup: false,
+  autoUpdate: false,
   appShortcuts: {},
   overlayPosition: null,
 };
@@ -86,6 +89,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     overlayHeight: clampInt(raw['overlayHeight'], OVERLAY_MIN_HEIGHT, OVERLAY_MAX_HEIGHT, base.overlayHeight),
     enterToSend: typeof raw['enterToSend'] === 'boolean' ? raw['enterToSend'] : base.enterToSend,
     launchAtStartup: typeof raw['launchAtStartup'] === 'boolean' ? raw['launchAtStartup'] : base.launchAtStartup,
+    autoUpdate: typeof raw['autoUpdate'] === 'boolean' ? raw['autoUpdate'] : base.autoUpdate,
     appShortcuts: sanitizeAppShortcuts(raw['appShortcuts'], base.appShortcuts),
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };

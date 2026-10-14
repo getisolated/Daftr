@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Folder, FolderDeleteMode } from '../models/folder.model';
 import { Note } from '../models/note.model';
 import { OverlayBackdrop } from '../models/overlay-backdrop.model';
+import { UpdateInfo, UpdateProgress } from '../models/update.model';
 import { AppSettings, SettingsPatch, SettingsUpdateResult } from '../models/settings.model';
 
 /** Raw row shape returned by the Electron main process (snake_case from SQLite). */
@@ -52,12 +53,18 @@ interface ElectronAPI {
   openExternal: (url: string) => Promise<void>;
   getSettings: () => Promise<AppSettings>;
   setSettings: (patch: SettingsPatch) => Promise<SettingsUpdateResult>;
+  getUpdateInfo: () => Promise<UpdateInfo | null>;
+  applyUpdate: () => Promise<void>;
   hideOverlay: () => Promise<void>;
   onOverlayShown: (callback: () => void) => () => void;
   onOverlayBackdrop: (callback: (backdrop: OverlayBackdrop | null) => void) => () => void;
   onNotesChanged: (callback: () => void) => () => void;
   onSettingsChanged: (callback: (settings: AppSettings) => void) => () => void;
   onOpenSettings: (callback: () => void) => () => void;
+  onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void;
+  onUpdateProgress: (callback: (progress: UpdateProgress) => void) => () => void;
+  onUpdateDownloaded: (callback: (info: UpdateInfo) => void) => () => void;
+  onUpdateDownloadFailed: (callback: (error: string) => void) => () => void;
 }
 
 function mapRow(row: NoteRow): Note {
@@ -209,6 +216,15 @@ export class ElectronBridgeService {
     return this.api ? this.api.setSettings(patch) : null;
   }
 
+  // Updates
+  async getUpdateInfo(): Promise<UpdateInfo | null> {
+    return this.api ? this.api.getUpdateInfo() : null;
+  }
+
+  async applyUpdate(): Promise<void> {
+    await this.api?.applyUpdate();
+  }
+
   // Overlay
   hideOverlay(): Promise<void> { return this.api?.hideOverlay() ?? Promise.resolve(); }
 
@@ -231,5 +247,21 @@ export class ElectronBridgeService {
 
   onOpenSettings(callback: () => void): () => void {
     return this.api?.onOpenSettings(callback) ?? (() => undefined);
+  }
+
+  onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void {
+    return this.api?.onUpdateAvailable(callback) ?? (() => undefined);
+  }
+
+  onUpdateProgress(callback: (progress: UpdateProgress) => void): () => void {
+    return this.api?.onUpdateProgress(callback) ?? (() => undefined);
+  }
+
+  onUpdateDownloaded(callback: (info: UpdateInfo) => void): () => void {
+    return this.api?.onUpdateDownloaded(callback) ?? (() => undefined);
+  }
+
+  onUpdateDownloadFailed(callback: (error: string) => void): () => void {
+    return this.api?.onUpdateDownloadFailed(callback) ?? (() => undefined);
   }
 }

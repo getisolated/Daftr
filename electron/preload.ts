@@ -41,6 +41,10 @@ const api = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch: Record<string, unknown>) => ipcRenderer.invoke('settings:set', patch),
 
+  // Updates
+  getUpdateInfo: () => ipcRenderer.invoke('update:getInfo'),
+  applyUpdate: () => ipcRenderer.invoke('update:apply'),
+
   // Overlay
   hideOverlay: () => ipcRenderer.invoke('overlay:hide'),
 
@@ -49,6 +53,10 @@ const api = {
   onOverlayBackdrop: (callback: (backdrop: unknown) => void) => subscribe('overlay:backdrop', callback),
   onNotesChanged: (callback: () => void) => subscribe('notes:changed', callback),
   onSettingsChanged: (callback: (settings: unknown) => void) => subscribe('settings:changed', callback),
+  onUpdateAvailable: (callback: (info: unknown) => void) => subscribe('update:available', callback),
+  onUpdateProgress: (callback: (progress: unknown) => void) => subscribe('update:progress', callback),
+  onUpdateDownloaded: (callback: (info: unknown) => void) => subscribe('update:downloaded', callback),
+  onUpdateDownloadFailed: (callback: (error: unknown) => void) => subscribe('update:download-failed', callback),
   onOpenSettings: (callback: () => void) => subscribe('settings:open', callback),
 
   // Shell

@@ -20,6 +20,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **Tag system** — organize notes with tags, filter from the sidebar
 - **Quick-note overlay** — a global shortcut (default `Ctrl+Alt+N`, configurable) pops a small translucent, always-on-top chat-like window anywhere on screen; notes sent from it are tagged `overlay` and appear in the app
 - **System tray** — closing the window keeps the app running in the tray (right-click > Quit to exit); optional launch at Windows startup
+- **Auto-update** — the app checks the latest GitHub release at startup then hourly (packaged Windows build only) and offers the update in a popup, with an entry in the sidebar above Settings; the installer is SHA-512 verified. The `Automatic Updates` setting downloads in the background and installs when the app closes. Releases (tags `v*`) publish a `latest.json` manifest next to the installer
 - **Settings editor** — VS Code-like modal (`Ctrl+,`) with search, categories and reset to default
 - **Keyboard-first** — every action has a shortcut (see below)
 - **Local storage** — all data stays on your machine in a SQLite database
@@ -46,6 +47,8 @@ electron/
   settings-schema.ts # Settings type, defaults, validation
   renderer-loader.ts # Loads the Angular bundle (#overlay selects the overlay root)
   tray.ts            # System tray icon & menu
+  updater.ts         # Update check (hourly), verified download, silent install on exit/restart
+  update-manifest.ts # Pure helpers: version comparison, manifest validation
   startup.ts         # Launch at startup (login item, started hidden with --hidden)
   preload.ts         # Context bridge (electronAPI)
   database.ts        # SQLite schema + migration (folders, notes.folder_id), FTS5 triggers, CRUD operations

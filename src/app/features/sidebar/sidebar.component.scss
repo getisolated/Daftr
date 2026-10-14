@@ -252,6 +252,16 @@
   font-size: 12px;
 }
 
+.footer-btn.update {
+  color: #4fc1ff;
+
+  &:disabled {
+    cursor: default;
+    color: #7a7a7a;
+    background: transparent;
+  }
+}
+
 .resize-handle {
   position: absolute;
   top: 0;

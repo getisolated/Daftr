@@ -16,6 +16,7 @@ import { PaletteService } from '../../core/services/palette.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { TabsService } from '../../core/services/tabs.service';
+import { UpdateService } from '../../core/services/update.service';
 import {
   buildFolderTree,
   canMoveFolder,
@@ -55,6 +56,11 @@ export class SidebarComponent {
   private readonly tabs = inject(TabsService);
   private readonly palette = inject(PaletteService);
   private readonly settings = inject(SettingsService);
+  private readonly updates = inject(UpdateService);
+
+  protected readonly updateInfo = this.updates.info;
+  protected readonly updateLabel = this.updates.label;
+  protected readonly updateBusy = this.updates.applying;
 
   protected readonly width = this.state.width;
   protected readonly selectedFolderId = this.state.selectedFolderId;
@@ -382,6 +388,10 @@ export class SidebarComponent {
   private async deleteNote(noteId: number): Promise<void> {
     this.tabs.closeByNoteId(noteId);
     await this.notesService.delete(noteId);
+  }
+
+  protected openUpdate(): void {
+    this.updates.openDialog();
   }
 
   protected async onDialogChoice(choice: string | null): Promise<void> {

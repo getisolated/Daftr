@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, OnDestroy, ViewChild, inject, ChangeDetectionStrategy
+  Component, OnInit, OnDestroy, ViewChild, computed, inject, ChangeDetectionStrategy
 } from '@angular/core';
 
 import { TabsBarComponent } from './features/tabs/tabs-bar.component';
@@ -17,6 +17,8 @@ import { LayoutService } from './core/services/layout.service';
 import { SettingsService } from './core/services/settings.service';
 import { FoldersService } from './core/services/folders.service';
 import { SidebarStateService } from './core/services/sidebar-state.service';
+import { UpdateService } from './core/services/update.service';
+import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
 import { GETTING_STARTED_FOLDER_NAME } from './core/models/folder.model';
 import { SAMPLE_NOTES } from './core/data/sample-notes';
 import { findSampleNotesToGather } from './core/utils/sample-notes.util';
@@ -24,7 +26,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent],
+  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-shell">
@@ -45,6 +47,15 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       </div>
       <app-palette />
       <app-settings />
+      @if (updateDialog(); as dialog) {
+        <app-confirm-dialog
+          [title]="dialog.title"
+          [message]="dialog.message"
+          [actions]="dialog.actions"
+          cancelLabel="Later"
+          (chosen)="onUpdateChoice($event)"
+        />
+      }
     </div>
   `,
   styles: [`
@@ -89,10 +100,24 @@ export class AppComponent implements OnInit, OnDestroy {
   private settingsService = inject(SettingsService);
   private foldersService = inject(FoldersService);
   private sidebarState = inject(SidebarStateService);
+  private updateService = inject(UpdateService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
   readonly sidebarVisible = this.sidebarState.visible;
+
+  /** Popup offering the update found by the main process; null when closed. */
+  readonly updateDialog = computed<{ title: string; message: string; actions: ConfirmDialogAction[] } | null>(() => {
+    const info = this.updateService.info();
+    if (!info || !this.updateService.dialogOpen()) return null;
+    return {
+      title: `Version ${info.version} is available`,
+      message: info.downloaded
+        ? `Version ${info.version} is ready (you have ${info.currentVersion}). The app restarts to apply it.`
+        : `You have version ${info.currentVersion}. Download and install version ${info.version}? The app restarts to apply it.`,
+      actions: [{ id: 'install', label: info.downloaded ? 'Restart now' : 'Update now' }],
+    };
+  });
 
   private unregisterFns: (() => void)[] = [];
   private unsubscribeNotesChanged: () => void = () => undefined;
@@ -118,6 +143,14 @@ export class AppComponent implements OnInit, OnDestroy {
     // Notes sent from the quick-note overlay show up without restarting the app
     this.unsubscribeNotesChanged = this.bridge.onNotesChanged(() => { void this.reloadNotesAndFolders(); });
     this.registerShortcuts();
+  }
+
+  onUpdateChoice(choice: string | null): void {
+    if (choice === 'install') {
+      void this.updateService.install();
+    } else {
+      this.updateService.closeDialog();
+    }
   }
 
   private async reloadNotesAndFolders(): Promise<void> {
