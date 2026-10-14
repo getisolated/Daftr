@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { extractNoteTitle as extractTitle } from '../src/app/core/utils/note-title.util';
 
-// extractTitle is a pure function on NotesService — extract the logic for direct testing
-function extractTitle(content: string): string {
-  const firstLine = content.split('\n')[0] ?? '';
-  return firstLine.replace(/^#+\s*/, '').trim() || 'Untitled';
-}
 
 describe('extractTitle', () => {
   it('extracts plain text from first line', () => {
@@ -41,5 +37,19 @@ describe('extractTitle', () => {
 
   it('uses only the first line', () => {
     expect(extractTitle('Line 1\n# Line 2')).toBe('Line 1');
+  });
+
+  it('skips blank lines and draft markers', () => {
+    expect(extractTitle('\n<!-- draft -->\n# Real title\n<!-- /draft -->')).toBe('Real title');
+  });
+
+  it('skips single and multi-line HTML comments', () => {
+    expect(extractTitle('<!-- meta -->Title')).toBe('Title');
+    expect(extractTitle('<!--\nmeta: 1\n-->\nTitle')).toBe('Title');
+  });
+
+  it('returns "Untitled" when only comments remain', () => {
+    expect(extractTitle('<!-- draft -->\n<!-- /draft -->')).toBe('Untitled');
+    expect(extractTitle('<!-- unclosed')).toBe('Untitled');
   });
 });

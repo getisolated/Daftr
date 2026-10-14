@@ -6,7 +6,7 @@ import {
 
 // CodeMirror
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
-import { Compartment, EditorState, Extension } from '@codemirror/state';
+import { Compartment, EditorState, Extension, Prec } from '@codemirror/state';
 import {
   defaultKeymap, history, historyKeymap, indentWithTab,
 } from '@codemirror/commands';
@@ -19,6 +19,8 @@ import { bracketMatching, syntaxTree } from '@codemirror/language';
 import { vscodeDarkModern } from '../../shared/codemirror/vscode-dark-modern';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
+import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
+import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
@@ -29,7 +31,7 @@ import { Note, OVERLAY_NOTES_TAB_ID } from '../../core/models/note.model';
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [],
+  imports: [ContextMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="editor-wrapper">
@@ -56,6 +58,15 @@ import { Note, OVERLAY_NOTES_TAB_ID } from '../../core/models/note.model';
         </div>
       }
     </div>
+    @if (ctxMenu(); as menu) {
+      <app-context-menu
+        [items]="menu.items"
+        [x]="menu.x"
+        [y]="menu.y"
+        (action)="onCtxAction($event)"
+        (closed)="ctxMenu.set(null)"
+      />
+    }
   `,
   styleUrls: ['./editor.component.scss'],
 })
@@ -68,6 +79,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private settingsService = inject(SettingsService);
 
   readonly activeNote = signal<Note | null>(null);
+  readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
 
   private editorView: EditorView | null = null;
   private readonly shortcutsCompartment = new Compartment();
@@ -280,8 +292,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.shortcutsCompartment.of(this.buildShortcutsKeymap()),
       updateListener,
       EditorView.lineWrapping,
-      // The concatenated overlay notes cannot be mapped back to their individual notes
-      ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme] : []),
+      // The concatenated overlay notes cannot be mapped back to their individual notes, hence no drafts either
+      ...(readOnly
+        ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme]
+        : [draftBlocks, this.contextMenuHandler()]),
     ];
 
     const state = EditorState.create({ doc: content, extensions });
@@ -317,10 +331,36 @@ export class EditorComponent implements OnDestroy, OnChanges {
     });
   }
 
+  private contextMenuHandler(): Extension {
+    return EditorView.domEventHandlers({
+      contextmenu: (event) => {
+        event.preventDefault();
+        const items: ContextMenuEntry[] = [
+          { id: 'draft', label: 'Toggle draft', shortcut: this.shortcutLabel('editor.draft') },
+        ];
+        this.ctxMenu.set({ items, x: event.clientX, y: event.clientY });
+        return true;
+      },
+    });
+  }
+
+  protected onCtxAction(id: string): void {
+    const view = this.editorView;
+    if (id === 'draft' && view) {
+      toggleDraft(view);
+      view.focus();
+    }
+  }
+
   /** Formatting/save bindings use the accelerators configured in the settings (reconfigured live, see constructor). */
   private buildShortcutsKeymap(): Extension {
     const keyFor = (id: string): string => acceleratorToCodeMirrorKey(this.settingsService.appShortcuts()[id] ?? '');
-    return keymap.of([
+    // High precedence: the search keymap already binds Ctrl+D (select next occurrence)
+    return Prec.high(keymap.of([
+      {
+        key: keyFor('editor.draft'),
+        run: (view) => toggleDraft(view),
+      },
       {
         key: keyFor('editor.bold'),
         run: (view) => this.wrapSelection(view, '**', '**'),
@@ -352,7 +392,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
           return true;
         },
       },
-    ]);
+    ]));
   }
 
   private wrapSelection(view: EditorView, before: string, after: string): boolean {

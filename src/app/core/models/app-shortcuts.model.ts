@@ -23,6 +23,7 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'editor.save', label: 'Save Note', defaultAccelerator: 'CommandOrControl+S' },
   { id: 'editor.bold', label: 'Bold', defaultAccelerator: 'CommandOrControl+B' },
   { id: 'editor.italic', label: 'Italic', defaultAccelerator: 'CommandOrControl+I' },
+  { id: 'editor.draft', label: 'Toggle Draft Block', defaultAccelerator: 'CommandOrControl+D' },
   { id: 'editor.link', label: 'Insert Link', defaultAccelerator: 'CommandOrControl+K' },
 ];
 

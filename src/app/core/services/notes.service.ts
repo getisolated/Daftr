@@ -2,6 +2,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { Note, NotePreview } from '../models/note.model';
 import { OVERLAY_NOTE_TAG } from '../models/settings.model';
 import { joinBlocks, TimestampedBlock } from '../../shared/codemirror/note-timestamps';
+import { extractNoteTitle } from '../utils/note-title.util';
 import { formatNoteTimestamp } from '../utils/note-timestamp.util';
 import { ElectronBridgeService } from './electron-bridge.service';
 
@@ -97,7 +98,6 @@ export class NotesService {
   }
 
   extractTitle(content: string): string {
-    const firstLine = content.split('\n')[0] ?? '';
-    return firstLine.replace(/^#+\s*/, '').trim() || 'Untitled';
+    return extractNoteTitle(content);
   }
 }
