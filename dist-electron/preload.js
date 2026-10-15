@@ -1,22 +1,54 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const electron_1 = require("electron");
+const renderer_1 = require("electron/renderer");
+function subscribe(channel, callback) {
+    const listener = (_event, payload) => callback(payload);
+    renderer_1.ipcRenderer.on(channel, listener);
+    return () => { renderer_1.ipcRenderer.removeListener(channel, listener); };
+}
 const api = {
     // Window controls
-    minimize: () => electron_1.ipcRenderer.invoke('window:minimize'),
-    maximize: () => electron_1.ipcRenderer.invoke('window:maximize'),
-    close: () => electron_1.ipcRenderer.invoke('window:close'),
-    isMaximized: () => electron_1.ipcRenderer.invoke('window:isMaximized'),
+    minimize: () => renderer_1.ipcRenderer.invoke('window:minimize'),
+    maximize: () => renderer_1.ipcRenderer.invoke('window:maximize'),
+    close: () => renderer_1.ipcRenderer.invoke('window:close'),
+    isMaximized: () => renderer_1.ipcRenderer.invoke('window:isMaximized'),
     // Notes
-    getAllNotes: () => electron_1.ipcRenderer.invoke('notes:getAll'),
-    getNoteById: (id) => electron_1.ipcRenderer.invoke('notes:getById', id),
-    createNote: (title, content) => electron_1.ipcRenderer.invoke('notes:create', title, content),
-    updateNote: (id, data) => electron_1.ipcRenderer.invoke('notes:update', id, data),
-    deleteNote: (id) => electron_1.ipcRenderer.invoke('notes:delete', id),
-    searchNotes: (query) => electron_1.ipcRenderer.invoke('notes:search', query),
-    getNotesByTag: (tag) => electron_1.ipcRenderer.invoke('notes:byTag', tag),
-    getAllTags: () => electron_1.ipcRenderer.invoke('notes:allTags'),
+    getAllNotes: () => renderer_1.ipcRenderer.invoke('notes:getAll'),
+    getNoteById: (id) => renderer_1.ipcRenderer.invoke('notes:getById', id),
+    createNote: (title, content, tags, folderId) => renderer_1.ipcRenderer.invoke('notes:create', title, content, tags, folderId),
+    updateNote: (id, data) => renderer_1.ipcRenderer.invoke('notes:update', id, data),
+    moveNote: (id, folderId) => renderer_1.ipcRenderer.invoke('notes:move', id, folderId),
+    placeNote: (id, folderId, orderedIds) => renderer_1.ipcRenderer.invoke('notes:place', id, folderId, orderedIds),
+    deleteNote: (id) => renderer_1.ipcRenderer.invoke('notes:delete', id),
+    searchNotes: (query) => renderer_1.ipcRenderer.invoke('notes:search', query),
+    getNotesByTag: (tag) => renderer_1.ipcRenderer.invoke('notes:byTag', tag),
+    getAllTags: () => renderer_1.ipcRenderer.invoke('notes:allTags'),
+    // Folders
+    getAllFolders: () => renderer_1.ipcRenderer.invoke('folders:getAll'),
+    createFolder: (name, parentId) => renderer_1.ipcRenderer.invoke('folders:create', name, parentId),
+    renameFolder: (id, name) => renderer_1.ipcRenderer.invoke('folders:rename', id, name),
+    moveFolder: (id, parentId) => renderer_1.ipcRenderer.invoke('folders:move', id, parentId),
+    placeFolder: (id, parentId, orderedIds) => renderer_1.ipcRenderer.invoke('folders:place', id, parentId, orderedIds),
+    deleteFolder: (id, mode) => renderer_1.ipcRenderer.invoke('folders:delete', id, mode),
+    // Settings
+    getSettings: () => renderer_1.ipcRenderer.invoke('settings:get'),
+    setSettings: (patch) => renderer_1.ipcRenderer.invoke('settings:set', patch),
+    // Updates
+    getUpdateInfo: () => renderer_1.ipcRenderer.invoke('update:getInfo'),
+    applyUpdate: () => renderer_1.ipcRenderer.invoke('update:apply'),
+    // Overlay
+    hideOverlay: () => renderer_1.ipcRenderer.invoke('overlay:hide'),
+    // Events pushed by the main process; each returns an unsubscribe function
+    onOverlayShown: (callback) => subscribe('overlay:shown', callback),
+    onOverlayBackdrop: (callback) => subscribe('overlay:backdrop', callback),
+    onNotesChanged: (callback) => subscribe('notes:changed', callback),
+    onSettingsChanged: (callback) => subscribe('settings:changed', callback),
+    onUpdateAvailable: (callback) => subscribe('update:available', callback),
+    onUpdateProgress: (callback) => subscribe('update:progress', callback),
+    onUpdateDownloaded: (callback) => subscribe('update:downloaded', callback),
+    onUpdateDownloadFailed: (callback) => subscribe('update:download-failed', callback),
+    onOpenSettings: (callback) => subscribe('settings:open', callback),
     // Shell
-    openExternal: (url) => electron_1.ipcRenderer.invoke('shell:openExternal', url),
+    openExternal: (url) => renderer_1.ipcRenderer.invoke('shell:openExternal', url),
 };
-electron_1.contextBridge.exposeInMainWorld('electronAPI', api);
+renderer_1.contextBridge.exposeInMainWorld('electronAPI', api);

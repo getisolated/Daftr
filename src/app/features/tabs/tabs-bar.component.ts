@@ -2,20 +2,35 @@ import {
   Component, inject, ElementRef, ViewChild,
   ChangeDetectionStrategy, HostListener, signal
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { TabsService } from '../../core/services/tabs.service';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { PaletteService } from '../../core/services/palette.service';
 import { LayoutService } from '../../core/services/layout.service';
+import { SettingsService } from '../../core/services/settings.service';
+import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 
 @Component({
   selector: 'app-tabs-bar',
   standalone: true,
-  imports: [CommonModule, ContextMenuComponent],
+  imports: [ContextMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="tabs-bar" (dblclick)="onTitleBarDblClick()">
+      <!-- Sidebar toggle -->
+      <button
+        class="home-btn"
+        [class.active]="sidebarVisible()"
+        (click)="toggleSidebar()"
+        (dblclick)="$event.stopPropagation()"
+        [title]="'Toggle sidebar (' + shortcutLabel('sidebar.toggle') + ')'"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+      </button>
+
       <!-- Home button -->
       <button
         class="home-btn"
@@ -71,7 +86,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
                 class="tab-close"
                 (click)="closeTab($event, i)"
                 tabindex="-1"
-                title="Close (Ctrl+W)"
+                [title]="'Close (' + shortcutLabel('tab.close') + ')'"
               >×</button>
             }
           </div>
@@ -79,7 +94,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
       </div>
 
       <!-- Search icon -->
-      <button class="search-icon-btn" (click)="openSearch()" (dblclick)="$event.stopPropagation()" title="Search notes (Ctrl+Shift+F)">
+      <button class="search-icon-btn" (click)="openSearch()" (dblclick)="$event.stopPropagation()" [title]="'Search notes (' + shortcutLabel('search.global') + ')'">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
@@ -90,7 +105,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
         class="search-icon-btn"
         (click)="toggleWideMode()"
         (dblclick)="$event.stopPropagation()"
-        [title]="wideMode() ? 'Centered layout (Alt+Z)' : 'Full width layout (Alt+Z)'"
+        [title]="(wideMode() ? 'Centered layout (' : 'Full width layout (') + shortcutLabel('layout.toggle') + ')'"
       >
         @if (wideMode()) {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -143,10 +158,13 @@ export class TabsBarComponent {
   private electron = inject(ElectronBridgeService);
   private palette = inject(PaletteService);
   private layout = inject(LayoutService);
+  private settings = inject(SettingsService);
+  private sidebarState = inject(SidebarStateService);
 
   @ViewChild('tabsContainer') tabsContainer!: ElementRef<HTMLElement>;
 
   readonly wideMode = this.layout.wideMode;
+  readonly sidebarVisible = this.sidebarState.visible;
 
   readonly tabs = this.tabs$.tabs;
   readonly activeIndex = this.tabs$.activeIndex;
@@ -165,6 +183,10 @@ export class TabsBarComponent {
   openSearch(): void { this.palette.open('search'); }
   selectTab(index: number): void { this.tabs$.setActiveIndex(index); }
   toggleWideMode(): void { this.layout.toggle(); }
+
+  toggleSidebar(): void { this.sidebarState.toggleVisible(); }
+
+  protected shortcutLabel(id: string): string { return this.settings.shortcutLabel(id); }
 
   closeTab(event: MouseEvent, index: number): void {
     event.stopPropagation();
@@ -263,10 +285,17 @@ export class TabsBarComponent {
     const pinIcon = 'M16 2L7.5 10.5 2 12l3 3-5 7 7-5 3 3 1.5-5.5L20 6l-2-2z';
     const closeIcon = 'M18 6L6 18M6 6l12 12';
 
+    // Pinned tabs are never closed in bulk: grey the entries out when they would do nothing
+    const allTabs = this.tabs();
+    const hasClosableTab = allTabs.some(t => !t.isPinned);
+    const hasClosableOthers = allTabs.some((t, i) => i !== index && !t.isPinned);
+
     const items: ContextMenuEntry[] = [
-      { id: 'pin', label: pinLabel, icon: pinIcon, shortcut: 'Alt+P' },
+      { id: 'pin', label: pinLabel, icon: pinIcon, shortcut: this.shortcutLabel('tab.pin') },
       { divider: true },
-      { id: 'close', label: 'Close Tab', icon: closeIcon, shortcut: 'Ctrl+W', disabled: tab.isPinned },
+      { id: 'close', label: 'Close Tab', icon: closeIcon, shortcut: this.shortcutLabel('tab.close'), disabled: tab.isPinned },
+      { id: 'closeOthers', label: 'Close Others', icon: closeIcon, disabled: !hasClosableOthers },
+      { id: 'closeAll', label: 'Close All Tabs', icon: closeIcon, disabled: !hasClosableTab },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, tabIndex: index });
@@ -283,6 +312,12 @@ export class TabsBarComponent {
         break;
       case 'close':
         this.tabs$.closeTab(index);
+        break;
+      case 'closeOthers':
+        this.tabs$.closeOthers(index);
+        break;
+      case 'closeAll':
+        this.tabs$.closeAll();
         break;
     }
     this.ctxMenu.set(null);

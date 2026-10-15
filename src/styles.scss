@@ -1,3 +1,143 @@
+// ── Theme tokens ──────────────────────────────────────────────────────────────
+// Dark is the default (no attribute yet = dark); `data-theme` is set on <html> by ThemeService and,
+// before Angular boots, by the inline script of index.html. To add a theme: copy a block below.
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  // Surfaces
+  --evn-bg: #1e1e1e;
+  --evn-bg-panel: #252526;
+  --evn-bg-modal: #1f1f1f;
+  --evn-bg-menu: #2d2d2d;
+  --evn-bg-input: #313131;
+  --evn-bg-chip: #2d2d2d;
+  --evn-bg-hover: #2a2d2e;
+  --evn-bg-active: #37373d;
+  --evn-bg-selected: #094771;
+  --evn-selection: #264f78;
+  --evn-caret: #aeafad;
+  // Translucent "ink" layered over a surface (hover backgrounds): white on dark, black on light
+  --evn-hover-rgb: 255, 255, 255;
+
+  // Borders & scrollbars
+  --evn-border: #454545;
+  --evn-border-soft: #3c3c3c;
+  --evn-border-subtle: #2b2b2b;
+  --evn-border-hover: #555555;
+  --evn-scrollbar: #454545;
+  --evn-scrollbar-hover: #555555;
+
+  // Text
+  --evn-text: #cccccc;
+  --evn-text-strong: #e7e7e7;
+  --evn-text-bright: #ffffff;
+  --evn-text-soft: #9d9d9d;
+  --evn-text-dimmed: #858585;
+  --evn-text-disabled: #6a6a6a;
+  --evn-text-faint: #555555;
+
+  // Accent & status
+  --evn-accent: #0078d4;
+  --evn-accent-strong: #0e639c;
+  --evn-accent-strong-rgb: 14, 99, 156;
+  --evn-accent-hover: #1177bb;
+  --evn-accent-text: #75beff;
+  --evn-danger: #f14c4c;
+
+  // Editor syntax (VS Code "Default Dark Modern")
+  --evn-syntax-plain: #d4d4d4;
+  --evn-syntax-punctuation: #808080;
+  --evn-syntax-comment: #6a9955;
+  --evn-syntax-keyword: #569cd6;
+  --evn-syntax-control: #c586c0;
+  --evn-syntax-variable: #9cdcfe;
+  --evn-syntax-function: #dcdcaa;
+  --evn-syntax-type: #4ec9b0;
+  --evn-syntax-string: #ce9178;
+  --evn-syntax-escape: #d7ba7d;
+  --evn-syntax-number: #b5cea8;
+  --evn-syntax-constant: #4fc1ff;
+  --evn-syntax-regexp: #d16969;
+  --evn-syntax-invalid: #f44747;
+  --evn-syntax-link: #3794ff;
+  --evn-syntax-strike: #6a6a6a;
+  // Markdown
+  --evn-syntax-heading: #569cd6;
+  --evn-syntax-bold: #569cd6;
+  --evn-syntax-italic: #569cd6;
+  --evn-syntax-quote: #6a9955;
+  --evn-syntax-code: #ce9178;
+  --evn-syntax-mark-hidden: #3e4a57;
+  --evn-syntax-mark-dim: #4a5568;
+  --evn-syntax-timestamp: #6e7681;
+}
+
+// "Default Light Modern"
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --evn-bg: #ffffff;
+  --evn-bg-panel: #f3f3f3;
+  --evn-bg-modal: #ffffff;
+  --evn-bg-menu: #ffffff;
+  --evn-bg-input: #ffffff;
+  --evn-bg-chip: #ececec;
+  --evn-bg-hover: #e8e8e8;
+  --evn-bg-active: #e4e6f1;
+  --evn-bg-selected: #cce4f7;
+  --evn-selection: #add6ff;
+  --evn-caret: #000000;
+  --evn-hover-rgb: 0, 0, 0;
+
+  --evn-border: #c8c8c8;
+  --evn-border-soft: #d4d4d4;
+  --evn-border-subtle: #e5e5e5;
+  --evn-border-hover: #a0a0a0;
+  --evn-scrollbar: #c4c4c4;
+  --evn-scrollbar-hover: #a0a0a0;
+
+  --evn-text: #3b3b3b;
+  --evn-text-strong: #1f1f1f;
+  --evn-text-bright: #000000;
+  --evn-text-soft: #616161;
+  --evn-text-dimmed: #6e6e6e;
+  --evn-text-disabled: #8a8a8a;
+  --evn-text-faint: #b0b0b0;
+
+  --evn-accent: #005fb8;
+  --evn-accent-strong: #0066b8;
+  --evn-accent-strong-rgb: 0, 102, 184;
+  --evn-accent-hover: #0258a8;
+  --evn-accent-text: #0451a5;
+  --evn-danger: #c72e2e;
+
+  --evn-syntax-plain: #3b3b3b;
+  --evn-syntax-punctuation: #6e6e6e;
+  --evn-syntax-comment: #008000;
+  --evn-syntax-keyword: #0000ff;
+  --evn-syntax-control: #af00db;
+  --evn-syntax-variable: #001080;
+  --evn-syntax-function: #795e26;
+  --evn-syntax-type: #267f99;
+  --evn-syntax-string: #a31515;
+  --evn-syntax-escape: #ee0000;
+  --evn-syntax-number: #098658;
+  --evn-syntax-constant: #0070c1;
+  --evn-syntax-regexp: #811f3f;
+  --evn-syntax-invalid: #cd3131;
+  --evn-syntax-link: #006ab1;
+  --evn-syntax-strike: #8a8a8a;
+  --evn-syntax-heading: #0451a5;
+  --evn-syntax-bold: #0451a5;
+  --evn-syntax-italic: #0451a5;
+  --evn-syntax-quote: #008000;
+  --evn-syntax-code: #a31515;
+  --evn-syntax-mark-hidden: #c8d1da;
+  --evn-syntax-mark-dim: #8a94a3;
+  --evn-syntax-timestamp: #6e7681;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -8,11 +148,17 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #1e1e1e;
-  color: #cccccc;
+  background: var(--evn-bg);
+  color: var(--evn-text);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+// Quick-note overlay window is transparent: the page itself must not paint a background
+html.overlay-mode,
+html.overlay-mode body {
+  background: transparent;
 }
 
 // Scrollbar (minimal, dark)
@@ -22,18 +168,18 @@ html, body {
 }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #454545;
+  background: var(--evn-scrollbar);
   border-radius: 3px;
-  &:hover { background: #555; }
+  &:hover { background: var(--evn-scrollbar-hover); }
 }
 
 // Remove focus outline for mouse users
 :focus:not(:focus-visible) { outline: none; }
-:focus-visible { outline: 2px solid #007acc; outline-offset: 1px; }
+:focus-visible { outline: 2px solid var(--evn-accent); outline-offset: 1px; }
 
 // Selection
 ::selection {
-  background: #264f78;
+  background: var(--evn-selection);
   color: inherit;
 }
 
@@ -41,8 +187,8 @@ html, body {
 .cm-slash-menu {
   position: fixed;
   z-index: 1000;
-  background: #252526;
-  border: 1px solid #3c3c3c;
+  background: var(--evn-bg-panel);
+  border: 1px solid var(--evn-border-soft);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   min-width: 220px;
@@ -57,7 +203,7 @@ html, body {
     width: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: #454545;
+    background: var(--evn-scrollbar);
     border-radius: 2px;
   }
 }
@@ -71,7 +217,7 @@ html, body {
   padding: 6px 10px 4px;
   font-size: 11px;
   font-weight: 600;
-  color: #858585;
+  color: var(--evn-text-dimmed);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   user-select: none;
@@ -89,11 +235,11 @@ html, body {
 
   &:hover,
   &.cm-slash-item-selected {
-    background: #2a2d2e;
+    background: var(--evn-bg-hover);
   }
 
   &.cm-slash-item-selected {
-    background: #094771;
+    background: var(--evn-bg-selected);
   }
 }
 
@@ -104,9 +250,9 @@ html, body {
   width: 28px;
   height: 28px;
   border-radius: 5px;
-  background: #2d2d2d;
-  border: 1px solid #3c3c3c;
-  color: #cccccc;
+  background: var(--evn-bg-chip);
+  border: 1px solid var(--evn-border-soft);
+  color: var(--evn-text);
   flex-shrink: 0;
 
   svg {
@@ -123,7 +269,7 @@ html, body {
 
 .cm-slash-item-label {
   font-size: 13px;
-  color: #cccccc;
+  color: var(--evn-text);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -132,7 +278,7 @@ html, body {
 
 .cm-slash-item-desc {
   font-size: 11px;
-  color: #6a6a6a;
+  color: var(--evn-text-disabled);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -141,13 +287,13 @@ html, body {
 .cm-slash-empty {
   padding: 16px;
   text-align: center;
-  color: #6a6a6a;
+  color: var(--evn-text-disabled);
   font-size: 13px;
 }
 
 // ── Slash placeholder on empty lines ──────────────────────────────────────────
 .cm-slash-placeholder {
-  color: #4a4a4a;
+  color: var(--evn-text-faint);
   font-style: italic;
   font-size: 14px;
   pointer-events: none;

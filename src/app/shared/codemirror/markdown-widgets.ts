@@ -54,6 +54,27 @@ export class CheckboxWidget extends WidgetType {
   override ignoreEvent(): boolean { return false; }
 }
 
+// ── External link icon widget ─────────────────────────────────────────────────
+// Any scheme except `note://`, which targets a local note
+export const EXTERNAL_URL = /^(?!note:\/\/)[a-z][a-z0-9+.-]*:\/\//i;
+
+export class ExternalLinkWidget extends WidgetType {
+  toDOM(): HTMLElement {
+    const span = document.createElement('span');
+    span.className = 'cm-external-link-icon';
+    span.setAttribute('aria-hidden', 'true');
+    span.innerHTML =
+      '<svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/>' +
+      '</svg>';
+    return span;
+  }
+
+  override eq(): boolean { return true; }
+  override ignoreEvent(): boolean { return true; }
+}
+
 // ── Heading level widget (hidden # symbols) ───────────────────────────────────
 export class HiddenMarkWidget extends WidgetType {
   toDOM(): HTMLElement {

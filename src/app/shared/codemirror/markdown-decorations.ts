@@ -3,7 +3,7 @@ import {
 } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
-import { CheckboxWidget } from './markdown-widgets';
+import { CheckboxWidget, EXTERNAL_URL, ExternalLinkWidget } from './markdown-widgets';
 
 // Check if cursor is within [from, to]
 function cursorInRange(view: EditorView, from: number, to: number): boolean {
@@ -139,9 +139,37 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
 
         // ── Links ─────────────────────────────────────────────────
-        case 'Link':
+        case 'Link': {
           pending.push({ from, to, deco: Decoration.mark({ class: 'cm-md-link' }) });
+
+          // Off the link, only its label shows: `[` and `](target)` are hidden, like the other marks
+          if (!cursorInRange(view, from, to)) {
+            const marks: { from: number; to: number }[] = [];
+
+            for (let child = node.node.firstChild; child; child = child.nextSibling) {
+              if (child.name === 'LinkMark') {
+                marks.push({ from: child.from, to: child.to });
+              }
+            }
+
+            const open = marks[0];
+            const close = marks[1];
+
+            if (open && close && open.to < close.from) {
+              pending.push({ from: open.from, to: open.to, deco: Decoration.replace({}) });
+              pending.push({ from: close.from, to, deco: Decoration.replace({}) });
+
+              // An external target (not a local note) is flagged with an icon after the label
+              const urlNode = node.node.getChild('URL');
+
+              if (urlNode && EXTERNAL_URL.test(doc.sliceString(urlNode.from, urlNode.to))) {
+                pending.push({ from: to, to, deco: Decoration.widget({ widget: new ExternalLinkWidget(), side: 1 }) });
+              }
+            }
+          }
+
           break;
+        }
       }
     }
   });
@@ -175,7 +203,8 @@ function buildDecorations(view: EditorView): DecorationSet {
   let lastTo = -1;
   for (const { from, to, deco } of pending) {
     // Skip overlapping ranges for replace decorations
-    if (deco.spec?.widget && from < lastTo) continue;
+    // Point widgets (from === to, e.g. the external link icon) never overlap anything
+    if (deco.spec?.widget && from !== to && from < lastTo) continue;
     try {
       builder.add(from, to, deco);
       if (to > lastTo) lastTo = to;
@@ -203,75 +232,84 @@ export const markdownDecorationPlugin = ViewPlugin.fromClass(
 );
 
 // Theme for markdown decorations
-// VS Code "Default Dark Modern" token colors
+// Colors come from the theme tokens (see styles.scss)
 export const markdownDecorationTheme = EditorView.baseTheme({
   '.cm-md-h1': {
     fontSize: '1.6em',
     fontWeight: '700',
     lineHeight: '1.3',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-h2': {
     fontSize: '1.35em',
     fontWeight: '700',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-h3': {
     fontSize: '1.15em',
     fontWeight: '600',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-h4': {
     fontSize: '1em',
     fontWeight: '600',
-    color: '#569cd6 !important',
+    color: 'var(--evn-syntax-heading) !important',
   },
   '.cm-md-mark-hidden': {
-    color: '#3e4a57 !important',
+    color: 'var(--evn-syntax-mark-hidden) !important',
     fontSize: '0.75em',
   },
   '.cm-md-mark-dim': {
-    color: '#4a5568 !important',
+    color: 'var(--evn-syntax-mark-dim) !important',
     opacity: '0.5',
   },
   '.cm-md-bold': {
     fontWeight: '700',
-    color: '#569cd6',
+    color: 'var(--evn-syntax-bold)',
   },
   '.cm-md-italic': {
     fontStyle: 'italic',
-    color: '#569cd6',
+    color: 'var(--evn-syntax-italic)',
   },
   '.cm-md-strike': {
     textDecoration: 'line-through',
-    color: '#6a6a6a',
+    color: 'var(--evn-syntax-strike)',
   },
   '.cm-md-inline-code': {
     fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: '0.88em',
-    background: '#2d2d2d',
+    background: 'var(--evn-bg-chip)',
     borderRadius: '3px',
     padding: '0 3px',
-    color: '#ce9178',
+    color: 'var(--evn-syntax-code)',
   },
   '.cm-md-code-block': {
     fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: '0.88em',
   },
   '.cm-md-hr': {
-    color: '#3e3e3e',
-    borderBottom: '1px solid #3e3e3e',
+    color: 'var(--evn-border-soft)',
+    borderBottom: '1px solid var(--evn-border-soft)',
     display: 'block',
   },
   '.cm-md-blockquote': {
-    borderLeft: '3px solid #6a9955',
+    borderLeft: '3px solid var(--evn-syntax-quote)',
     paddingLeft: '8px',
-    color: '#6a9955',
+    color: 'var(--evn-syntax-quote)',
     fontStyle: 'italic',
   },
   '.cm-md-link': {
-    color: '#3794ff',
+    color: 'var(--evn-syntax-link)',
     textDecoration: 'underline',
+  },
+  '.cm-external-link-icon': {
+    display: 'inline-block',
+    verticalAlign: 'middle',
+    marginLeft: '2px',
+    color: 'var(--evn-syntax-link)',
+    opacity: '0.7',
+    userSelect: 'none',
+    pointerEvents: 'none',
   },
   '.cm-checkbox-wrap': {
     display: 'inline-flex',
@@ -280,23 +318,23 @@ export const markdownDecorationTheme = EditorView.baseTheme({
     marginRight: '4px',
   },
   '.cm-task-checkbox': {
-    accentColor: '#007acc',
+    accentColor: 'var(--evn-accent)',
     width: '14px',
     height: '14px',
     cursor: 'pointer',
     margin: '0',
   },
   '.cm-bullet-todo': {
-    color: '#858585',
+    color: 'var(--evn-text-dimmed)',
     cursor: 'pointer',
     fontFamily: 'monospace',
-    '&:hover': { color: '#cccccc' },
+    '&:hover': { color: 'var(--evn-text)' },
   },
   '.cm-bullet-done': {
-    color: '#6a9955',
+    color: 'var(--evn-syntax-comment)',
     cursor: 'pointer',
     fontFamily: 'monospace',
-    '&:hover': { color: '#cccccc' },
+    '&:hover': { color: 'var(--evn-text)' },
   },
   '.cm-hidden-mark': {
     display: 'none',

@@ -2,17 +2,19 @@ import {
   Component, inject, OnDestroy, signal, computed, effect,
   ViewChild, ElementRef, ChangeDetectionStrategy
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { PaletteService } from '../../core/services/palette.service';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
-import { PaletteResult } from '../../core/models/note.model';
+import { SettingsService } from '../../core/services/settings.service';
+import { LayoutService } from '../../core/services/layout.service';
+import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.model';
 
 @Component({
   selector: 'app-palette',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isOpen()) {
@@ -110,6 +112,8 @@ export class PaletteComponent implements OnDestroy {
   private palette = inject(PaletteService);
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
+  private settings = inject(SettingsService);
+  private layout = inject(LayoutService);
 
   @ViewChild('inputEl') inputEl!: ElementRef<HTMLInputElement>;
 
@@ -132,48 +136,83 @@ export class PaletteComponent implements OnDestroy {
     }
   });
 
-  private readonly commands: PaletteResult[] = [
-    {
-      type: 'command',
-      command: {
-        id: 'new-note', label: 'New Note', shortcut: 'Ctrl+N',
-        description: 'Create a new empty note', category: 'note',
-        action: () => this.createNote(),
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'global-search', label: 'Search Notes', shortcut: 'Ctrl+Shift+F',
-        description: 'Search across all notes', category: 'note',
-        action: () => { this.palette.open('search'); }
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'close-tab', label: 'Close Tab', shortcut: 'Ctrl+W',
-        description: 'Close the current tab', category: 'action',
-        action: () => this.tabs.closeActiveTab(),
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'next-tab', label: 'Next Tab', shortcut: 'Ctrl+Tab',
-        description: 'Switch to next tab', category: 'action',
-        action: () => this.tabs.nextTab(),
-      }
-    },
-    {
-      type: 'command',
-      command: {
-        id: 'prev-tab', label: 'Previous Tab', shortcut: 'Ctrl+Shift+Tab',
-        description: 'Switch to previous tab', category: 'action',
-        action: () => this.tabs.prevTab(),
-      }
-    },
-  ];
+  // A getter: the displayed shortcuts follow the user's bindings
+  private get commands(): PaletteResult[] {
+    return [
+      {
+        type: 'command',
+        command: {
+          id: 'new-note', label: 'New Note', shortcut: this.settings.shortcutLabel('note.new'),
+          description: 'Create a new empty note', category: 'note',
+          action: () => this.createNote(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'global-search', label: 'Search Notes', shortcut: this.settings.shortcutLabel('search.global'),
+          description: 'Search across all notes', category: 'note',
+          action: () => { this.palette.open('search'); }
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'overlay-notes', label: 'Overlay Notes',
+          description: 'Open every quick note in a single document', category: 'note',
+          action: () => this.tabs.openOverlayNotes(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'graph-view', label: 'Graph View',
+          description: 'Show the links between notes on the home page', category: 'note',
+          action: () => this.openGraphView(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'copy-note-link', label: 'Copy Note Link',
+          description: 'Copy the note:// link to the current note', category: 'note',
+          action: () => { void this.copyNoteLink(); },
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'close-tab', label: 'Close Tab', shortcut: this.settings.shortcutLabel('tab.close'),
+          description: 'Close the current tab', category: 'action',
+          action: () => this.tabs.closeActiveTab(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'next-tab', label: 'Next Tab', shortcut: this.settings.shortcutLabel('tab.next'),
+          description: 'Switch to next tab', category: 'action',
+          action: () => this.tabs.nextTab(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'prev-tab', label: 'Previous Tab', shortcut: this.settings.shortcutLabel('tab.prev'),
+          description: 'Switch to previous tab', category: 'action',
+          action: () => this.tabs.prevTab(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'settings', label: 'Settings', shortcut: this.settings.shortcutLabel('settings.open'),
+          description: 'Global shortcut and quick-note overlay', category: 'settings',
+          action: () => this.settings.open(),
+        }
+      },
+    ];
+  }
 
   constructor() {
     // React to open/close state changes via Angular effect (replaces setInterval polling)
@@ -285,6 +324,19 @@ export class PaletteComponent implements OnDestroy {
         event.stopPropagation();
         this.close();
         break;
+    }
+  }
+
+  private openGraphView(): void {
+    this.layout.setHomeView('graph');
+    this.tabs.goHome();
+  }
+
+  private async copyNoteLink(): Promise<void> {
+    const noteId = this.tabs.activeNoteId();
+
+    if (noteId !== null && noteId !== OVERLAY_NOTES_TAB_ID) {
+      await navigator.clipboard.writeText(`note://${noteId}`);
     }
   }
 

@@ -28,6 +28,12 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      # The app compares its own version (package.json) to the published one: it must match the tag
+      - name: Stamp version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
       - name: Install dependencies
         run: npm i
         
@@ -68,10 +74,37 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      # The app polls this manifest (releases/latest/download/latest.json) to offer updates
+      - name: Generate update manifest (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          INSTALLER=$(ls release/*Setup*.exe | head -n 1)
+          # GitHub turns spaces into dots in asset names: the manifest must use the published name
+          export FILENAME=$(basename "$INSTALLER" | tr ' ' '.')
+          export SHA512=$(sha512sum "$INSTALLER" | cut -d ' ' -f 1)
+          export VERSION="${TAG#v}"
+          export URL="https://github.com/${REPOSITORY}/releases/download/${TAG}/${FILENAME}"
+          node -e "
+            require('node:fs').writeFileSync('release/latest.json', JSON.stringify({
+              version: process.env.VERSION,
+              path: process.env.FILENAME,
+              url: process.env.URL,
+              sha512: process.env.SHA512,
+            }, null, 2));
+          "
+          cat release/latest.json
+
       - name: Create GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.exe
+          files: |
+            release/*.exe
+            release/latest.json
           draft: true
           generate_release_notes: true

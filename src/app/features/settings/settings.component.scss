@@ -1,0 +1,222 @@
+// Mirrors the VS Code (Dark Modern) settings editor, inside a modal
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade-in 0.12s ease;
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(960px, calc(100vw - 48px));
+  height: min(680px, calc(100vh - 48px));
+  background: var(--evn-bg-modal);
+  border: 1px solid var(--evn-border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color: var(--evn-text);
+  font-size: 13px;
+  // Labels and descriptions are not content to select; text fields stay selectable (see below)
+  user-select: none;
+  animation: modal-in 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.header {
+  flex: none;
+  padding: 10px 20px 12px;
+  border-bottom: 1px solid var(--evn-border-subtle);
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--evn-text-soft);
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--evn-text-soft);
+  cursor: pointer;
+
+  &:hover { background: rgba(var(--evn-hover-rgb), 0.08); color: var(--evn-text); }
+}
+
+.search {
+  position: relative;
+
+  input {
+    width: 100%;
+    padding: 7px 130px 7px 10px;
+    background: var(--evn-bg-input);
+    border: 1px solid var(--evn-border-soft);
+    border-radius: 4px;
+    color: var(--evn-text);
+    font: inherit;
+    font-size: 14px;
+    outline: none;
+
+    &:focus { border-color: var(--evn-accent); }
+    &::placeholder { color: var(--evn-text-dimmed); }
+  }
+}
+
+.count {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--evn-text-dimmed);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.toc {
+  flex: none;
+  width: 200px;
+  padding: 12px 0;
+  border-right: 1px solid var(--evn-border-subtle);
+  overflow-y: auto;
+}
+
+.toc-item {
+  display: block;
+  width: 100%;
+  padding: 4px 20px;
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--evn-text-soft);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover { color: var(--evn-text); background: rgba(var(--evn-hover-rgb), 0.04); }
+  &.active { color: var(--evn-text-bright); font-weight: 600; }
+}
+
+.list {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 0 24px 24px 12px;
+}
+
+h2 {
+  margin: 18px 0 6px 14px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--evn-text-strong);
+}
+
+.setting {
+  position: relative;
+  padding: 10px 14px 14px;
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
+
+  &:hover { background: rgba(var(--evn-hover-rgb), 0.04); }
+  // VS Code's "modified" indicator
+  &.modified { border-left-color: var(--evn-accent); }
+  &:hover .reset { opacity: 1; }
+}
+
+.setting-title {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+  color: var(--evn-text-strong);
+
+  .category { color: var(--evn-text); }
+}
+
+.reset {
+  margin-left: 8px;
+  background: none;
+  border: none;
+  color: var(--evn-text-soft);
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.1s;
+
+  &:hover { color: var(--evn-text); }
+  &:focus-visible { opacity: 1; }
+}
+
+.description {
+  color: var(--evn-text-soft);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+app-checkbox .description { margin-bottom: 0; }
+
+app-select { display: block; max-width: 360px; }
+
+input { user-select: text; }
+
+.control {
+  min-width: 240px;
+  padding: 4px 8px;
+  background: var(--evn-bg-input);
+  border: 1px solid var(--evn-border-soft);
+  border-radius: 2px;
+  color: var(--evn-text);
+  font: inherit;
+  outline: none;
+
+  &:focus { border-color: var(--evn-accent); }
+}
+
+input.control { width: 120px; min-width: 0; }
+
+.shortcut {
+  cursor: pointer;
+  text-align: left;
+
+  &.recording { border-color: var(--evn-accent); color: var(--evn-accent-text); }
+}
+
+.error {
+  margin-top: 6px;
+  color: var(--evn-danger);
+  font-size: 12px;
+}
+
+.empty {
+  padding: 24px 14px;
+  color: var(--evn-text-soft);
+}

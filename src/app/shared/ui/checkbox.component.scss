@@ -1,0 +1,38 @@
+:host {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.box {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  box-sizing: border-box;
+  background: var(--evn-bg-input);
+  border: 1px solid var(--evn-border-soft);
+  border-radius: 3px;
+  color: #fff;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+:host(:hover) .box { border-color: var(--evn-text-faint); }
+
+:host(.checked) .box {
+  background: var(--evn-accent);
+  border-color: var(--evn-accent);
+}
+
+:host(:focus-visible) .box {
+  outline: 1px solid var(--evn-accent);
+  outline-offset: 2px;
+}
+
+.label { min-width: 0; }

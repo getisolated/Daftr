@@ -1,5 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Tab } from '../models/note.model';
+import { OVERLAY_NOTES_TAB_ID, Tab } from '../models/note.model';
+import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
 
 const SESSION_KEY = 'evnote-session';
 
@@ -22,6 +23,10 @@ export class TabsService {
     return this.activeTab()?.noteId ?? null;
   });
 
+  isOpen(noteId: number): boolean {
+    return this._tabs().some(t => t.noteId === noteId);
+  }
+
   /** Number of pinned tabs (always at the start of the array). */
   readonly pinnedCount = computed(() =>
     this._tabs().filter(t => t.isPinned).length
@@ -35,7 +40,7 @@ export class TabsService {
       if (raw) {
         const parsed = JSON.parse(raw) as { tabs: Tab[]; activeIndex: number };
         const validTabs = parsed.tabs
-          .filter(t => validNoteIds.has(t.noteId))
+          .filter(t => validNoteIds.has(t.noteId) || t.noteId === OVERLAY_NOTES_TAB_ID)
           .map(t => ({ ...t, isPinned: t.isPinned ?? false }));
         if (validTabs.length > 0) {
           this._tabs.set(validTabs);
@@ -73,6 +78,10 @@ export class TabsService {
     this.persist();
   }
 
+  openOverlayNotes(): void {
+    this.openNote(OVERLAY_NOTES_TAB_ID, 'Overlay notes');
+  }
+
   closeTab(index: number): void {
     const tabs = this._tabs();
     if (index < 0 || index >= tabs.length) return;
@@ -102,6 +111,24 @@ export class TabsService {
   closeByNoteId(noteId: number): void {
     const idx = this._tabs().findIndex(t => t.noteId === noteId);
     if (idx >= 0) this.closeTab(idx);
+  }
+
+  /** Closes every tab but the one at `index` (pinned tabs stay), which becomes the active one when needed. */
+  closeOthers(index: number): void {
+    const kept = this._tabs()[index];
+    if (!kept) return;
+    this.applyClosing(closeTabsWhere(this._tabs(), this.activeNoteId(), t => t.noteId !== kept.noteId, kept.noteId));
+  }
+
+  /** Closes every tab except the pinned ones. */
+  closeAll(): void {
+    this.applyClosing(closeTabsWhere(this._tabs(), this.activeNoteId(), () => true));
+  }
+
+  private applyClosing(result: TabsAfterClosing): void {
+    this._tabs.set(result.tabs);
+    this._activeIndex.set(result.activeIndex);
+    this.persist();
   }
 
   nextTab(): void {
