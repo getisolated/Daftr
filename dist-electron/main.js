@@ -44,10 +44,17 @@ const settings_1 = require("./settings");
 const settings_schema_1 = require("./settings-schema");
 const startup_1 = require("./startup");
 const tray_1 = require("./tray");
+const updater_1 = require("./updater");
 const isDev = process.env['NODE_ENV'] === 'development';
 let mainWindow = null;
 // Closing the window only hides it to the tray; a real quit comes from the tray menu (or the OS)
 let isQuitting = false;
+/** Window color shown before the renderer paints: matches the theme so a light theme does not flash dark. */
+function windowBackgroundColor() {
+    const { theme } = (0, settings_1.getSettings)();
+    const isDark = theme === 'system' ? main_1.nativeTheme.shouldUseDarkColors : theme === 'dark';
+    return isDark ? '#1e1e1e' : '#ffffff';
+}
 function createWindow(showOnReady = true) {
     mainWindow = new main_1.BrowserWindow({
         show: false,
@@ -56,7 +63,7 @@ function createWindow(showOnReady = true) {
         minWidth: 600,
         minHeight: 400,
         frame: false,
-        backgroundColor: '#1e1e1e',
+        backgroundColor: windowBackgroundColor(),
         titleBarStyle: 'hidden',
         icon: path.join(__dirname, '../assets/logo.ico'),
         webPreferences: {
@@ -131,6 +138,7 @@ main_1.app.whenReady().then(() => {
     if (!(0, global_shortcut_1.registerGlobalShortcut)(settings.globalShortcut, onGlobalShortcut)) {
         console.error(`[Shortcut] Unable to register ${settings.globalShortcut}`);
     }
+    (0, updater_1.startUpdater)();
     main_1.app.on('activate', () => {
         if (!mainWindow)
             createWindow();
@@ -143,6 +151,7 @@ main_1.app.on('before-quit', () => {
     (0, database_1.closeDatabase)();
 });
 main_1.app.on('will-quit', () => {
+    (0, updater_1.stopUpdater)();
     (0, global_shortcut_1.unregisterGlobalShortcuts)();
     (0, tray_1.destroyTray)();
 });
@@ -179,6 +188,7 @@ safeHandle('notes:create', (e, title, content, tags, folderId) => {
 });
 safeHandle('notes:update', (_e, id, data) => database_1.noteOps.update(id, data) ?? null);
 safeHandle('notes:move', (_e, id, folderId) => database_1.noteOps.moveToFolder(id, typeof folderId === 'number' ? folderId : null) ?? null);
+safeHandle('notes:place', (_e, id, folderId, orderedIds) => database_1.noteOps.place(id, typeof folderId === 'number' ? folderId : null, parseIds(orderedIds)) ?? null);
 safeHandle('notes:delete', (_e, id) => { database_1.noteOps.delete(id); return true; });
 safeHandle('notes:search', (_e, query) => database_1.noteOps.search(query));
 safeHandle('notes:byTag', (_e, tag) => database_1.noteOps.getByTag(tag));
@@ -187,10 +197,14 @@ safeHandle('notes:allTags', () => database_1.noteOps.getAllTags());
 function parseParentId(value) {
     return typeof value === 'number' ? value : null;
 }
+function parseIds(value) {
+    return Array.isArray(value) ? value.filter((id) => typeof id === 'number') : [];
+}
 safeHandle('folders:getAll', () => database_1.folderOps.getAll());
 safeHandle('folders:create', (_e, name, parentId) => database_1.folderOps.create(name, parseParentId(parentId)) ?? null);
 safeHandle('folders:rename', (_e, id, name) => database_1.folderOps.rename(id, name) ?? null);
 safeHandle('folders:move', (_e, id, parentId) => database_1.folderOps.move(id, parseParentId(parentId)) ?? null);
+safeHandle('folders:place', (_e, id, parentId, orderedIds) => database_1.folderOps.place(id, parseParentId(parentId), parseIds(orderedIds)) ?? null);
 safeHandle('folders:delete', (e, id, mode) => {
     // Anything but an explicit "deleteAll" keeps the notes: the safe choice if the payload is malformed
     const deletedNoteIds = database_1.folderOps.delete(id, mode === 'deleteAll' ? 'deleteAll' : 'moveToRoot');
@@ -212,10 +226,16 @@ safeHandle('settings:set', (e, patch) => {
     if (next.launchAtStartup !== before.launchAtStartup) {
         (0, startup_1.applyLaunchAtStartup)(next.launchAtStartup);
     }
+    if (next.autoUpdate !== before.autoUpdate) {
+        (0, updater_1.onAutoUpdateChanged)();
+    }
     (0, overlay_1.broadcastToWindows)('settings:changed', (0, settings_1.getSettings)(), e.sender);
     return { ok: true, settings: (0, settings_1.getSettings)() };
 });
 safeHandle('overlay:hide', () => (0, overlay_1.hideOverlay)());
+// ── Updates ──────────────────────────────────────────────────────────────────
+safeHandle('update:getInfo', () => (0, updater_1.getUpdateInfo)());
+safeHandle('update:apply', () => (0, updater_1.applyUpdate)());
 // ── Shell ─────────────────────────────────────────────────────────────────────
 safeHandle('shell:openExternal', (_e, url) => {
     if (typeof url !== 'string' || !(url.startsWith('http://') || url.startsWith('https://'))) {

@@ -60,6 +60,20 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     ],
   },
   {
+    key: 'showLineNumbers',
+    category: 'Editor',
+    title: 'Line Numbers',
+    description: 'Show the line numbers on the left of the editor.',
+    control: 'checkbox',
+  },
+  {
+    key: 'wordWrap',
+    category: 'Editor',
+    title: 'Word Wrap',
+    description: 'Wrap long lines at the edge of the editor. When unchecked, they scroll horizontally.',
+    control: 'checkbox',
+  },
+  {
     key: 'formattingBarEnabled',
     category: 'Formatting Bar',
     title: 'Show Formatting Bar',

@@ -2,6 +2,8 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { OVERLAY_NOTES_TAB_ID } from '../models/note.model';
 import { OVERLAY_NOTE_TAG } from '../models/settings.model';
 import { Backlink, buildNoteGraph, findBacklinks, NoteGraph } from '../utils/note-links.util';
+import { createLinkResolver } from '../utils/note-paths.util';
+import { FoldersService } from './folders.service';
 import { NotesService } from './notes.service';
 import { SidebarStateService } from './sidebar-state.service';
 import { TabsService } from './tabs.service';
@@ -10,6 +12,7 @@ import { TabsService } from './tabs.service';
 @Injectable({ providedIn: 'root' })
 export class BacklinksService {
   private notes = inject(NotesService);
+  private folders = inject(FoldersService);
   private tabs = inject(TabsService);
   private sidebarState = inject(SidebarStateService);
 
@@ -39,10 +42,13 @@ export class BacklinksService {
     this.notes.notes().filter(n => !n.tags.includes(OVERLAY_NOTE_TAG))
   );
 
+  /** Resolves `[label](Folder/Note title)` links; follows the renames and moves. */
+  private readonly resolver = computed(() => createLinkResolver(this.linkableNotes(), this.folders.folders()));
+
   /** Notes linking to the active one; follows the active tab and the edits. */
   readonly backlinks = computed<Backlink[]>(() => {
     const activeId = this.tabs.activeNoteId();
-    return activeId === null || activeId === OVERLAY_NOTES_TAB_ID ? [] : findBacklinks(this.linkableNotes(), activeId);
+    return activeId === null || activeId === OVERLAY_NOTES_TAB_ID ? [] : findBacklinks(this.linkableNotes(), activeId, this.resolver());
   });
 
   /** Graph of the folder selected in the sidebar (everything when none is). */
@@ -50,6 +56,7 @@ export class BacklinksService {
     folderId: this.sidebarState.selectedFolderId(),
     focusId: this.referenceNoteId(),
     hideOrphans: this._hideOrphans(),
+    resolve: this.resolver(),
   }));
 
   toggleHideOrphans(): void {

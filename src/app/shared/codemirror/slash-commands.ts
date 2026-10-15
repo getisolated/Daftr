@@ -4,10 +4,9 @@ import {
 } from '@codemirror/view';
 import { StateField, StateEffect, EditorState, Transaction } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
-import { createEmptyTable } from './markdown-table';
 import { FormatId } from '../../core/models/formatting-bar.model';
 import {
-  FORMAT_ACTIONS, ICONS, insertCodeBlock, insertHorizontalRule, insertLinePrefix, insertWrap,
+  FORMAT_ACTIONS, insertCodeBlock, insertHorizontalRule, insertLinePrefix, insertTable, insertWrap,
 } from './formatting-commands';
 
 // ─── Slash Command Definitions ───────────────────────────────────────────────
@@ -31,21 +30,6 @@ export function isInCodeBlock(state: EditorState, pos: number): boolean {
   return false;
 }
 
-/** Replaces the slash line with an empty 2×2 table, the caret in its first header cell */
-function insertTable(view: EditorView, range: { from: number; to: number }) {
-  const line = view.state.doc.lineAt(range.from);
-  // A table cannot interrupt a paragraph: keep a blank line before it
-  const needsBlankLine = line.number > 1 && view.state.doc.line(line.number - 1).text.trim() !== '';
-  const prefix = needsBlankLine ? '\n' : '';
-  const { text, cells } = createEmptyTable();
-
-  view.dispatch({
-    changes: { from: line.from, to: line.to, insert: `${prefix}${text}` },
-    selection: { anchor: line.from + prefix.length + cells[0]![0]!.from },
-  });
-  view.focus();
-}
-
 export const slashCommands: SlashCommand[] = [
   // ── Style ──
   slashCommand('paragraph', 'Style', (view, range) => insertLinePrefix(view, range, '')),
@@ -65,11 +49,7 @@ export const slashCommands: SlashCommand[] = [
   slashCommand('inlineCode', 'Formatage', (view, range) => insertWrap(view, range, '`', '`', 'code')),
   // ── Insérer ──
   slashCommand('hr', 'Insérer', (view, range) => insertHorizontalRule(view, range)),
-  {
-    id: 'table', label: 'Tableau', group: 'Insérer', icon: ICONS.table,
-    description: 'Tableau 2×2',
-    execute: (view, range) => insertTable(view, range),
-  },
+  slashCommand('table', 'Insérer', (view, range) => insertTable(view, range)),
 ];
 
 /** Label, icon and description come from the shared formatting actions, so the slash menu and the toolbar never drift. */

@@ -26,6 +26,10 @@ export interface AppSettings {
   formattingBarMode: FormattingBarMode;
   formattingBarStyle: FormattingBarStyle;
   formattingBarPosition: FormattingBarPosition;
+  /** Line numbers in the left gutter of the editor. */
+  showLineNumbers: boolean;
+  /** true: long lines wrap at the editor edge. false: they scroll horizontally. */
+  wordWrap: boolean;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -50,6 +54,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   formattingBarMode: 'full',
   formattingBarStyle: 'pinned',
   formattingBarPosition: 'top',
+  showLineNumbers: true,
+  wordWrap: true,
 };
 
 export const OVERLAY_NOTE_TAG = 'overlay';

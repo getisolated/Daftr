@@ -4,7 +4,7 @@ import { EditorView } from '@codemirror/view';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { ensureSyntaxTree } from '@codemirror/language';
 import {
-  detectActiveFormats, insertRuleBelow, toggleCodeBlock, toggleInlineMark, toggleLineKind,
+  detectActiveFormats, insertRuleBelow, insertTableBelow, toggleCodeBlock, toggleInlineMark, toggleLineKind,
 } from '../src/app/shared/codemirror/formatting-commands';
 
 /** Minimal stand-in for EditorView (no DOM in the test environment): only state, dispatch and focus are used. */
@@ -160,5 +160,33 @@ describe('detectActiveFormats', () => {
   it('reports quotes and code blocks', () => {
     expect(formats('> a', 3)).toEqual(expect.arrayContaining(['quote']));
     expect(formats('```\ncode\n```', 6)).toEqual(['codeBlock']);
+  });
+});
+
+describe('table and draft actions', () => {
+  it('inserts a table below the current line, after a blank line', () => {
+    const view = createView('text', 2);
+    insertTableBelow(view);
+    expect(view.state.doc.toString().startsWith('text\n\n|')).toBe(true);
+  });
+
+  it('inserts the table in place on a blank line', () => {
+    const view = createView('', 0);
+    insertTableBelow(view);
+    expect(view.state.doc.toString().startsWith('|')).toBe(true);
+  });
+
+  it('does not nest a table in a table', () => {
+    const view = createView('| a | b |\n| --- | --- |\n| c | d |', 3);
+    const before = view.state.doc.toString();
+    insertTableBelow(view);
+    expect(view.state.doc.toString()).toBe(before);
+    expect(detectActiveFormats(view.state).has('table')).toBe(true);
+  });
+
+  it('reports the draft block under the caret', () => {
+    const doc = '<!-- draft -->\nwip\n<!-- /draft -->\nafter';
+    expect(detectActiveFormats(createView(doc, 16).state).has('draft')).toBe(true);
+    expect(detectActiveFormats(createView(doc, 40).state).has('draft')).toBe(false);
   });
 });

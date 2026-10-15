@@ -18,6 +18,7 @@ const api = {
     createNote: (title, content, tags, folderId) => renderer_1.ipcRenderer.invoke('notes:create', title, content, tags, folderId),
     updateNote: (id, data) => renderer_1.ipcRenderer.invoke('notes:update', id, data),
     moveNote: (id, folderId) => renderer_1.ipcRenderer.invoke('notes:move', id, folderId),
+    placeNote: (id, folderId, orderedIds) => renderer_1.ipcRenderer.invoke('notes:place', id, folderId, orderedIds),
     deleteNote: (id) => renderer_1.ipcRenderer.invoke('notes:delete', id),
     searchNotes: (query) => renderer_1.ipcRenderer.invoke('notes:search', query),
     getNotesByTag: (tag) => renderer_1.ipcRenderer.invoke('notes:byTag', tag),
@@ -27,10 +28,14 @@ const api = {
     createFolder: (name, parentId) => renderer_1.ipcRenderer.invoke('folders:create', name, parentId),
     renameFolder: (id, name) => renderer_1.ipcRenderer.invoke('folders:rename', id, name),
     moveFolder: (id, parentId) => renderer_1.ipcRenderer.invoke('folders:move', id, parentId),
+    placeFolder: (id, parentId, orderedIds) => renderer_1.ipcRenderer.invoke('folders:place', id, parentId, orderedIds),
     deleteFolder: (id, mode) => renderer_1.ipcRenderer.invoke('folders:delete', id, mode),
     // Settings
     getSettings: () => renderer_1.ipcRenderer.invoke('settings:get'),
     setSettings: (patch) => renderer_1.ipcRenderer.invoke('settings:set', patch),
+    // Updates
+    getUpdateInfo: () => renderer_1.ipcRenderer.invoke('update:getInfo'),
+    applyUpdate: () => renderer_1.ipcRenderer.invoke('update:apply'),
     // Overlay
     hideOverlay: () => renderer_1.ipcRenderer.invoke('overlay:hide'),
     // Events pushed by the main process; each returns an unsubscribe function
@@ -38,6 +43,10 @@ const api = {
     onOverlayBackdrop: (callback) => subscribe('overlay:backdrop', callback),
     onNotesChanged: (callback) => subscribe('notes:changed', callback),
     onSettingsChanged: (callback) => subscribe('settings:changed', callback),
+    onUpdateAvailable: (callback) => subscribe('update:available', callback),
+    onUpdateProgress: (callback) => subscribe('update:progress', callback),
+    onUpdateDownloaded: (callback) => subscribe('update:downloaded', callback),
+    onUpdateDownloadFailed: (callback) => subscribe('update:download-failed', callback),
     onOpenSettings: (callback) => subscribe('settings:open', callback),
     // Shell
     openExternal: (url) => renderer_1.ipcRenderer.invoke('shell:openExternal', url),

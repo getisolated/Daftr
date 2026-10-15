@@ -5,7 +5,7 @@ import {
 
 
 // CodeMirror
-import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
+import { EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
 import { Compartment, EditorState, Extension, Prec } from '@codemirror/state';
 import {
   defaultKeymap, history, historyKeymap, indentWithTab,
@@ -21,6 +21,12 @@ import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
+import { linkNavigation } from '../../shared/codemirror/link-navigation';
+import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
+import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
+import { createLinkResolver } from '../../core/utils/note-paths.util';
+import { FoldersService } from '../../core/services/folders.service';
+import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
@@ -78,6 +84,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   @ViewChild('editorHost') editorHost!: ElementRef<HTMLElement>;
 
   private notes = inject(NotesService);
+  private folders = inject(FoldersService);
+  private bridge = inject(ElectronBridgeService);
   private tabs = inject(TabsService);
   private settingsService = inject(SettingsService);
   private themeService = inject(ThemeService);
@@ -89,6 +97,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private editorView: EditorView | null = null;
   private readonly shortcutsCompartment = new Compartment();
   private readonly themeCompartment = new Compartment();
+  private readonly lineNumbersCompartment = new Compartment();
+  private readonly wrapCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
   private loadGeneration = 0;
@@ -108,6 +118,19 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.themeService.theme();
       untracked(() => {
         this.editorView?.dispatch({ effects: this.themeCompartment.reconfigure(this.buildThemeMode()) });
+      });
+    });
+
+    effect(() => {
+      this.settingsService.settings().showLineNumbers;
+      this.settingsService.settings().wordWrap;
+      untracked(() => {
+        this.editorView?.dispatch({
+          effects: [
+            this.lineNumbersCompartment.reconfigure(this.buildLineNumbers()),
+            this.wrapCompartment.reconfigure(this.buildWrapping()),
+          ],
+        });
       });
     });
 
@@ -222,15 +245,33 @@ export class EditorComponent implements OnDestroy, OnChanges {
         minHeight: '100%',
         caretColor: 'var(--evn-caret)',
         maxWidth: '780px',
-        margin: '0 auto',
       },
       '.cm-scroller': {
+        justifyContent: 'center',
         fontFamily: 'Consolas, "Courier New", monospace',
         lineHeight: '1.65',
         overflow: 'auto',
       },
       '.cm-line': {
         padding: '0',
+      },
+      '.cm-gutters': {
+        background: 'transparent',
+        border: 'none',
+        color: 'var(--evn-text-faint)',
+        userSelect: 'none',
+      },
+      // Numbers hug the text, left-aligned like in VS Code: the gutter and the content are centered together
+      '.cm-lineNumbers .cm-gutterElement': {
+        padding: '0 0 0 8px',
+        textAlign: 'left',
+        // Centered on the line: the headings are taller than the text
+        display: 'flex',
+        alignItems: 'center',
+        fontSize: '12px',
+      },
+      '&.cm-with-numbers .cm-content': {
+        paddingLeft: '16px',
       },
       '&.cm-focused .cm-cursor': {
         borderLeftColor: 'var(--evn-caret)',
@@ -241,7 +282,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
       '.cm-activeLine': {
         background: 'rgba(var(--evn-hover-rgb), 0.02)',
       },
-      '.cm-gutters': { display: 'none' },
       '.cm-search': {
         background: 'var(--evn-bg-chip)',
         border: '1px solid var(--evn-border)',
@@ -275,6 +315,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
       markdownDecorationPlugin,
       ...slashCommandExtensions,
       ...tableExtensions,
+      noteLinkCompletion({
+        notes: () => this.notes.notes().filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)),
+        folders: () => this.folders.folders(),
+      }),
       drawSelection(),
       dropCursor(),
       highlightActiveLine(),
@@ -311,7 +355,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
       ]),
       this.shortcutsCompartment.of(this.buildShortcutsKeymap()),
       updateListener,
-      EditorView.lineWrapping,
+      this.wrapCompartment.of(this.buildWrapping()),
+      this.lineNumbersCompartment.of(this.buildLineNumbers()),
+      linkNavigation(target => this.followLink(target)),
       // The concatenated overlay notes cannot be mapped back to their individual notes, hence no drafts either
       ...(readOnly
         ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme]
@@ -389,6 +435,36 @@ export class EditorComponent implements OnDestroy, OnChanges {
       view.focus();
     } else if (id.startsWith('table:') && view) {
       applyTableAction(view, id.slice('table:'.length) as TableAction);
+    }
+  }
+
+  private buildLineNumbers(): Extension {
+    return this.settingsService.settings().showLineNumbers
+      ? [lineNumbers(), EditorView.editorAttributes.of({ class: 'cm-with-numbers' })]
+      : [];
+  }
+
+  private buildWrapping(): Extension {
+    return this.settingsService.settings().wordWrap ? EditorView.lineWrapping : [];
+  }
+
+  /** Ctrl+click on a link: a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
+  private followLink(target: string): void {
+    const noteUrl = /^note:\/\/(?<id>\d+)$/.exec(target.trim());
+    const notes = this.notes.notes();
+    let noteId: number | null = noteUrl?.groups?.['id'] ? Number(noteUrl.groups['id']) : null;
+
+    if (noteId === null && /^https?:\/\//i.test(target.trim())) {
+      void this.bridge.openExternal(target.trim());
+      return;
+    }
+
+    noteId ??= createLinkResolver(notes.filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)), this.folders.folders())(target);
+
+    const note = notes.find(n => n.id === noteId);
+
+    if (note) {
+      this.tabs.openNote(note.id, note.title || 'Untitled');
     }
   }
 

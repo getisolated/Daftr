@@ -35,6 +35,8 @@ export interface AppSettings {
   formattingBarMode: FormattingBarMode;
   formattingBarStyle: FormattingBarStyle;
   formattingBarPosition: FormattingBarPosition;
+  showLineNumbers: boolean;
+  wordWrap: boolean;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -61,6 +63,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   formattingBarMode: 'full',
   formattingBarStyle: 'pinned',
   formattingBarPosition: 'top',
+  showLineNumbers: true,
+  wordWrap: true,
   overlayPosition: null,
 };
 
@@ -119,6 +123,8 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     formattingBarMode: FORMATTING_BAR_MODES.find(mode => mode === raw['formattingBarMode']) ?? base.formattingBarMode,
     formattingBarStyle: FORMATTING_BAR_STYLES.find(style => style === raw['formattingBarStyle']) ?? base.formattingBarStyle,
     formattingBarPosition: FORMATTING_BAR_POSITIONS.find(position => position === raw['formattingBarPosition']) ?? base.formattingBarPosition,
+    showLineNumbers: typeof raw['showLineNumbers'] === 'boolean' ? raw['showLineNumbers'] : base.showLineNumbers,
+    wordWrap: typeof raw['wordWrap'] === 'boolean' ? raw['wordWrap'] : base.wordWrap,
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

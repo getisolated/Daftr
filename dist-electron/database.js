@@ -123,15 +123,21 @@ function initDatabase() {
     };
     ensureDefaultFolder();
 }
+/** `ALTER TABLE ... ADD COLUMN` is not idempotent, hence the check. */
+function addColumnIfMissing(table, column, definition) {
+    const columns = db.pragma(`table_info(${table})`);
+    if (!columns.some(existing => existing.name === column)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+}
 /**
- * Adds `notes.folder_id` to databases created before the folders existed. `ALTER TABLE ... ADD COLUMN`
- * is not idempotent, hence the check; existing notes get NULL, which means "at the root".
+ * Adds the folder-related columns to databases created before the folders existed. Existing notes get a NULL
+ * `folder_id` ("at the root"); a NULL `sort_order` means "never positioned by the user" (alphabetical order).
  */
 function migrateNotesFolderColumn() {
-    const columns = db.pragma('table_info(notes)');
-    if (!columns.some(column => column.name === 'folder_id')) {
-        db.exec('ALTER TABLE notes ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL');
-    }
+    addColumnIfMissing('notes', 'folder_id', 'INTEGER REFERENCES folders(id) ON DELETE SET NULL');
+    addColumnIfMissing('notes', 'sort_order', 'INTEGER');
+    addColumnIfMissing('folders', 'sort_order', 'INTEGER');
     db.exec('CREATE INDEX IF NOT EXISTS idx_notes_folder_id ON notes(folder_id)');
 }
 /** The default folder must always exist: the notes created on the fly land in it. */
@@ -201,7 +207,24 @@ exports.noteOps = {
         if (folderId !== null && !exports.folderOps.getById(folderId)) {
             return this.getById(id);
         }
-        db.prepare('UPDATE notes SET folder_id = ? WHERE id = ?').run(folderId, id);
+        // A note arriving in another folder loses its position there: it is listed after the positioned ones
+        db.prepare('UPDATE notes SET folder_id = ?, sort_order = CASE WHEN folder_id IS ? THEN sort_order ELSE NULL END WHERE id = ?')
+            .run(folderId, folderId, id);
+        return this.getById(id);
+    },
+    /**
+     * Puts the note in `folderId` at the position given by `orderedIds` (the ids of the whole folder content,
+     * in display order). Only the notes really in that folder are renumbered.
+     */
+    place(id, folderId, orderedIds) {
+        const moved = this.moveToFolder(id, folderId);
+        if (!moved || moved.folder_id !== folderId) {
+            return moved;
+        }
+        const setOrder = db.prepare('UPDATE notes SET sort_order = ? WHERE id = ? AND folder_id IS ?');
+        db.transaction(() => {
+            orderedIds.forEach((noteId, index) => setOrder.run(index + 1, noteId, folderId));
+        })();
         return this.getById(id);
     },
     delete(id) {
@@ -275,7 +298,26 @@ exports.folderOps = {
         if (parentId !== null && subtreeIds(id).includes(parentId)) {
             return undefined;
         }
-        db.prepare('UPDATE folders SET parent_id = ? WHERE id = ?').run(parentId, id);
+        db.prepare('UPDATE folders SET parent_id = ?, sort_order = CASE WHEN parent_id IS ? THEN sort_order ELSE NULL END WHERE id = ?')
+            .run(parentId, parentId, id);
+        return this.getById(id);
+    },
+    /**
+     * Puts the folder under `parentId` at the position given by `orderedIds` (the ids of all the children of
+     * that parent, in display order). Refused (`undefined`) when the move itself is, see `move`.
+     */
+    place(id, parentId, orderedIds) {
+        const folder = this.getById(id);
+        if (!folder) {
+            return undefined;
+        }
+        if (folder.parent_id !== parentId && !this.move(id, parentId)) {
+            return undefined;
+        }
+        const setOrder = db.prepare('UPDATE folders SET sort_order = ? WHERE id = ? AND parent_id IS ?');
+        db.transaction(() => {
+            orderedIds.forEach((folderId, index) => setOrder.run(index + 1, folderId, parentId));
+        })();
         return this.getById(id);
     },
     /**

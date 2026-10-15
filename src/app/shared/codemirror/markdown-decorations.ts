@@ -139,9 +139,30 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
 
         // ── Links ─────────────────────────────────────────────────
-        case 'Link':
+        case 'Link': {
           pending.push({ from, to, deco: Decoration.mark({ class: 'cm-md-link' }) });
+
+          // Off the link, only its label shows: `[` and `](target)` are hidden, like the other marks
+          if (!cursorInRange(view, from, to)) {
+            const marks: { from: number; to: number }[] = [];
+
+            for (let child = node.node.firstChild; child; child = child.nextSibling) {
+              if (child.name === 'LinkMark') {
+                marks.push({ from: child.from, to: child.to });
+              }
+            }
+
+            const open = marks[0];
+            const close = marks[1];
+
+            if (open && close && open.to < close.from) {
+              pending.push({ from: open.from, to: open.to, deco: Decoration.replace({}) });
+              pending.push({ from: close.from, to, deco: Decoration.replace({}) });
+            }
+          }
+
           break;
+        }
       }
     }
   });

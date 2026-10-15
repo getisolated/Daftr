@@ -3,6 +3,8 @@ import { EditorView } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import type { SyntaxNode } from '@lezer/common';
 import { FormatId } from '../../core/models/formatting-bar.model';
+import { findDraftBlocks, toggleDraft } from './draft-blocks';
+import { createEmptyTable } from './markdown-table';
 
 // ─── Slash menu primitives: they replace the `/query` range typed by the user ──
 
@@ -51,8 +53,23 @@ export function insertHorizontalRule(view: EditorView, range: { from: number; to
   view.focus();
 }
 
+/** Replaces the slash line with an empty 2×2 table, the caret in its first header cell */
+export function insertTable(view: EditorView, range: { from: number; to: number }): void {
+  const line = view.state.doc.lineAt(range.from);
+  // A table cannot interrupt a paragraph: keep a blank line before it
+  const needsBlankLine = line.number > 1 && view.state.doc.line(line.number - 1).text.trim() !== '';
+  const prefix = needsBlankLine ? '\n' : '';
+  const { text, cells } = createEmptyTable();
+
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: `${prefix}${text}` },
+    selection: { anchor: line.from + prefix.length + cells[0]![0]!.from },
+  });
+  view.focus();
+}
+
 // SVG icon paths (24x24 viewBox)
-export const ICONS: Record<FormatId | 'table', string> = {
+export const ICONS: Record<FormatId, string> = {
   paragraph: '<path d="M13 4a4 4 0 0 1 0 8H7v8m6-16v16m4-16v16" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   h1: '<path d="M4 12h6M4 6v12M10 6v12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><text x="15" y="18" font-size="12" font-weight="700" fill="currentColor">1</text>',
   h2: '<path d="M4 12h6M4 6v12M10 6v12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><text x="15" y="18" font-size="12" font-weight="700" fill="currentColor">2</text>',
@@ -67,6 +84,7 @@ export const ICONS: Record<FormatId | 'table', string> = {
   strikethrough: '<path d="M16 4a4 4 0 0 0-4.37-.37 4.95 4.95 0 0 0-3.39 2.87M4 12h16M12 12c5 0 5 8-1 8a3.5 3.5 0 0 1-3.5-3.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   inlineCode: '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   table: '<rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M3 10h18M3 15h18M9 4v16" stroke="currentColor" stroke-width="1.8" fill="none"/>',
+  draft: '<path d="M12 20h9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   hr: '<path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="12" r="1" fill="currentColor"/>',
   taskList: '<rect x="3" y="5" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M3.5 14.5h5v5h-5z" stroke="currentColor" stroke-width="1.8" fill="none" rx="1"/><path d="M11 8h10M11 17h10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M4.5 8l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
 };
@@ -234,6 +252,38 @@ export function insertRuleBelow(view: EditorView): void {
   view.focus();
 }
 
+/** Inserts an empty table: in place on a blank line, otherwise below the current line. Nothing happens inside a table. */
+export function insertTableBelow(view: EditorView): void {
+  const { state } = view;
+  const line = state.doc.lineAt(state.selection.main.head);
+
+  const names = new Set<string>();
+
+  collectAncestorNames(state, line.from + /^\s*/.exec(line.text)![0].length, 1, names);
+
+  if (names.has('Table')) {
+    view.focus();
+    return;
+  }
+
+  if (line.text.trim() !== '') {
+    // A table needs a blank line before it, and the following text stays out of it
+    const { text, cells } = createEmptyTable();
+    const insert = `\n\n${text}\n`;
+    view.dispatch({ changes: { from: line.to, insert }, selection: { anchor: line.to + 2 + cells[0]![0]!.from } });
+    view.focus();
+    return;
+  }
+
+  insertTable(view, { from: line.from, to: line.to });
+}
+
+/** Turns the selected lines into a draft block, or the draft under the caret back into text. */
+function toggleDraftAndFocus(view: EditorView): void {
+  toggleDraft(view);
+  view.focus();
+}
+
 // ─── Active formatting under the caret ───────────────────────────────────────
 
 function collectAncestorNames(state: EditorState, pos: number, side: -1 | 1, into: Set<string>): void {
@@ -265,6 +315,9 @@ export function detectActiveFormats(state: EditorState): Set<FormatId> {
   if (block.has('FencedCode')) active.add('codeBlock');
   if (block.has('Blockquote')) active.add('quote');
   if (block.has('HorizontalRule')) active.add('hr');
+  if (block.has('Table')) active.add('table');
+  const caretLine = line.number;
+  if (findDraftBlocks(state.doc).some(draft => caretLine >= draft.startLine && caretLine <= draft.endLine)) active.add('draft');
   if (block.has('Task')) active.add('taskList');
   else if (block.has('BulletList')) active.add('bulletList');
   if (block.has('OrderedList')) active.add('orderedList');
@@ -304,12 +357,14 @@ export const FORMAT_ACTIONS = Object.fromEntries([
   action('strikethrough', 'Barré', 'Texte barré', view => toggleInlineMark(view, '~~', 'Strikethrough')),
   action('inlineCode', 'Code', 'Code en ligne', view => toggleInlineMark(view, '`', 'InlineCode')),
   action('hr', 'Séparateur', 'Ligne horizontale', insertRuleBelow),
+  action('table', 'Tableau', 'Tableau 2×2', insertTableBelow),
+  action('draft', 'Brouillon', 'Bloc de brouillon', toggleDraftAndFocus),
 ]) as Record<FormatId, FormatAction>;
 
 /** Toolbar layout: one array per visual group. */
 export const FORMATTING_BAR_GROUPS: FormatId[][] = [
   ['paragraph', 'h1', 'h2', 'h3', 'h4'],
   ['bold', 'italic', 'strikethrough', 'inlineCode'],
-  ['codeBlock', 'quote', 'hr'],
+  ['codeBlock', 'quote', 'hr', 'table', 'draft'],
   ['bulletList', 'orderedList', 'taskList'],
 ];

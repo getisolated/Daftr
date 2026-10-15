@@ -6,5 +6,5 @@ export type FormattingBarPosition = 'top' | 'bottom';
 export type FormatId =
   | 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4'
   | 'bold' | 'italic' | 'strikethrough' | 'inlineCode'
-  | 'codeBlock' | 'quote' | 'hr'
+  | 'codeBlock' | 'quote' | 'hr' | 'table' | 'draft'
   | 'bulletList' | 'orderedList' | 'taskList';

@@ -24,6 +24,11 @@ describe('sanitizeSettings', () => {
     });
   });
 
+  it('keeps valid editor preferences and falls back to the current ones otherwise', () => {
+    expect(sanitizeSettings({ showLineNumbers: false, wordWrap: false })).toMatchObject({ showLineNumbers: false, wordWrap: false });
+    expect(sanitizeSettings({ showLineNumbers: 'no', wordWrap: 0 })).toMatchObject({ showLineNumbers: true, wordWrap: true });
+  });
+
   it('keeps a valid theme and falls back to the current one otherwise', () => {
     expect(sanitizeSettings({ theme: 'light' }).theme).toBe('light');
     expect(sanitizeSettings({ theme: 'system' }).theme).toBe('system');

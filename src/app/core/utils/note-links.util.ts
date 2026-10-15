@@ -1,3 +1,5 @@
+import { LinkResolver } from './note-paths.util';
+
 /** Minimal shape of a note needed to analyse its links (a `Note` satisfies it). */
 export interface LinkableNote {
   id: number;
@@ -39,6 +41,8 @@ export interface GraphOptions {
   focusId?: number | null;
   /** Notes without any link stay out of the graph. */
   hideOrphans?: boolean;
+  /** Resolves `[label](path)` links to notes; without it only `note://id` links count. */
+  resolve?: LinkResolver;
 }
 
 /** Above this many notes the graph is limited to what stays readable and fast. */
@@ -48,37 +52,57 @@ export const GRAPH_FOCUS_DEPTH = 2;
 
 const EXCERPT_RADIUS = 60;
 const NOTE_LINK = /note:\/\/(?<id>\d+)/g;
+/** `[label](target)` and `[label](<target with spaces>)`, an optional title after the target; images are left out. */
+const MARKDOWN_LINK = /(?<!!)\[[^\]\n]*\]\((?<target><[^>\n]*>|[^)\s\n]*)(?:\s+"[^"\n]*")?\)/g;
 
-/** Ids of the notes `content` links to (`note://id`), in order of appearance and without duplicates. */
-export function extractNoteLinks(content: string): number[] {
-  const ids = new Set<number>();
-
-  for (const match of content.matchAll(NOTE_LINK)) {
-    ids.add(Number(match.groups?.['id']));
-  }
-
-  return [...ids];
+interface LinkOccurrence {
+  noteId: number;
+  /** Position of the link in the content. */
+  index: number;
+  /** Length of the text standing for the link. */
+  length: number;
 }
 
-/** Text around the first `note://targetId` of `content`, on its line, with an ellipsis where it was cut. */
-export function extractLinkExcerpt(content: string, targetId: number): string {
-  const marker = `note://${targetId}`;
-  let index = content.indexOf(marker);
+/** Every link to a note found in `content`, in order of appearance: `note://id`, and `[label](path)` when `resolve` knows the path. */
+function findLinkOccurrences(content: string, resolve?: LinkResolver): LinkOccurrence[] {
+  const occurrences: LinkOccurrence[] = [];
 
-  // `note://12` must not match `note://123`
-  while (index !== -1 && /\d/.test(content.charAt(index + marker.length))) {
-    index = content.indexOf(marker, index + 1);
+  for (const match of content.matchAll(NOTE_LINK)) {
+    occurrences.push({ noteId: Number(match.groups?.['id']), index: match.index, length: match[0].length });
   }
 
-  if (index === -1) {
+  if (resolve) {
+    for (const match of content.matchAll(MARKDOWN_LINK)) {
+      const noteId = resolve(match.groups?.['target'] ?? '');
+
+      if (noteId !== null) {
+        occurrences.push({ noteId, index: match.index, length: match[0].length });
+      }
+    }
+  }
+
+  return occurrences.sort((a, b) => a.index - b.index);
+}
+
+/** Ids of the notes `content` links to, in order of appearance and without duplicates. */
+export function extractNoteLinks(content: string, resolve?: LinkResolver): number[] {
+  return [...new Set(findLinkOccurrences(content, resolve).map(o => o.noteId))];
+}
+
+/** Text around the first link to `targetId` in `content`, on its line, with an ellipsis where it was cut. */
+export function extractLinkExcerpt(content: string, targetId: number, resolve?: LinkResolver): string {
+  const occurrence = findLinkOccurrences(content, resolve).find(o => o.noteId === targetId);
+
+  if (!occurrence) {
     return '';
   }
 
+  const { index, length } = occurrence;
   const lineStart = content.lastIndexOf('\n', index) + 1;
   const lineEndRaw = content.indexOf('\n', index);
   const lineEnd = lineEndRaw === -1 ? content.length : lineEndRaw;
   const from = Math.max(lineStart, index - EXCERPT_RADIUS);
-  const to = Math.min(lineEnd, index + marker.length + EXCERPT_RADIUS);
+  const to = Math.min(lineEnd, index + length + EXCERPT_RADIUS);
   const prefix = from > lineStart ? '…' : '';
   const suffix = to < lineEnd ? '…' : '';
 
@@ -86,15 +110,15 @@ export function extractLinkExcerpt(content: string, targetId: number): string {
 }
 
 /** Notes linking to `targetId`, sorted by title. A note never backlinks itself. */
-export function findBacklinks(notes: readonly LinkableNote[], targetId: number): Backlink[] {
+export function findBacklinks(notes: readonly LinkableNote[], targetId: number, resolve?: LinkResolver): Backlink[] {
   const backlinks: Backlink[] = [];
 
   for (const note of notes) {
-    if (note.id === targetId || !extractNoteLinks(note.content).includes(targetId)) {
+    if (note.id === targetId || !extractNoteLinks(note.content, resolve).includes(targetId)) {
       continue;
     }
 
-    backlinks.push({ noteId: note.id, title: note.title || 'Untitled', excerpt: extractLinkExcerpt(note.content, targetId) });
+    backlinks.push({ noteId: note.id, title: note.title || 'Untitled', excerpt: extractLinkExcerpt(note.content, targetId, resolve) });
   }
 
   return backlinks.sort((a, b) => a.title.localeCompare(b.title));
@@ -135,7 +159,7 @@ function collectNeighbourhood(links: readonly GraphLink[], focusId: number, dept
  * Two notes linking each other keep one link per direction (A→B and B→A), so a cycle stays visible.
  */
 export function buildNoteGraph(notes: readonly LinkableNote[], options: GraphOptions = {}): NoteGraph {
-  const { folderId = null, focusId = null, hideOrphans = false } = options;
+  const { folderId = null, focusId = null, hideOrphans = false, resolve } = options;
   const scoped = folderId === null ? notes : notes.filter(n => n.folderId === folderId);
   const known = new Map(scoped.map(n => [n.id, n]));
   const existing = new Set(notes.map(n => n.id));
@@ -143,7 +167,7 @@ export function buildNoteGraph(notes: readonly LinkableNote[], options: GraphOpt
   const missing = new Set<number>();
 
   for (const note of scoped) {
-    for (const targetId of extractNoteLinks(note.content)) {
+    for (const targetId of extractNoteLinks(note.content, resolve)) {
       if (targetId === note.id) {
         continue;
       }

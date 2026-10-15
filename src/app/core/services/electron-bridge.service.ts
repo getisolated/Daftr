@@ -105,6 +105,8 @@ export class ElectronBridgeService {
   close(): Promise<void> { return this.api?.close() ?? Promise.resolve(); }
   isMaximized(): Promise<boolean> { return this.api?.isMaximized() ?? Promise.resolve(false); }
 
+  openExternal(url: string): Promise<void> { return this.api?.openExternal(url) ?? Promise.resolve(); }
+
   // Notes
   async getAllNotes(): Promise<Note[]> {
     if (!this.api) return [];
