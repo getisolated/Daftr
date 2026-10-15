@@ -47,7 +47,7 @@ const ARROW_SIZE = 6;
 /** Ticks run at once on the first layout, so the graph does not open as a ball exploding. */
 const WARMUP_TICKS = 150;
 /** Time constant (ms) of the dimming (about 95% reached after 3x) transition when hovering a node. */
-const DIM_DURATION = 300;
+const DIM_DURATION = 70;
 const DIM_ALPHA_NODE = 0.15;
 const DIM_ALPHA_LINK = 0.1;
 /** Duration (ms) of the animation played when the graph appears. */
