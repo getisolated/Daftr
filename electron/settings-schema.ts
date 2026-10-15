@@ -37,6 +37,10 @@ export interface AppSettings {
   formattingBarPosition: FormattingBarPosition;
   showLineNumbers: boolean;
   wordWrap: boolean;
+  /** true: the note always ends with an empty line, added automatically. */
+  trailingLine: boolean;
+  /** true: the h1/h2/h3 outline is shown on the right of the open note. */
+  showOutline: boolean;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -65,6 +69,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   formattingBarPosition: 'top',
   showLineNumbers: true,
   wordWrap: true,
+  trailingLine: false,
+  showOutline: true,
   overlayPosition: null,
 };
 
@@ -125,6 +131,8 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     formattingBarPosition: FORMATTING_BAR_POSITIONS.find(position => position === raw['formattingBarPosition']) ?? base.formattingBarPosition,
     showLineNumbers: typeof raw['showLineNumbers'] === 'boolean' ? raw['showLineNumbers'] : base.showLineNumbers,
     wordWrap: typeof raw['wordWrap'] === 'boolean' ? raw['wordWrap'] : base.wordWrap,
+    trailingLine: typeof raw['trailingLine'] === 'boolean' ? raw['trailingLine'] : base.trailingLine,
+    showOutline: typeof raw['showOutline'] === 'boolean' ? raw['showOutline'] : base.showOutline,
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

@@ -74,6 +74,20 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'trailingLine',
+    category: 'Editor',
+    title: 'Trailing Line',
+    description: 'Always keep an empty line at the end of a note, added automatically.',
+    control: 'checkbox',
+  },
+  {
+    key: 'showOutline',
+    category: 'Editor',
+    title: 'Outline',
+    description: 'Show the h1, h2 and h3 headings of the note on the right of the editor, to jump to a chapter.',
+    control: 'checkbox',
+  },
+  {
     key: 'formattingBarEnabled',
     category: 'Formatting Bar',
     title: 'Show Formatting Bar',

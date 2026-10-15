@@ -21,6 +21,7 @@ import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
+import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
@@ -30,6 +31,7 @@ import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
+import { LinkRenameService } from '../../core/services/link-rename.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { FormattingBarService } from '../../core/services/formatting-bar.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -46,6 +48,21 @@ import { Note, OVERLAY_NOTES_TAB_ID } from '../../core/models/note.model';
     <div class="editor-wrapper">
       @if (activeNote()) {
         <div class="editor-host" #editorHost></div>
+        @if (settingsService.settings().showOutline && headings().length) {
+          <nav class="toc" aria-label="Table of contents">
+            @for (heading of headings(); track heading.from; let i = $index) {
+              <button
+                type="button"
+                class="toc-item"
+                [class.toc-h2]="heading.level === 2"
+                [class.toc-h3]="heading.level === 3"
+                [class.active]="i === activeHeading()"
+                [title]="heading.text"
+                (click)="goToHeading(heading)"
+              >{{ heading.text }}</button>
+            }
+          </nav>
+        }
       } @else {
         <div class="editor-empty">
           <div class="empty-content">
@@ -84,14 +101,17 @@ export class EditorComponent implements OnDestroy, OnChanges {
   @ViewChild('editorHost') editorHost!: ElementRef<HTMLElement>;
 
   private notes = inject(NotesService);
+  private linkRename = inject(LinkRenameService);
   private folders = inject(FoldersService);
   private bridge = inject(ElectronBridgeService);
   private tabs = inject(TabsService);
-  private settingsService = inject(SettingsService);
+  protected settingsService = inject(SettingsService);
   private themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
 
   readonly activeNote = signal<Note | null>(null);
+  readonly headings = signal<OutlineHeading[]>([]);
+  readonly activeHeading = signal(-1);
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
 
   private editorView: EditorView | null = null;
@@ -99,6 +119,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private readonly themeCompartment = new Compartment();
   private readonly lineNumbersCompartment = new Compartment();
   private readonly wrapCompartment = new Compartment();
+  private readonly trailingLineCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
   private loadGeneration = 0;
@@ -124,9 +145,11 @@ export class EditorComponent implements OnDestroy, OnChanges {
     effect(() => {
       this.settingsService.settings().showLineNumbers;
       this.settingsService.settings().wordWrap;
+      this.settingsService.settings().trailingLine;
       untracked(() => {
         this.editorView?.dispatch({
           effects: [
+            this.trailingLineCompartment.reconfigure(this.buildTrailingLine()),
             this.lineNumbersCompartment.reconfigure(this.buildLineNumbers()),
             this.wrapCompartment.reconfigure(this.buildWrapping()),
           ],
@@ -203,6 +226,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private destroyEditor(): void {
     this.editorView?.destroy();
     this.editorView = null;
+    this.headings.set([]);
+    this.activeHeading.set(-1);
     this.formattingBar.attach(null);
   }
 
@@ -213,6 +238,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const updateListener = EditorView.updateListener.of(update => {
       if (update.docChanged || update.selectionSet) {
         this.formattingBar.refresh(update.state);
+      }
+      if (update.docChanged) {
+        this.refreshOutline(update.view);
       }
       if (update.docChanged && !this.isUpdatingFromModel) {
         const content = update.state.doc.toString();
@@ -357,7 +385,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
       updateListener,
       this.wrapCompartment.of(this.buildWrapping()),
       this.lineNumbersCompartment.of(this.buildLineNumbers()),
+      this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
+      EditorView.domEventHandlers({ scroll: (_event, view) => { this.refreshActiveHeading(view); } }),
       // The concatenated overlay notes cannot be mapped back to their individual notes, hence no drafts either
       ...(readOnly
         ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme]
@@ -371,6 +401,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     });
 
     this.formattingBar.attach(this.editorView, readOnly);
+    this.refreshOutline(this.editorView);
 
     if (readOnly) {
       this.editorView.dispatch({ effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()) });
@@ -378,6 +409,34 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     // Focus the editor
     setTimeout(() => this.editorView?.focus(), 50);
+  }
+
+  private refreshOutline(view: EditorView): void {
+    const next = extractHeadings(view.state);
+    const current = this.headings();
+    const same = next.length === current.length
+      && next.every((h, i) => h.from === current[i]!.from && h.text === current[i]!.text && h.level === current[i]!.level);
+    if (!same) this.headings.set(next);
+    this.refreshActiveHeading(view);
+  }
+
+  private headingTop(view: EditorView, heading: OutlineHeading): number {
+    return view.lineBlockAt(heading.from).top + view.documentPadding.top;
+  }
+
+  private refreshActiveHeading(view: EditorView): void {
+    const scroller = view.scrollDOM;
+    const tops = this.headings().map(h => this.headingTop(view, h));
+    const atBottom = scroller.scrollTop > 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+    this.activeHeading.set(findActiveHeading(tops, scroller.scrollTop, atBottom));
+  }
+
+  protected goToHeading(heading: OutlineHeading): void {
+    const view = this.editorView;
+    if (!view) return;
+    view.dispatch({ selection: { anchor: heading.from } });
+    view.scrollDOM.scrollTo({ top: Math.max(0, this.headingTop(view, heading) - 8), behavior: 'smooth' });
+    view.contentDOM.focus({ preventScroll: true });
   }
 
   private buildOverlayNotesDocument(): Note {
@@ -442,6 +501,17 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return this.settingsService.settings().showLineNumbers
       ? [lineNumbers(), EditorView.editorAttributes.of({ class: 'cm-with-numbers' })]
       : [];
+  }
+
+  /** Keeps an empty line at the end of the note while the setting is on (never in the read-only overlay document). */
+  private buildTrailingLine(): Extension {
+    if (!this.settingsService.settings().trailingLine) return [];
+    const NEWLINE = String.fromCharCode(10);
+    return EditorState.transactionFilter.of(tr => {
+      const length = tr.newDoc.length;
+      if (!tr.docChanged || tr.startState.readOnly || tr.newDoc.sliceString(Math.max(0, length - 1)) === NEWLINE) return tr;
+      return [tr, { changes: { from: length, insert: NEWLINE }, selection: tr.newSelection, sequential: true }];
+    });
   }
 
   private buildWrapping(): Extension {
@@ -530,7 +600,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
     if (id === OVERLAY_NOTES_TAB_ID) return;
     try {
       const title = this.notes.extractTitle(content);
+      const previousTitle = this.notes.notes().find(n => n.id === id)?.title;
       await this.notes.update(id, { content, title });
+
+      if (previousTitle !== undefined && previousTitle !== title) {
+        this.linkRename.notifyTitleChanged(id, previousTitle);
+      }
+
       this.tabs.markDirty(id, false);
       this.tabs.updateTitle(id, title || 'Untitled');
       this.activeNote.update(n => n ? { ...n, title, content } : n);

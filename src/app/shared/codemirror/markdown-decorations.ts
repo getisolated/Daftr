@@ -3,7 +3,7 @@ import {
 } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
-import { CheckboxWidget } from './markdown-widgets';
+import { CheckboxWidget, EXTERNAL_URL, ExternalLinkWidget } from './markdown-widgets';
 
 // Check if cursor is within [from, to]
 function cursorInRange(view: EditorView, from: number, to: number): boolean {
@@ -158,6 +158,13 @@ function buildDecorations(view: EditorView): DecorationSet {
             if (open && close && open.to < close.from) {
               pending.push({ from: open.from, to: open.to, deco: Decoration.replace({}) });
               pending.push({ from: close.from, to, deco: Decoration.replace({}) });
+
+              // An external target (not a local note) is flagged with an icon after the label
+              const urlNode = node.node.getChild('URL');
+
+              if (urlNode && EXTERNAL_URL.test(doc.sliceString(urlNode.from, urlNode.to))) {
+                pending.push({ from: to, to, deco: Decoration.widget({ widget: new ExternalLinkWidget(), side: 1 }) });
+              }
             }
           }
 
@@ -196,7 +203,8 @@ function buildDecorations(view: EditorView): DecorationSet {
   let lastTo = -1;
   for (const { from, to, deco } of pending) {
     // Skip overlapping ranges for replace decorations
-    if (deco.spec?.widget && from < lastTo) continue;
+    // Point widgets (from === to, e.g. the external link icon) never overlap anything
+    if (deco.spec?.widget && from !== to && from < lastTo) continue;
     try {
       builder.add(from, to, deco);
       if (to > lastTo) lastTo = to;
@@ -293,6 +301,15 @@ export const markdownDecorationTheme = EditorView.baseTheme({
   '.cm-md-link': {
     color: 'var(--evn-syntax-link)',
     textDecoration: 'underline',
+  },
+  '.cm-external-link-icon': {
+    display: 'inline-block',
+    verticalAlign: 'middle',
+    marginLeft: '2px',
+    color: 'var(--evn-syntax-link)',
+    opacity: '0.7',
+    userSelect: 'none',
+    pointerEvents: 'none',
   },
   '.cm-checkbox-wrap': {
     display: 'inline-flex',

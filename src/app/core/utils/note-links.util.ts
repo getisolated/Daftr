@@ -1,4 +1,4 @@
-import { LinkResolver } from './note-paths.util';
+import { LinkResolver, needsAngleBrackets, normalizeLinkTarget, pathKey } from './note-paths.util';
 
 /** Minimal shape of a note needed to analyse its links (a `Note` satisfies it). */
 export interface LinkableNote {
@@ -82,6 +82,34 @@ function findLinkOccurrences(content: string, resolve?: LinkResolver): LinkOccur
   }
 
   return occurrences.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * `content` with every `[label](path)` link to `fromPath` pointed at `toPath`; `null` when none was found.
+ * The label, the `./` prefix and the `.md` suffix of each link are kept.
+ */
+export function retargetNoteLinks(content: string, fromPath: string, toPath: string): string | null {
+  const fromKey = pathKey(fromPath);
+  let changed = false;
+
+  const rewritten = content.replace(MARKDOWN_LINK, (link: string, target: string) => {
+    const normalized = normalizeLinkTarget(target);
+
+    if (normalized === null || pathKey(normalized) !== fromKey) {
+      return link;
+    }
+
+    changed = true;
+
+    const prefix = /^<?\.\//.test(target) ? './' : '';
+    const suffix = /\.md>?$/i.test(target) ? '.md' : '';
+    const path = `${prefix}${toPath}${suffix}`;
+    const newTarget = needsAngleBrackets(path) ? `<${path}>` : path;
+
+    return link.replace(target, () => newTarget);
+  });
+
+  return changed ? rewritten : null;
 }
 
 /** Ids of the notes `content` links to, in order of appearance and without duplicates. */

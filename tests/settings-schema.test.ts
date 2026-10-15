@@ -25,6 +25,8 @@ describe('sanitizeSettings', () => {
   });
 
   it('keeps valid editor preferences and falls back to the current ones otherwise', () => {
+    expect(sanitizeSettings({ showOutline: false })).toMatchObject({ showOutline: false });
+    expect(sanitizeSettings({ showOutline: 'no' })).toMatchObject({ showOutline: true });
     expect(sanitizeSettings({ showLineNumbers: false, wordWrap: false })).toMatchObject({ showLineNumbers: false, wordWrap: false });
     expect(sanitizeSettings({ showLineNumbers: 'no', wordWrap: 0 })).toMatchObject({ showLineNumbers: true, wordWrap: true });
   });

@@ -6,6 +6,7 @@ import {
   removeRow, serializeTable, tsvToMarkdownTable,
 } from './markdown-table';
 import { isInCodeBlock } from './slash-commands';
+import { EXTERNAL_URL, ExternalLinkWidget } from './markdown-widgets';
 
 // ─── Table detection ─────────────────────────────────────────────────────────
 
@@ -224,7 +225,16 @@ const INLINE_RULES: InlineRule[] = [
   { pattern: /\*(?=\S)(.+?)(?<=\S)\*/y, render: (match, parent) => appendInline(parent, 'em', 'cm-md-italic', match[1]!) },
   { pattern: /_(?=\S)(.+?)(?<=\S)_/y, wordBoundary: true, render: (match, parent) => appendInline(parent, 'em', 'cm-md-italic', match[1]!) },
   // Not an <a>: a click inside the table must edit the cell, never navigate
-  { pattern: /\[([^\]]+)\]\([^)]*\)/y, render: (match, parent) => appendInline(parent, 'span', 'cm-md-link', match[1]!) },
+  {
+    pattern: /\[([^\]]+)\]\((?<url>[^)]*)\)/y,
+    render: (match, parent) => {
+      appendInline(parent, 'span', 'cm-md-link', match[1]!);
+
+      if (EXTERNAL_URL.test(match.groups?.['url'] ?? '')) {
+        parent.appendChild(new ExternalLinkWidget().toDOM());
+      }
+    },
+  },
   { pattern: /<br\s*\/?>/iy, render: (_, parent) => parent.appendChild(document.createElement('br')) },
 ];
 

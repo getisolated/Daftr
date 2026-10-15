@@ -18,9 +18,13 @@ interface SimNode extends SimulationNodeDatum {
   degree: number;
   missing: boolean;
   radius: number;
+  /** 0 = fully visible, 1 = fully dimmed; eased toward its target on every frame. */
+  dim: number;
 }
 
-type SimLink = SimulationLinkDatum<SimNode>;
+interface SimLink extends SimulationLinkDatum<SimNode> {
+  dim: number;
+}
 
 interface Palette {
   node: string;
@@ -42,6 +46,13 @@ const LINK_CURVATURE = 0.12;
 const ARROW_SIZE = 6;
 /** Ticks run at once on the first layout, so the graph does not open as a ball exploding. */
 const WARMUP_TICKS = 150;
+/** Time constant (ms) of the dimming (about 95% reached after 3x) transition when hovering a node. */
+const DIM_DURATION = 300;
+const DIM_ALPHA_NODE = 0.15;
+const DIM_ALPHA_LINK = 0.1;
+/** Duration (ms) of the animation played when the graph appears. */
+const INTRO_DURATION = 700;
+const INTRO_START_ZOOM = 0.8;
 
 function nodeRadius(degree: number): number {
   return 4 + Math.sqrt(degree) * 2.5;
@@ -119,6 +130,10 @@ export class GraphViewComponent implements OnDestroy {
   private signature = '';
   /** The view was fitted once: later resizes keep what the user did with zoom and pan. */
   private fitted = false;
+  /** Hidden under another page: the intro plays again when it comes back. */
+  private hidden = true;
+  private introStart = 0;
+  private lastDraw = 0;
 
   private view = { x: 0, y: 0, k: 1 };
   private hovered: SimNode | null = null;
@@ -204,7 +219,7 @@ export class GraphViewComponent implements OnDestroy {
     const nodes = graph.nodes.map<SimNode>(n => {
       const kept = previous.get(n.id);
 
-      return { ...n, radius: nodeRadius(n.degree), x: kept?.x, y: kept?.y, vx: kept?.vx, vy: kept?.vy };
+      return { ...n, radius: nodeRadius(n.degree), dim: kept?.dim ?? 0, x: kept?.x, y: kept?.y, vx: kept?.vx, vy: kept?.vy };
     });
 
     this.placeNewNodes(nodes, previous.size);
@@ -212,7 +227,7 @@ export class GraphViewComponent implements OnDestroy {
     this.hovered = null;
     this.dragged = null;
     this.simulation.nodes(this.nodes);
-    this.links = graph.links.map(l => ({ source: l.source, target: l.target }));
+    this.links = graph.links.map(l => ({ source: l.source, target: l.target, dim: 0 }));
     this.linkForce.links(this.links);
 
     // Orphans orbit on a ring around the connected part
@@ -269,7 +284,13 @@ export class GraphViewComponent implements OnDestroy {
 
     // Hidden (the home page is display: none under a note): nothing to size, keep the view as it is
     if (rect.width === 0 || rect.height === 0) {
+      this.hidden = true;
       return;
+    }
+
+    if (this.hidden) {
+      this.hidden = false;
+      this.introStart = performance.now();
     }
 
     const canvas = this.canvasRef().nativeElement;
@@ -484,15 +505,50 @@ export class GraphViewComponent implements OnDestroy {
 
     this.palette ??= this.readPalette();
 
+    const now = performance.now();
+    const dt = this.lastDraw === 0 ? 16 : Math.min(now - this.lastDraw, 64);
+    const introProgress = Math.min((now - this.introStart) / INTRO_DURATION, 1);
+    const intro = 1 - (1 - introProgress) ** 3;
     const palette = this.palette;
     const focus = this.hovered ?? this.dragged;
     const focusLinks = focus ? this.neighbours.get(focus.id) : undefined;
     const openIds = new Set(this.tabs.tabs().map(t => t.noteId));
     const referenceId = this.backlinks.referenceNoteId();
     const isRelated = (node: SimNode): boolean => focus === null || node === focus || (focusLinks?.has(node.id) ?? false);
+    const step = 1 - Math.exp(-dt / DIM_DURATION);
+    let animating = introProgress < 1;
+
+    const ease = (current: number, target: number): number => {
+      const next = current + (target - current) * step;
+
+      if (Math.abs(target - next) < 0.01) {
+        return target;
+      }
+
+      animating = true;
+      return next;
+    };
+
+    for (const node of this.nodes) {
+      node.dim = ease(node.dim, isRelated(node) ? 0 : 1);
+    }
+
+    for (const link of this.links) {
+      const touchesFocus = focus !== null && (link.source === focus || link.target === focus);
+
+      link.dim = ease(link.dim, focus && !touchesFocus ? 1 : 0);
+    }
+
+    // The graph grows from the centre of the view while it fades in
+    const zoom = INTRO_START_ZOOM + (1 - INTRO_START_ZOOM) * intro;
+    const cx = this.width / 2;
+    const cy = this.height / 2;
 
     ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
     ctx.clearRect(0, 0, this.width, this.height);
+    ctx.translate(cx, cy);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-cx, -cy);
     ctx.translate(this.view.x, this.view.y);
     ctx.scale(this.view.k, this.view.k);
 
@@ -502,23 +558,29 @@ export class GraphViewComponent implements OnDestroy {
       const target = link.target as SimNode;
       const touchesFocus = focus !== null && (source === focus || target === focus);
 
-      ctx.globalAlpha = focus && !touchesFocus ? 0.1 : 1;
+      ctx.globalAlpha = (1 - link.dim * (1 - DIM_ALPHA_LINK)) * intro;
       ctx.strokeStyle = touchesFocus ? palette.linkHighlight : palette.link;
       ctx.fillStyle = ctx.strokeStyle;
       this.drawLink(ctx, source, target, target.missing);
     }
 
     for (const node of this.nodes) {
-      ctx.globalAlpha = isRelated(node) ? 1 : 0.15;
+      ctx.globalAlpha = (1 - node.dim * (1 - DIM_ALPHA_NODE)) * intro;
       this.drawNode(ctx, node, palette, node.id === referenceId, openIds.has(node.id), node === focus);
     }
 
     ctx.globalAlpha = 1;
 
     for (const node of this.nodes) {
-      if (isRelated(node)) {
-        this.drawLabel(ctx, node, palette, node === focus || node.id === referenceId);
+      if (node.dim < 1) {
+        this.drawLabel(ctx, node, palette, node === focus || node.id === referenceId, (1 - node.dim) * intro);
       }
+    }
+
+    this.lastDraw = animating ? now : 0;
+
+    if (animating) {
+      this.scheduleDraw();
     }
   }
 
@@ -599,10 +661,10 @@ export class GraphViewComponent implements OnDestroy {
   }
 
   /** Titles fade in with the zoom; the connected notes keep theirs when zoomed out. */
-  private drawLabel(ctx: CanvasRenderingContext2D, node: SimNode, palette: Palette, emphasised: boolean): void {
+  private drawLabel(ctx: CanvasRenderingContext2D, node: SimNode, palette: Palette, emphasised: boolean, visibility: number): void {
     const { k } = this.view;
     const zoomAlpha = Math.min(Math.max((k - 0.5) / 0.4, 0), 1);
-    const alpha = emphasised ? 1 : Math.max(zoomAlpha, node.degree >= 3 ? 0.7 : 0);
+    const alpha = (emphasised ? 1 : Math.max(zoomAlpha, node.degree >= 3 ? 0.7 : 0)) * visibility;
 
     if (alpha === 0) {
       return;

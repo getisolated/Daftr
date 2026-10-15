@@ -63,7 +63,8 @@ export function notePath(note: PathNote, folders: readonly PathFolder[]): string
   return [...folderSegments(note.folderId, indexFolders(folders)), toPathSegment(note.title)].join('/');
 }
 
-function pathKey(path: string): string {
+/** Form of a path under which two paths designate the same note (case and surrounding spaces ignored). */
+export function pathKey(path: string): string {
   return path.split('/').map(s => s.trim().toLowerCase()).filter(Boolean).join('/');
 }
 
