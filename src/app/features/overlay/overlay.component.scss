@@ -40,7 +40,7 @@
 
 // The OS paints the (rather light grey) acrylic behind the window: a flat anthracite tint darkens it
 :host-context(html.overlay-acrylic) .overlay {
-  background: rgba(22, 22, 24, 0.62);
+  background: rgba(22, 22, 24, 0.2);
 }
 
 .drag-handle {
