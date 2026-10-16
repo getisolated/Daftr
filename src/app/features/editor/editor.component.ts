@@ -1,6 +1,6 @@
 import {
   Component, OnDestroy, OnChanges, Input, SimpleChanges,
-  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, effect, untracked
+  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, computed, effect, untracked
 } from '@angular/core';
 
 
@@ -48,7 +48,7 @@ import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/n
     <div class="editor-wrapper">
       @if (activeNote()) {
         <div class="editor-host" #editorHost></div>
-        @if (settingsService.settings().showOutline && headings().length) {
+        @if (outlineShown()) {
           <nav class="toc" aria-label="Table of contents">
             @for (heading of headings(); track heading.from; let i = $index) {
               <button
@@ -112,6 +112,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
   readonly activeHeading = signal(-1);
+  /** The quick notes are a list of short notes: an outline of their headings would mean nothing. */
+  protected readonly outlineShown = computed(() =>
+    this.settingsService.settings().showOutline && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
+  );
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
 
   private editorView: EditorView | null = null;
