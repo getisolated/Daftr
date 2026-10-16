@@ -65,12 +65,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   appShortcuts: {},
   formattingBarEnabled: true,
   formattingBarMode: 'full',
-  formattingBarStyle: 'pinned',
+  formattingBarStyle: 'floating',
   formattingBarPosition: 'top',
-  showLineNumbers: true,
+  showLineNumbers: false,
   wordWrap: true,
   trailingLine: false,
-  showOutline: true,
+  showOutline: false,
   overlayPosition: null,
 };
 
