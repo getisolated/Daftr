@@ -2,7 +2,7 @@
  * Collections worker: runs in an Electron utilityProcess so that scanning, watching and searching folders on disk
  * never blocks the main process nor the window. Talks with the main process through `process.parentPort`.
  */
-import { FSWatcher, promises as fs, watch } from 'fs';
+import { FSWatcher, promises as fs, realpathSync, watch } from 'fs';
 import * as path from 'path';
 import { CollectionNode, DEFAULT_COLLECTION_EXCLUDES, findInText, isMarkdownFile, scanFolder } from './collections-scan';
 import { CollectionKind, WorkerRequest, WorkerResponse } from './collections-protocol';
@@ -92,7 +92,8 @@ function startWatching(root: string, kind: CollectionKind): void {
 
   try {
     // Recursive watching is native on Windows (ReadDirectoryChangesW): one handle per collection
-    entry.watcher = watch(root, { recursive: kind === 'folder' }, (_event, filename) => scheduleRescan(entry, filename ? String(filename) : null));
+    // Long path form: libuv aborts the whole process on a short 8.3 name (C:\Users\JOHNDO~1)
+    entry.watcher = watch(realpathSync.native(root), { recursive: kind === 'folder' }, (_event, filename) => scheduleRescan(entry, filename ? String(filename) : null));
     entry.watcher.on('error', () => scheduleRescan(entry, null));
   } catch {
     // Missing path: the scan reports the error, the collection shows it

@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { promises as fs, realpathSync } from 'fs';
 import * as path from 'path';
 import { BrowserWindow, UtilityProcess, dialog, utilityProcess } from 'electron/main';
 import { shell } from 'electron/common';
@@ -63,9 +63,23 @@ export function setCollectionExcludes(next: string[]): void {
   post({ type: 'setExcludes', excludes });
 }
 
-/** Key of a collection: its absolute path, resolved; the same folder opened twice (other case) is the same collection. */
+/**
+ * Canonical form of a path: absolute, long names (not the 8.3 `JOHNDO~1` form, which the file watcher cannot handle)
+ * and the case of the disk. Left as resolved when it does not exist (yet).
+ */
+function canonicalPath(candidate: string): string {
+  const absolute = path.resolve(candidate);
+
+  try {
+    return realpathSync.native(absolute);
+  } catch {
+    return absolute;
+  }
+}
+
+/** Key of a collection: its canonical path; the same folder opened twice (other case) is the same collection. */
 function findCollection(candidate: string): CollectionRow | undefined {
-  const lower = path.resolve(candidate).toLowerCase();
+  const lower = canonicalPath(candidate).toLowerCase();
   return collectionOps.getAll().find(row => row.path.toLowerCase() === lower);
 }
 
@@ -122,7 +136,7 @@ export async function addCollection(candidate: string): Promise<CollectionRow | 
     return existing;
   }
 
-  const absolute = path.resolve(candidate);
+  const absolute = canonicalPath(candidate);
   const stats = await fs.stat(absolute).catch(() => null);
   let kind: CollectionKind;
 
@@ -179,7 +193,7 @@ export async function relocateCollection(window: BrowserWindow | null, root: unk
   }
 
   post({ type: 'unwatch', root: row.path });
-  const moved = collectionOps.relocate(row.path, path.resolve(picked));
+  const moved = collectionOps.relocate(row.path, canonicalPath(picked));
 
   if (moved) {
     post({ type: 'watch', root: moved.path, kind: moved.kind });
@@ -311,7 +325,7 @@ export async function openPaths(paths: string[]): Promise<CollectionFileRef[]> {
   const toOpen: CollectionFileRef[] = [];
 
   for (const candidate of paths) {
-    const absolute = path.resolve(candidate);
+    const absolute = canonicalPath(candidate);
     const container = collectionOps.getAll().find(row => row.kind === 'folder' && resolveInside(row.path, path.relative(row.path, absolute)) === absolute);
 
     if (container && isMarkdownFile(absolute)) {
