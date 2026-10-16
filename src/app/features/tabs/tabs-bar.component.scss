@@ -269,3 +269,119 @@
     color: #fff;
   }
 }
+
+// ── Experimental styles (Settings → Experimental → Tabs Style) ────────────────
+
+// Attached: the tabs hang from the top of the window and the active one flows into the page, like a browser
+.tabs-bar[data-tabs-style='attached'] {
+  align-items: stretch;
+
+  .home-btn,
+  .search-icon-btn,
+  .window-controls {
+    align-self: center;
+  }
+
+  .tabs-container {
+    align-items: flex-end;
+    gap: 0;
+    padding-top: 6px;
+  }
+
+  .tab {
+    height: 32px;
+    border-radius: 8px 8px 0 0;
+    padding: 0 10px 0 14px;
+
+    // Thin separators between inactive tabs
+    & + .tab:not(.active)::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 9px;
+      bottom: 9px;
+      width: 1px;
+      background: var(--evn-border-soft);
+    }
+
+    &:hover {
+      background: rgba(var(--evn-hover-rgb), 0.05);
+    }
+
+    &.active {
+      background: var(--evn-bg);
+      border-radius: 8px 8px 0 0;
+      z-index: 1;
+
+      & + .tab::before {
+        display: none;
+      }
+    }
+  }
+
+  .corner {
+    position: absolute;
+    bottom: 0;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+  }
+
+  .corner-left {
+    left: -8px;
+    background: radial-gradient(circle at 0 0, transparent 8px, var(--evn-bg) 8.5px);
+  }
+
+  .corner-right {
+    right: -8px;
+    background: radial-gradient(circle at 100% 0, transparent 8px, var(--evn-bg) 8.5px);
+  }
+}
+
+// Recents: no tabs, the current document opens the recents switcher
+.current-doc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+  min-width: 0;
+  height: 26px;
+  margin-left: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--evn-border-subtle);
+  border-radius: 8px;
+  background: var(--evn-bg);
+  color: var(--evn-text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+
+  &:hover {
+    border-color: var(--evn-border-hover);
+  }
+
+  svg {
+    flex-shrink: 0;
+    color: var(--evn-text-soft);
+  }
+}
+
+.current-doc-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.current-doc-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--evn-text-dimmed);
+}
+
+.tabs-spacer {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}

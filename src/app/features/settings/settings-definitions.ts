@@ -128,6 +128,18 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     ],
   },
   {
+    key: 'tabsStyle',
+    category: 'Experimental',
+    title: 'Tabs Style',
+    description: 'Pills: the current tabs. Attached: tabs joined to the page, like a browser. Recents: no tabs, a recent documents switcher instead (Ctrl+E). Pinning, reordering and session restore are only guaranteed with Pills.',
+    control: 'select',
+    options: [
+      { value: 'pills', label: 'Pills' },
+      { value: 'attached', label: 'Attached' },
+      { value: 'recents', label: 'Recents' },
+    ],
+  },
+  {
     key: 'globalShortcut',
     category: 'Global Shortcut',
     title: 'Shortcut',

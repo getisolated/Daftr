@@ -38,6 +38,11 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ theme: 42 }, { ...DEFAULT_SETTINGS, theme: 'light' }).theme).toBe('light');
   });
 
+  it('keeps a known tabs style and falls back to the current one otherwise', () => {
+    expect(sanitizeSettings({ tabsStyle: 'recents' }).tabsStyle).toBe('recents');
+    expect(sanitizeSettings({ tabsStyle: 'stack' }).tabsStyle).toBe('pills');
+  });
+
   it('clamps the overlay size to its bounds', () => {
     expect(sanitizeSettings({ overlayWidth: 10, overlayHeight: 99999 })).toMatchObject({ overlayWidth: 200, overlayHeight: 1200 });
   });

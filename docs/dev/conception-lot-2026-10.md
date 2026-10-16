@@ -223,7 +223,7 @@ Gelé tant que l'app n'est pas assez aboutie. À la reprise : **POC comparatif**
 
 Pistes conservées : dessins stockés à part, référencés dans les notes par `![Schéma](drawing://42)` et rendus comme images ; slash command `/drawing` ; bouton dans la barre de formatage.
 
-## 19. Onglets : variantes « tweak » 🟢
+## 19. Onglets : variantes « tweak » ✅
 
 Réglage `tabsStyle` (catégorie « Expérimental ») :
 - **pills** : style actuel (défaut), inchangé.

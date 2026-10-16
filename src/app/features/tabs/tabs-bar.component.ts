@@ -1,6 +1,6 @@
 import {
   Component, inject, ElementRef, ViewChild,
-  ChangeDetectionStrategy, HostListener, signal
+  ChangeDetectionStrategy, HostListener, signal, computed
 } from '@angular/core';
 
 import { TabsService } from '../../core/services/tabs.service';
@@ -17,7 +17,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
   imports: [ContextMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="tabs-bar" (dblclick)="onTitleBarDblClick()">
+    <div class="tabs-bar" [attr.data-tabs-style]="tabsStyle()" (dblclick)="onTitleBarDblClick()">
       <!-- Sidebar toggle -->
       <button
         class="home-btn"
@@ -48,8 +48,26 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
       <!-- Window drag region -->
       <div class="drag-region"></div>
 
+      @if (tabsStyle() === 'recents') {
+        <!-- No tabs: the current document, and the recents switcher -->
+        <button
+          type="button"
+          class="current-doc"
+          (click)="openRecents()"
+          (dblclick)="$event.stopPropagation()"
+          [title]="'Recent documents (' + shortcutLabel('tab.recent') + ')'"
+        >
+          <span class="current-doc-title">{{ activeTitle() }}</span>
+          @if (tabs().length > 1) {
+            <span class="current-doc-count">{{ tabs().length }} open</span>
+          }
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 8 11 13 6"/></svg>
+        </button>
+        <div class="tabs-spacer"></div>
+      }
+
       <!-- Tabs -->
-      <div class="tabs-container" #tabsContainer>
+      <div class="tabs-container" #tabsContainer [hidden]="tabsStyle() === 'recents'">
         @for (tab of tabs(); track tab.noteId; let i = $index) {
           <div
             class="tab"
@@ -72,6 +90,11 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
             (drop)="onDrop($event, i)"
             (dragend)="onDragEnd()"
           >
+            @if (tabsStyle() === 'attached' && i === activeIndex()) {
+              <!-- Inverted corners: the active tab flows into the page below -->
+              <span class="corner corner-left" aria-hidden="true"></span>
+              <span class="corner corner-right" aria-hidden="true"></span>
+            }
             @if (tab.isPinned) {
               <svg class="pin-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                 <path d="M16 2L7.5 10.5 2 12l3 3-5 7 7-5 3 3 1.5-5.5L20 6l-2-2z"/>
@@ -175,6 +198,17 @@ export class TabsBarComponent {
   readonly dragSide = signal<'left' | 'right' | null>(null);
 
   // ── Context menu state ─────────────────────────────────────────────────────
+  /** Experimental look of the tabs (Settings → Experimental → Tabs Style). */
+  readonly tabsStyle = computed(() => this.settings.settings().tabsStyle);
+
+  /** Title of the document shown, for the "recents" style that has no tabs. */
+  readonly activeTitle = computed(() => {
+    const tab = this.tabs()[this.activeIndex()];
+    return tab ? tab.title || 'Untitled' : 'Home';
+  });
+
+  openRecents(): void { this.palette.openRecents(); }
+
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number; tabIndex: number } | null>(null);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
