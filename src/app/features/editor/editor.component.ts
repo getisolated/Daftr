@@ -1,6 +1,6 @@
 import {
   Component, OnDestroy, OnChanges, Input, SimpleChanges,
-  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, effect, untracked
+  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, computed, effect, untracked
 } from '@angular/core';
 
 
@@ -17,7 +17,7 @@ import { languages } from '@codemirror/language-data';
 import { bracketMatching, syntaxTree } from '@codemirror/language';
 
 import { editorHighlight } from '../../shared/codemirror/editor-highlight';
-import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
+import { linkStatusFacet, markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
@@ -25,7 +25,7 @@ import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
-import { createLinkResolver } from '../../core/utils/note-paths.util';
+import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
@@ -112,6 +112,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
   readonly activeHeading = signal(-1);
+
+  /** Whether a link target exists, shared by the editor decorations and the preview. */
+  protected readonly linkStatusOf = computed<(target: string) => LinkStatus>(() => {
+    const notes = this.notes.notes();
+    const resolve = createLinkResolver(notes.filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)), this.folders.folders());
+    const ids = new Set(notes.map(n => n.id));
+    return target => linkStatus(target, resolve, id => ids.has(id));
+  });
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
 
   private editorView: EditorView | null = null;
@@ -120,6 +128,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private readonly lineNumbersCompartment = new Compartment();
   private readonly wrapCompartment = new Compartment();
   private readonly trailingLineCompartment = new Compartment();
+  private readonly linkStatusCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
   private loadGeneration = 0;
@@ -154,6 +163,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
             this.wrapCompartment.reconfigure(this.buildWrapping()),
           ],
         });
+      });
+    });
+
+    // Links turn red / back to normal as notes are created, renamed or deleted
+    effect(() => {
+      const status = this.linkStatusOf();
+      untracked(() => {
+        this.editorView?.dispatch({ effects: this.linkStatusCompartment.reconfigure(linkStatusFacet.of(status)) });
       });
     });
 
@@ -388,6 +405,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
       EditorView.domEventHandlers({ scroll: (_event, view) => { this.refreshActiveHeading(view); } }),
+      this.linkStatusCompartment.of(linkStatusFacet.of(this.linkStatusOf())),
       // The concatenated overlay notes cannot be mapped back to their individual notes, hence no drafts either
       ...(readOnly
         ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme]
