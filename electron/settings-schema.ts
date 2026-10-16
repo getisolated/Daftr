@@ -6,11 +6,11 @@ const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system'
 
 export type FormattingBarMode = 'full' | 'compact';
 export type FormattingBarStyle = 'pinned' | 'floating';
-export type FormattingBarPosition = 'top' | 'bottom';
+export type FormattingBarPosition = 'top' | 'bottom' | 'left' | 'right';
 
 const FORMATTING_BAR_MODES: readonly FormattingBarMode[] = ['full', 'compact'];
 const FORMATTING_BAR_STYLES: readonly FormattingBarStyle[] = ['pinned', 'floating'];
-const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom'];
+const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom', 'left', 'right'];
 
 export interface OverlayPosition {
   x: number;

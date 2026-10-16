@@ -19,7 +19,9 @@ describe('sanitizeSettings', () => {
   it('keeps valid formatting bar preferences and falls back to the current ones otherwise', () => {
     const valid = { formattingBarEnabled: false, formattingBarMode: 'compact', formattingBarStyle: 'floating', formattingBarPosition: 'bottom' };
     expect(sanitizeSettings(valid)).toMatchObject(valid);
-    expect(sanitizeSettings({ formattingBarEnabled: 'no', formattingBarMode: 'huge', formattingBarStyle: 1, formattingBarPosition: 'left' })).toMatchObject({
+    expect(sanitizeSettings({ formattingBarPosition: 'left' }).formattingBarPosition).toBe('left');
+    expect(sanitizeSettings({ formattingBarPosition: 'right' }).formattingBarPosition).toBe('right');
+    expect(sanitizeSettings({ formattingBarEnabled: 'no', formattingBarMode: 'huge', formattingBarStyle: 1, formattingBarPosition: 'middle' })).toMatchObject({
       formattingBarEnabled: true, formattingBarMode: 'full', formattingBarStyle: 'floating', formattingBarPosition: 'top',
     });
   });

@@ -1,6 +1,6 @@
 export type FormattingBarMode = 'full' | 'compact';
 export type FormattingBarStyle = 'pinned' | 'floating';
-export type FormattingBarPosition = 'top' | 'bottom';
+export type FormattingBarPosition = 'top' | 'bottom' | 'left' | 'right';
 
 /** Formatting an editor command can apply; also the ids reported as active under the caret. */
 export type FormatId =

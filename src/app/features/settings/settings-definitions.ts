@@ -105,7 +105,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'formattingBarMode',
     category: 'Formatting Bar',
     title: 'Size',
-    description: 'Full shows separators between groups; Compact is smaller, with tighter spacing.',
+    description: 'Full has large buttons with separators between groups; Compact is smaller, with tighter spacing.',
     control: 'select',
     options: [
       { value: 'full', label: 'Full' },
@@ -116,7 +116,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'formattingBarStyle',
     category: 'Formatting Bar',
     title: 'Style',
-    description: 'Pinned is attached to the window edges; Floating is detached from them, with rounded corners.',
+    description: 'Pinned is attached to the edges of the page; Floating is detached from them, with rounded corners.',
     control: 'select',
     options: [
       { value: 'pinned', label: 'Pinned' },
@@ -127,11 +127,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'formattingBarPosition',
     category: 'Formatting Bar',
     title: 'Position',
-    description: 'Above or below the editing area.',
+    description: 'Side of the page the bar sits on. Left and Right show it vertically, inside the page.',
     control: 'select',
     options: [
       { value: 'top', label: 'Top' },
       { value: 'bottom', label: 'Bottom' },
+      { value: 'left', label: 'Left' },
+      { value: 'right', label: 'Right' },
     ],
   },
   {
