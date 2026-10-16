@@ -29,6 +29,7 @@ import { createLinkResolver } from '../../core/utils/note-paths.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
+import { insertLink } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
@@ -571,13 +572,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       {
         key: keyFor('editor.link'),
         run: (view) => {
-          const sel = view.state.selection.main;
-          const selected = view.state.sliceDoc(sel.from, sel.to);
-          const insert = selected ? `[${selected}](url)` : '[text](url)';
-          view.dispatch({
-            changes: { from: sel.from, to: sel.to, insert },
-            selection: { anchor: sel.from + insert.length - 4, head: sel.from + insert.length - 1 },
-          });
+          insertLink(view);
           return true;
         },
       },

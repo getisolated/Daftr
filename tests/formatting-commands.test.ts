@@ -4,7 +4,8 @@ import { EditorView } from '@codemirror/view';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { ensureSyntaxTree } from '@codemirror/language';
 import {
-  detectActiveFormats, insertRuleBelow, insertTableBelow, toggleCodeBlock, toggleInlineMark, toggleLineKind,
+  clearInlineFormatting, detectActiveFormats, findTagAround, insertLink, insertRuleBelow, insertTableBelow,
+  stripInlineFormatting, toggleCodeBlock, toggleHtmlTag, toggleInlineMark, toggleLineKind,
 } from '../src/app/shared/codemirror/formatting-commands';
 
 /** Minimal stand-in for EditorView (no DOM in the test environment): only state, dispatch and focus are used. */
@@ -188,5 +189,113 @@ describe('table and draft actions', () => {
     const doc = '<!-- draft -->\nwip\n<!-- /draft -->\nafter';
     expect(detectActiveFormats(createView(doc, 16).state).has('draft')).toBe(true);
     expect(detectActiveFormats(createView(doc, 40).state).has('draft')).toBe(false);
+  });
+});
+
+describe('headings 5 and 6', () => {
+  it('applies and detects the deepest levels', () => {
+    const view = createView('Titre', 2);
+    toggleLineKind(view, 'h6');
+    expect(text(view)).toBe('###### Titre');
+    expect(detectActiveFormats(view.state).has('h6')).toBe(true);
+    toggleLineKind(view, 'h5');
+    expect(text(view)).toBe('##### Titre');
+    expect(detectActiveFormats(view.state).has('h5')).toBe(true);
+  });
+});
+
+describe('findTagAround', () => {
+  it('finds the tags enclosing a position or a span', () => {
+    const line = 'a <u>bc</u> d';
+    expect(findTagAround(line, 'u', 6)).toEqual({ open: { from: 2, to: 5 }, close: { from: 7, to: 11 } });
+    expect(findTagAround(line, 'u', 5, 7)).not.toBeNull();
+  });
+
+  it('returns null outside the tags, or for an unclosed tag', () => {
+    expect(findTagAround('a <u>bc</u> d', 'u', 12)).toBeNull();
+    expect(findTagAround('a <u>bc</u> d', 'u', 1)).toBeNull();
+    expect(findTagAround('<u>bc', 'u', 4)).toBeNull();
+  });
+
+  it('picks the pair that still encloses the span when another one closes before it', () => {
+    const line = '<u>a</u> <u>b</u>';
+    expect(findTagAround(line, 'u', 13)?.open.from).toBe(9);
+  });
+});
+
+describe('toggleHtmlTag', () => {
+  it('wraps the selection, keeping it selected inside the tags', () => {
+    const view = createView('mot', 0, 3);
+    toggleHtmlTag(view, 'sup');
+    expect(text(view)).toBe('<sup>mot</sup>');
+    expect(view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)).toBe('mot');
+  });
+
+  it('unwraps when the caret is inside the tags', () => {
+    const view = createView('a <u>mot</u> b', 6);
+    toggleHtmlTag(view, 'u');
+    expect(text(view)).toBe('a mot b');
+  });
+
+  it('puts the caret between the tags on an empty selection', () => {
+    const view = createView('', 0);
+    toggleHtmlTag(view, 'sub');
+    expect(text(view)).toBe('<sub></sub>');
+    expect(view.state.selection.main.head).toBe(5);
+  });
+
+  it('is reported as active under the caret', () => {
+    const active = detectActiveFormats(createView('x <u>a</u> <sup>b</sup> <sub>c</sub>', 6).state);
+    expect(active.has('underline')).toBe(true);
+    expect(active.has('superscript')).toBe(false);
+  });
+});
+
+describe('stripInlineFormatting', () => {
+  it('removes bold, italic, strike, code and inline HTML styling', () => {
+    expect(stripInlineFormatting('**a** *b* _c_ ~~d~~ `e` <u>f</u> <sup>g</sup> <sub>h</sub> __i__'))
+      .toBe('a b c d e f g h i');
+  });
+
+  it('keeps links, snake_case words and lone markers', () => {
+    expect(stripInlineFormatting('[**x**](url) snake_case_name 2 * 3')).toBe('[x](url) snake_case_name 2 * 3');
+  });
+});
+
+describe('clearInlineFormatting', () => {
+  it('clears the whole caret line past its block prefix when nothing is selected', () => {
+    const view = createView('- [ ] **gras** et *italique*', 3);
+    clearInlineFormatting(view);
+    expect(text(view)).toBe('- [ ] gras et italique');
+  });
+
+  it('only clears the selection when there is one', () => {
+    const view = createView('**a** **b**', 0, 5);
+    clearInlineFormatting(view);
+    expect(text(view)).toBe('a **b**');
+  });
+
+  it('keeps a heading marker', () => {
+    const view = createView('## *Titre*', 0);
+    clearInlineFormatting(view);
+    expect(text(view)).toBe('## Titre');
+  });
+});
+
+describe('insertLink', () => {
+  const selected = (view: EditorView): string => view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to);
+
+  it('uses the selection as the label and selects the url placeholder', () => {
+    const view = createView('voir doc', 5, 8);
+    insertLink(view);
+    expect(text(view)).toBe('voir [doc](url)');
+    expect(selected(view)).toBe('url');
+  });
+
+  it('inserts an image with a placeholder label', () => {
+    const view = createView('', 0);
+    insertLink(view, true);
+    expect(text(view)).toBe('![image](url)');
+    expect(selected(view)).toBe('url');
   });
 });
