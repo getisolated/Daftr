@@ -29,6 +29,8 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ showOutline: 'no' })).toMatchObject({ showOutline: false });
     expect(sanitizeSettings({ showLineNumbers: true, wordWrap: false })).toMatchObject({ showLineNumbers: true, wordWrap: false });
     expect(sanitizeSettings({ showLineNumbers: 'no', wordWrap: 0 })).toMatchObject({ showLineNumbers: false, wordWrap: true });
+    expect(sanitizeSettings({ hideScrollbar: true })).toMatchObject({ hideScrollbar: true });
+    expect(sanitizeSettings({ hideScrollbar: 'yes' })).toMatchObject({ hideScrollbar: false });
   });
 
   it('keeps a valid theme and falls back to the current one otherwise', () => {

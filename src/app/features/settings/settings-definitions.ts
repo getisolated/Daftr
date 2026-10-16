@@ -88,6 +88,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'hideScrollbar',
+    category: 'Editor',
+    title: 'Hide Scrollbar',
+    description: 'Hide the scrollbar of the editor; it shows again while the mouse is over its edge. Scrolling keeps working.',
+    control: 'checkbox',
+  },
+  {
     key: 'formattingBarEnabled',
     category: 'Formatting Bar',
     title: 'Show Formatting Bar',
