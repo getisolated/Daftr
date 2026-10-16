@@ -27,7 +27,7 @@ import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { createLinkResolver } from '../../core/utils/note-paths.util';
 import { FoldersService } from '../../core/services/folders.service';
-import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
+import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
@@ -37,7 +37,7 @@ import { FormattingBarService } from '../../core/services/formatting-bar.service
 import { ThemeService } from '../../core/services/theme.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { acceleratorToCodeMirrorKey } from '../../core/utils/accelerator.util';
-import { Note, OVERLAY_NOTES_TAB_ID } from '../../core/models/note.model';
+import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/note.model';
 
 @Component({
   selector: 'app-editor',
@@ -129,10 +129,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   constructor() {
-    // The overlay notes document follows new notes sent from the overlay while it is open
+    // The quick notes document follows new notes sent from the overlay while it is open
     effect(() => {
-      const document = this.notes.overlayNotesDocument();
-      untracked(() => this.refreshOverlayNotesView(document));
+      const document = this.notes.quickNotesDocument();
+      untracked(() => this.refreshQuickNotesView(document));
     });
 
     effect(() => {
@@ -187,7 +187,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     if (generation !== this.loadGeneration) return;
 
     // A note whose tab was just closed while still empty (e.g. Ctrl+N then Ctrl+W) is not worth keeping
-    if (previousId !== null && previousId !== id && previousId !== OVERLAY_NOTES_TAB_ID && !this.tabs.isOpen(previousId)) {
+    if (previousId !== null && previousId !== id && previousId !== QUICK_NOTES_TAB_ID && !this.tabs.isOpen(previousId)) {
       await this.notes.deleteIfEmpty(previousId);
     }
 
@@ -198,14 +198,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
 
     try {
-      const note = id === OVERLAY_NOTES_TAB_ID ? this.buildOverlayNotesDocument() : await this.notes.getById(id);
+      const note = id === QUICK_NOTES_TAB_ID ? this.buildQuickNotesDocument() : await this.notes.getById(id);
       // Abort if a newer load was started while fetching
       if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
       // Wait for DOM to update
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
-        this.initEditor(note?.content ?? '', id === OVERLAY_NOTES_TAB_ID);
+        this.initEditor(note?.content ?? '', id === QUICK_NOTES_TAB_ID);
       }, 0);
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
@@ -344,7 +344,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       ...slashCommandExtensions,
       ...tableExtensions,
       noteLinkCompletion({
-        notes: () => this.notes.notes().filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)),
+        notes: () => this.notes.notes().filter(n => !n.tags.includes(QUICK_NOTE_TAG)),
         folders: () => this.folders.folders(),
       }),
       drawSelection(),
@@ -388,7 +388,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
       EditorView.domEventHandlers({ scroll: (_event, view) => { this.refreshActiveHeading(view); } }),
-      // The concatenated overlay notes cannot be mapped back to their individual notes, hence no drafts either
+      // The concatenated quick notes cannot be mapped back to their individual notes, hence no drafts either
       ...(readOnly
         ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme]
         : [draftBlocks, this.contextMenuHandler()]),
@@ -404,7 +404,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.refreshOutline(this.editorView);
 
     if (readOnly) {
-      this.editorView.dispatch({ effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()) });
+      this.editorView.dispatch({ effects: setTimestampBlocks.of(this.notes.quickNoteBlocks()) });
     }
 
     // Focus the editor
@@ -439,22 +439,22 @@ export class EditorComponent implements OnDestroy, OnChanges {
     view.contentDOM.focus({ preventScroll: true });
   }
 
-  private buildOverlayNotesDocument(): Note {
+  private buildQuickNotesDocument(): Note {
     const now = new Date().toISOString();
     return {
-      id: OVERLAY_NOTES_TAB_ID, title: 'Overlay notes', content: this.notes.overlayNotesDocument(),
+      id: QUICK_NOTES_TAB_ID, title: QUICK_NOTES_TITLE, content: this.notes.quickNotesDocument(),
       tags: [], folderId: null, sortOrder: null, createdAt: now, updatedAt: now,
     };
   }
 
-  private refreshOverlayNotesView(document: string): void {
+  private refreshQuickNotesView(document: string): void {
     const view = this.editorView;
-    if (!view || this.activeNote()?.id !== OVERLAY_NOTES_TAB_ID || view.state.doc.toString() === document) {
+    if (!view || this.activeNote()?.id !== QUICK_NOTES_TAB_ID || view.state.doc.toString() === document) {
       return;
     }
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: document },
-      effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()),
+      effects: setTimestampBlocks.of(this.notes.quickNoteBlocks()),
     });
   }
 
@@ -529,7 +529,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       return;
     }
 
-    noteId ??= createLinkResolver(notes.filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)), this.folders.folders())(target);
+    noteId ??= createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders())(target);
 
     const note = notes.find(n => n.id === noteId);
 
@@ -597,7 +597,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private async saveNote(id: number, content: string): Promise<void> {
-    if (id === OVERLAY_NOTES_TAB_ID) return;
+    if (id === QUICK_NOTES_TAB_ID) return;
     try {
       const title = this.notes.extractTitle(content);
       const previousTitle = this.notes.notes().find(n => n.id === id)?.title;
