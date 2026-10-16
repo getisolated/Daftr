@@ -19,6 +19,8 @@ import { bracketMatching, syntaxTree } from '@codemirror/language';
 import { editorHighlight } from '../../shared/codemirror/editor-highlight';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
+import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
+import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
@@ -42,7 +44,7 @@ import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/n
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [ContextMenuComponent],
+  imports: [ContextMenuComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="editor-wrapper">
@@ -84,6 +86,14 @@ import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/n
         </div>
       }
     </div>
+    @if (quickNoteToDelete() !== null) {
+      <app-confirm-dialog
+        title="Delete this quick note?"
+        message="It is deleted for good."
+        [actions]="deleteQuickNoteActions"
+        (chosen)="onDeleteQuickNoteChoice($event)"
+      />
+    }
     @if (ctxMenu(); as menu) {
       <app-context-menu
         [items]="menu.items"
@@ -117,6 +127,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.settingsService.settings().showOutline && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
   );
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
+  /** Quick note whose deletion waits for a confirmation. */
+  protected readonly quickNoteToDelete = signal<number | null>(null);
+  protected readonly deleteQuickNoteActions: ConfirmDialogAction[] = [{ id: 'delete', label: 'Delete', danger: true }];
 
   private editorView: EditorView | null = null;
   private readonly shortcutsCompartment = new Compartment();
@@ -249,7 +262,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
       if (update.docChanged && !this.isUpdatingFromModel) {
         const content = update.state.doc.toString();
         const note = this.activeNote();
-        if (!note) return;
+        // The quick notes are saved one by one, by their own edit (see quickNoteHandlers)
+        if (!note || note.id === QUICK_NOTES_TAB_ID) return;
 
         // Extract title from first line
         const title = this.notes.extractTitle(content);
@@ -392,9 +406,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
       EditorView.domEventHandlers({ scroll: (_event, view) => { this.refreshActiveHeading(view); } }),
-      // The concatenated quick notes cannot be mapped back to their individual notes, hence no drafts either
+      // The quick notes are edited one at a time, from their hover actions: no drafts, no context menu
       ...(readOnly
-        ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme]
+        ? [noteTimestamps, noteTimestampsTheme, quickNotesEditing(this.quickNoteHandlers())]
         : [draftBlocks, this.contextMenuHandler()]),
     ];
 
@@ -453,13 +467,34 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   private refreshQuickNotesView(document: string): void {
     const view = this.editorView;
-    if (!view || this.activeNote()?.id !== QUICK_NOTES_TAB_ID || view.state.doc.toString() === document) {
+    // A note being edited is not overwritten: the document catches up once the edit ends
+    if (!view || this.activeNote()?.id !== QUICK_NOTES_TAB_ID || editingQuickNote(view.state) !== null || view.state.doc.toString() === document) {
       return;
     }
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: document },
       effects: setTimestampBlocks.of(this.notes.quickNoteBlocks()),
+      // The edit guard of the quick notes only lets the edited note change
+      filter: false,
     });
+  }
+
+  private quickNoteHandlers(): QuickNoteHandlers {
+    return {
+      save: (id, text) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text) }); },
+      remove: id => this.quickNoteToDelete.set(id),
+      copy: text => { void navigator.clipboard.writeText(text); },
+      editEnded: () => this.refreshQuickNotesView(this.notes.quickNotesDocument()),
+    };
+  }
+
+  protected async onDeleteQuickNoteChoice(choice: string | null): Promise<void> {
+    const id = this.quickNoteToDelete();
+    this.quickNoteToDelete.set(null);
+
+    if (choice === 'delete' && id !== null) {
+      await this.notes.delete(id);
+    }
   }
 
   private contextMenuHandler(): Extension {

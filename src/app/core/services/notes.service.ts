@@ -41,7 +41,7 @@ export class NotesService {
 
   /** Quick notes as the blocks of one document (trimmed text + timestamp label), oldest first. */
   readonly quickNoteBlocks = computed<TimestampedBlock[]>(() =>
-    this.quickNotes().map(n => ({ text: n.content.trim(), label: formatNoteTimestamp(n.createdAt) }))
+    this.quickNotes().map(n => ({ id: n.id, text: n.content.trim(), label: formatNoteTimestamp(n.createdAt) }))
   );
 
   /** All quick notes as one document: one blank line between two notes. */
