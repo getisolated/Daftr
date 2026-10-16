@@ -258,6 +258,7 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('formattingBar.toggle', () => this.formattingBar.toggle());
     bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
     bind('tab.pin', () => this.tabsService.togglePinActiveTab());
+    bind('tab.recent', () => this.paletteService.openRecents());
     for (let i = 1; i <= 9; i++) {
       bind(`tab.goto.${i}`, () => this.tabsService.setActiveIndex(i - 1));
     }

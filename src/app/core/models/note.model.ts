@@ -27,7 +27,7 @@ export interface Tab {
   isPinned: boolean;
 }
 
-export type PaletteMode = 'command' | 'search' | 'tag';
+export type PaletteMode = 'command' | 'search' | 'tag' | 'recent';
 
 export interface PaletteCommand {
   id: string;
@@ -39,10 +39,12 @@ export interface PaletteCommand {
 }
 
 export interface PaletteResult {
-  type: 'command' | 'note' | 'tag';
+  type: 'command' | 'note' | 'tag' | 'tab';
   command?: PaletteCommand;
   note?: NotePreview;
   tag?: string;
+  /** An open document of the recents switcher. */
+  tab?: Tab;
 }
 
 /** Pseudo note id of the read-only tab that concatenates every note sent from the quick-note overlay. */
