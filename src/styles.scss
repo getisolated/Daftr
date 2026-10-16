@@ -5,15 +5,15 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  // Surfaces
-  --evn-bg: #1e1e1e;
-  --evn-bg-panel: #252526;
-  --evn-bg-modal: #1f1f1f;
-  --evn-bg-menu: #2d2d2d;
-  --evn-bg-input: #313131;
-  --evn-bg-chip: #2d2d2d;
-  --evn-bg-hover: #2a2d2e;
-  --evn-bg-active: #37373d;
+  // Surfaces: neutral greys drawn very slightly towards blue (hue ~220°, a few % of saturation)
+  --evn-bg: #1c1e22;
+  --evn-bg-panel: #232529;
+  --evn-bg-modal: #1d1f23;
+  --evn-bg-menu: #2b2d31;
+  --evn-bg-input: #2f3135;
+  --evn-bg-chip: #2b2d31;
+  --evn-bg-hover: #282c30;
+  --evn-bg-active: #35373e;
   --evn-bg-selected: #094771;
   --evn-selection: #264f78;
   --evn-caret: #aeafad;
@@ -21,21 +21,21 @@
   --evn-hover-rgb: 255, 255, 255;
 
   // Borders & scrollbars
-  --evn-border: #454545;
-  --evn-border-soft: #3c3c3c;
-  --evn-border-subtle: #2b2b2b;
-  --evn-border-hover: #555555;
-  --evn-scrollbar: #454545;
-  --evn-scrollbar-hover: #555555;
+  --evn-border: #42454b;
+  --evn-border-soft: #3a3c41;
+  --evn-border-subtle: #292b2f;
+  --evn-border-hover: #52555b;
+  --evn-scrollbar: #42454b;
+  --evn-scrollbar-hover: #52555b;
 
   // Text
   --evn-text: #cccccc;
   --evn-text-strong: #e7e7e7;
   --evn-text-bright: #ffffff;
-  --evn-text-soft: #9d9d9d;
-  --evn-text-dimmed: #858585;
-  --evn-text-disabled: #6a6a6a;
-  --evn-text-faint: #555555;
+  --evn-text-soft: #9a9da3;
+  --evn-text-dimmed: #83868c;
+  --evn-text-disabled: #686b71;
+  --evn-text-faint: #53565c;
 
   // Accent & status
   --evn-accent: #0078d4;

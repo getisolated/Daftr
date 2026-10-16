@@ -20,7 +20,7 @@ let isQuitting = false;
 function windowBackgroundColor(): string {
   const { theme } = getSettings();
   const isDark = theme === 'system' ? nativeTheme.shouldUseDarkColors : theme === 'dark';
-  return isDark ? '#1e1e1e' : '#ffffff';
+  return isDark ? '#1c1e22' : '#ffffff';
 }
 
 function createWindow(showOnReady = true): void {
