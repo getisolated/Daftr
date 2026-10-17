@@ -19,16 +19,20 @@ describe('sanitizeSettings', () => {
   it('keeps valid formatting bar preferences and falls back to the current ones otherwise', () => {
     const valid = { formattingBarEnabled: false, formattingBarMode: 'compact', formattingBarStyle: 'floating', formattingBarPosition: 'bottom' };
     expect(sanitizeSettings(valid)).toMatchObject(valid);
-    expect(sanitizeSettings({ formattingBarEnabled: 'no', formattingBarMode: 'huge', formattingBarStyle: 1, formattingBarPosition: 'left' })).toMatchObject({
-      formattingBarEnabled: true, formattingBarMode: 'full', formattingBarStyle: 'pinned', formattingBarPosition: 'top',
+    expect(sanitizeSettings({ formattingBarPosition: 'left' }).formattingBarPosition).toBe('left');
+    expect(sanitizeSettings({ formattingBarPosition: 'right' }).formattingBarPosition).toBe('right');
+    expect(sanitizeSettings({ formattingBarEnabled: 'no', formattingBarMode: 'huge', formattingBarStyle: 1, formattingBarPosition: 'middle' })).toMatchObject({
+      formattingBarEnabled: true, formattingBarMode: 'full', formattingBarStyle: 'floating', formattingBarPosition: 'top',
     });
   });
 
   it('keeps valid editor preferences and falls back to the current ones otherwise', () => {
-    expect(sanitizeSettings({ showOutline: false })).toMatchObject({ showOutline: false });
-    expect(sanitizeSettings({ showOutline: 'no' })).toMatchObject({ showOutline: true });
-    expect(sanitizeSettings({ showLineNumbers: false, wordWrap: false })).toMatchObject({ showLineNumbers: false, wordWrap: false });
-    expect(sanitizeSettings({ showLineNumbers: 'no', wordWrap: 0 })).toMatchObject({ showLineNumbers: true, wordWrap: true });
+    expect(sanitizeSettings({ showOutline: true })).toMatchObject({ showOutline: true });
+    expect(sanitizeSettings({ showOutline: 'no' })).toMatchObject({ showOutline: false });
+    expect(sanitizeSettings({ showLineNumbers: true, wordWrap: false })).toMatchObject({ showLineNumbers: true, wordWrap: false });
+    expect(sanitizeSettings({ showLineNumbers: 'no', wordWrap: 0 })).toMatchObject({ showLineNumbers: false, wordWrap: true });
+    expect(sanitizeSettings({ hideScrollbar: true })).toMatchObject({ hideScrollbar: true });
+    expect(sanitizeSettings({ hideScrollbar: 'yes' })).toMatchObject({ hideScrollbar: false });
   });
 
   it('keeps a valid theme and falls back to the current one otherwise', () => {

@@ -29,11 +29,11 @@ function sanitizeThemeOfKind(value: unknown, kind: ThemeKind, fallback: ThemeId)
 
 export type FormattingBarMode = 'full' | 'compact';
 export type FormattingBarStyle = 'pinned' | 'floating';
-export type FormattingBarPosition = 'top' | 'bottom';
+export type FormattingBarPosition = 'top' | 'bottom' | 'left' | 'right';
 
 const FORMATTING_BAR_MODES: readonly FormattingBarMode[] = ['full', 'compact'];
 const FORMATTING_BAR_STYLES: readonly FormattingBarStyle[] = ['pinned', 'floating'];
-const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom'];
+const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom', 'left', 'right'];
 
 export interface OverlayPosition {
   x: number;
@@ -68,6 +68,8 @@ export interface AppSettings {
   trailingLine: boolean;
   /** true: the h1/h2/h3 outline is shown on the right of the open note. */
   showOutline: boolean;
+  /** true: the editor scrollbar only shows while the mouse is over it. */
+  hideScrollbar: boolean;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -94,12 +96,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   appShortcuts: {},
   formattingBarEnabled: true,
   formattingBarMode: 'full',
-  formattingBarStyle: 'pinned',
+  formattingBarStyle: 'floating',
   formattingBarPosition: 'top',
-  showLineNumbers: true,
+  showLineNumbers: false,
   wordWrap: true,
   trailingLine: false,
-  showOutline: true,
+  showOutline: false,
+  hideScrollbar: false,
   overlayPosition: null,
 };
 
@@ -164,6 +167,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     wordWrap: typeof raw['wordWrap'] === 'boolean' ? raw['wordWrap'] : base.wordWrap,
     trailingLine: typeof raw['trailingLine'] === 'boolean' ? raw['trailingLine'] : base.trailingLine,
     showOutline: typeof raw['showOutline'] === 'boolean' ? raw['showOutline'] : base.showOutline,
+    hideScrollbar: typeof raw['hideScrollbar'] === 'boolean' ? raw['hideScrollbar'] : base.hideScrollbar,
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

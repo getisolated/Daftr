@@ -37,6 +37,8 @@ export interface AppSettings {
   trailingLine: boolean;
   /** true: the h1/h2/h3 outline is shown on the right of the open note. */
   showOutline: boolean;
+  /** true: the editor scrollbar only shows while the mouse is over it. */
+  hideScrollbar: boolean;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -61,12 +63,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   appShortcuts: {},
   formattingBarEnabled: true,
   formattingBarMode: 'full',
-  formattingBarStyle: 'pinned',
+  formattingBarStyle: 'floating',
   formattingBarPosition: 'top',
-  showLineNumbers: true,
+  showLineNumbers: false,
   wordWrap: true,
   trailingLine: false,
-  showOutline: true,
+  showOutline: false,
+  hideScrollbar: false,
 };
 
 export const OVERLAY_NOTE_TAG = 'overlay';
