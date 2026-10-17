@@ -1,4 +1,5 @@
 import { APP_SHORTCUTS } from '../../core/models/app-shortcuts.model';
+import { THEMES, ThemeKind } from '../../core/models/theme.model';
 
 export type SettingControl = 'checkbox' | 'number' | 'select' | 'shortcut';
 
@@ -20,6 +21,10 @@ export interface SettingDefinition {
 export interface SettingsSection {
   category: string;
   settings: SettingDefinition[];
+}
+
+function themeOptionsOfKind(kind: ThemeKind): { value: string; label: string }[] {
+  return THEMES.filter(theme => theme.kind === kind).map(theme => ({ value: theme.id, label: theme.label }));
 }
 
 /** Single source of truth for the settings editor: adding a setting = adding an entry here. */
@@ -51,13 +56,28 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'theme',
     category: 'Appearance',
     title: 'Theme',
-    description: 'Color theme of the app. System follows the Windows light/dark setting.',
+    description: 'Color theme of the app. System follows the Windows light/dark setting, with the preferred themes below.',
     control: 'select',
     options: [
-      { value: 'dark', label: 'Dark' },
-      { value: 'light', label: 'Light' },
+      ...THEMES.map(theme => ({ value: theme.id, label: theme.label })),
       { value: 'system', label: 'System' },
     ],
+  },
+  {
+    key: 'preferredDarkTheme',
+    category: 'Appearance',
+    title: 'Preferred Dark Theme',
+    description: 'Theme used by System while Windows is in dark mode.',
+    control: 'select',
+    options: themeOptionsOfKind('dark'),
+  },
+  {
+    key: 'preferredLightTheme',
+    category: 'Appearance',
+    title: 'Preferred Light Theme',
+    description: 'Theme used by System while Windows is in light mode.',
+    control: 'select',
+    options: themeOptionsOfKind('light'),
   },
   {
     key: 'showLineNumbers',

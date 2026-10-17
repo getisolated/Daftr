@@ -39,7 +39,7 @@ describe('findShortcutConflict', () => {
   });
 
   it('refuses the first key of an existing chord, and a chord starting with an existing shortcut', () => {
-    expect(findShortcutConflict('note.new', 'CommandOrControl+K', resolved)?.id).toBe('theme.toggle');
+    expect(findShortcutConflict('note.new', 'CommandOrControl+K', resolved)?.id).toBe('theme.select');
     const custom = resolveAppShortcuts({ 'tab.close': 'Alt+Q' });
     expect(findShortcutConflict('note.new', 'Alt+Q, Alt+R', custom)?.id).toBe('tab.close');
   });

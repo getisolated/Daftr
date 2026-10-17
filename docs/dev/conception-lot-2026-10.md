@@ -40,7 +40,7 @@ Justification des regroupements non évidents :
 
 ---
 
-## 1. Gris sombre légèrement bleuté 🟢
+## 1. Gris sombre légèrement bleuté ✅
 
 **Actuel** : `--evn-bg-panel: #252526` (sidebar, titlebar), `--evn-bg: #1e1e1e`, etc. ([styles.scss](../../src/styles.scss)).
 
@@ -232,7 +232,7 @@ Réglage `tabsStyle` (catégorie « Expérimental ») :
 
 Pin, drag & drop et restauration de session ne sont garantis que dans **pills**.
 
-## 20. Nouveaux thèmes 🟢
+## 20. Nouveaux thèmes ✅
 
 **Actuel** : `ThemePreference = 'dark' | 'light' | 'system'`, un bloc `:root[data-theme='…']` par thème dans [styles.scss](../../src/styles.scss) ; `oppositeTheme()` suppose deux thèmes seulement ([theme.util.ts](../../src/app/core/utils/theme.util.ts)).
 
@@ -245,7 +245,7 @@ Pin, drag & drop et restauration de session ne sont garantis que dans **pills**.
 
 **Décisions** : Solarized en version light uniquement ; Violet light composé ; le gris bleuté (#1) ne touche que `dark`.
 
-## 21. Chord sans timeout + sélecteur de thème 🟢
+## 21. Chord sans timeout + sélecteur de thème ✅
 
 **Actuel** ([shortcuts.service.ts](../../src/app/core/services/shortcuts.service.ts)) : après `Ctrl+K`, la 2ᵉ touche est attendue **2 s** (`CHORD_TIMEOUT_MS`), et `Ctrl+K Ctrl+T` bascule directement dark ↔ light.
 

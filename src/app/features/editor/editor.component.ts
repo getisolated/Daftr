@@ -139,7 +139,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     });
 
     effect(() => {
-      this.themeService.theme();
+      this.themeService.kind();
       untracked(() => {
         this.editorView?.dispatch({ effects: this.themeCompartment.reconfigure(this.buildThemeMode()) });
       });
@@ -549,7 +549,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private buildThemeMode(): Extension {
-    return EditorView.darkTheme.of(this.themeService.theme() === 'dark');
+    return EditorView.darkTheme.of(this.themeService.kind() === 'dark');
   }
 
   /** Formatting/save bindings use the accelerators configured in the settings (reconfigured live, see constructor). */

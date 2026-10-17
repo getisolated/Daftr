@@ -136,7 +136,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private foldersService = inject(FoldersService);
   private sidebarState = inject(SidebarStateService);
   private updateService = inject(UpdateService);
-  private themeService = inject(ThemeService);
+  // Injected eagerly: it applies the theme to the document from the first render
+  private readonly themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
@@ -271,7 +272,7 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('editor.wordWrap', () => {
       void this.settingsService.update({ wordWrap: !this.settingsService.settings().wordWrap });
     });
-    bind('theme.toggle', () => { void this.themeService.toggle(); });
+    bind('theme.select', () => this.paletteService.open('theme'));
     bind('formattingBar.toggle', () => this.formattingBar.toggle());
     bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
     bind('tab.pin', () => this.tabsService.togglePinActiveTab());

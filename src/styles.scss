@@ -1,19 +1,20 @@
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 // Dark is the default (no attribute yet = dark); `data-theme` is set on <html> by ThemeService and,
-// before Angular boots, by the inline script of index.html. To add a theme: copy a block below.
+// before Angular boots, by the inline script of index.html. To add a theme: copy a block below and register it
+// in theme.model.ts, settings-schema.ts (electron), main.ts (window background) and index.html.
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  // Surfaces
-  --evn-bg: #1e1e1e;
-  --evn-bg-panel: #252526;
-  --evn-bg-modal: #1f1f1f;
-  --evn-bg-menu: #2d2d2d;
-  --evn-bg-input: #313131;
-  --evn-bg-chip: #2d2d2d;
-  --evn-bg-hover: #2a2d2e;
-  --evn-bg-active: #37373d;
+  // Surfaces: neutral greys drawn very slightly towards blue (hue ~220°, a few % of saturation)
+  --evn-bg: #1c1e22;
+  --evn-bg-panel: #232529;
+  --evn-bg-modal: #1d1f23;
+  --evn-bg-menu: #2b2d31;
+  --evn-bg-input: #2f3135;
+  --evn-bg-chip: #2b2d31;
+  --evn-bg-hover: #282c30;
+  --evn-bg-active: #35373e;
   --evn-bg-selected: #094771;
   --evn-selection: #264f78;
   --evn-caret: #aeafad;
@@ -21,21 +22,21 @@
   --evn-hover-rgb: 255, 255, 255;
 
   // Borders & scrollbars
-  --evn-border: #454545;
-  --evn-border-soft: #3c3c3c;
-  --evn-border-subtle: #2b2b2b;
-  --evn-border-hover: #555555;
-  --evn-scrollbar: #454545;
-  --evn-scrollbar-hover: #555555;
+  --evn-border: #42454b;
+  --evn-border-soft: #3a3c41;
+  --evn-border-subtle: #292b2f;
+  --evn-border-hover: #52555b;
+  --evn-scrollbar: #42454b;
+  --evn-scrollbar-hover: #52555b;
 
   // Text
   --evn-text: #cccccc;
   --evn-text-strong: #e7e7e7;
   --evn-text-bright: #ffffff;
-  --evn-text-soft: #9d9d9d;
-  --evn-text-dimmed: #858585;
-  --evn-text-disabled: #6a6a6a;
-  --evn-text-faint: #555555;
+  --evn-text-soft: #9a9da3;
+  --evn-text-dimmed: #83868c;
+  --evn-text-disabled: #686b71;
+  --evn-text-faint: #53565c;
 
   // Accent & status
   --evn-accent: #0078d4;
@@ -136,6 +137,266 @@
   --evn-syntax-mark-hidden: #c8d1da;
   --evn-syntax-mark-dim: #8a94a3;
   --evn-syntax-timestamp: #6e7681;
+}
+
+// Solarized Light (Ethan Schoonover's palette)
+:root[data-theme='solarized-light'] {
+  color-scheme: light;
+
+  --evn-bg: #fdf6e3;
+  --evn-bg-panel: #eee8d5;
+  --evn-bg-modal: #fdf6e3;
+  --evn-bg-menu: #fdf6e3;
+  --evn-bg-input: #fffbf0;
+  --evn-bg-chip: #eee8d5;
+  --evn-bg-hover: #e9e2cb;
+  --evn-bg-active: #e4ddc6;
+  --evn-bg-selected: #e6d9a8;
+  --evn-selection: #e3dbbf;
+  --evn-caret: #657b83;
+  --evn-hover-rgb: 88, 110, 117;
+
+  --evn-border: #d3cbb7;
+  --evn-border-soft: #ddd6c1;
+  --evn-border-subtle: #e8e1cc;
+  --evn-border-hover: #b9b29d;
+  --evn-scrollbar: #d3cbb7;
+  --evn-scrollbar-hover: #b9b29d;
+
+  --evn-text: #586e75;
+  --evn-text-strong: #073642;
+  --evn-text-bright: #002b36;
+  --evn-text-soft: #657b83;
+  --evn-text-dimmed: #708189;
+  --evn-text-disabled: #93a1a1;
+  --evn-text-faint: #c5c0ad;
+
+  --evn-accent: #268bd2;
+  --evn-accent-strong: #2176b3;
+  --evn-accent-strong-rgb: 33, 118, 179;
+  --evn-accent-hover: #1d679c;
+  --evn-accent-text: #1f72ad;
+  --evn-danger: #dc322f;
+
+  --evn-syntax-plain: #586e75;
+  --evn-syntax-punctuation: #93a1a1;
+  --evn-syntax-comment: #93a1a1;
+  --evn-syntax-keyword: #859900;
+  --evn-syntax-control: #859900;
+  --evn-syntax-variable: #268bd2;
+  --evn-syntax-function: #268bd2;
+  --evn-syntax-type: #b58900;
+  --evn-syntax-string: #2aa198;
+  --evn-syntax-escape: #cb4b16;
+  --evn-syntax-number: #d33682;
+  --evn-syntax-constant: #cb4b16;
+  --evn-syntax-regexp: #dc322f;
+  --evn-syntax-invalid: #dc322f;
+  --evn-syntax-link: #268bd2;
+  --evn-syntax-strike: #93a1a1;
+  --evn-syntax-heading: #268bd2;
+  --evn-syntax-bold: #b58900;
+  --evn-syntax-italic: #6c71c4;
+  --evn-syntax-quote: #859900;
+  --evn-syntax-code: #2aa198;
+  --evn-syntax-mark-hidden: #d8d0b8;
+  --evn-syntax-mark-dim: #93a1a1;
+  --evn-syntax-timestamp: #93a1a1;
+}
+
+// Composed for the app: lavender-tinted whites, violet accents
+:root[data-theme='violet-light'] {
+  color-scheme: light;
+
+  --evn-bg: #fdfcff;
+  --evn-bg-panel: #f4f1fb;
+  --evn-bg-modal: #ffffff;
+  --evn-bg-menu: #ffffff;
+  --evn-bg-input: #ffffff;
+  --evn-bg-chip: #ece7f7;
+  --evn-bg-hover: #eee9f8;
+  --evn-bg-active: #e5ddf6;
+  --evn-bg-selected: #ddd0fa;
+  --evn-selection: #d9cbfb;
+  --evn-caret: #6d28d9;
+  --evn-hover-rgb: 46, 16, 101;
+
+  --evn-border: #d6cdea;
+  --evn-border-soft: #ded7ee;
+  --evn-border-subtle: #ebe6f5;
+  --evn-border-hover: #b3a6d4;
+  --evn-scrollbar: #d6cdea;
+  --evn-scrollbar-hover: #b3a6d4;
+
+  --evn-text: #3a3350;
+  --evn-text-strong: #241d38;
+  --evn-text-bright: #0f0a1f;
+  --evn-text-soft: #625a7a;
+  --evn-text-dimmed: #706889;
+  --evn-text-disabled: #9890ad;
+  --evn-text-faint: #bcb4d1;
+
+  --evn-accent: #7c3aed;
+  --evn-accent-strong: #6d28d9;
+  --evn-accent-strong-rgb: 109, 40, 217;
+  --evn-accent-hover: #5b21b6;
+  --evn-accent-text: #6d28d9;
+  --evn-danger: #d13a4c;
+
+  --evn-syntax-plain: #3a3350;
+  --evn-syntax-punctuation: #8a82a3;
+  --evn-syntax-comment: #8b83a3;
+  --evn-syntax-keyword: #7c3aed;
+  --evn-syntax-control: #c026d3;
+  --evn-syntax-variable: #3b4fc4;
+  --evn-syntax-function: #a3478c;
+  --evn-syntax-type: #0f7c8c;
+  --evn-syntax-string: #b8451f;
+  --evn-syntax-escape: #c2410c;
+  --evn-syntax-number: #0b7a5a;
+  --evn-syntax-constant: #4c4fbf;
+  --evn-syntax-regexp: #a1365a;
+  --evn-syntax-invalid: #d13a4c;
+  --evn-syntax-link: #6d28d9;
+  --evn-syntax-strike: #9890ad;
+  --evn-syntax-heading: #6d28d9;
+  --evn-syntax-bold: #5b21b6;
+  --evn-syntax-italic: #5b21b6;
+  --evn-syntax-quote: #0b7a5a;
+  --evn-syntax-code: #b8451f;
+  --evn-syntax-mark-hidden: #d9d1ea;
+  --evn-syntax-mark-dim: #9890ad;
+  --evn-syntax-timestamp: #8a82a3;
+}
+
+// GitHub Light (Primer)
+:root[data-theme='github-light'] {
+  color-scheme: light;
+
+  --evn-bg: #ffffff;
+  --evn-bg-panel: #f6f8fa;
+  --evn-bg-modal: #ffffff;
+  --evn-bg-menu: #ffffff;
+  --evn-bg-input: #ffffff;
+  --evn-bg-chip: #eff1f3;
+  --evn-bg-hover: #eef1f4;
+  --evn-bg-active: #e6eaef;
+  --evn-bg-selected: #ddf4ff;
+  --evn-selection: #bbdfff;
+  --evn-caret: #1f2328;
+  --evn-hover-rgb: 31, 35, 40;
+
+  --evn-border: #d0d7de;
+  --evn-border-soft: #d8dee4;
+  --evn-border-subtle: #eaeef2;
+  --evn-border-hover: #afb8c1;
+  --evn-scrollbar: #d0d7de;
+  --evn-scrollbar-hover: #afb8c1;
+
+  --evn-text: #24292f;
+  --evn-text-strong: #1f2328;
+  --evn-text-bright: #000000;
+  --evn-text-soft: #59636e;
+  --evn-text-dimmed: #656d76;
+  --evn-text-disabled: #8c959f;
+  --evn-text-faint: #afb8c1;
+
+  --evn-accent: #0969da;
+  --evn-accent-strong: #0969da;
+  --evn-accent-strong-rgb: 9, 105, 218;
+  --evn-accent-hover: #0860ca;
+  --evn-accent-text: #0969da;
+  --evn-danger: #d1242f;
+
+  --evn-syntax-plain: #1f2328;
+  --evn-syntax-punctuation: #6e7781;
+  --evn-syntax-comment: #6e7781;
+  --evn-syntax-keyword: #cf222e;
+  --evn-syntax-control: #cf222e;
+  --evn-syntax-variable: #953800;
+  --evn-syntax-function: #8250df;
+  --evn-syntax-type: #953800;
+  --evn-syntax-string: #0a3069;
+  --evn-syntax-escape: #116329;
+  --evn-syntax-number: #0550ae;
+  --evn-syntax-constant: #0550ae;
+  --evn-syntax-regexp: #116329;
+  --evn-syntax-invalid: #82071e;
+  --evn-syntax-link: #0969da;
+  --evn-syntax-strike: #6e7781;
+  --evn-syntax-heading: #0550ae;
+  --evn-syntax-bold: #1f2328;
+  --evn-syntax-italic: #1f2328;
+  --evn-syntax-quote: #116329;
+  --evn-syntax-code: #0550ae;
+  --evn-syntax-mark-hidden: #d0d7de;
+  --evn-syntax-mark-dim: #8c959f;
+  --evn-syntax-timestamp: #6e7781;
+}
+
+// GitHub Dark Dimmed (Primer)
+:root[data-theme='github-dark-dimmed'] {
+  color-scheme: dark;
+
+  --evn-bg: #22272e;
+  --evn-bg-panel: #1c2128;
+  --evn-bg-modal: #2d333b;
+  --evn-bg-menu: #2d333b;
+  --evn-bg-input: #22272e;
+  --evn-bg-chip: #373e47;
+  --evn-bg-hover: #272d35;
+  --evn-bg-active: #3b424b;
+  --evn-bg-selected: #253a54;
+  --evn-selection: #34507a;
+  --evn-caret: #539bf5;
+  --evn-hover-rgb: 205, 217, 229;
+
+  --evn-border: #444c56;
+  --evn-border-soft: #373e47;
+  --evn-border-subtle: #2d333b;
+  --evn-border-hover: #545d68;
+  --evn-scrollbar: #444c56;
+  --evn-scrollbar-hover: #545d68;
+
+  --evn-text: #adbac7;
+  --evn-text-strong: #cdd9e5;
+  --evn-text-bright: #e6edf3;
+  --evn-text-soft: #909dab;
+  --evn-text-dimmed: #768390;
+  --evn-text-disabled: #636e7b;
+  --evn-text-faint: #545d68;
+
+  --evn-accent: #316dca;
+  --evn-accent-strong: #316dca;
+  --evn-accent-strong-rgb: 49, 109, 202;
+  --evn-accent-hover: #4184e4;
+  --evn-accent-text: #539bf5;
+  --evn-danger: #e5534b;
+
+  --evn-syntax-plain: #adbac7;
+  --evn-syntax-punctuation: #768390;
+  --evn-syntax-comment: #768390;
+  --evn-syntax-keyword: #f47067;
+  --evn-syntax-control: #f47067;
+  --evn-syntax-variable: #f69d50;
+  --evn-syntax-function: #dcbdfb;
+  --evn-syntax-type: #f69d50;
+  --evn-syntax-string: #96d0ff;
+  --evn-syntax-escape: #8ddb8c;
+  --evn-syntax-number: #6cb6ff;
+  --evn-syntax-constant: #6cb6ff;
+  --evn-syntax-regexp: #8ddb8c;
+  --evn-syntax-invalid: #ff938a;
+  --evn-syntax-link: #539bf5;
+  --evn-syntax-strike: #636e7b;
+  --evn-syntax-heading: #6cb6ff;
+  --evn-syntax-bold: #adbac7;
+  --evn-syntax-italic: #adbac7;
+  --evn-syntax-quote: #8ddb8c;
+  --evn-syntax-code: #6cb6ff;
+  --evn-syntax-mark-hidden: #444c56;
+  --evn-syntax-mark-dim: #636e7b;
+  --evn-syntax-timestamp: #768390;
 }
 
 *, *::before, *::after {

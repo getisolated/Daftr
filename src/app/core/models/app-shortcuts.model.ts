@@ -17,7 +17,7 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'layout.toggle', label: 'Toggle Full Width Layout', defaultAccelerator: 'Alt+W' },
   { id: 'editor.wordWrap', label: 'Toggle Line Wrap', defaultAccelerator: 'Alt+Z' },
   // Not Ctrl+B: it is Bold in the editor
-  { id: 'theme.toggle', label: 'Toggle Light / Dark Theme', defaultAccelerator: 'CommandOrControl+K, CommandOrControl+T' },
+  { id: 'theme.select', label: 'Color Theme', defaultAccelerator: 'CommandOrControl+K, CommandOrControl+T' },
   { id: 'formattingBar.toggle', label: 'Toggle Formatting Bar', defaultAccelerator: 'Alt+T' },
   { id: 'sidebar.toggle', label: 'Toggle Sidebar', defaultAccelerator: 'CommandOrControl+Shift+E' },
   { id: 'tab.close', label: 'Close Tab', defaultAccelerator: 'CommandOrControl+W' },

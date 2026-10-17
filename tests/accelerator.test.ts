@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { acceleratorToCodeMirrorKey, formatAccelerator, keyEventToAccelerator } from '../src/app/core/utils/accelerator.util';
+import { acceleratorToCodeMirrorKey, formatAccelerator, isModifierKey, keyEventToAccelerator } from '../src/app/core/utils/accelerator.util';
 
 const ev = (code: string, mods: Partial<{ key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }> = {}) =>
   ({ key: '', code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
@@ -38,6 +38,26 @@ describe('keyEventToAccelerator', () => {
 
   it('allows a bare function key', () => {
     expect(keyEventToAccelerator(ev('F9'))).toBe('F9');
+  });
+
+  it('allows a bare key when asked (second key of a chord)', () => {
+    expect(keyEventToAccelerator(ev('KeyV', { key: 'v' }), { allowBareKey: true })).toBe('V');
+    expect(keyEventToAccelerator(ev('KeyT', { key: 't', ctrlKey: true }), { allowBareKey: true })).toBe('CommandOrControl+T');
+  });
+
+  it('still returns null for an unsupported key, even bare keys allowed', () => {
+    expect(keyEventToAccelerator(ev('Escape', { key: 'Escape' }), { allowBareKey: true })).toBeNull();
+    expect(keyEventToAccelerator(ev('ShiftLeft', { key: 'Shift', shiftKey: true }), { allowBareKey: true })).toBeNull();
+  });
+});
+
+describe('isModifierKey', () => {
+  it('recognises a modifier pressed alone', () => {
+    ['Control', 'Shift', 'Alt', 'AltGraph', 'Meta'].forEach(key => expect(isModifierKey({ key })).toBe(true));
+  });
+
+  it('rejects any other key', () => {
+    ['t', 'Escape', 'F1', 'Enter'].forEach(key => expect(isModifierKey({ key })).toBe(false));
   });
 });
 

@@ -1,8 +1,31 @@
 export type ShortcutMode = 'overlay' | 'app';
 
-export type ThemePreference = 'dark' | 'light' | 'system';
+export type ThemeId = 'dark' | 'light' | 'solarized-light' | 'violet-light' | 'github-light' | 'github-dark-dimmed';
+export type ThemeKind = 'dark' | 'light';
+export type ThemePreference = ThemeId | 'system';
 
-const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system'];
+/** Light/dark family of every theme (mirrors theme.model.ts on the renderer side). */
+export const THEME_KINDS: Readonly<Record<ThemeId, ThemeKind>> = {
+  'dark': 'dark',
+  'light': 'light',
+  'solarized-light': 'light',
+  'violet-light': 'light',
+  'github-light': 'light',
+  'github-dark-dimmed': 'dark',
+};
+
+function isThemeId(value: unknown): value is ThemeId {
+  return typeof value === 'string' && Object.keys(THEME_KINDS).includes(value);
+}
+
+/** A theme id of the expected family, the fallback otherwise (a light theme cannot be the 'system' dark one). */
+function sanitizeThemePreference(value: unknown, fallback: ThemePreference): ThemePreference {
+  return isThemeId(value) || value === 'system' ? value : fallback;
+}
+
+function sanitizeThemeOfKind(value: unknown, kind: ThemeKind, fallback: ThemeId): ThemeId {
+  return isThemeId(value) && THEME_KINDS[value] === kind ? value : fallback;
+}
 
 export type FormattingBarMode = 'full' | 'compact';
 export type FormattingBarStyle = 'pinned' | 'floating';
@@ -27,6 +50,10 @@ export interface AppSettings {
   launchAtStartup: boolean;
   /** 'system' follows the OS color scheme. */
   theme: ThemePreference;
+  /** Theme used by 'system' while the OS is in dark mode. */
+  preferredDarkTheme: ThemeId;
+  /** Theme used by 'system' while the OS is in light mode. */
+  preferredLightTheme: ThemeId;
   /** true: updates download in the background and install when the app quits. false: the user is asked first. */
   autoUpdate: boolean;
   /** In-app shortcuts changed by the user, by shortcut id; absent = default (the renderer owns the id list). */
@@ -63,6 +90,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enterToSend: true,
   launchAtStartup: false,
   theme: 'dark',
+  preferredDarkTheme: 'dark',
+  preferredLightTheme: 'light',
   autoUpdate: false,
   appShortcuts: {},
   formattingBarEnabled: true,
@@ -124,7 +153,9 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     overlayWidth: clampInt(raw['overlayWidth'], OVERLAY_MIN_WIDTH, OVERLAY_MAX_WIDTH, base.overlayWidth),
     overlayHeight: clampInt(raw['overlayHeight'], OVERLAY_MIN_HEIGHT, OVERLAY_MAX_HEIGHT, base.overlayHeight),
     enterToSend: typeof raw['enterToSend'] === 'boolean' ? raw['enterToSend'] : base.enterToSend,
-    theme: THEME_PREFERENCES.find(theme => theme === raw['theme']) ?? base.theme,
+    theme: sanitizeThemePreference(raw['theme'], base.theme),
+    preferredDarkTheme: sanitizeThemeOfKind(raw['preferredDarkTheme'], 'dark', base.preferredDarkTheme),
+    preferredLightTheme: sanitizeThemeOfKind(raw['preferredLightTheme'], 'light', base.preferredLightTheme),
     launchAtStartup: typeof raw['launchAtStartup'] === 'boolean' ? raw['launchAtStartup'] : base.launchAtStartup,
     autoUpdate: typeof raw['autoUpdate'] === 'boolean' ? raw['autoUpdate'] : base.autoUpdate,
     appShortcuts: sanitizeAppShortcuts(raw['appShortcuts'], base.appShortcuts),

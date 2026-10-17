@@ -1,3 +1,5 @@
+import { ThemePickerItem } from './theme.model';
+
 export interface Note {
   id: number;
   title: string;
@@ -27,7 +29,7 @@ export interface Tab {
   isPinned: boolean;
 }
 
-export type PaletteMode = 'command' | 'search' | 'tag';
+export type PaletteMode = 'command' | 'search' | 'tag' | 'theme';
 
 export interface PaletteCommand {
   id: string;
@@ -39,10 +41,11 @@ export interface PaletteCommand {
 }
 
 export interface PaletteResult {
-  type: 'command' | 'note' | 'tag';
+  type: 'command' | 'note' | 'tag' | 'theme';
   command?: PaletteCommand;
   note?: NotePreview;
   tag?: string;
+  theme?: ThemePickerItem;
 }
 
 /** Pseudo note id of the read-only tab that concatenates every note sent from the quick-note overlay. */
