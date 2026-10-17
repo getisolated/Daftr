@@ -1,8 +1,8 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, effect, inject, untracked } from '@angular/core';
 import { CollectionFileRef } from '../models/collection.model';
 import { QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE, Tab } from '../models/note.model';
 import { FileDocsService } from './file-docs.service';
-import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
+import { closeTabsWhere, orderByRecency, TabsAfterClosing, touchRecent } from '../utils/tabs-closing.util';
 
 const SESSION_KEY = 'evnote-session';
 
@@ -25,6 +25,22 @@ export class TabsService {
   readonly activeNoteId = computed<number | null>(() => {
     return this.activeTab()?.noteId ?? null;
   });
+
+  /** Documents in the order they were last shown (the recents switcher, Ctrl+E). */
+  private readonly _recent = signal<number[]>([]);
+
+  /** The open tabs, most recently used first. */
+  readonly recentTabs = computed<Tab[]>(() => orderByRecency(this._tabs(), this._recent()));
+
+  constructor() {
+    effect(() => {
+      const id = this.activeNoteId();
+
+      if (id !== null) {
+        untracked(() => this._recent.update(recent => touchRecent(recent, id)));
+      }
+    });
+  }
 
   isOpen(noteId: number): boolean {
     return this._tabs().some(t => t.noteId === noteId);

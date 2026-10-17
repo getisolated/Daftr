@@ -1,5 +1,9 @@
 export type ShortcutMode = 'overlay' | 'app';
 
+export type TabsStyle = 'pills' | 'attached' | 'attached-reverse' | 'recents' | 'trail' | 'deck' | 'dial';
+
+const TABS_STYLES: readonly TabsStyle[] = ['pills', 'attached', 'attached-reverse', 'recents', 'trail', 'deck', 'dial'];
+
 export type ThemeId = 'dark' | 'light' | 'solarized-light' | 'violet-light' | 'github-light' | 'github-dark-dimmed';
 export type ThemeKind = 'dark' | 'light';
 export type ThemePreference = ThemeId | 'system';
@@ -91,6 +95,7 @@ export interface AppSettings {
   openInPreview: boolean;
   /** Folder names never listed in the collections (hidden folders are always skipped). */
   collectionsExclude: string[];
+  tabsStyle: TabsStyle;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -126,6 +131,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hideScrollbar: false,
   openInPreview: false,
   collectionsExclude: DEFAULT_COLLECTIONS_EXCLUDE,
+  tabsStyle: 'pills',
   overlayPosition: null,
 };
 
@@ -193,6 +199,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     hideScrollbar: typeof raw['hideScrollbar'] === 'boolean' ? raw['hideScrollbar'] : base.hideScrollbar,
     openInPreview: typeof raw['openInPreview'] === 'boolean' ? raw['openInPreview'] : base.openInPreview,
     collectionsExclude: sanitizeExcludes(raw['collectionsExclude'], base.collectionsExclude),
+    tabsStyle: TABS_STYLES.find(style => style === raw['tabsStyle']) ?? base.tabsStyle,
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

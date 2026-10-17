@@ -3,6 +3,9 @@ import { ThemeChoice, ThemeId } from './theme.model';
 
 export type ShortcutMode = 'overlay' | 'app';
 
+/** Look of the open documents in the title bar (experimental): see TABS_STYLES. */
+export type TabsStyle = 'pills' | 'attached' | 'attached-reverse' | 'recents' | 'trail' | 'deck' | 'dial';
+
 /** See preferredDarkTheme / preferredLightTheme for what 'system' resolves to. */
 export type ThemePreference = ThemeChoice;
 
@@ -43,6 +46,7 @@ export interface AppSettings {
   openInPreview: boolean;
   /** Folder names never listed in the collections (hidden folders are always skipped). */
   collectionsExclude: string[];
+  tabsStyle: TabsStyle;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -79,6 +83,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     'node_modules', 'bin', 'obj', 'build', 'dist', 'out', 'target', 'coverage', 'vendor',
     '__pycache__', 'venv', '.venv', '.git', '.angular', '.next', '.nuxt', '.vs', '.vscode', '.idea',
   ],
+  tabsStyle: 'pills',
 };
 
 /** Tag of the notes sent from the quick-note overlay (formerly `overlay`, migrated by the main process). */

@@ -35,7 +35,7 @@ export interface Tab {
   file?: CollectionFileRef;
 }
 
-export type PaletteMode = 'command' | 'search' | 'tag' | 'theme';
+export type PaletteMode = 'command' | 'search' | 'tag' | 'theme' | 'recent';
 
 export interface PaletteCommand {
   id: string;
@@ -47,12 +47,14 @@ export interface PaletteCommand {
 }
 
 export interface PaletteResult {
-  type: 'command' | 'note' | 'tag' | 'theme' | 'file';
+  type: 'command' | 'note' | 'tag' | 'theme' | 'file' | 'tab';
   command?: PaletteCommand;
   note?: NotePreview;
   tag?: string;
   theme?: ThemePickerItem;
   file?: PaletteFileResult;
+  /** An open document of the recents switcher. */
+  tab?: Tab;
 }
 
 /** A file of a collection found by the palette (by its name, or a line of its content). */

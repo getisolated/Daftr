@@ -24,6 +24,7 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'tab.next', label: 'Next Tab', defaultAccelerator: 'CommandOrControl+Tab' },
   { id: 'tab.prev', label: 'Previous Tab', defaultAccelerator: 'CommandOrControl+Shift+Tab' },
   { id: 'tab.pin', label: 'Pin / Unpin Tab', defaultAccelerator: 'Alt+P' },
+  { id: 'tab.recent', label: 'Recent Documents', defaultAccelerator: 'CommandOrControl+E' },
   ...Array.from({ length: 9 }, (_, i) => ({
     id: `tab.goto.${i + 1}`, label: `Go To Tab ${i + 1}`, defaultAccelerator: `CommandOrControl+Alt+${i + 1}`,
   })),
