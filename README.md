@@ -95,7 +95,8 @@ Every in-app shortcut below is a default and can be rebound in **Settings → Ke
 | `Ctrl+S` | Save note |
 | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+K` | Bold / italic / link |
 | `Alt+P` | Pin/unpin tab |
-| `Alt+Z` | Toggle wide mode |
+| `Alt+Z` | Toggle line wrap |
+| `Alt+W` | Toggle wide mode |
 | `Alt+T` | Toggle formatting bar |
 | `Alt+Ctrl+1-9` | Jump to tab by index |
 | `Ctrl+,` | Settings |

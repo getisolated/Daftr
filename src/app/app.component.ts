@@ -268,6 +268,9 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('editor.find', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(); });
     bind('settings.open', () => this.settingsService.open());
     bind('layout.toggle', () => this.layoutService.toggle());
+    bind('editor.wordWrap', () => {
+      void this.settingsService.update({ wordWrap: !this.settingsService.settings().wordWrap });
+    });
     bind('theme.toggle', () => { void this.themeService.toggle(); });
     bind('formattingBar.toggle', () => this.formattingBar.toggle());
     bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
