@@ -39,6 +39,8 @@ export interface AppSettings {
   showOutline: boolean;
   /** true: the editor scrollbar only shows while the mouse is over it. */
   hideScrollbar: boolean;
+  /** true: a note opens in preview (rendered, read-only) instead of its markdown source. */
+  openInPreview: boolean;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -70,6 +72,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trailingLine: false,
   showOutline: false,
   hideScrollbar: false,
+  openInPreview: false,
 };
 
 /** Tag of the notes sent from the quick-note overlay (formerly `overlay`, migrated by the main process). */
