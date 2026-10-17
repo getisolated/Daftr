@@ -34,8 +34,21 @@ describe('sanitizeSettings', () => {
   it('keeps a valid theme and falls back to the current one otherwise', () => {
     expect(sanitizeSettings({ theme: 'light' }).theme).toBe('light');
     expect(sanitizeSettings({ theme: 'system' }).theme).toBe('system');
+    expect(sanitizeSettings({ theme: 'github-dark-dimmed' }).theme).toBe('github-dark-dimmed');
     expect(sanitizeSettings({ theme: 'solarized' }).theme).toBe('dark');
+    expect(sanitizeSettings({ theme: 'toString' }).theme).toBe('dark');
     expect(sanitizeSettings({ theme: 42 }, { ...DEFAULT_SETTINGS, theme: 'light' }).theme).toBe('light');
+  });
+
+  it('keeps the system themes only when they belong to the matching family', () => {
+    expect(sanitizeSettings({ preferredDarkTheme: 'github-dark-dimmed', preferredLightTheme: 'solarized-light' })).toMatchObject({
+      preferredDarkTheme: 'github-dark-dimmed', preferredLightTheme: 'solarized-light',
+    });
+    expect(sanitizeSettings({ preferredDarkTheme: 'violet-light', preferredLightTheme: 'dark' })).toMatchObject({
+      preferredDarkTheme: 'dark', preferredLightTheme: 'light',
+    });
+    const base = { ...DEFAULT_SETTINGS, preferredDarkTheme: 'github-dark-dimmed' as const };
+    expect(sanitizeSettings({ preferredDarkTheme: 'nope' }, base).preferredDarkTheme).toBe('github-dark-dimmed');
   });
 
   it('clamps the overlay size to its bounds', () => {

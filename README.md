@@ -24,7 +24,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **System tray** — closing the window keeps the app running in the tray (right-click > Quit to exit); optional launch at Windows startup
 - **Auto-update** — the app checks the latest GitHub release at startup then hourly (packaged Windows build only) and offers the update in a popup, with an entry in the sidebar above Settings; the installer is SHA-512 verified. The `Automatic Updates` setting downloads in the background and installs when the app closes. Releases (tags `v*`) publish a `latest.json` manifest next to the installer
 - **Settings editor** — VS Code-like modal (`Ctrl+,`) with search, categories and reset to default
-- **Light & dark themes** — dark by default; **Settings → Appearance → Theme** (Dark / Light / System, following the OS) or the `Ctrl+K Ctrl+T` chord to flip. Every color is a CSS variable `--evn-*` defined per `data-theme` in `src/styles.scss` (the editor syntax colors too, so CodeMirror needs no per-theme extension): a new theme = a new `:root[data-theme='…']` block. The choice lives in `settings.json` and is mirrored in localStorage so an inline script in `index.html` applies it before the first paint. The quick-note overlay keeps its own dark translucent look
+- **Themes** — Dark (default), Light, GitHub Light, Solarized Light, Violet Light and GitHub Dark Dimmed. **Settings → Appearance → Theme**, or `Ctrl+K Ctrl+T` for a VS Code-like picker: the arrow keys preview each theme live, `Enter` keeps it, `Escape` restores the previous one. `System` follows the Windows light/dark mode with the *Preferred Dark / Light Theme* settings. Chords (`Ctrl+K` then a second key) wait for the second key with no time limit; `Escape` or any other key cancels them. Every color is a CSS variable `--evn-*` defined per `data-theme` in `src/styles.scss` (the editor syntax colors too, so CodeMirror needs no per-theme extension): a new theme = a new `:root[data-theme='…']` block, registered in `theme.model.ts` (a test checks every block defines every token). The choice lives in `settings.json` and is mirrored in localStorage so an inline script in `index.html` applies it before the first paint. The quick-note overlay keeps its own dark translucent look
 - **Formatting bar** — Word-like toolbar (styles, bold/italic/strike/code, blocks, lists) between the tabs and the editor, buttons reflect the formatting under the caret (read from the syntax tree) and never steal the editor focus. `Alt+T` toggles it; **Settings → Formatting Bar** turns it off for good and sets its size (Full / Compact), style (Pinned / Floating) and position (Top / Bottom)
 - **Keyboard-first** — every action has a shortcut (see below)
 - **Local storage** — all data stays on your machine in a SQLite database
@@ -87,7 +87,7 @@ Every in-app shortcut below is a default and can be rebound in **Settings → Ke
 | `F1` | Command palette |
 | `Ctrl+N` | New note |
 | `Ctrl+Shift+E` | Toggle sidebar |
-| `Ctrl+K` `Ctrl+T` (chord) | Toggle light / dark theme |
+| `Ctrl+K` `Ctrl+T` (chord) | Color theme picker (live preview) |
 | `Ctrl+W` | Close tab |
 | `Ctrl+F` | Find in editor |
 | `Ctrl+Shift+F` | Search all notes |
