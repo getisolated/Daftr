@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Tab } from '../src/app/core/models/note.model';
-import { closeTabsWhere } from '../src/app/core/utils/tabs-closing.util';
+import { closeTabsWhere, orderByRecency, touchRecent } from '../src/app/core/utils/tabs-closing.util';
 
 function tab(noteId: number, isPinned = false): Tab {
   return { noteId, title: `n${noteId}`, isDirty: false, isPinned };
@@ -31,5 +31,17 @@ describe('closeTabsWhere', () => {
 
   it('keeps home active (-1) when no tab was active and nothing takes over', () => {
     expect(closeTabsWhere(TABS, null, t => t.noteId === 2).activeIndex).toBe(-1);
+  });
+});
+
+describe('touchRecent / orderByRecency', () => {
+  it('moves the shown document to the front of the recent ones', () => {
+    expect(touchRecent([1, 2, 3], 3)).toEqual([3, 1, 2]);
+    expect(touchRecent([], 5)).toEqual([5]);
+  });
+
+  it('orders the open tabs by recency, the never shown ones last in their order', () => {
+    const tabs = [{ noteId: 1 }, { noteId: 2 }, { noteId: 3 }, { noteId: 4 }];
+    expect(orderByRecency(tabs, [3, 9, 1]).map(tab => tab.noteId)).toEqual([3, 1, 2, 4]);
   });
 });

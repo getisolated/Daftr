@@ -1,5 +1,5 @@
 import {
-  Component, inject, OnDestroy, signal, computed, effect,
+  Component, inject, OnDestroy, signal, computed, effect, untracked,
   ViewChild, ElementRef, ChangeDetectionStrategy
 } from '@angular/core';
 
@@ -16,6 +16,9 @@ import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.mode
   standalone: true,
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '(window:keyup)': 'onKeyup($event)',
+  },
   template: `
     @if (isOpen()) {
       <div class="palette-backdrop" (click)="close()">
@@ -85,6 +88,20 @@ import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.mode
                     }
                   }
 
+                  @if (result.type === 'tab') {
+                    <div class="item-icon note-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                      </svg>
+                    </div>
+                    <div class="item-content">
+                      <span class="item-label">{{ result.tab!.title || 'Untitled' }}</span>
+                      @if (result.tab!.isDirty || result.tab!.isPinned) {
+                        <span class="item-desc">{{ result.tab!.isPinned ? 'Pinned' : '' }}{{ result.tab!.isPinned && result.tab!.isDirty ? ' · ' : '' }}{{ result.tab!.isDirty ? 'Unsaved changes' : '' }}</span>
+                      }
+                    </div>
+                  }
+
                   @if (result.type === 'tag') {
                     <div class="item-icon">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -132,6 +149,7 @@ export class PaletteComponent implements OnDestroy {
     switch (this.mode()) {
       case 'search': return 'Search all notes... (or #tag to filter)';
       case 'tag': return 'Filter by tag...';
+      case 'recent': return 'Open a recent document (Ctrl+E again for the next one)';
       default: return 'Type a command or note name...';
     }
   });
@@ -231,6 +249,27 @@ export class PaletteComponent implements OnDestroy {
         this.selectedIndex.set(0);
       }
     });
+
+    // Ctrl+E pressed again while the switcher is open: next document
+    effect(() => {
+      if (this.palette.cycle() > 0) {
+        untracked(() => {
+          const total = Math.max(1, this.results().length);
+          this.selectedIndex.update(index => (index + 1) % total);
+        });
+      }
+    });
+  }
+
+  /** Releasing Ctrl after Ctrl+E (held) opens the highlighted document, like VS Code's quick navigation. */
+  protected onKeyup(event: KeyboardEvent): void {
+    if (this.isOpen() && this.mode() === 'recent' && this.palette.quickNavigate() && (event.key === 'Control' || event.key === 'Meta')) {
+      const result = this.results()[this.selectedIndex()];
+
+      if (result) {
+        void this.execute(result);
+      }
+    }
   }
 
   ngOnDestroy(): void {
@@ -248,6 +287,11 @@ export class PaletteComponent implements OnDestroy {
 
   private async search(query: string): Promise<void> {
     const mode = this.mode();
+
+    if (mode === 'recent') {
+      this.searchRecents(query);
+      return;
+    }
 
     if (mode === 'command' && !query.trim()) {
       this._results.set(this.commands);
@@ -289,6 +333,18 @@ export class PaletteComponent implements OnDestroy {
     }
   }
 
+  /** Open documents, most recent first; the previous one is highlighted, so Ctrl+E then release switches back to it. */
+  private searchRecents(query: string): void {
+    const needle = query.trim().toLowerCase();
+    const tabs = this.tabs.recentTabs().filter(tab => (tab.title || 'Untitled').toLowerCase().includes(needle));
+
+    this._results.set(tabs.map(tab => ({ type: 'tab', tab })));
+
+    if (!needle && tabs.length > 1 && this.tabs.activeNoteId() === tabs[0]?.noteId) {
+      this.selectedIndex.set(1);
+    }
+  }
+
   async execute(result: PaletteResult): Promise<void> {
     this.palette.close();
     await new Promise(r => setTimeout(r, 10));
@@ -299,6 +355,8 @@ export class PaletteComponent implements OnDestroy {
       this.tabs.openNote(result.note!.id, result.note!.title);
     } else if (result.type === 'tag') {
       this.palette.open('search', '#' + result.tag);
+    } else if (result.type === 'tab') {
+      this.tabs.setActiveIndex(this.tabs.tabs().findIndex(tab => tab.noteId === result.tab!.noteId));
     }
   }
 

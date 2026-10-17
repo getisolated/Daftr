@@ -269,3 +269,161 @@
     color: #fff;
   }
 }
+
+// ── Experimental styles (Settings → Experimental → Tabs Style) ────────────────
+
+// Attached / Attached Reverse: tabs joined to the page below, or hanging from the top of the window
+.tabs-bar[data-tabs-style='attached'],
+.tabs-bar[data-tabs-style='attached-reverse'] {
+  align-items: stretch;
+
+  .home-btn,
+  .search-icon-btn,
+  .window-controls {
+    align-self: center;
+  }
+
+  .tabs-container {
+    gap: 0;
+  }
+
+  .tab {
+    // Thin separators between inactive tabs
+    & + .tab:not(.active)::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 9px;
+      bottom: 9px;
+      width: 1px;
+      background: var(--evn-border-soft);
+    }
+
+    &:hover {
+      background: rgba(var(--evn-hover-rgb), 0.05);
+    }
+
+    &.active {
+      background: var(--evn-bg);
+      z-index: 1;
+
+      & + .tab::before {
+        display: none;
+      }
+    }
+  }
+
+  .corner {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+  }
+
+  .corner-left {
+    left: -8px;
+  }
+
+  .corner-right {
+    right: -8px;
+  }
+}
+
+.tabs-bar[data-tabs-style='attached'] {
+  .tabs-container {
+    align-items: flex-end;
+    padding-top: 6px;
+  }
+
+  .tab,
+  .tab.active {
+    height: 32px;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .corner {
+    bottom: 0;
+  }
+
+  .corner-left {
+    background: radial-gradient(circle at 0 0, transparent 8px, var(--evn-bg) 8.5px);
+  }
+
+  .corner-right {
+    background: radial-gradient(circle at 100% 0, transparent 8px, var(--evn-bg) 8.5px);
+  }
+}
+
+.tabs-bar[data-tabs-style='attached-reverse'] {
+  .tabs-container {
+    align-items: flex-start;
+    padding-bottom: 6px;
+  }
+
+  .tab,
+  .tab.active {
+    height: 32px;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .corner {
+    top: 0;
+  }
+
+  .corner-left {
+    background: radial-gradient(circle at 0 100%, transparent 8px, var(--evn-bg) 8.5px);
+  }
+
+  .corner-right {
+    background: radial-gradient(circle at 100% 100%, transparent 8px, var(--evn-bg) 8.5px);
+  }
+}
+
+// Recents: no tabs, only the current document centered in the title bar
+.tabs-bar:is([data-tabs-style='recents'], [data-tabs-style='trail'], [data-tabs-style='deck'], [data-tabs-style='dial']) .tabs-container {
+  display: none;
+}
+
+.current-doc {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  // Large and fixed whatever the document, but never under the buttons on each side
+  width: 480px;
+  max-width: calc(100% - 480px);
+  min-width: 160px;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--evn-border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--evn-text-soft);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  -webkit-app-region: no-drag;
+
+  &:hover {
+    border-color: var(--evn-border-hover);
+    background: rgba(var(--evn-hover-rgb), 0.04);
+    color: var(--evn-text);
+  }
+}
+
+.current-doc-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tabs-spacer {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}

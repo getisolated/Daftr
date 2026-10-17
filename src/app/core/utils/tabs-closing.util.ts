@@ -25,3 +25,17 @@ export function closeTabsWhere(
     activeIndex: remaining.findIndex(tab => tab.noteId === nextActiveId),
   };
 }
+
+/** Ids with `id` moved to the front: the most recently used order of the documents. */
+export function touchRecent(recent: readonly number[], id: number): number[] {
+  return [id, ...recent.filter(other => other !== id)];
+}
+
+/** The open tabs, most recently used first; tabs never activated keep their order, after the others. */
+export function orderByRecency<T extends { noteId: number }>(tabs: readonly T[], recent: readonly number[]): T[] {
+  const rank = new Map(recent.map((id, index) => [id, index]));
+  return tabs
+    .map((tab, index) => ({ tab, index, rank: rank.get(tab.noteId) ?? Number.MAX_SAFE_INTEGER }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(entry => entry.tab);
+}

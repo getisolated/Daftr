@@ -1,5 +1,9 @@
 export type ShortcutMode = 'overlay' | 'app';
 
+export type TabsStyle = 'pills' | 'attached' | 'attached-reverse' | 'recents' | 'trail' | 'deck' | 'dial';
+
+const TABS_STYLES: readonly TabsStyle[] = ['pills', 'attached', 'attached-reverse', 'recents', 'trail', 'deck', 'dial'];
+
 export type ThemePreference = 'dark' | 'light' | 'system';
 
 const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system'];
@@ -41,6 +45,7 @@ export interface AppSettings {
   trailingLine: boolean;
   /** true: the h1/h2/h3 outline is shown on the right of the open note. */
   showOutline: boolean;
+  tabsStyle: TabsStyle;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -71,6 +76,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   wordWrap: true,
   trailingLine: false,
   showOutline: true,
+  tabsStyle: 'pills',
   overlayPosition: null,
 };
 
@@ -133,6 +139,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     wordWrap: typeof raw['wordWrap'] === 'boolean' ? raw['wordWrap'] : base.wordWrap,
     trailingLine: typeof raw['trailingLine'] === 'boolean' ? raw['trailingLine'] : base.trailingLine,
     showOutline: typeof raw['showOutline'] === 'boolean' ? raw['showOutline'] : base.showOutline,
+    tabsStyle: TABS_STYLES.find(style => style === raw['tabsStyle']) ?? base.tabsStyle,
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

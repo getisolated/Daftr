@@ -2,6 +2,9 @@ import { FormattingBarMode, FormattingBarPosition, FormattingBarStyle } from './
 
 export type ShortcutMode = 'overlay' | 'app';
 
+/** Look of the open documents in the title bar (experimental): see TABS_STYLES. */
+export type TabsStyle = 'pills' | 'attached' | 'attached-reverse' | 'recents' | 'trail' | 'deck' | 'dial';
+
 export type ThemePreference = 'dark' | 'light' | 'system';
 
 /** Theme actually applied once 'system' is resolved against the OS color scheme. */
@@ -34,6 +37,7 @@ export interface AppSettings {
   trailingLine: boolean;
   /** true: the h1/h2/h3 outline is shown on the right of the open note. */
   showOutline: boolean;
+  tabsStyle: TabsStyle;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -62,6 +66,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   wordWrap: true,
   trailingLine: false,
   showOutline: true,
+  tabsStyle: 'pills',
 };
 
 export const OVERLAY_NOTE_TAG = 'overlay';
