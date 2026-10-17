@@ -28,6 +28,15 @@ export interface FolderRow {
 
 export type FolderDeleteMode = 'moveToRoot' | 'deleteAll';
 
+/** A folder or a file of the disk opened in the app; the path (absolute, normalized) is its key. */
+export interface CollectionRow {
+  path: string;
+  kind: 'folder' | 'file';
+  display_name: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export const MAX_FOLDER_NAME_LENGTH = 100;
 const DEFAULT_FOLDER_NAME = 'Inbox';
 
@@ -96,6 +105,7 @@ export function initDatabase(): void {
   migrateNotesFolderColumn();
   migrateQuickNoteTag();
   migrateColorColumns();
+  createCollectionsTable();
 
   // Cache prepared statements after schema is ready
   stmts = {
@@ -195,6 +205,19 @@ export function normalizeColor(value: unknown): string | null {
 /** `?, ?, ?` for an `IN (…)` clause of `count` values. */
 function placeholders(count: number): string {
   return Array.from({ length: count }, () => '?').join(', ');
+}
+
+/** Collections (folders / files on disk) are listed here; their content is read from the disk, never stored. */
+function createCollectionsTable(): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS collections (
+      path TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('folder', 'file')),
+      display_name TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
 }
 
 /** The default folder must always exist: the notes created on the fly land in it. */
@@ -480,5 +503,37 @@ export const folderOps = {
     if (ids.length > 0) {
       db.prepare(`UPDATE folders SET color = ? WHERE id IN (${placeholders(ids.length)})`).run(color, ...ids);
     }
+  },
+};
+
+export const collectionOps = {
+  getAll(): CollectionRow[] {
+    return db.prepare('SELECT * FROM collections ORDER BY sort_order, created_at').all() as CollectionRow[];
+  },
+
+  get(collectionPath: string): CollectionRow | undefined {
+    return db.prepare('SELECT * FROM collections WHERE path = ?').get(collectionPath) as CollectionRow | undefined;
+  },
+
+  /** Adds the collection (last of the list); an already opened path is returned as is. */
+  add(collectionPath: string, kind: 'folder' | 'file', displayName: string): CollectionRow | undefined {
+    const next = (db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM collections').get() as { next: number }).next;
+    db.prepare('INSERT OR IGNORE INTO collections (path, kind, display_name, sort_order) VALUES (?, ?, ?, ?)').run(collectionPath, kind, displayName, next);
+    return this.get(collectionPath);
+  },
+
+  remove(collectionPath: string): void {
+    db.prepare('DELETE FROM collections WHERE path = ?').run(collectionPath);
+  },
+
+  rename(collectionPath: string, displayName: string): CollectionRow | undefined {
+    db.prepare('UPDATE collections SET display_name = ? WHERE path = ?').run(displayName, collectionPath);
+    return this.get(collectionPath);
+  },
+
+  /** A file or folder moved on disk (relocated by the user): same collection, new key. */
+  relocate(from: string, to: string): CollectionRow | undefined {
+    db.prepare('UPDATE collections SET path = ? WHERE path = ?').run(to, from);
+    return this.get(to);
   },
 };

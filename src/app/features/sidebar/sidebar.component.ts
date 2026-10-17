@@ -36,6 +36,7 @@ import { ColorPickerComponent } from '../../shared/ui/color-picker.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { MoveToDialogComponent } from './move-to-dialog.component';
+import { CollectionsSectionComponent } from './collections-section.component';
 
 const NEW_FOLDER_NAME = 'New folder';
 
@@ -50,7 +51,7 @@ const ICON_EMPTY = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, ColorPickerComponent, MoveToDialogComponent],
+  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, ColorPickerComponent, MoveToDialogComponent, CollectionsSectionComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[style.width.px]': 'width()',

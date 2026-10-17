@@ -57,6 +57,11 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ preferredDarkTheme: 'nope' }, base).preferredDarkTheme).toBe('github-dark-dimmed');
   });
 
+  it('keeps a clean list of excluded collection folders', () => {
+    expect(sanitizeSettings({ collectionsExclude: [' build ', 'build', '', 'a/b', 42, 'tmp'] }).collectionsExclude).toEqual(['build', 'tmp']);
+    expect(sanitizeSettings({ collectionsExclude: 'node_modules' }).collectionsExclude).toEqual(DEFAULT_SETTINGS.collectionsExclude);
+  });
+
   it('clamps the overlay size to its bounds', () => {
     expect(sanitizeSettings({ overlayWidth: 10, overlayHeight: 99999 })).toMatchObject({ overlayWidth: 200, overlayHeight: 1200 });
   });

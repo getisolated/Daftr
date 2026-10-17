@@ -1,11 +1,14 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { CollectionFileRef } from '../models/collection.model';
 import { QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE, Tab } from '../models/note.model';
+import { FileDocsService } from './file-docs.service';
 import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
 
 const SESSION_KEY = 'evnote-session';
 
 @Injectable({ providedIn: 'root' })
 export class TabsService {
+  private readonly fileDocs = inject(FileDocsService);
   private readonly _tabs = signal<Tab[]>([]);
   private readonly _activeIndex = signal<number>(-1);
   private _initialized = false;
@@ -40,9 +43,16 @@ export class TabsService {
       if (raw) {
         const parsed = JSON.parse(raw) as { tabs: Tab[]; activeIndex: number };
         const validTabs = parsed.tabs
-          .filter(t => validNoteIds.has(t.noteId) || t.noteId === QUICK_NOTES_TAB_ID)
-          // Sessions saved before the rename still say "Overlay notes"
-          .map(t => ({ ...t, isPinned: t.isPinned ?? false, title: t.noteId === QUICK_NOTES_TAB_ID ? QUICK_NOTES_TITLE : t.title }));
+          .filter(t => validNoteIds.has(t.noteId) || t.noteId === QUICK_NOTES_TAB_ID || !!t.file)
+          // Sessions saved before the rename still say "Overlay notes".
+          // File ids only last a session: the saved file gets a fresh one (a missing file shows an error when opened)
+          .map(t => ({
+            ...t,
+            isPinned: t.isPinned ?? false,
+            isDirty: false,
+            noteId: t.file ? this.fileDocs.idFor(t.file) : t.noteId,
+            title: t.noteId === QUICK_NOTES_TAB_ID ? QUICK_NOTES_TITLE : t.title,
+          }));
         if (validTabs.length > 0) {
           this._tabs.set(validTabs);
           const clamped = Math.min(Math.max(parsed.activeIndex, -1), validTabs.length - 1);
@@ -68,14 +78,20 @@ export class TabsService {
     this.persist();
   }
 
-  openNote(noteId: number, title: string): void {
+  openNote(noteId: number, title: string, file?: CollectionFileRef): void {
     const existing = this._tabs().findIndex(t => t.noteId === noteId);
     if (existing >= 0) {
       this._activeIndex.set(existing);
     } else {
-      this._tabs.update(tabs => [...tabs, { noteId, title, isDirty: false, isPinned: false }]);
+      this._tabs.update(tabs => [...tabs, { noteId, title, isDirty: false, isPinned: false, ...(file ? { file } : {}) }]);
       this._activeIndex.set(this._tabs().length - 1);
     }
+    this.persist();
+  }
+
+  /** A file of a collection was renamed or moved: its tab follows. */
+  updateFile(noteId: number, file: CollectionFileRef, title: string): void {
+    this._tabs.update(tabs => tabs.map(t => (t.noteId === noteId ? { ...t, file, title } : t)));
     this.persist();
   }
 
