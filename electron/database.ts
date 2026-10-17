@@ -9,6 +9,8 @@ export interface NoteRow {
   tags: string; // JSON array string
   folder_id: number | null;
   sort_order: number | null;
+  /** `#rrggbb` chosen by the user in the sidebar, `null` for none. */
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +21,8 @@ export interface FolderRow {
   parent_id: number | null;
   is_default: number; // 0 | 1 (SQLite has no boolean)
   sort_order: number | null;
+  /** `#rrggbb` chosen by the user in the sidebar, `null` for none. */
+  color: string | null;
   created_at: string;
 }
 
@@ -91,6 +95,7 @@ export function initDatabase(): void {
 
   migrateNotesFolderColumn();
   migrateQuickNoteTag();
+  migrateColorColumns();
 
   // Cache prepared statements after schema is ready
   stmts = {
@@ -172,6 +177,24 @@ function parseTags(raw: string): string[] {
 /** Tags with `from` renamed to `to`, without duplicating `to` when it is already there. */
 export function renameTag(tags: string[], from: string, to: string): string[] {
   return [...new Set(tags.map(tag => (tag === from ? to : tag)))];
+}
+
+/** Colors of the sidebar items, added after the first releases. */
+function migrateColorColumns(): void {
+  addColumnIfMissing('notes', 'color', 'TEXT');
+  addColumnIfMissing('folders', 'color', 'TEXT');
+}
+
+const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+/** A `#rrggbb` color in lower case, or `null` for anything else (no color). */
+export function normalizeColor(value: unknown): string | null {
+  return typeof value === 'string' && COLOR_PATTERN.test(value) ? value.toLowerCase() : null;
+}
+
+/** `?, ?, ?` for an `IN (…)` clause of `count` values. */
+function placeholders(count: number): string {
+  return Array.from({ length: count }, () => '?').join(', ');
 }
 
 /** The default folder must always exist: the notes created on the fly land in it. */
@@ -272,6 +295,13 @@ export const noteOps = {
 
   delete(id: number): void {
     stmts.delete.run(id);
+  },
+
+  /** Colors the notes without touching `updated_at`: a color is not an edit. */
+  setColor(ids: number[], color: string | null): void {
+    if (ids.length > 0) {
+      db.prepare(`UPDATE notes SET color = ? WHERE id IN (${placeholders(ids.length)})`).run(color, ...ids);
+    }
   },
 
   search(query: string): NoteRow[] {
@@ -421,5 +451,34 @@ export const folderOps = {
 
       return deletedNoteIds;
     })();
+  },
+
+  /**
+   * Deletes everything inside the folder (its notes, its sub-folders and their notes) but keeps the folder itself,
+   * the default one included. Returns the ids of the deleted notes, `null` for an unknown folder.
+   */
+  empty(id: number): number[] | null {
+    if (!this.getById(id)) {
+      return null;
+    }
+
+    const ids = subtreeIds(id);
+    const marks = placeholders(ids.length);
+
+    return db.transaction((): number[] => {
+      const rows = db.prepare(`SELECT id FROM notes WHERE folder_id IN (${marks})`).all(...ids) as { id: number }[];
+
+      db.prepare(`DELETE FROM notes WHERE folder_id IN (${marks})`).run(...ids);
+      // Their own sub-folders go away through ON DELETE CASCADE
+      db.prepare('DELETE FROM folders WHERE parent_id = ?').run(id);
+
+      return rows.map(row => row.id);
+    })();
+  },
+
+  setColor(ids: number[], color: string | null): void {
+    if (ids.length > 0) {
+      db.prepare(`UPDATE folders SET color = ? WHERE id IN (${placeholders(ids.length)})`).run(color, ...ids);
+    }
   },
 };
