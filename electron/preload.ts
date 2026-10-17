@@ -40,6 +40,10 @@ const api = {
   emptyFolder: (id: number) => ipcRenderer.invoke('folders:empty', id),
   setFoldersColor: (ids: number[], color: string | null) => ipcRenderer.invoke('folders:setColor', ids, color),
 
+  // Export: asks where to save, returns the written path or null
+  saveExport: (kind: 'md' | 'html' | 'zip', suggestedName: string, payload: unknown) =>
+    ipcRenderer.invoke('export:save', kind, suggestedName, payload),
+
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch: Record<string, unknown>) => ipcRenderer.invoke('settings:set', patch),

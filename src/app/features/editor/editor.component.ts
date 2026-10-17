@@ -30,6 +30,7 @@ import { ElectronBridgeService } from '../../core/services/electron-bridge.servi
 import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
 import { EditorViewMode, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
+import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
 import { FoldersService } from '../../core/services/folders.service';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
@@ -172,6 +173,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
   protected readonly find = inject(FindService);
+  private noteExport = inject(NoteExportService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
@@ -686,6 +688,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
           );
         }
 
+        if (this.noteExport.canExport(this.activeNote()?.id ?? null)) {
+          items.push({ divider: true }, ...NOTE_EXPORT_MENU);
+        }
+
         this.ctxMenu.set({ items, x: event.clientX, y: event.clientY });
         return true;
       },
@@ -694,7 +700,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   protected onCtxAction(id: string): void {
     const view = this.editorView;
-    if (id === 'draft' && view) {
+    const noteId = this.activeNote()?.id;
+
+    if (id.startsWith('export:') && noteId !== undefined) {
+      // What was typed in the last second is not saved yet: the export must include it
+      void this.flushPendingSave().then(() => this.noteExport.runNoteAction(id, noteId));
+    } else if (id === 'draft' && view) {
       toggleDraft(view);
       view.focus();
     } else if (id.startsWith('table:') && view) {
