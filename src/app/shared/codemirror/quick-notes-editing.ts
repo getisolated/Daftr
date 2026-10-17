@@ -1,6 +1,6 @@
 import { EditorState, Extension, Facet, Prec, StateEffect, StateField, Transaction } from '@codemirror/state';
-import { EditorView, ViewPlugin, ViewUpdate, keymap } from '@codemirror/view';
-import { BlockRange, timestampBlocks } from './note-timestamps';
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType, keymap } from '@codemirror/view';
+import { BlockRange, noteTimestamps, timestampBlocks } from './note-timestamps';
 
 /** What the quick notes document asks the app to do with one of its notes. */
 export interface QuickNoteHandlers {
@@ -120,8 +120,6 @@ const ICONS = {
   copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   remove: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
-  save: '<path d="M20 6 9 17l-5-5"/>',
-  cancel: '<path d="M18 6 6 18M6 6l12 12"/>',
 };
 
 interface ToolbarButton {
@@ -137,16 +135,11 @@ const READ_BUTTONS: ToolbarButton[] = [
   { icon: 'remove', title: 'Delete', danger: true, run: (view, range) => view.state.facet(handlersFacet)?.remove(range.id) },
 ];
 
-const EDIT_BUTTONS: ToolbarButton[] = [
-  { icon: 'save', title: 'Save (Ctrl+Enter)', run: view => commit(view) },
-  { icon: 'cancel', title: 'Cancel (Escape)', run: view => cancel(view) },
-];
-
-/** Discord-like actions over the hovered note (copy / edit / delete), or save / cancel over the one being edited. */
+/** Discord-like actions over the hovered note (copy / edit / delete); the edited note has its own buttons below it. */
 const actionsToolbar = ViewPlugin.fromClass(class {
   private readonly dom = document.createElement('div');
   private hovered: number | null = null;
-  /** Block the buttons were drawn for, and in which mode: redrawn only when that changes. */
+  /** Block the buttons were drawn for: redrawn only when that changes. */
   private drawn = '';
 
   private readonly onMove = (event: MouseEvent): void => {
@@ -178,13 +171,14 @@ const actionsToolbar = ViewPlugin.fromClass(class {
 
   update(update: ViewUpdate): void {
     if (update.docChanged || update.geometryChanged || update.transactions.some(tr => tr.effects.length > 0)) {
-      this.render();
+      // The layout can't be read during an update: an exception there would disable the plugin for good
+      this.view.requestMeasure({ key: this, read: () => this.render() });
     }
   }
 
   private render(): void {
-    const editing = editingQuickNote(this.view.state);
-    const target = editing ?? this.hovered;
+    // No actions while a note is edited: its own buttons are the only ones
+    const target = editingQuickNote(this.view.state) === null ? this.hovered : null;
     const range = target === null ? undefined : timestampBlocks(this.view.state).find(block => block.id === target);
 
     if (!range) {
@@ -193,9 +187,9 @@ const actionsToolbar = ViewPlugin.fromClass(class {
       return;
     }
 
-    const key = `${range.id}:${editing !== null}`;
+    const key = String(range.id);
     if (key !== this.drawn) {
-      this.draw(range, editing !== null ? EDIT_BUTTONS : READ_BUTTONS);
+      this.draw(range, READ_BUTTONS);
       this.drawn = key;
     }
     this.place(range);
@@ -243,7 +237,114 @@ const actionsToolbar = ViewPlugin.fromClass(class {
   }
 });
 
+/** Cancel / Save buttons under the edited note, like Discord's message edit. */
+class EditBarWidget extends WidgetType {
+  override eq(): boolean {
+    return true;
+  }
+
+  override toDOM(view: EditorView): HTMLElement {
+    const bar = document.createElement('div');
+    bar.className = 'cm-quick-note-edit-bar';
+    // The buttons must not take the focus from the editor: leaving it would save the note
+    bar.addEventListener('mousedown', event => event.preventDefault());
+    bar.append(
+      this.button('Cancel', 'Escape', 'cm-quick-note-edit-button', () => cancel(view)),
+      this.button('Save', 'Ctrl+Enter', 'cm-quick-note-edit-button primary', () => commit(view)),
+    );
+    return bar;
+  }
+
+  private button(label: string, shortcut: string, className: string, run: () => void): HTMLButtonElement {
+    const element = document.createElement('button');
+    element.type = 'button';
+    element.className = className;
+    element.textContent = label;
+    element.title = `${label} (${shortcut})`;
+    element.addEventListener('click', run);
+    return element;
+  }
+}
+
+const editedLine = Decoration.line({ class: 'cm-quick-note-editing' });
+const editedFirstLine = Decoration.line({ class: 'cm-quick-note-editing cm-quick-note-editing-first' });
+const editedLastLine = Decoration.line({ class: 'cm-quick-note-editing cm-quick-note-editing-last' });
+const editedSingleLine = Decoration.line({ class: 'cm-quick-note-editing cm-quick-note-editing-first cm-quick-note-editing-last' });
+const editBar = Decoration.widget({ widget: new EditBarWidget(), block: true, side: 1 });
+
+/** Frames the lines of the edited note and adds the edit buttons below it. */
+function editDecorations(state: EditorState): DecorationSet {
+  const range = editedRange(state);
+
+  if (!range) {
+    return Decoration.none;
+  }
+
+  const first = state.doc.lineAt(range.from).number;
+  const last = state.doc.lineAt(range.to).number;
+  const decorations = [];
+
+  for (let number = first; number <= last; number++) {
+    const line = number === first
+      ? (number === last ? editedSingleLine : editedFirstLine)
+      : (number === last ? editedLastLine : editedLine);
+    decorations.push(line.range(state.doc.line(number).from));
+  }
+  decorations.push(editBar.range(range.to));
+  return Decoration.set(decorations);
+}
+
+/** Left offset of the text column (see `noteTimestampsTheme`), minus the frame's border and padding. */
+const FRAME_LEFT = '141px';
+
 const quickNotesTheme = EditorView.baseTheme({
+  // Doubled class: wins over the timestamp column's padding
+  '.cm-line.cm-quick-note-editing.cm-quick-note-editing': {
+    marginLeft: FRAME_LEFT,
+    padding: '0 10px 0 8px',
+    background: 'var(--evn-bg-input)',
+    borderLeft: '1px solid var(--evn-border)',
+    borderRight: '1px solid var(--evn-border)',
+  },
+  '.cm-line.cm-quick-note-editing-first': {
+    paddingTop: '6px',
+    borderTop: '1px solid var(--evn-border)',
+    borderTopLeftRadius: '6px',
+    borderTopRightRadius: '6px',
+  },
+  '.cm-line.cm-quick-note-editing-last': {
+    paddingBottom: '6px',
+    borderBottom: '1px solid var(--evn-border)',
+    borderBottomLeftRadius: '6px',
+    borderBottomRightRadius: '6px',
+  },
+  '.cm-quick-note-edit-bar': {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px',
+    marginLeft: FRAME_LEFT,
+    padding: '6px 0 8px',
+  },
+  '.cm-quick-note-edit-button': {
+    padding: '6px 14px',
+    border: '1px solid var(--evn-border)',
+    borderRadius: '4px',
+    background: 'transparent',
+    color: 'var(--evn-text)',
+    fontSize: '12px',
+    cursor: 'pointer',
+  },
+  '.cm-quick-note-edit-button:hover': {
+    background: 'rgba(var(--evn-hover-rgb), 0.08)',
+  },
+  '.cm-quick-note-edit-button.primary': {
+    borderColor: 'var(--evn-accent-strong)',
+    background: 'var(--evn-accent-strong)',
+    color: 'var(--evn-text-bright)',
+  },
+  '.cm-quick-note-edit-button.primary:hover': {
+    background: 'var(--evn-accent-hover)',
+  },
   '.cm-quick-note-actions': {
     position: 'absolute',
     zIndex: '5',
@@ -254,6 +355,10 @@ const quickNotesTheme = EditorView.baseTheme({
     border: '1px solid var(--evn-border)',
     borderRadius: '6px',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+  },
+  // `display: flex` above would otherwise override the `hidden` attribute
+  '.cm-quick-note-actions[hidden]': {
+    display: 'none',
   },
   '.cm-quick-note-action': {
     display: 'flex',
@@ -287,6 +392,7 @@ export function quickNotesEditing(handlers: QuickNoteHandlers): Extension {
     editingField,
     editGuard,
     EditorView.editable.compute([editingField], state => state.field(editingField) !== null),
+    EditorView.decorations.compute([editingField, noteTimestamps], editDecorations),
     Prec.highest(keymap.of([
       { key: 'Escape', run: cancel },
       { key: 'Mod-Enter', run: commit },

@@ -536,8 +536,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
   }
 
+  /** Never in the quick notes document: its lines are notes, not a file. */
   private buildLineNumbers(): Extension {
-    return this.settingsService.settings().showLineNumbers
+    return this.settingsService.settings().showLineNumbers && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
       ? [lineNumbers(), EditorView.editorAttributes.of({ class: 'cm-with-numbers' })]
       : [];
   }
