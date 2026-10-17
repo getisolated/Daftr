@@ -40,6 +40,7 @@ describe('sanitizeSettings', () => {
 
   it('keeps a known tabs style and falls back to the current one otherwise', () => {
     expect(sanitizeSettings({ tabsStyle: 'recents' }).tabsStyle).toBe('recents');
+    expect(sanitizeSettings({ tabsStyle: 'attached-reverse' }).tabsStyle).toBe('attached-reverse');
     expect(sanitizeSettings({ tabsStyle: 'stack' }).tabsStyle).toBe('pills');
   });
 

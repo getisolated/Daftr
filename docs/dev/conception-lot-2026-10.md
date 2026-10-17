@@ -228,7 +228,15 @@ Pistes conservées : dessins stockés à part, référencés dans les notes par 
 Réglage `tabsStyle` (catégorie « Expérimental ») :
 - **pills** : style actuel (défaut), inchangé.
 - **attached** : onglets dont la forme de fond est rattachée au haut de la fenêtre (style navigateur), l'onglet actif se fond dans la surface de la page.
-- **recents** : aucun onglet affiché ; sélecteur de récents identique au `Ctrl+E` de VS Code (palette des documents récents, ordre MRU, `Ctrl+E` répété = suivant, relâchement = ouvrir).
+- **attached-reverse** : comme attached, mais rattaché vers le haut : les onglets pendent du bord supérieur de la fenêtre (coins arrondis en bas, coins inversés en haut).
+- **recents** : aucun onglet affiché ; seul le document actif, centré dans la barre de titre, dans un bloc large et de largeur fixe à bordure fine. Un clic ouvre les récents.
+- **trail** (sillage) : pas d'onglets mais une ligne du temps. Le document courant au centre, les précédents à sa gauche dans l'ordre d'utilisation, de plus en plus petits et pâles à mesure qu'ils vieillissent (8 au plus, fondu sur le bord). L'ordre se réorganise tout seul : la position dit « quand », pas « où ».
+- **deck** (pile) : les documents sont une pile de cartes au centre de la barre, le courant sur le dessus, les suivants dépassent derrière. Au survol, la pile s'éventaille de part et d'autre dans l'ordre de récence ; un clic ramène la carte sur le dessus.
+- **dial** (cadran) : un « orbe » au centre (monogramme coloré du document, titre, nombre d'ouverts). Un clic déploie sous la barre un demi-cercle de documents, le plus récent juste en dessous, les autres alternant à droite et à gauche, puis sur des anneaux plus larges. Chaque document a une couleur et un monogramme stables (repère visuel sans lire).
+
+Dans trail, deck et dial : clic du milieu = fermer le document ; le reste passe par `Ctrl+E`.
+
+Quel que soit le style, `Ctrl+E` ouvre le sélecteur de récents identique à celui de VS Code (palette des documents récents, ordre MRU, `Ctrl+E` répété = suivant, relâchement = ouvrir).
 
 Pin, drag & drop et restauration de session ne sont garantis que dans **pills**.
 

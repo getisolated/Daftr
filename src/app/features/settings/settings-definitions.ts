@@ -131,12 +131,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'tabsStyle',
     category: 'Experimental',
     title: 'Tabs Style',
-    description: 'Pills: the current tabs. Attached: tabs joined to the page, like a browser. Recents: no tabs, a recent documents switcher instead (Ctrl+E). Pinning, reordering and session restore are only guaranteed with Pills.',
+    description: 'Pills: the current tabs. Attached: tabs joined to the page, like a browser. Attached Reverse: tabs hanging from the top of the window. Recents: no tabs, the current document in the middle of the title bar opens the recent documents (Ctrl+E). Trail: the documents along time, older ones fading away. Deck: a pile of cards fanned out on hover. Dial: a half circle of documents unfolding under the title bar. Pinning, reordering and session restore are only guaranteed with Pills.',
     control: 'select',
     options: [
       { value: 'pills', label: 'Pills' },
       { value: 'attached', label: 'Attached' },
+      { value: 'attached-reverse', label: 'Attached Reverse' },
       { value: 'recents', label: 'Recents' },
+      { value: 'trail', label: 'Trail' },
+      { value: 'deck', label: 'Deck' },
+      { value: 'dial', label: 'Dial' },
     ],
   },
   {

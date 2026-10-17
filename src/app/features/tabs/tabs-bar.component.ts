@@ -10,11 +10,15 @@ import { LayoutService } from '../../core/services/layout.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
+import { DocsNavigatorComponent } from './docs-navigator.component';
+
+/** Styles that replace the row of tabs with a navigator of their own. */
+const NAVIGATOR_STYLES: ReadonlySet<string> = new Set(['trail', 'deck', 'dial']);
 
 @Component({
   selector: 'app-tabs-bar',
   standalone: true,
-  imports: [ContextMenuComponent],
+  imports: [ContextMenuComponent, DocsNavigatorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="tabs-bar" [attr.data-tabs-style]="tabsStyle()" (dblclick)="onTitleBarDblClick()">
@@ -49,7 +53,9 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
       <div class="drag-region"></div>
 
       @if (tabsStyle() === 'recents') {
-        <!-- No tabs: the current document, and the recents switcher -->
+        <!-- Before the centered controls: Electron applies the drag regions in DOM order, a later one would cover them -->
+        <div class="tabs-spacer"></div>
+        <!-- No tabs: only the current document, centered, which opens the recents -->
         <button
           type="button"
           class="current-doc"
@@ -58,16 +64,18 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
           [title]="'Recent documents (' + shortcutLabel('tab.recent') + ')'"
         >
           <span class="current-doc-title">{{ activeTitle() }}</span>
-          @if (tabs().length > 1) {
-            <span class="current-doc-count">{{ tabs().length }} open</span>
+          @if (activeDirty()) {
+            <span class="dirty-dot" title="Unsaved changes"></span>
           }
-          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 8 11 13 6"/></svg>
         </button>
+      }
+      @else if (hasNavigator()) {
         <div class="tabs-spacer"></div>
+        <app-docs-navigator [mode]="tabsStyle()" />
       }
 
       <!-- Tabs -->
-      <div class="tabs-container" #tabsContainer [hidden]="tabsStyle() === 'recents'">
+      <div class="tabs-container" #tabsContainer>
         @for (tab of tabs(); track tab.noteId; let i = $index) {
           <div
             class="tab"
@@ -90,8 +98,8 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
             (drop)="onDrop($event, i)"
             (dragend)="onDragEnd()"
           >
-            @if (tabsStyle() === 'attached' && i === activeIndex()) {
-              <!-- Inverted corners: the active tab flows into the page below -->
+            @if (hasCorners() && i === activeIndex()) {
+              <!-- Inverted corners: the active tab flows into the page (attached) or the window top (reverse) -->
               <span class="corner corner-left" aria-hidden="true"></span>
               <span class="corner corner-right" aria-hidden="true"></span>
             }
@@ -206,6 +214,13 @@ export class TabsBarComponent {
     const tab = this.tabs()[this.activeIndex()];
     return tab ? tab.title || 'Untitled' : 'Home';
   });
+
+  readonly activeDirty = computed(() => this.tabs()[this.activeIndex()]?.isDirty ?? false);
+
+  readonly hasNavigator = computed(() => NAVIGATOR_STYLES.has(this.tabsStyle()));
+
+  /** Attached styles draw inverted corners on each side of the active tab. */
+  readonly hasCorners = computed(() => this.tabsStyle() === 'attached' || this.tabsStyle() === 'attached-reverse');
 
   openRecents(): void { this.palette.openRecents(); }
 

@@ -1,8 +1,8 @@
 export type ShortcutMode = 'overlay' | 'app';
 
-export type TabsStyle = 'pills' | 'attached' | 'recents';
+export type TabsStyle = 'pills' | 'attached' | 'attached-reverse' | 'recents' | 'trail' | 'deck' | 'dial';
 
-const TABS_STYLES: readonly TabsStyle[] = ['pills', 'attached', 'recents'];
+const TABS_STYLES: readonly TabsStyle[] = ['pills', 'attached', 'attached-reverse', 'recents', 'trail', 'deck', 'dial'];
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 

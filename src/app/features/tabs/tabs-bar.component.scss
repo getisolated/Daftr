@@ -272,8 +272,9 @@
 
 // ── Experimental styles (Settings → Experimental → Tabs Style) ────────────────
 
-// Attached: the tabs hang from the top of the window and the active one flows into the page, like a browser
-.tabs-bar[data-tabs-style='attached'] {
+// Attached / Attached Reverse: tabs joined to the page below, or hanging from the top of the window
+.tabs-bar[data-tabs-style='attached'],
+.tabs-bar[data-tabs-style='attached-reverse'] {
   align-items: stretch;
 
   .home-btn,
@@ -283,16 +284,10 @@
   }
 
   .tabs-container {
-    align-items: flex-end;
     gap: 0;
-    padding-top: 6px;
   }
 
   .tab {
-    height: 32px;
-    border-radius: 8px 8px 0 0;
-    padding: 0 10px 0 14px;
-
     // Thin separators between inactive tabs
     & + .tab:not(.active)::before {
       content: '';
@@ -310,7 +305,6 @@
 
     &.active {
       background: var(--evn-bg);
-      border-radius: 8px 8px 0 0;
       z-index: 1;
 
       & + .tab::before {
@@ -321,7 +315,6 @@
 
   .corner {
     position: absolute;
-    bottom: 0;
     width: 8px;
     height: 8px;
     pointer-events: none;
@@ -329,41 +322,96 @@
 
   .corner-left {
     left: -8px;
-    background: radial-gradient(circle at 0 0, transparent 8px, var(--evn-bg) 8.5px);
   }
 
   .corner-right {
     right: -8px;
+  }
+}
+
+.tabs-bar[data-tabs-style='attached'] {
+  .tabs-container {
+    align-items: flex-end;
+    padding-top: 6px;
+  }
+
+  .tab,
+  .tab.active {
+    height: 32px;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .corner {
+    bottom: 0;
+  }
+
+  .corner-left {
+    background: radial-gradient(circle at 0 0, transparent 8px, var(--evn-bg) 8.5px);
+  }
+
+  .corner-right {
     background: radial-gradient(circle at 100% 0, transparent 8px, var(--evn-bg) 8.5px);
   }
 }
 
-// Recents: no tabs, the current document opens the recents switcher
+.tabs-bar[data-tabs-style='attached-reverse'] {
+  .tabs-container {
+    align-items: flex-start;
+    padding-bottom: 6px;
+  }
+
+  .tab,
+  .tab.active {
+    height: 32px;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .corner {
+    top: 0;
+  }
+
+  .corner-left {
+    background: radial-gradient(circle at 0 100%, transparent 8px, var(--evn-bg) 8.5px);
+  }
+
+  .corner-right {
+    background: radial-gradient(circle at 100% 100%, transparent 8px, var(--evn-bg) 8.5px);
+  }
+}
+
+// Recents: no tabs, only the current document centered in the title bar
+.tabs-bar:is([data-tabs-style='recents'], [data-tabs-style='trail'], [data-tabs-style='deck'], [data-tabs-style='dial']) .tabs-container {
+  display: none;
+}
+
 .current-doc {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  max-width: 420px;
-  min-width: 0;
+  // Large and fixed whatever the document, but never under the buttons on each side
+  width: 480px;
+  max-width: calc(100% - 480px);
+  min-width: 160px;
   height: 26px;
-  margin-left: 8px;
   padding: 0 12px;
-  border: 1px solid var(--evn-border-subtle);
-  border-radius: 8px;
-  background: var(--evn-bg);
-  color: var(--evn-text);
+  border: 1px solid var(--evn-border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--evn-text-soft);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 12px;
   cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
   -webkit-app-region: no-drag;
 
   &:hover {
     border-color: var(--evn-border-hover);
-  }
-
-  svg {
-    flex-shrink: 0;
-    color: var(--evn-text-soft);
+    background: rgba(var(--evn-hover-rgb), 0.04);
+    color: var(--evn-text);
   }
 }
 
@@ -372,12 +420,6 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.current-doc-count {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--evn-text-dimmed);
 }
 
 .tabs-spacer {

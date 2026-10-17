@@ -3,7 +3,7 @@ import { FormattingBarMode, FormattingBarPosition, FormattingBarStyle } from './
 export type ShortcutMode = 'overlay' | 'app';
 
 /** Look of the open documents in the title bar (experimental): see TABS_STYLES. */
-export type TabsStyle = 'pills' | 'attached' | 'recents';
+export type TabsStyle = 'pills' | 'attached' | 'attached-reverse' | 'recents' | 'trail' | 'deck' | 'dial';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 
