@@ -10,7 +10,7 @@ import { TabsService } from '../../core/services/tabs.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { ThemeService } from '../../core/services/theme.service';
-import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.model';
+import { QUICK_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.model';
 import { buildThemePickerItems } from '../../core/utils/theme.util';
 
 @Component({
@@ -175,9 +175,9 @@ export class PaletteComponent implements OnDestroy {
       {
         type: 'command',
         command: {
-          id: 'overlay-notes', label: 'Overlay Notes',
+          id: 'quick-notes', label: 'Quick Notes',
           description: 'Open every quick note in a single document', category: 'note',
-          action: () => this.tabs.openOverlayNotes(),
+          action: () => this.tabs.openQuickNotes(),
         }
       },
       {
@@ -399,7 +399,7 @@ export class PaletteComponent implements OnDestroy {
   private async copyNoteLink(): Promise<void> {
     const noteId = this.tabs.activeNoteId();
 
-    if (noteId !== null && noteId !== OVERLAY_NOTES_TAB_ID) {
+    if (noteId !== null && noteId !== QUICK_NOTES_TAB_ID) {
       await navigator.clipboard.writeText(`note://${noteId}`);
     }
   }
