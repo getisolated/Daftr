@@ -320,7 +320,7 @@ export class SidebarComponent {
     event.stopPropagation();
 
     const items: ContextMenuEntry[] = [
-      ...NOTE_EXPORT_MENU,
+      NOTE_EXPORT_MENU,
       { divider: true },
       { id: 'delete', label: 'Delete Note', icon: ICON_DELETE, danger: true },
     ];

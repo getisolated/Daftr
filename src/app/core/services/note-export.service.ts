@@ -5,19 +5,24 @@ import { collectSubtreeIds } from '../utils/folder-tree.util';
 import { ElectronBridgeService } from './electron-bridge.service';
 import { FoldersService } from './folders.service';
 import { NotesService } from './notes.service';
-import { ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
+import { ContextMenuItem } from '../../shared/context-menu/context-menu.component';
 
 const ICON_COPY = 'M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M16 4h2a2 2 0 0 1 2 2v4M21 14H11M15 10l-4 4 4 4';
 const ICON_EXPORT = 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3';
 
-/** Context-menu entries of a note, the same in the tabs, the editor and the sidebar. */
-export const NOTE_EXPORT_MENU: ContextMenuEntry[] = [
-  { id: 'export:copy', label: 'Copy Content', icon: ICON_COPY },
-  { id: 'export:md', label: 'Export as Markdown…', icon: ICON_EXPORT },
-  { id: 'export:html', label: 'Export as HTML…', icon: ICON_EXPORT },
-];
+/** Context-menu entry of a note, the same in the tabs, the editor and the sidebar: its actions open in a submenu. */
+export const NOTE_EXPORT_MENU: ContextMenuItem = {
+  id: 'export',
+  label: 'Export as',
+  icon: ICON_EXPORT,
+  children: [
+    { id: 'export:copy', label: 'Copy Content', icon: ICON_COPY },
+    { id: 'export:md', label: 'Markdown…', icon: ICON_EXPORT },
+    { id: 'export:html', label: 'HTML…', icon: ICON_EXPORT },
+  ],
+};
 
-export const FOLDER_EXPORT_MENU: ContextMenuEntry = { id: 'export:zip', label: 'Export as ZIP…', icon: ICON_EXPORT };
+export const FOLDER_EXPORT_MENU: ContextMenuItem = { id: 'export:zip', label: 'Export as ZIP…', icon: ICON_EXPORT };
 
 /** Copy / export of notes. Links are kept as written: in an export they may lead nowhere, that is up to the user. */
 @Injectable({ providedIn: 'root' })

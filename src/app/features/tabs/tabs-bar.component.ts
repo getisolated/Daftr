@@ -301,7 +301,7 @@ export class TabsBarComponent {
     ];
 
     if (this.noteExport.canExport(tab.noteId)) {
-      items.push({ divider: true }, ...NOTE_EXPORT_MENU);
+      items.push({ divider: true }, NOTE_EXPORT_MENU);
     }
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, tabIndex: index });

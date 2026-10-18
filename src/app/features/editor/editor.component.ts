@@ -626,7 +626,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         }
 
         if (this.noteExport.canExport(this.activeNote()?.id ?? null)) {
-          items.push({ divider: true }, ...NOTE_EXPORT_MENU);
+          items.push({ divider: true }, NOTE_EXPORT_MENU);
         }
 
         this.ctxMenu.set({ items, x: event.clientX, y: event.clientY });
