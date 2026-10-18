@@ -3,6 +3,8 @@ import { DropPlacement, Folder, FolderTreeNode, FolderTreeRow, TreeNote } from '
 export const SIDEBAR_MIN_WIDTH = 180;
 export const SIDEBAR_MAX_WIDTH = 600;
 export const SIDEBAR_DEFAULT_WIDTH = 260;
+/** A resized sidebar section keeps at least its header and a row. */
+export const SECTION_MIN_HEIGHT = 48;
 
 /** Items the user positioned come first in that order; the others follow (`null`), alphabetically. */
 function compareSortOrder(a: number | null, b: number | null): number {
@@ -188,6 +190,11 @@ export function clampSidebarWidth(value: unknown): number {
   }
 
   return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, value));
+}
+
+/** Height of a resized sidebar section, between its minimum and `max` (what leaves room for the notes tree). */
+export function clampSectionHeight(value: number, max: number): number {
+  return Math.round(Math.max(SECTION_MIN_HEIGHT, Math.min(max, value)));
 }
 
 /** Share of a row's height, at its top and bottom, where a drop means "next to this row" rather than "into it". */

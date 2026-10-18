@@ -20,6 +20,8 @@ let worker: UtilityProcess | null = null;
 let getWindow: () => BrowserWindow | null = () => null;
 let excludes: string[] = [];
 let searchCounter = 0;
+/** Collections the window asked for (expanded once): only those are scanned and watched, the others stay unloaded. */
+const loaded = new Set<string>();
 
 function post(message: WorkerRequest): void {
   worker?.postMessage(message);
@@ -39,7 +41,9 @@ function startWorker(): void {
 
   post({ type: 'setExcludes', excludes });
   for (const row of collectionOps.getAll()) {
-    post({ type: 'watch', root: row.path, kind: row.kind });
+    if (loaded.has(row.path)) {
+      post({ type: 'watch', root: row.path, kind: row.kind });
+    }
   }
 }
 
@@ -148,12 +152,8 @@ export async function addCollection(candidate: string): Promise<CollectionRow | 
     return null;
   }
 
-  const row = collectionOps.add(absolute, kind, path.basename(absolute));
-
-  if (row) {
-    post({ type: 'watch', root: row.path, kind: row.kind });
-  }
-  return row ?? null;
+  // Not scanned yet: the window loads it when it is expanded
+  return collectionOps.add(absolute, kind, path.basename(absolute)) ?? null;
 }
 
 /** Asks for folders (or markdown files) to open as collections. */
@@ -174,6 +174,7 @@ export async function pickCollections(window: BrowserWindow | null, kind: Collec
 export function removeCollection(root: unknown): void {
   const row = requireCollection(root);
   collectionOps.remove(row.path);
+  loaded.delete(row.path);
   post({ type: 'unwatch', root: row.path });
 }
 
@@ -193,12 +194,8 @@ export async function relocateCollection(window: BrowserWindow | null, root: unk
   }
 
   post({ type: 'unwatch', root: row.path });
-  const moved = collectionOps.relocate(row.path, canonicalPath(picked));
-
-  if (moved) {
-    post({ type: 'watch', root: moved.path, kind: moved.kind });
-  }
-  return moved ?? null;
+  loaded.delete(row.path);
+  return collectionOps.relocate(row.path, canonicalPath(picked)) ?? null;
 }
 
 async function pickPaths(window: BrowserWindow | null, kind: CollectionKind): Promise<string[]> {
@@ -297,8 +294,14 @@ export function revealCollectionPath(root: unknown, relative: unknown): void {
   shell.showItemInFolder(absolute);
 }
 
-export function rescanCollection(root: unknown): void {
-  post({ type: 'rescan', root: requireCollection(root).path });
+/**
+ * Scans and watches a collection; its tree comes as a `tree` (or `error`) event. Also used to refresh it, and after a
+ * reload of the window: watching again always sends the tree.
+ */
+export function loadCollection(root: unknown): void {
+  const row = requireCollection(root);
+  loaded.add(row.path);
+  post({ type: 'watch', root: row.path, kind: row.kind });
 }
 
 /** Starts a search in the files of every collection; results come as `collections:event` messages with this id. */

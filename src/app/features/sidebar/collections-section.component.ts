@@ -44,7 +44,7 @@ function readSet(key: string): Set<string> {
         <svg class="chevron" [class.open]="open()" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
         Collections
       </button>
-      <button type="button" class="icon-btn" title="Open Folder…" (click)="collections.add('folder')">
+      <button type="button" class="icon-btn" title="Open Folder…" (click)="addFolder()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14h6"/></svg>
       </button>
       <button type="button" class="icon-btn" title="Open Markdown File…" (click)="collections.add('file')">
@@ -61,9 +61,8 @@ function readSet(key: string): Set<string> {
               role="treeitem"
               tabindex="0"
               [attr.aria-selected]="false"
-              [attr.aria-expanded]="row.state.collection.kind === 'folder' ? isExpanded(row.key) : null"
+              [attr.aria-expanded]="row.state.collection.kind === 'folder' ? isCollectionOpen(row.state) : null"
               [class.error]="row.state.status === 'error'"
-              [class.loading]="row.state.status === 'loading'"
               [class.drop-target]="dropKey() === row.key"
               [title]="rootTitle(row.state)"
               (click)="onCollectionClick(row.state)"
@@ -74,7 +73,7 @@ function readSet(key: string): Set<string> {
               (drop)="onDrop($event, row.state.collection.path, '')"
             >
               @if (row.state.collection.kind === 'folder') {
-                <svg class="chevron" [class.open]="isExpanded(row.key)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                <svg class="chevron" [class.open]="isCollectionOpen(row.state)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
               } @else {
                 <span class="chevron-space"></span>
               }
@@ -93,12 +92,20 @@ function readSet(key: string): Set<string> {
                 @if (row.state.hint) {
                   <span class="hint">{{ row.state.hint }}</span>
                 }
-                @if (row.state.status === 'error') {
-                  <span class="status" title="Not found on disk">!</span>
+                @switch (row.state.status) {
+                  @case ('error') {
+                    <span class="status" title="Not found on disk">!</span>
+                  }
+                  @case ('loading') {
+                    <span class="spinner" role="status" aria-label="Loading"></span>
+                  }
+                  @case ('unloaded') {
+                    <span class="status unloaded" title="Not loaded: expand it to load it">N</span>
+                  }
                 }
               }
             </div>
-            @if (isEditing('newFile', row.state.collection.path, '') && isExpanded(row.key)) {
+            @if (isEditing('newFile', row.state.collection.path, '') && isCollectionOpen(row.state)) {
               <div class="row" [style.padding-left.px]="22">
                 <span class="chevron-space"></span>
                 <svg class="row-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path [attr.d]="iconFile"/></svg>
@@ -178,6 +185,7 @@ function readSet(key: string): Set<string> {
     }
   `,
   styleUrls: ['./collections-section.component.scss'],
+  host: { '[class.open]': 'open()' },
 })
 export class CollectionsSectionComponent {
   protected readonly collections = inject(CollectionsService);
@@ -218,7 +226,8 @@ export class CollectionsSectionComponent {
       const key = nodeKey(state.collection.path, '');
       rows.push({ kind: 'collection', key, state, depth: 0 });
 
-      if (state.collection.kind === 'folder' && expanded.has(key)) {
+      // An unloaded collection has no tree yet: expanded in a previous session, it waits for a click
+      if (state.collection.kind === 'folder' && state.status !== 'unloaded' && expanded.has(key)) {
         visit(state.collection.path, state.tree, 1);
       }
     }
@@ -233,6 +242,31 @@ export class CollectionsSectionComponent {
 
   protected isExpanded(key: string): boolean {
     return this.expanded().has(key);
+  }
+
+  protected isCollectionOpen(state: CollectionState): boolean {
+    return state.status !== 'unloaded' && this.isExpanded(nodeKey(state.collection.path, ''));
+  }
+
+  /** Expands a folder collection, loading it the first time. */
+  private openCollection(state: CollectionState): void {
+    this.expand(nodeKey(state.collection.path, ''));
+
+    if (state.status === 'unloaded') {
+      void this.collections.load(state.collection.path);
+    }
+  }
+
+  protected async addFolder(): Promise<void> {
+    const added = await this.collections.add('folder');
+
+    for (const collection of added) {
+      const state = this.collections.states().find(candidate => candidate.collection.path === collection.path);
+
+      if (state) {
+        this.openCollection(state);
+      }
+    }
   }
 
   private toggle(key: string): void {
@@ -282,6 +316,8 @@ export class CollectionsSectionComponent {
   protected onCollectionClick(state: CollectionState): void {
     if (state.collection.kind === 'file') {
       this.collections.open({ root: state.collection.path, path: baseName(state.collection.path) });
+    } else if (state.status === 'unloaded') {
+      this.openCollection(state);
     } else {
       this.toggle(nodeKey(state.collection.path, ''));
     }
@@ -410,7 +446,14 @@ export class CollectionsSectionComponent {
     switch (actionId) {
       case 'newFile': {
         const folder = node?.path ?? '';
-        this.expand(nodeKey(root, folder));
+        const state = this.collections.states().find(candidate => candidate.collection.path === root);
+
+        if (!node && state) {
+          this.openCollection(state);
+        } else {
+          this.expand(nodeKey(root, folder));
+        }
+
         this.startEditing({ kind: 'newFile', root, folder });
         break;
       }
@@ -424,7 +467,7 @@ export class CollectionsSectionComponent {
         this.collections.reveal(ref);
         break;
       case 'refresh':
-        await this.collections.reload();
+        await this.collections.load(root);
         break;
       case 'relocate':
         await this.report(() => this.collections.relocate(root));

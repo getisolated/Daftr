@@ -1,12 +1,14 @@
+// The separator above it (app-section-splitter) draws the line and sets --section-height
 :host {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   min-height: 0;
-  max-height: 45%;
-  border-top: 1px solid var(--evn-border-subtle);
+  max-height: var(--section-max-height, 45%);
   padding: 4px 0;
 }
+
+:host(.open) { flex: 0 1 var(--section-height, auto); }
 
 .header {
   display: flex;
@@ -88,7 +90,6 @@
   }
 
   &.collection { font-weight: 600; }
-  &.loading { opacity: 0.6; }
   &.error .row-label { color: var(--evn-text-dimmed); text-decoration: line-through; }
 }
 
@@ -129,6 +130,7 @@
 }
 
 .status {
+  flex-shrink: 0;
   margin-left: auto;
   padding: 0 5px;
   border-radius: 8px;
@@ -136,6 +138,27 @@
   color: #fff;
   font-size: 10px;
   font-weight: 700;
+
+  &.unloaded {
+    background: transparent;
+    border: 1px solid var(--evn-border-hover);
+    color: var(--evn-text-dimmed);
+  }
+}
+
+.spinner {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+  margin-left: auto;
+  border: 1.5px solid var(--evn-border-hover);
+  border-top-color: var(--evn-accent-strong);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .inline-input {

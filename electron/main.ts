@@ -13,7 +13,7 @@ import { applyUpdate, getUpdateInfo, onAutoUpdateChanged, startUpdater, stopUpda
 import {
   CollectionFileRef, addCollection, cancelCollectionSearch, createCollectionFile, initCollections, listCollections,
   moveCollectionPath, openPaths, pickCollections, readCollectionFile, relocateCollection, removeCollection,
-  renameCollection, renameCollectionPath, rescanCollection, revealCollectionPath, searchCollections,
+  renameCollection, renameCollectionPath, loadCollection, revealCollectionPath, searchCollections,
   setCollectionExcludes, stopCollections, trashCollectionPath, writeCollectionFile,
 } from './collections';
 import { promises as fs } from 'fs';
@@ -253,7 +253,7 @@ safeHandle('collections:add', (_e, candidate: unknown) => (typeof candidate === 
 safeHandle('collections:remove', (_e, root: unknown) => { removeCollection(root); return true; });
 safeHandle('collections:rename', (_e, root: unknown, name: unknown) => renameCollection(root, name) ?? null);
 safeHandle('collections:relocate', (e, root: unknown) => relocateCollection(BrowserWindow.fromWebContents(e.sender), root));
-safeHandle('collections:rescan', (_e, root: unknown) => { rescanCollection(root); return true; });
+safeHandle('collections:load', (_e, root: unknown) => { loadCollection(root); return true; });
 safeHandle('collections:read', (_e, root: unknown, relative: unknown) => readCollectionFile(root, relative));
 safeHandle('collections:write', async (_e, root: unknown, relative: unknown, content: unknown) => {
   await writeCollectionFile(root, relative, content);

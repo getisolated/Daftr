@@ -161,13 +161,6 @@ port.on('message', ({ data }: { data: WorkerRequest }) => {
       excludes = data.excludes;
       watched.forEach(entry => { entry.treeSignature = ''; void scan(entry); });
       break;
-    case 'rescan': {
-      const entry = watched.get(data.root);
-      if (entry) {
-        void scan(entry);
-      }
-      break;
-    }
     case 'search':
       void search(data.requestId, data.query);
       break;
