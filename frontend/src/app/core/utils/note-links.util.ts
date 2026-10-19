@@ -24,6 +24,8 @@ export interface GraphNode {
   degree: number;
   /** Target of a link whose note does not exist (anymore). */
   missing: boolean;
+  /** Colour group (folder), `null` for none; see graphGroups. */
+  group?: string | null;
 }
 
 export interface GraphLink {

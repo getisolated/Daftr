@@ -88,3 +88,30 @@ canvas {
   font-size: 13px;
   pointer-events: none;
 }
+
+// Colour of each folder group (the deepest level giving at most 10 groups)
+.graph-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-width: 640px;
+  margin-bottom: 4px;
+}
+
+.graph-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--evn-text-soft);
+}
+
+.swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}

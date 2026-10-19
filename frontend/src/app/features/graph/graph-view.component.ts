@@ -1,5 +1,5 @@
 import {
-  Component, ElementRef, OnDestroy, afterNextRender, effect, inject, signal, untracked, viewChild,
+  Component, ElementRef, OnDestroy, afterNextRender, computed, effect, inject, signal, untracked, viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import {
@@ -13,6 +13,7 @@ import { ThemeService } from '../../core/services/theme.service';
 import { FileDocsService } from '../../core/services/file-docs.service';
 import { CollectionsService } from '../../core/services/collections.service';
 import { NoteGraph } from '../../core/utils/note-links.util';
+import { GRAPH_GROUP_COLORS } from '../../core/utils/graph-groups.util';
 import { I18nService } from '../../core/i18n/i18n.service';
 
 interface SimNode extends SimulationNodeDatum {
@@ -23,6 +24,16 @@ interface SimNode extends SimulationNodeDatum {
   radius: number;
   /** 0 = fully visible, 1 = fully dimmed; eased toward its target on every frame. */
   dim: number;
+  /** Colour group (folder), `null` for none. */
+  group: string | null;
+}
+
+/** A label kept on screen, in world coordinates: the next ones must not overlap it. */
+interface LabelBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 interface SimLink extends SimulationLinkDatum<SimNode> {
@@ -61,6 +72,18 @@ function nodeRadius(degree: number): number {
   return 4 + Math.sqrt(degree) * 2.5;
 }
 
+/** Room given to the layout: a large graph spreads out instead of piling up in a dense ball. */
+function layoutScale(nodeCount: number): number {
+  return Math.min(Math.max(Math.sqrt(nodeCount / 150), 1), 3);
+}
+
+/** Space kept around a label (screen px) so that two neighbouring names stay apart. */
+const LABEL_PADDING = 4;
+
+function overlaps(a: LabelBox, b: LabelBox): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
 /** Interactive graph of the links between notes (canvas + d3-force): zoom, pan, drag, click to open. */
 @Component({
   selector: 'app-graph-view',
@@ -87,6 +110,13 @@ function nodeRadius(degree: number): number {
         <div class="graph-empty">{{ i18n.t(collections.selectedRoot() !== null ? 'workspace.graph.emptyFiles' : 'workspace.graph.emptyNotes') }}</div>
       } @else {
         <div class="graph-legend">
+          @if (groupLegend().length > 1) {
+            <div class="graph-groups">
+              @for (group of groupLegend(); track group.name) {
+                <span class="graph-group" [title]="group.name"><span class="swatch" [style.background]="group.color"></span>{{ group.name }}</span>
+              }
+            </div>
+          }
           <span>{{ i18n.plural('workspace.graph.noteCount', graph().nodes.length) }} · {{ i18n.plural('workspace.graph.linkCount', graph().links.length) }}</span>
           @if (graph().links.length === 0) {
             <span>{{ i18n.t('workspace.graph.hintBefore') }} <kbd>note://ID</kbd> {{ i18n.t('workspace.graph.hintMiddle') }} <em>{{ i18n.t('workspace.palette.cmd.copyNoteLink') }}</em> {{ i18n.t('workspace.graph.hintAfter') }}</span>
@@ -107,6 +137,17 @@ export class GraphViewComponent implements OnDestroy {
 
   protected readonly graph = this.backlinks.graph;
   protected readonly hideOrphans = this.backlinks.hideOrphans;
+
+  /** Colour of each folder group, in name order (the legend and the nodes share it). */
+  private readonly groupColors = computed(() => {
+    const names = [...new Set(this.graph().nodes.map(node => node.group).filter(group => group != null))].sort();
+    return new Map(names.map((name, index) => [name, GRAPH_GROUP_COLORS[index % GRAPH_GROUP_COLORS.length]]));
+  });
+
+  protected readonly groupLegend = computed(() => [...this.groupColors()].map(([name, color]) => ({ name, color })));
+
+  /** Widths of the titles at the label font size (screen px), measured once each. */
+  private readonly labelWidths = new Map<string, number>();
 
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly hostRef = viewChild.required<ElementRef<HTMLElement>>('host');
@@ -213,6 +254,7 @@ export class GraphViewComponent implements OnDestroy {
 
         if (node) {
           node.title = n.title;
+          node.group = n.group ?? null;
         }
       }
 
@@ -225,7 +267,10 @@ export class GraphViewComponent implements OnDestroy {
     const nodes = graph.nodes.map<SimNode>(n => {
       const kept = previous.get(n.id);
 
-      return { ...n, radius: nodeRadius(n.degree), dim: kept?.dim ?? 0, x: kept?.x, y: kept?.y, vx: kept?.vx, vy: kept?.vy };
+      return {
+        ...n, group: n.group ?? null, radius: nodeRadius(n.degree), dim: kept?.dim ?? 0,
+        x: kept?.x, y: kept?.y, vx: kept?.vx, vy: kept?.vy,
+      };
     });
 
     this.placeNewNodes(nodes, previous.size);
@@ -236,9 +281,11 @@ export class GraphViewComponent implements OnDestroy {
     this.links = graph.links.map(l => ({ source: l.source, target: l.target, dim: 0 }));
     this.linkForce.links(this.links);
 
+    this.applyForces(nodes);
+
     // Orphans orbit on a ring around the connected part
     const orphans = nodes.filter(n => n.degree === 0).length;
-    const ringRadius = 160 + Math.sqrt(orphans) * 22;
+    const ringRadius = (160 + Math.sqrt(orphans) * 22) * layoutScale(nodes.length);
 
     this.simulation.force('orphans', forceRadial<SimNode>(ringRadius, 0, 0).strength(d => d.degree === 0 ? 0.1 : 0));
 
@@ -251,6 +298,27 @@ export class GraphViewComponent implements OnDestroy {
     }
 
     this.simulation.restart();
+  }
+
+  /**
+   * Forces sized to the graph (more room for more notes), and the notes of a folder gathered around their own spot, on a
+   * circle: each colour forms its own area.
+   */
+  private applyForces(nodes: readonly SimNode[]): void {
+    const scale = layoutScale(nodes.length);
+    const groups = [...new Set(nodes.map(n => n.group).filter(group => group !== null))].sort();
+    const spread = groups.length > 1 ? 140 * scale * Math.sqrt(groups.length) : 0;
+    const centre = new Map(groups.map((group, index) => {
+      const angle = (index / groups.length) * Math.PI * 2;
+      return [group, { x: Math.cos(angle) * spread, y: Math.sin(angle) * spread }];
+    }));
+    const pull = (d: SimNode): number => (d.degree === 0 ? 0 : d.group !== null && centre.has(d.group) ? 0.07 : 0.04);
+
+    this.linkForce.distance(70 * scale);
+    this.simulation
+      .force('charge', forceManyBody<SimNode>().strength(-180 * scale).distanceMax(450 * scale))
+      .force('x', forceX<SimNode>(d => (d.group !== null ? centre.get(d.group)?.x ?? 0 : 0)).strength(pull))
+      .force('y', forceY<SimNode>(d => (d.group !== null ? centre.get(d.group)?.y ?? 0 : 0)).strength(pull));
   }
 
   /** A new note starts next to a note it is linked to, so it does not cross the whole graph. */
@@ -587,12 +655,7 @@ export class GraphViewComponent implements OnDestroy {
     }
 
     ctx.globalAlpha = 1;
-
-    for (const node of this.nodes) {
-      if (node.dim < 1) {
-        this.drawLabel(ctx, node, palette, node === focus || node.id === referenceId, (1 - node.dim) * intro);
-      }
-    }
+    this.drawLabels(ctx, palette, focus, referenceId, intro);
 
     this.lastDraw = animating ? now : 0;
 
@@ -664,7 +727,8 @@ export class GraphViewComponent implements OnDestroy {
       ctx.shadowBlur = 14;
     }
 
-    ctx.fillStyle = isReference || isFocus ? palette.active : isOpen ? palette.open : palette.node;
+    const groupColor = node.group !== null ? this.groupColors().get(node.group) : undefined;
+    ctx.fillStyle = isReference || isFocus ? palette.active : isOpen ? palette.open : groupColor ?? palette.node;
     ctx.fill();
     ctx.shadowBlur = 0;
 
@@ -677,21 +741,77 @@ export class GraphViewComponent implements OnDestroy {
     }
   }
 
-  /** Titles fade in with the zoom; the connected notes keep theirs when zoomed out. */
-  private drawLabel(ctx: CanvasRenderingContext2D, node: SimNode, palette: Palette, emphasised: boolean, visibility: number): void {
-    const { k } = this.view;
-    const zoomAlpha = Math.min(Math.max((k - 0.5) / 0.4, 0), 1);
-    const alpha = (emphasised ? 1 : Math.max(zoomAlpha, node.degree >= 3 ? 0.7 : 0)) * visibility;
+  /**
+   * Labels by priority (the hovered and reference notes, then the most connected ones): a label that would cover one
+   * already drawn is left out, so the names stay readable however many notes there are. Zooming in frees room.
+   */
+  private drawLabels(ctx: CanvasRenderingContext2D, palette: Palette, focus: SimNode | null, referenceId: number | null, intro: number): void {
+    const isEmphasised = (node: SimNode): boolean => node === focus || node.id === referenceId;
+    const candidates = this.nodes
+      .filter(node => node.dim < 1 && this.isOnScreen(node))
+      .sort((a, b) => Number(isEmphasised(b)) - Number(isEmphasised(a)) || b.degree - a.degree);
+    const kept: LabelBox[] = [];
 
-    if (alpha === 0) {
-      return;
+    ctx.font = `${LABEL_FONT_SIZE / this.view.k}px "Segoe UI", system-ui, sans-serif`;
+
+    // Zoomed out, only the connected notes are named; the others fade in with the zoom
+    const zoomAlpha = Math.min(Math.max((this.view.k - 0.5) / 0.4, 0), 1);
+
+    for (const node of candidates) {
+      const emphasised = isEmphasised(node);
+      const alpha = emphasised ? 1 : Math.max(zoomAlpha, node.degree >= 3 ? 0.8 : 0);
+      if (alpha === 0) {
+        continue;
+      }
+      const box = this.labelBox(ctx, node);
+
+      if (!emphasised && kept.some(other => overlaps(box, other))) {
+        continue;
+      }
+      kept.push(box);
+      this.drawLabel(ctx, node, palette, emphasised, alpha * (1 - node.dim) * intro);
     }
+  }
 
-    const title = node.title.length > LABEL_MAX_LENGTH ? `${node.title.slice(0, LABEL_MAX_LENGTH - 1)}…` : node.title;
+  private isOnScreen(node: SimNode): boolean {
+    const { x, y, k } = this.view;
+    const screenX = (node.x ?? 0) * k + x;
+    const screenY = (node.y ?? 0) * k + y;
+    const margin = 200;
+
+    return screenX > -margin && screenX < this.width + margin && screenY > -margin && screenY < this.height + margin;
+  }
+
+  private labelTitle(node: SimNode): string {
+    return node.title.length > LABEL_MAX_LENGTH ? `${node.title.slice(0, LABEL_MAX_LENGTH - 1)}…` : node.title;
+  }
+
+  /** Box of a node's label, in world coordinates, padded so that neighbouring names keep some space. */
+  private labelBox(ctx: CanvasRenderingContext2D, node: SimNode): LabelBox {
+    const { k } = this.view;
+    const title = this.labelTitle(node);
+    let width = this.labelWidths.get(title);
+
+    if (width === undefined) {
+      // Measured at the screen size: the world size follows the zoom
+      width = ctx.measureText(title).width * k;
+      this.labelWidths.set(title, width);
+    }
+    const halfWidth = (width / 2 + LABEL_PADDING) / k;
+    const halfHeight = (LABEL_FONT_SIZE / 2 + LABEL_PADDING) / k;
     const x = node.x ?? 0;
     const y = (node.y ?? 0) + node.radius + 12 / k;
 
-    ctx.globalAlpha = alpha;
+    return { left: x - halfWidth, right: x + halfWidth, top: y - halfHeight, bottom: y + halfHeight };
+  }
+
+  private drawLabel(ctx: CanvasRenderingContext2D, node: SimNode, palette: Palette, emphasised: boolean, visibility: number): void {
+    const { k } = this.view;
+    const title = this.labelTitle(node);
+    const x = node.x ?? 0;
+    const y = (node.y ?? 0) + node.radius + 12 / k;
+
+    ctx.globalAlpha = visibility;
     ctx.font = `${LABEL_FONT_SIZE / k}px "Segoe UI", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

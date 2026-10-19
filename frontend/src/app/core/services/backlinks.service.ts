@@ -10,7 +10,9 @@ import { SidebarStateService } from './sidebar-state.service';
 import { TabsService } from './tabs.service';
 import { CollectionsService } from './collections.service';
 import { FileDocsService } from './file-docs.service';
-import { baseName } from '../utils/collection.util';
+import { baseName, parentPath } from '../utils/collection.util';
+import { graphGroups } from '../utils/graph-groups.util';
+import { Folder } from '../models/folder.model';
 
 /** Links between notes (`note://id`): who points at the active note, and the whole graph. */
 @Injectable({ providedIn: 'root' })
@@ -66,12 +68,16 @@ export class BacklinksService {
       return this.collectionGraph(root);
     }
 
-    return buildNoteGraph(this.linkableNotes(), this.i18n.t, {
+    const graph = buildNoteGraph(this.linkableNotes(), this.i18n.t, {
       folderId: this.sidebarState.selectedFolderId(),
       focusId: this.referenceNoteId(),
       hideOrphans: this._hideOrphans(),
       resolve: this.resolver(),
     });
+    const folderOfNote = new Map(this.linkableNotes().map(note => [note.id, note.folderId]));
+    const paths = folderPaths(this.folders.folders());
+
+    return withGroups(graph, id => paths.get(folderOfNote.get(id) ?? -1) ?? '');
   });
 
   /** The files of the collection take their session ids (FileDocsService): the graph view opens them like notes. */
@@ -83,9 +89,11 @@ export class BacklinksService {
     }
 
     const idOf = (path: string): number => this.fileDocs.idFor({ root, path });
-    const nodes = graph.nodes
-      .filter(node => !this._hideOrphans() || node.degree > 0)
-      .map(node => ({ id: idOf(node.path), title: baseName(node.path), degree: node.degree, missing: node.missing }));
+    const shownNodes = graph.nodes.filter(node => !this._hideOrphans() || node.degree > 0);
+    const groups = graphGroups(shownNodes.map(node => parentPath(node.path)));
+    const nodes = shownNodes.map((node, index) => ({
+      id: idOf(node.path), title: baseName(node.path), degree: node.degree, missing: node.missing, group: groups[index] ?? null,
+    }));
     const shown = new Set(nodes.map(node => node.id));
     const links = graph.links
       .map(link => ({ source: idOf(link.source), target: idOf(link.target) }))
@@ -97,4 +105,25 @@ export class BacklinksService {
   toggleHideOrphans(): void {
     this._hideOrphans.update(hidden => !hidden);
   }
+}
+
+/** Path (`Parent/Child`) of every folder, by id; a cycle in the data cuts the walk short. */
+function folderPaths(folders: readonly Folder[]): Map<number, string> {
+  const byId = new Map(folders.map(folder => [folder.id, folder]));
+  const pathOf = (folder: Folder): string => {
+    const names: string[] = [];
+    const seen = new Set<number>();
+    for (let current: Folder | undefined = folder; current && !seen.has(current.id); current = byId.get(current.parentId ?? -1)) {
+      seen.add(current.id);
+      names.unshift(current.name);
+    }
+    return names.join('/');
+  };
+  return new Map(folders.map(folder => [folder.id, pathOf(folder)]));
+}
+
+/** The graph with the colour group of each node, from the folder holding it. */
+function withGroups(graph: NoteGraph, folderOf: (id: number) => string): NoteGraph {
+  const groups = graphGroups(graph.nodes.map(node => folderOf(node.id)));
+  return { ...graph, nodes: graph.nodes.map((node, index) => ({ ...node, group: groups[index] ?? null })) };
 }
