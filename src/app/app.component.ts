@@ -21,11 +21,14 @@ import { FoldersService } from './core/services/folders.service';
 import { SidebarStateService } from './core/services/sidebar-state.service';
 import { UpdateService } from './core/services/update.service';
 import { FormattingBarService } from './core/services/formatting-bar.service';
+import { FileDocsService } from './core/services/file-docs.service';
+import { CollectionsService } from './core/services/collections.service';
+import { CollectionsBridgeService } from './core/services/collections-bridge.service';
 import { ThemeService } from './core/services/theme.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
-import { OVERLAY_NOTES_TAB_ID } from './core/models/note.model';
-import { GETTING_STARTED_FOLDER_NAME } from './core/models/folder.model';
-import { SAMPLE_NOTES } from './core/data/sample-notes';
+import { QUICK_NOTES_TAB_ID } from './core/models/note.model';
+import { I18nService } from './core/i18n/i18n.service';
+import { SAMPLE_NOTES, SAMPLE_NOTES_FR, getSampleNotes } from './core/data/sample-notes';
 import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 
 @Component({
@@ -33,6 +36,10 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
   standalone: true,
   imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, FormattingBarComponent, BacklinksPanelComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '(document:dragover)': 'onFilesDragOver($event)',
+    '(document:drop)': 'onFilesDrop($event)',
+  },
   template: `
     <div class="app-shell">
       <app-tabs-bar />
@@ -41,18 +48,20 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
           <app-sidebar />
         }
         <div class="app-main">
-          <!-- Placed above or below the editor by its own CSS order -->
-          @if (formattingBarShown()) {
-            <app-formatting-bar />
-          }
-          <div class="app-content" [class.wide]="wideMode()">
-            <!-- Always keep both in DOM to avoid editor teardown on home navigation -->
-            <app-home [style.display]="activeNoteId() !== null ? 'none' : 'flex'" />
-            <app-editor
-              #editor
-              [noteId]="activeNoteId()"
-              [style.display]="activeNoteId() === null ? 'none' : 'flex'"
-            />
+          <!-- The page: the formatting bar sits on one of its sides (see data-bar-position), above the backlinks -->
+          <div class="app-page" [attr.data-bar-position]="formattingBarPosition()">
+            @if (formattingBarShown()) {
+              <app-formatting-bar />
+            }
+            <div class="app-content" [class.wide]="wideMode()">
+              <!-- Always keep both in DOM to avoid editor teardown on home navigation -->
+              <app-home [style.display]="activeNoteId() !== null ? 'none' : 'flex'" />
+              <app-editor
+                #editor
+                [noteId]="activeNoteId()"
+                [style.display]="activeNoteId() === null ? 'none' : 'flex'"
+              />
+            </div>
           </div>
           @if (backlinksShown()) {
             <app-backlinks-panel />
@@ -66,7 +75,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
           [title]="dialog.title"
           [message]="dialog.message"
           [actions]="dialog.actions"
-          cancelLabel="Later"
+          [cancelLabel]="i18n.t('workspace.update.later')"
           (chosen)="onUpdateChoice($event)"
         />
       }
@@ -95,6 +104,17 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       min-height: 0;
       min-width: 0;
     }
+    .app-page {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+      min-width: 0;
+    }
+    .app-page[data-bar-position='bottom'] { flex-direction: column-reverse; }
+    .app-page[data-bar-position='left'] { flex-direction: row; }
+    .app-page[data-bar-position='right'] { flex-direction: row-reverse; }
     .app-content {
       display: flex;
       flex: 1;
@@ -113,6 +133,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 export class AppComponent implements OnInit, OnDestroy {
   @ViewChild('editor') editorRef!: EditorComponent;
 
+  protected readonly i18n = inject(I18nService);
   private notesService = inject(NotesService);
   private tabsService = inject(TabsService);
   private paletteService = inject(PaletteService);
@@ -123,19 +144,25 @@ export class AppComponent implements OnInit, OnDestroy {
   private foldersService = inject(FoldersService);
   private sidebarState = inject(SidebarStateService);
   private updateService = inject(UpdateService);
-  private themeService = inject(ThemeService);
+  // Injected eagerly: it applies the theme to the document from the first render
+  private readonly themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
+  private fileDocs = inject(FileDocsService);
+  private collections = inject(CollectionsService);
+  private collectionsBridge = inject(CollectionsBridgeService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
   readonly sidebarVisible = this.sidebarState.visible;
   /** Only worth its room when there is a note to format (not on the home page). */
   readonly formattingBarShown = computed(() => this.formattingBar.visible() && this.activeNoteId() !== null);
+  readonly formattingBarPosition = this.formattingBar.position;
 
-  /** The read-only overlay notes document has no identity of its own to be linked to. */
+  /** The read-only quick notes document has no identity of its own to be linked to. */
   readonly backlinksShown = computed(() => {
     const id = this.activeNoteId();
-    return id !== null && id !== OVERLAY_NOTES_TAB_ID;
+    // Nor do the collection files: they are not part of the notes' links
+    return id !== null && id !== QUICK_NOTES_TAB_ID && !this.fileDocs.isFileDoc(id);
   });
 
   /** Popup offering the update found by the main process; null when closed. */
@@ -143,11 +170,12 @@ export class AppComponent implements OnInit, OnDestroy {
     const info = this.updateService.info();
     if (!info || !this.updateService.dialogOpen()) return null;
     return {
-      title: `Version ${info.version} is available`,
-      message: info.downloaded
-        ? `Version ${info.version} is ready (you have ${info.currentVersion}). The app restarts to apply it.`
-        : `You have version ${info.currentVersion}. Download and install version ${info.version}? The app restarts to apply it.`,
-      actions: [{ id: 'install', label: info.downloaded ? 'Restart now' : 'Update now' }],
+      title: this.i18n.t('workspace.update.title', { version: info.version }),
+      message: this.i18n.t(
+        info.downloaded ? 'workspace.update.messageDownloaded' : 'workspace.update.messageAvailable',
+        { version: info.version, current: info.currentVersion },
+      ),
+      actions: [{ id: 'install', label: this.i18n.t(info.downloaded ? 'workspace.update.restartNow' : 'workspace.update.updateNow') }],
     };
   });
 
@@ -169,12 +197,35 @@ export class AppComponent implements OnInit, OnDestroy {
 
       const noteIds = new Set(this.notesService.notes().map(n => n.id));
       this.tabsService.restoreSession(noteIds);
+      // In the background: the folders of the disk never delay the notes
+      this.collections.start();
     } catch (err) {
       console.error('[App] Failed to load notes:', err);
     }
     // Notes sent from the quick-note overlay show up without restarting the app
     this.unsubscribeNotesChanged = this.bridge.onNotesChanged(() => { void this.reloadNotesAndFolders(); });
     this.registerShortcuts();
+  }
+
+  /** Files dragged from the Explorer (not the sidebar's own drags): the window accepts them. */
+  protected onFilesDragOver(event: DragEvent): void {
+    if (event.dataTransfer?.types.includes('Files')) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  /** Dropped folders and markdown files become collections; the files open in tabs. */
+  protected onFilesDrop(event: DragEvent): void {
+    const files = Array.from(event.dataTransfer?.files ?? []);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const paths = files.map(file => this.collectionsBridge.pathForFile(file)).filter((path): path is string => !!path);
+    void this.collections.addPaths(paths);
   }
 
   onUpdateChoice(choice: string | null): void {
@@ -192,9 +243,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   /** The sample notes get their own folder so the user can delete them all at once. */
   private async seedSampleNotes(): Promise<void> {
-    const folder = await this.foldersService.create(GETTING_STARTED_FOLDER_NAME, null);
+    const language = this.i18n.language();
+    const folder = await this.foldersService.create(this.i18n.t('workspace.sample.folderName'), null);
 
-    for (const sample of SAMPLE_NOTES) {
+    for (const sample of getSampleNotes(language)) {
       await this.bridge.createNote(sample.title, sample.content, [], folder?.id ?? null);
     }
 
@@ -210,13 +262,13 @@ export class AppComponent implements OnInit, OnDestroy {
     const treeNotes = this.notesService.notes().map(n => ({
       id: n.id, title: n.title, folderId: n.folderId, sortOrder: n.sortOrder,
     }));
-    const toMove = findSampleNotesToGather(this.foldersService.folders(), treeNotes, SAMPLE_NOTES.map(n => n.title));
+    const toMove = findSampleNotesToGather(this.foldersService.folders(), treeNotes, [...SAMPLE_NOTES, ...SAMPLE_NOTES_FR].map(n => n.title));
 
     if (toMove.length === 0) {
       return;
     }
 
-    const folder = await this.foldersService.create(GETTING_STARTED_FOLDER_NAME, null);
+    const folder = await this.foldersService.create(this.i18n.t('workspace.sample.folderName'), null);
 
     if (!folder) {
       return;
@@ -252,9 +304,15 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('tab.prev', () => this.tabsService.prevTab());
     bind('search.global', () => this.paletteService.open('search'));
     bind('editor.find', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(); });
+    bind('editor.replace', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(true); });
+    bind('editor.preview', () => { if (this.activeNoteId() !== null) this.editorRef?.togglePreview(); });
+    bind('editor.previewSide', () => { if (this.activeNoteId() !== null) this.editorRef?.togglePreviewSide(); });
     bind('settings.open', () => this.settingsService.open());
     bind('layout.toggle', () => this.layoutService.toggle());
-    bind('theme.toggle', () => { void this.themeService.toggle(); });
+    bind('editor.wordWrap', () => {
+      void this.settingsService.update({ wordWrap: !this.settingsService.settings().wordWrap });
+    });
+    bind('theme.select', () => this.paletteService.open('theme'));
     bind('formattingBar.toggle', () => this.formattingBar.toggle());
     bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
     bind('tab.pin', () => this.tabsService.togglePinActiveTab());
@@ -277,6 +335,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private async createNote(): Promise<void> {
     const note = await this.notesService.create();
-    this.tabsService.openNote(note.id, 'Untitled');
+    this.tabsService.openNote(note.id, note.title);
   }
 }

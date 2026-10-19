@@ -1,7 +1,7 @@
 import { app } from 'electron/main';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AppSettings, DEFAULT_SETTINGS, sanitizeSettings } from './settings-schema';
+import { AppSettings, DEFAULT_SETTINGS, isLanguage, resolveLanguage, sanitizeSettings } from './settings-schema';
 
 let current: AppSettings = { ...DEFAULT_SETTINGS };
 
@@ -10,12 +10,18 @@ function settingsPath(): string {
 }
 
 export function loadSettings(): AppSettings {
+  let hasLanguage = false;
   try {
     const raw = JSON.parse(fs.readFileSync(settingsPath(), 'utf-8'));
+    hasLanguage = isLanguage(raw?.language);
     current = sanitizeSettings(raw);
   } catch {
     // First launch or corrupted file: defaults are fine
     current = { ...DEFAULT_SETTINGS };
+  }
+  // No language chosen yet (first launch, or settings saved before the language existed): follow the OS locale
+  if (!hasLanguage) {
+    updateSettings({ language: resolveLanguage(app.getLocale()) });
   }
   return current;
 }

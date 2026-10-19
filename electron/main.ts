@@ -1,26 +1,47 @@
 import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron/main';
 import { shell } from 'electron/common';
 import * as path from 'path';
-import { initDatabase, closeDatabase, noteOps, folderOps, FolderDeleteMode } from './database';
+import { initDatabase, closeDatabase, noteOps, folderOps, FolderDeleteMode, normalizeColor } from './database';
 import { registerGlobalShortcut, unregisterGlobalShortcuts } from './global-shortcut';
 import { applyOverlaySize, broadcastToWindows, hideOverlay, prepareOverlay, showOverlay, toggleOverlay } from './overlay';
 import { loadRenderer } from './renderer-loader';
 import { getSettings, loadSettings, updateSettings } from './settings';
-import { sanitizeSettings, SettingsPatch } from './settings-schema';
+import { sanitizeSettings, SettingsPatch, ThemeId } from './settings-schema';
 import { applyLaunchAtStartup, launchedHidden } from './startup';
-import { createTray, destroyTray } from './tray';
+import { createTray, destroyTray, setTrayLanguage } from './tray';
 import { applyUpdate, getUpdateInfo, onAutoUpdateChanged, startUpdater, stopUpdater } from './updater';
+import {
+  CollectionFileRef, addCollection, cancelCollectionSearch, createCollectionFile, initCollections, listCollections,
+  moveCollectionPath, openPaths, pickCollections, readCollectionFile, relocateCollection, removeCollection,
+  renameCollection, renameCollectionPath, loadCollection, revealCollectionPath, searchCollections,
+  setCollectionExcludes, stopCollections, trashCollectionPath, writeCollectionFile,
+  requestCollectionGraph,
+} from './collections';
+import { promises as fs } from 'fs';
+import { isExportKind, saveExport } from './export';
 
 const isDev = process.env['NODE_ENV'] === 'development';
 let mainWindow: BrowserWindow | null = null;
 // Closing the window only hides it to the tray; a real quit comes from the tray menu (or the OS)
 let isQuitting = false;
 
+/** `--evn-bg` of every theme (styles.scss). */
+const THEME_BACKGROUNDS: Readonly<Record<ThemeId, string>> = {
+  'dark': '#1c1e22',
+  'light': '#ffffff',
+  'solarized-light': '#fdf6e3',
+  'violet-light': '#fdfcff',
+  'github-light': '#ffffff',
+  'github-dark-dimmed': '#22272e',
+};
+
 /** Window color shown before the renderer paints: matches the theme so a light theme does not flash dark. */
 function windowBackgroundColor(): string {
-  const { theme } = getSettings();
-  const isDark = theme === 'system' ? nativeTheme.shouldUseDarkColors : theme === 'dark';
-  return isDark ? '#1e1e1e' : '#ffffff';
+  const { theme, preferredDarkTheme, preferredLightTheme } = getSettings();
+  const systemTheme = nativeTheme.shouldUseDarkColors ? preferredDarkTheme : preferredLightTheme;
+  const resolved = theme === 'system' ? systemTheme : theme;
+
+  return THEME_BACKGROUNDS[resolved];
 }
 
 function createWindow(showOnReady = true): void {
@@ -50,6 +71,9 @@ function createWindow(showOnReady = true): void {
   if (showOnReady) {
     mainWindow.once('ready-to-show', () => mainWindow?.show());
   }
+
+  // Markdown files given at launch (double-click in the Explorer) open once the app is loaded
+  mainWindow.webContents.once('did-finish-load', () => { void openFromArguments(process.argv); });
 
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
@@ -91,12 +115,32 @@ function onGlobalShortcut(): void {
   }
 }
 
-// A second launch (start menu, login item...) just brings the running instance forward
+/** Markdown files passed on the command line (file association): opened as collections, in editor tabs. */
+async function openFromArguments(argv: string[]): Promise<void> {
+  const candidates = argv.slice(1).filter(arg => /\.md$/i.test(arg));
+  const existing = await Promise.all(candidates.map(arg => fs.stat(arg).then(stats => (stats.isFile() ? arg : null), () => null)));
+  const files = existing.filter((arg): arg is string => arg !== null);
+
+  if (files.length > 0) {
+    sendOpenFiles(await openPaths(files));
+  }
+}
+
+function sendOpenFiles(refs: CollectionFileRef[]): void {
+  if (refs.length > 0) {
+    mainWindow?.webContents.send('collections:open', refs);
+  }
+}
+
+// A second launch (start menu, login item, a .md double-clicked...) just brings the running instance forward
 const isPrimaryInstance = app.requestSingleInstanceLock();
 if (!isPrimaryInstance) {
   app.quit();
 } else {
-  app.on('second-instance', () => showMainWindow());
+  app.on('second-instance', (_event, argv) => {
+    showMainWindow();
+    void openFromArguments(argv);
+  });
 }
 
 app.whenReady().then(() => {
@@ -106,12 +150,14 @@ app.whenReady().then(() => {
   const settings = loadSettings();
   createWindow(!launchedHidden());
   void prepareOverlay();
-  createTray({ openApp: showMainWindow, quickNote: showOverlay, openSettings, quit: quitApp });
+  createTray({ openApp: showMainWindow, quickNote: showOverlay, openSettings, quit: quitApp }, settings.language);
   applyLaunchAtStartup(settings.launchAtStartup);
   if (!registerGlobalShortcut(settings.globalShortcut, onGlobalShortcut)) {
     console.error(`[Shortcut] Unable to register ${settings.globalShortcut}`);
   }
   startUpdater();
+  // In the background, once the window exists: the core notes never wait for the disk scans
+  initCollections(() => mainWindow, settings.collectionsExclude);
   app.on('activate', () => {
     if (!mainWindow) createWindow();
   });
@@ -127,6 +173,7 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   stopUpdater();
+  stopCollections();
   unregisterGlobalShortcuts();
   destroyTray();
 });
@@ -176,6 +223,10 @@ safeHandle('notes:place', (_e, id: number, folderId: number | null, orderedIds: 
   noteOps.place(id, typeof folderId === 'number' ? folderId : null, parseIds(orderedIds)) ?? null
 );
 safeHandle('notes:delete', (_e, id: number) => { noteOps.delete(id); return true; });
+safeHandle('notes:setColor', (_e, ids: number[], color: string | null) => {
+  noteOps.setColor(parseIds(ids), normalizeColor(color));
+  return true;
+});
 safeHandle('notes:search', (_e, query: string) => noteOps.search(query));
 safeHandle('notes:byTag', (_e, tag: string) => noteOps.getByTag(tag));
 safeHandle('notes:allTags', () => noteOps.getAllTags());
@@ -207,6 +258,46 @@ safeHandle('folders:delete', (e, id: number, mode: FolderDeleteMode) => {
   return deletedNoteIds;
 });
 
+// ── Collections (folders / markdown files of the disk) ──────────────────────
+safeHandle('collections:list', () => listCollections());
+safeHandle('collections:pick', (e, kind: unknown) =>
+  pickCollections(BrowserWindow.fromWebContents(e.sender), kind === 'file' ? 'file' : 'folder')
+);
+safeHandle('collections:openPaths', async (_e, paths: unknown) => {
+  const valid = Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : [];
+  return openPaths(valid);
+});
+safeHandle('collections:add', (_e, candidate: unknown) => (typeof candidate === 'string' ? addCollection(candidate) : null));
+safeHandle('collections:remove', (_e, root: unknown) => { removeCollection(root); return true; });
+safeHandle('collections:rename', (_e, root: unknown, name: unknown) => renameCollection(root, name) ?? null);
+safeHandle('collections:relocate', (e, root: unknown) => relocateCollection(BrowserWindow.fromWebContents(e.sender), root));
+safeHandle('collections:load', (_e, root: unknown) => { loadCollection(root); return true; });
+safeHandle('collections:read', (_e, root: unknown, relative: unknown) => readCollectionFile(root, relative));
+safeHandle('collections:write', async (_e, root: unknown, relative: unknown, content: unknown) => {
+  await writeCollectionFile(root, relative, content);
+  return true;
+});
+safeHandle('collections:createFile', (_e, root: unknown, folder: unknown, name: unknown) => createCollectionFile(root, folder, name));
+safeHandle('collections:renamePath', (_e, root: unknown, relative: unknown, name: unknown) => renameCollectionPath(root, relative, name));
+safeHandle('collections:movePath', (_e, root: unknown, relative: unknown, folder: unknown) => moveCollectionPath(root, relative, folder));
+safeHandle('collections:trash', async (_e, root: unknown, relative: unknown) => {
+  await trashCollectionPath(root, relative);
+  return true;
+});
+safeHandle('collections:reveal', (_e, root: unknown, relative: unknown) => { revealCollectionPath(root, relative); return true; });
+safeHandle('collections:search', (_e, query: unknown) => searchCollections(query));
+safeHandle('collections:graph', (_e, root: unknown) => { requestCollectionGraph(root); return true; });
+safeHandle('collections:cancelSearch', (_e, requestId: unknown) => { cancelCollectionSearch(requestId); return true; });
+safeHandle('folders:empty', (e, id: number) => {
+  const deletedNoteIds = typeof id === 'number' ? folderOps.empty(id) : null;
+  broadcastToWindows('notes:changed', undefined, e.sender);
+  return deletedNoteIds;
+});
+safeHandle('folders:setColor', (_e, ids: number[], color: string | null) => {
+  folderOps.setColor(parseIds(ids), normalizeColor(color));
+  return true;
+});
+
 // ── Settings & overlay ───────────────────────────────────────────────────────
 safeHandle('settings:get', () => getSettings());
 safeHandle('settings:set', (e, patch: SettingsPatch) => {
@@ -224,8 +315,14 @@ safeHandle('settings:set', (e, patch: SettingsPatch) => {
   if (next.launchAtStartup !== before.launchAtStartup) {
     applyLaunchAtStartup(next.launchAtStartup);
   }
+  if (next.language !== before.language) {
+    setTrayLanguage(next.language);
+  }
   if (next.autoUpdate !== before.autoUpdate) {
     onAutoUpdateChanged();
+  }
+  if (next.collectionsExclude.join('\n') !== before.collectionsExclude.join('\n')) {
+    setCollectionExcludes(next.collectionsExclude);
   }
   broadcastToWindows('settings:changed', getSettings(), e.sender);
   return { ok: true, settings: getSettings() };
@@ -235,6 +332,14 @@ safeHandle('overlay:hide', () => hideOverlay());
 // ── Updates ──────────────────────────────────────────────────────────────────
 safeHandle('update:getInfo', () => getUpdateInfo());
 safeHandle('update:apply', () => applyUpdate());
+
+// ── Export ───────────────────────────────────────────────────────────────────
+safeHandle('export:save', (e, kind: unknown, suggestedName: unknown, payload: unknown) => {
+  if (!isExportKind(kind) || typeof suggestedName !== 'string') {
+    throw new Error('Invalid export request');
+  }
+  return saveExport(BrowserWindow.fromWebContents(e.sender), kind, suggestedName, payload);
+});
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 safeHandle('shell:openExternal', (_e, url: string) => {

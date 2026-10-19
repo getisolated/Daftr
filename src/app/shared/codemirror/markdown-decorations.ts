@@ -1,8 +1,10 @@
 import {
   ViewPlugin, ViewUpdate, Decoration, DecorationSet, EditorView
 } from '@codemirror/view';
-import { RangeSetBuilder } from '@codemirror/state';
+import { Facet, RangeSetBuilder } from '@codemirror/state';
+import { LinkStatus } from '../../core/utils/note-paths.util';
 import { syntaxTree } from '@codemirror/language';
+import { translatorOf } from './translator';
 import { CheckboxWidget, EXTERNAL_URL, ExternalLinkWidget } from './markdown-widgets';
 
 // Check if cursor is within [from, to]
@@ -12,6 +14,14 @@ function cursorInRange(view: EditorView, from: number, to: number): boolean {
   }
   return false;
 }
+
+/** Tells the decorations whether a link target exists: a local link pointing to nothing is shown in red. */
+export const linkStatusFacet = Facet.define<(target: string) => LinkStatus, (target: string) => LinkStatus>({
+  combine: values => values[0] ?? ((): LinkStatus => 'note'),
+});
+
+const linkMark = Decoration.mark({ class: 'cm-md-link' });
+const brokenLinkMark = (title: string): Decoration => Decoration.mark({ class: 'cm-md-link cm-md-link-broken', attributes: { title } });
 
 interface PendingDeco {
   from: number;
@@ -140,7 +150,13 @@ function buildDecorations(view: EditorView): DecorationSet {
 
         // ── Links ─────────────────────────────────────────────────
         case 'Link': {
-          pending.push({ from, to, deco: Decoration.mark({ class: 'cm-md-link' }) });
+          // Lezer also parses a lone `[text]` as a (shortcut reference) link: only `[label](target)` is one here
+          const closeMark = node.node.getChildren('LinkMark')[1];
+          if (!closeMark || doc.sliceString(closeMark.to, closeMark.to + 1) !== '(') break;
+
+          const target = node.node.getChild('URL');
+          const broken = target !== null && view.state.facet(linkStatusFacet)(doc.sliceString(target.from, target.to)) === 'broken';
+          pending.push({ from, to, deco: broken ? brokenLinkMark(translatorOf(view.state)('editor.link.broken')) : linkMark });
 
           // Off the link, only its label shows: `[` and `](target)` are hidden, like the other marks
           if (!cursorInRange(view, from, to)) {
@@ -223,7 +239,8 @@ export const markdownDecorationPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      const linksChanged = update.startState.facet(linkStatusFacet) !== update.state.facet(linkStatusFacet);
+      if (update.docChanged || update.selectionSet || update.viewportChanged || linksChanged) {
         this.decorations = buildDecorations(update.view);
       }
     }
@@ -297,6 +314,9 @@ export const markdownDecorationTheme = EditorView.baseTheme({
     paddingLeft: '8px',
     color: 'var(--evn-syntax-quote)',
     fontStyle: 'italic',
+  },
+  '.cm-md-link.cm-md-link-broken, .cm-md-link.cm-md-link-broken *': {
+    color: 'var(--evn-danger) !important',
   },
   '.cm-md-link': {
     color: 'var(--evn-syntax-link)',

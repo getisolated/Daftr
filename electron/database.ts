@@ -9,6 +9,8 @@ export interface NoteRow {
   tags: string; // JSON array string
   folder_id: number | null;
   sort_order: number | null;
+  /** `#rrggbb` chosen by the user in the sidebar, `null` for none. */
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,10 +21,21 @@ export interface FolderRow {
   parent_id: number | null;
   is_default: number; // 0 | 1 (SQLite has no boolean)
   sort_order: number | null;
+  /** `#rrggbb` chosen by the user in the sidebar, `null` for none. */
+  color: string | null;
   created_at: string;
 }
 
 export type FolderDeleteMode = 'moveToRoot' | 'deleteAll';
+
+/** A folder or a file of the disk opened in the app; the path (absolute, normalized) is its key. */
+export interface CollectionRow {
+  path: string;
+  kind: 'folder' | 'file';
+  display_name: string;
+  sort_order: number;
+  created_at: string;
+}
 
 export const MAX_FOLDER_NAME_LENGTH = 100;
 const DEFAULT_FOLDER_NAME = 'Inbox';
@@ -90,6 +103,9 @@ export function initDatabase(): void {
   `);
 
   migrateNotesFolderColumn();
+  createCollectionsTable();
+  migrateColorColumns();
+  migrateQuickNoteTag();
 
   // Cache prepared statements after schema is ready
   stmts = {
@@ -141,6 +157,67 @@ function migrateNotesFolderColumn(): void {
   addColumnIfMissing('folders', 'sort_order', 'INTEGER');
 
   db.exec('CREATE INDEX IF NOT EXISTS idx_notes_folder_id ON notes(folder_id)');
+}
+
+/** Collections (folders / files on disk) are listed here; their content is read from the disk, never stored. */
+function createCollectionsTable(): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS collections (
+      path TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('folder', 'file')),
+      display_name TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+}
+
+/** Colors of the sidebar items, added after the first releases. */
+function migrateColorColumns(): void {
+  addColumnIfMissing('notes', 'color', 'TEXT');
+  addColumnIfMissing('folders', 'color', 'TEXT');
+}
+
+const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+/** A `#rrggbb` color in lower case, or `null` for anything else (no color). */
+export function normalizeColor(value: unknown): string | null {
+  return typeof value === 'string' && COLOR_PATTERN.test(value) ? value.toLowerCase() : null;
+}
+
+/** `?, ?, ?` for an `IN (…)` clause of `count` values. */
+function placeholders(count: number): string {
+  return Array.from({ length: count }, () => '?').join(', ');
+}
+
+/** Tag of the notes sent from the quick-note overlay (QUICK_NOTE_TAG on the renderer side), and its former name. */
+const QUICK_NOTE_TAG = 'quick-note';
+const LEGACY_QUICK_NOTE_TAG = 'overlay';
+
+/** The overlay notes became "quick notes": their tag follows. Idempotent: nothing is left to rename the next time. */
+function migrateQuickNoteTag(): void {
+  const legacy = db.prepare(`SELECT id, tags FROM notes WHERE tags LIKE ?`).all(`%"${LEGACY_QUICK_NOTE_TAG}"%`) as { id: number; tags: string }[];
+  const update = db.prepare('UPDATE notes SET tags = ? WHERE id = ?');
+
+  db.transaction(() => {
+    for (const { id, tags } of legacy) {
+      update.run(JSON.stringify(renameTag(parseTags(tags), LEGACY_QUICK_NOTE_TAG, QUICK_NOTE_TAG)), id);
+    }
+  })();
+}
+
+function parseTags(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((tag): tag is string => typeof tag === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Tags with `from` renamed to `to`, without duplicating `to` when it is already there. */
+export function renameTag(tags: string[], from: string, to: string): string[] {
+  return [...new Set(tags.map(tag => (tag === from ? to : tag)))];
 }
 
 /** The default folder must always exist: the notes created on the fly land in it. */
@@ -241,6 +318,13 @@ export const noteOps = {
 
   delete(id: number): void {
     stmts.delete.run(id);
+  },
+
+  /** Colors the notes without touching `updated_at`: a color is not an edit. */
+  setColor(ids: number[], color: string | null): void {
+    if (ids.length > 0) {
+      db.prepare(`UPDATE notes SET color = ? WHERE id IN (${placeholders(ids.length)})`).run(color, ...ids);
+    }
   },
 
   search(query: string): NoteRow[] {
@@ -390,5 +474,66 @@ export const folderOps = {
 
       return deletedNoteIds;
     })();
+  },
+
+  /**
+   * Deletes everything inside the folder (its notes, its sub-folders and their notes) but keeps the folder itself,
+   * the default one included. Returns the ids of the deleted notes, `null` for an unknown folder.
+   */
+  empty(id: number): number[] | null {
+    if (!this.getById(id)) {
+      return null;
+    }
+
+    const ids = subtreeIds(id);
+    const marks = placeholders(ids.length);
+
+    return db.transaction((): number[] => {
+      const rows = db.prepare(`SELECT id FROM notes WHERE folder_id IN (${marks})`).all(...ids) as { id: number }[];
+
+      db.prepare(`DELETE FROM notes WHERE folder_id IN (${marks})`).run(...ids);
+      // Their own sub-folders go away through ON DELETE CASCADE
+      db.prepare('DELETE FROM folders WHERE parent_id = ?').run(id);
+
+      return rows.map(row => row.id);
+    })();
+  },
+
+  setColor(ids: number[], color: string | null): void {
+    if (ids.length > 0) {
+      db.prepare(`UPDATE folders SET color = ? WHERE id IN (${placeholders(ids.length)})`).run(color, ...ids);
+    }
+  },
+};
+
+export const collectionOps = {
+  getAll(): CollectionRow[] {
+    return db.prepare('SELECT * FROM collections ORDER BY sort_order, created_at').all() as CollectionRow[];
+  },
+
+  get(collectionPath: string): CollectionRow | undefined {
+    return db.prepare('SELECT * FROM collections WHERE path = ?').get(collectionPath) as CollectionRow | undefined;
+  },
+
+  /** Adds the collection (last of the list); an already opened path is returned as is. */
+  add(collectionPath: string, kind: 'folder' | 'file', displayName: string): CollectionRow | undefined {
+    const next = (db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM collections').get() as { next: number }).next;
+    db.prepare('INSERT OR IGNORE INTO collections (path, kind, display_name, sort_order) VALUES (?, ?, ?, ?)').run(collectionPath, kind, displayName, next);
+    return this.get(collectionPath);
+  },
+
+  remove(collectionPath: string): void {
+    db.prepare('DELETE FROM collections WHERE path = ?').run(collectionPath);
+  },
+
+  rename(collectionPath: string, displayName: string): CollectionRow | undefined {
+    db.prepare('UPDATE collections SET display_name = ? WHERE path = ?').run(displayName, collectionPath);
+    return this.get(collectionPath);
+  },
+
+  /** A file or folder moved on disk (relocated by the user): same collection, new key. */
+  relocate(from: string, to: string): CollectionRow | undefined {
+    db.prepare('UPDATE collections SET path = ? WHERE path = ?').run(to, from);
+    return this.get(to);
   },
 };

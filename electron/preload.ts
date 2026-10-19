@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron/renderer';
+import { contextBridge, ipcRenderer, webUtils } from 'electron/renderer';
 
 function subscribe(channel: string, callback: (payload?: any) => void): () => void {
   const listener = (_event: unknown, payload?: unknown): void => callback(payload);
@@ -24,6 +24,7 @@ const api = {
   placeNote: (id: number, folderId: number | null, orderedIds: number[]) =>
     ipcRenderer.invoke('notes:place', id, folderId, orderedIds),
   deleteNote: (id: number) => ipcRenderer.invoke('notes:delete', id),
+  setNotesColor: (ids: number[], color: string | null) => ipcRenderer.invoke('notes:setColor', ids, color),
   searchNotes: (query: string) => ipcRenderer.invoke('notes:search', query),
   getNotesByTag: (tag: string) => ipcRenderer.invoke('notes:byTag', tag),
   getAllTags: () => ipcRenderer.invoke('notes:allTags'),
@@ -36,6 +37,35 @@ const api = {
   placeFolder: (id: number, parentId: number | null, orderedIds: number[]) =>
     ipcRenderer.invoke('folders:place', id, parentId, orderedIds),
   deleteFolder: (id: number, mode: 'moveToRoot' | 'deleteAll') => ipcRenderer.invoke('folders:delete', id, mode),
+  emptyFolder: (id: number) => ipcRenderer.invoke('folders:empty', id),
+  setFoldersColor: (ids: number[], color: string | null) => ipcRenderer.invoke('folders:setColor', ids, color),
+
+  // Export: asks where to save, returns the written path or null
+  saveExport: (kind: 'md' | 'html' | 'zip', suggestedName: string, payload: unknown) =>
+    ipcRenderer.invoke('export:save', kind, suggestedName, payload),
+
+  // Collections (folders / markdown files of the disk)
+  listCollections: () => ipcRenderer.invoke('collections:list'),
+  pickCollections: (kind: 'folder' | 'file') => ipcRenderer.invoke('collections:pick', kind),
+  openCollectionPaths: (paths: string[]) => ipcRenderer.invoke('collections:openPaths', paths),
+  removeCollection: (root: string) => ipcRenderer.invoke('collections:remove', root),
+  renameCollection: (root: string, name: string) => ipcRenderer.invoke('collections:rename', root, name),
+  relocateCollection: (root: string) => ipcRenderer.invoke('collections:relocate', root),
+  loadCollection: (root: string) => ipcRenderer.invoke('collections:load', root),
+  readCollectionFile: (root: string, path: string) => ipcRenderer.invoke('collections:read', root, path),
+  writeCollectionFile: (root: string, path: string, content: string) => ipcRenderer.invoke('collections:write', root, path, content),
+  createCollectionFile: (root: string, folder: string, name: string) => ipcRenderer.invoke('collections:createFile', root, folder, name),
+  renameCollectionPath: (root: string, path: string, name: string) => ipcRenderer.invoke('collections:renamePath', root, path, name),
+  moveCollectionPath: (root: string, path: string, folder: string) => ipcRenderer.invoke('collections:movePath', root, path, folder),
+  trashCollectionPath: (root: string, path: string) => ipcRenderer.invoke('collections:trash', root, path),
+  revealCollectionPath: (root: string, path: string) => ipcRenderer.invoke('collections:reveal', root, path),
+  searchCollections: (query: string) => ipcRenderer.invoke('collections:search', query),
+  cancelCollectionSearch: (requestId: number) => ipcRenderer.invoke('collections:cancelSearch', requestId),
+  requestCollectionGraph: (root: string) => ipcRenderer.invoke('collections:graph', root),
+  /** Disk path of a file dropped on the window (File.path no longer exists in Electron). */
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+  onCollectionsEvent: (callback: (event: unknown) => void) => subscribe('collections:event', callback),
+  onCollectionsOpen: (callback: (refs: unknown) => void) => subscribe('collections:open', callback),
 
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),

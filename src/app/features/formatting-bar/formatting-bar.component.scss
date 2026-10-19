@@ -1,27 +1,43 @@
+// Sizes: Compact keeps the former Full dimensions, Full is a step larger
 :host {
+  --bar-thickness: 44px;
+  --tool-width: 34px;
+  --tool-height: 32px;
+  --tool-icon: 19px;
+  --group-gap: 3px;
+  --separator-length: 22px;
+  --separator-margin: 8px;
+
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--group-gap);
   flex-shrink: 0;
   box-sizing: border-box;
-  height: 36px;
-  padding: 0 8px;
+  height: var(--bar-thickness);
+  padding: 0 10px;
   background: var(--evn-bg-panel);
   user-select: none;
   overflow-x: auto;
   overflow-y: hidden;
-  // Above or below the editor, with a single instance in the template
-  order: -1;
 
-  &[data-position='top'] { order: -1; }
-  &[data-position='bottom'] { order: 1; }
+  &[data-mode='compact'] {
+    --bar-thickness: 36px;
+    --tool-width: 28px;
+    --tool-height: 26px;
+    --tool-icon: 16px;
+    --group-gap: 2px;
+    --separator-length: 18px;
+    --separator-margin: 6px;
 
+    padding: 0 8px;
+  }
+
+  // ── Horizontal (top / bottom of the page) ──
   &[data-style='pinned'] {
-    border-bottom: 1px solid var(--evn-border-subtle);
-    &[data-position='bottom'] {
-      border-bottom: none;
-      border-top: 1px solid var(--evn-border-subtle);
-    }
+    &[data-position='top'] { border-bottom: 1px solid var(--evn-border-subtle); }
+    &[data-position='bottom'] { border-top: 1px solid var(--evn-border-subtle); }
+    &[data-position='left'] { border-right: 1px solid var(--evn-border-subtle); }
+    &[data-position='right'] { border-left: 1px solid var(--evn-border-subtle); }
   }
 
   &[data-style='floating'] {
@@ -31,28 +47,61 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   }
 
-  &[data-mode='compact'] {
-    height: 28px;
-    gap: 0;
-    padding: 0 4px;
+  // ── Vertical (left / right of the page) ──
+  &[data-position='left'],
+  &[data-position='right'] {
+    flex-direction: column;
+    width: var(--bar-thickness);
+    height: auto;
+    max-height: 100%;
+    padding: 10px 0;
+    overflow-x: hidden;
+    overflow-y: auto;
 
-    .tool { width: 24px; height: 22px; }
-    .tool svg { width: 14px; height: 14px; }
-    .separator { display: none; }
-    .group + .group { margin-left: 4px; }
+    .group { flex-direction: column; }
+
+    .separator {
+      width: var(--separator-length);
+      height: 1px;
+      margin: var(--separator-margin) 0;
+    }
+
+    .heading-select ::ng-deep .trigger {
+      width: var(--tool-width);
+      justify-content: center;
+      padding: 0;
+
+      .chevron { display: none; }
+    }
+  }
+
+  &[data-style='floating'][data-position='left'],
+  &[data-style='floating'][data-position='right'] {
+    align-self: center;
+    margin: 12px 8px;
+  }
+
+  &[data-style='pinned'][data-position='left'],
+  &[data-style='pinned'][data-position='right'] {
+    align-self: stretch;
+  }
+
+  &.disabled .heading-select {
+    opacity: 0.4;
+    pointer-events: none;
   }
 }
 
 .group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--group-gap);
 }
 
 .separator {
   width: 1px;
-  height: 18px;
-  margin: 0 6px;
+  height: var(--separator-length);
+  margin: 0 var(--separator-margin);
   background: var(--evn-border);
   flex-shrink: 0;
 }
@@ -61,8 +110,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 26px;
+  width: var(--tool-width);
+  height: var(--tool-height);
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -71,6 +120,11 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
+
+  svg {
+    width: var(--tool-icon);
+    height: var(--tool-icon);
+  }
 
   &:hover:not(:disabled) {
     background: rgba(var(--evn-hover-rgb), 0.07);
@@ -85,5 +139,24 @@
   &:disabled {
     cursor: default;
     opacity: 0.4;
+  }
+}
+
+// The heading drop-down blends into the bar: no input look until hovered
+.heading-select ::ng-deep .trigger {
+  min-width: 0;
+  width: 118px;
+  height: var(--tool-height);
+  padding: 0 8px;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 4px;
+  color: var(--evn-text-soft);
+  font-size: 12px;
+
+  &:hover {
+    border-color: transparent;
+    background: rgba(var(--evn-hover-rgb), 0.07);
+    color: var(--evn-text);
   }
 }

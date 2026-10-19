@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { APP_SHORTCUTS, findShortcutConflict, resolveAppShortcuts } from '../src/app/core/models/app-shortcuts.model';
+import { translate } from '../src/app/core/i18n/translate';
+import { APP_SHORTCUTS, findShortcutConflict, resolveAppShortcuts, shortcutLabel } from '../src/app/core/models/app-shortcuts.model';
 
 describe('APP_SHORTCUTS', () => {
   it('has unique ids and unique default accelerators', () => {
@@ -7,6 +8,15 @@ describe('APP_SHORTCUTS', () => {
     const accelerators = APP_SHORTCUTS.map(s => s.defaultAccelerator);
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(accelerators).size).toBe(accelerators.length);
+  });
+
+  it('has a translated label in every language', () => {
+    for (const language of ['en', 'fr'] as const) {
+      const labels = APP_SHORTCUTS.map(s => shortcutLabel(s, (key, params) => translate(language, key, params)));
+      expect(new Set(labels).size).toBe(labels.length);
+    }
+    const goto = APP_SHORTCUTS.find(s => s.id === 'tab.goto.2')!;
+    expect(shortcutLabel(goto, (key, params) => translate('fr', key, params))).toBe("Aller à l'onglet 2");
   });
 });
 
@@ -39,7 +49,7 @@ describe('findShortcutConflict', () => {
   });
 
   it('refuses the first key of an existing chord, and a chord starting with an existing shortcut', () => {
-    expect(findShortcutConflict('note.new', 'CommandOrControl+K', resolved)?.id).toBe('theme.toggle');
+    expect(findShortcutConflict('note.new', 'CommandOrControl+K', resolved)?.id).toBe('theme.select');
     const custom = resolveAppShortcuts({ 'tab.close': 'Alt+Q' });
     expect(findShortcutConflict('note.new', 'Alt+Q, Alt+R', custom)?.id).toBe('tab.close');
   });

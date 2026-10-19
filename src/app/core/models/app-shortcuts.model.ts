@@ -1,6 +1,11 @@
+import { TranslationKey } from '../i18n/translations';
+import { Translator } from '../i18n/translate';
+
 export interface AppShortcutDefinition {
   id: string;
-  label: string;
+  /** Translation key of the name shown in the settings and in conflicts (see `shortcutLabel`). */
+  labelKey: TranslationKey;
+  labelParams?: Record<string, string | number>;
   /**
    * Electron-style accelerator, as produced by `keyEventToAccelerator` (e.g. `CommandOrControl+Shift+F`).
    * A chord is two accelerators separated by `, ` (e.g. `CommandOrControl+K, CommandOrControl+T`).
@@ -10,29 +15,34 @@ export interface AppShortcutDefinition {
 
 /** Every in-app shortcut the user can rebind. Global (system-wide) shortcut lives in its own setting. */
 export const APP_SHORTCUTS: AppShortcutDefinition[] = [
-  { id: 'note.new', label: 'New Note', defaultAccelerator: 'CommandOrControl+N' },
-  { id: 'search.global', label: 'Search Notes', defaultAccelerator: 'CommandOrControl+Shift+F' },
-  { id: 'palette.commands', label: 'Command Palette', defaultAccelerator: 'F1' },
-  { id: 'settings.open', label: 'Open Settings', defaultAccelerator: 'CommandOrControl+,' },
-  { id: 'layout.toggle', label: 'Toggle Full Width Layout', defaultAccelerator: 'Alt+Z' },
+  { id: 'note.new', labelKey: 'settings.shortcut.note.new', defaultAccelerator: 'CommandOrControl+N' },
+  { id: 'search.global', labelKey: 'settings.shortcut.search.global', defaultAccelerator: 'CommandOrControl+Shift+F' },
+  { id: 'palette.commands', labelKey: 'settings.shortcut.palette.commands', defaultAccelerator: 'F1' },
+  { id: 'settings.open', labelKey: 'settings.shortcut.settings.open', defaultAccelerator: 'CommandOrControl+,' },
+  { id: 'layout.toggle', labelKey: 'settings.shortcut.layout.toggle', defaultAccelerator: 'Alt+W' },
+  { id: 'editor.wordWrap', labelKey: 'settings.shortcut.editor.wordWrap', defaultAccelerator: 'Alt+Z' },
   // Not Ctrl+B: it is Bold in the editor
-  { id: 'theme.toggle', label: 'Toggle Light / Dark Theme', defaultAccelerator: 'CommandOrControl+K, CommandOrControl+T' },
-  { id: 'formattingBar.toggle', label: 'Toggle Formatting Bar', defaultAccelerator: 'Alt+T' },
-  { id: 'sidebar.toggle', label: 'Toggle Sidebar', defaultAccelerator: 'CommandOrControl+Shift+E' },
-  { id: 'tab.close', label: 'Close Tab', defaultAccelerator: 'CommandOrControl+W' },
-  { id: 'tab.next', label: 'Next Tab', defaultAccelerator: 'CommandOrControl+Tab' },
-  { id: 'tab.prev', label: 'Previous Tab', defaultAccelerator: 'CommandOrControl+Shift+Tab' },
-  { id: 'tab.pin', label: 'Pin / Unpin Tab', defaultAccelerator: 'Alt+P' },
+  { id: 'theme.select', labelKey: 'settings.shortcut.theme.select', defaultAccelerator: 'CommandOrControl+K, CommandOrControl+T' },
+  { id: 'formattingBar.toggle', labelKey: 'settings.shortcut.formattingBar.toggle', defaultAccelerator: 'Alt+T' },
+  { id: 'sidebar.toggle', labelKey: 'settings.shortcut.sidebar.toggle', defaultAccelerator: 'CommandOrControl+Shift+E' },
+  { id: 'tab.close', labelKey: 'settings.shortcut.tab.close', defaultAccelerator: 'CommandOrControl+W' },
+  { id: 'tab.next', labelKey: 'settings.shortcut.tab.next', defaultAccelerator: 'CommandOrControl+Tab' },
+  { id: 'tab.prev', labelKey: 'settings.shortcut.tab.prev', defaultAccelerator: 'CommandOrControl+Shift+Tab' },
+  { id: 'tab.pin', labelKey: 'settings.shortcut.tab.pin', defaultAccelerator: 'Alt+P' },
   ...Array.from({ length: 9 }, (_, i) => ({
-    id: `tab.goto.${i + 1}`, label: `Go To Tab ${i + 1}`, defaultAccelerator: `CommandOrControl+Alt+${i + 1}`,
+    id: `tab.goto.${i + 1}`, labelKey: 'settings.shortcut.tab.goto' as const, labelParams: { number: i + 1 }, defaultAccelerator: `CommandOrControl+Alt+${i + 1}`,
   })),
-  { id: 'editor.find', label: 'Find In Note', defaultAccelerator: 'CommandOrControl+F' },
-  { id: 'editor.save', label: 'Save Note', defaultAccelerator: 'CommandOrControl+S' },
-  { id: 'editor.bold', label: 'Bold', defaultAccelerator: 'CommandOrControl+B' },
-  { id: 'editor.italic', label: 'Italic', defaultAccelerator: 'CommandOrControl+I' },
-  { id: 'editor.draft', label: 'Toggle Draft Block', defaultAccelerator: 'CommandOrControl+D' },
+  { id: 'editor.find', labelKey: 'settings.shortcut.editor.find', defaultAccelerator: 'CommandOrControl+F' },
+  { id: 'editor.replace', labelKey: 'settings.shortcut.editor.replace', defaultAccelerator: 'CommandOrControl+H' },
+  { id: 'editor.preview', labelKey: 'settings.shortcut.editor.preview', defaultAccelerator: 'CommandOrControl+Shift+V' },
+  // Like VS Code: Ctrl+K then V alone
+  { id: 'editor.previewSide', labelKey: 'settings.shortcut.editor.previewSide', defaultAccelerator: 'CommandOrControl+K, V' },
+  { id: 'editor.save', labelKey: 'settings.shortcut.editor.save', defaultAccelerator: 'CommandOrControl+S' },
+  { id: 'editor.bold', labelKey: 'settings.shortcut.editor.bold', defaultAccelerator: 'CommandOrControl+B' },
+  { id: 'editor.italic', labelKey: 'settings.shortcut.editor.italic', defaultAccelerator: 'CommandOrControl+I' },
+  { id: 'editor.draft', labelKey: 'settings.shortcut.editor.draft', defaultAccelerator: 'CommandOrControl+D' },
   // Not Ctrl+K: it starts the chords (theme)
-  { id: 'editor.link', label: 'Insert Link', defaultAccelerator: 'CommandOrControl+Shift+K' },
+  { id: 'editor.link', labelKey: 'settings.shortcut.editor.link', defaultAccelerator: 'CommandOrControl+Shift+K' },
 ];
 
 /** Accelerator in effect for every shortcut: the user's override when there is one, the default otherwise. */
@@ -56,4 +66,9 @@ export function findShortcutConflict(
   resolved: Record<string, string>,
 ): AppShortcutDefinition | null {
   return APP_SHORTCUTS.find(other => other.id !== id && acceleratorsClash(resolved[other.id] ?? '', accelerator)) ?? null;
+}
+
+/** Translated name of a shortcut. */
+export function shortcutLabel(shortcut: AppShortcutDefinition, t: Translator): string {
+  return t(shortcut.labelKey, shortcut.labelParams);
 }

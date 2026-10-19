@@ -1,16 +1,73 @@
 export type ShortcutMode = 'overlay' | 'app';
 
-export type ThemePreference = 'dark' | 'light' | 'system';
+/** Languages of the interface (mirrors language.model.ts on the renderer side). */
+export type Language = 'en' | 'fr';
 
-const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system'];
+export const DEFAULT_LANGUAGE: Language = 'en';
+const LANGUAGES: readonly Language[] = ['en', 'fr'];
+
+export function isLanguage(value: unknown): value is Language {
+  return LANGUAGES.some(language => language === value);
+}
+
+/** Language matching a locale such as `fr-FR` or `en_US`; English when the locale is not (yet) translated. */
+export function resolveLanguage(locale: string | null | undefined): Language {
+  const primary = (locale ?? '').toLowerCase().split(/[-_]/)[0];
+
+  return LANGUAGES.find(language => language === primary) ?? DEFAULT_LANGUAGE;
+}
+
+export type ThemeId = 'dark' | 'light' | 'solarized-light' | 'violet-light' | 'github-light' | 'github-dark-dimmed';
+export type ThemeKind = 'dark' | 'light';
+export type ThemePreference = ThemeId | 'system';
+
+/** Light/dark family of every theme (mirrors theme.model.ts on the renderer side). */
+export const THEME_KINDS: Readonly<Record<ThemeId, ThemeKind>> = {
+  'dark': 'dark',
+  'light': 'light',
+  'solarized-light': 'light',
+  'violet-light': 'light',
+  'github-light': 'light',
+  'github-dark-dimmed': 'dark',
+};
+
+function isThemeId(value: unknown): value is ThemeId {
+  return typeof value === 'string' && Object.keys(THEME_KINDS).includes(value);
+}
+
+/** A theme id of the expected family, the fallback otherwise (a light theme cannot be the 'system' dark one). */
+function sanitizeThemePreference(value: unknown, fallback: ThemePreference): ThemePreference {
+  return isThemeId(value) || value === 'system' ? value : fallback;
+}
+
+function sanitizeThemeOfKind(value: unknown, kind: ThemeKind, fallback: ThemeId): ThemeId {
+  return isThemeId(value) && THEME_KINDS[value] === kind ? value : fallback;
+}
 
 export type FormattingBarMode = 'full' | 'compact';
 export type FormattingBarStyle = 'pinned' | 'floating';
-export type FormattingBarPosition = 'top' | 'bottom';
+export type FormattingBarPosition = 'top' | 'bottom' | 'left' | 'right';
 
 const FORMATTING_BAR_MODES: readonly FormattingBarMode[] = ['full', 'compact'];
 const FORMATTING_BAR_STYLES: readonly FormattingBarStyle[] = ['pinned', 'floating'];
-const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom'];
+const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom', 'left', 'right'];
+
+/** Folders skipped when scanning a collection (mirrors DEFAULT_COLLECTION_EXCLUDES of collections-scan.ts). */
+const DEFAULT_COLLECTIONS_EXCLUDE = [
+  'node_modules', 'bin', 'obj', 'build', 'dist', 'out', 'target', 'coverage', 'vendor',
+  '__pycache__', 'venv', '.venv', '.git', '.angular', '.next', '.nuxt', '.vs', '.vscode', '.idea',
+];
+const MAX_EXCLUDES = 100;
+const MAX_EXCLUDE_LENGTH = 100;
+
+function sanitizeExcludes(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const names = value.filter((name): name is string => typeof name === 'string').map(name => name.trim())
+    .filter(name => name.length > 0 && name.length <= MAX_EXCLUDE_LENGTH && !/[\\/]/.test(name));
+  return [...new Set(names)].slice(0, MAX_EXCLUDES);
+}
 
 export interface OverlayPosition {
   x: number;
@@ -18,6 +75,8 @@ export interface OverlayPosition {
 }
 
 export interface AppSettings {
+  /** Language of the interface; chosen from the OS locale on the first launch. */
+  language: Language;
   globalShortcut: string;
   shortcutMode: ShortcutMode;
   overlayWidth: number;
@@ -27,6 +86,10 @@ export interface AppSettings {
   launchAtStartup: boolean;
   /** 'system' follows the OS color scheme. */
   theme: ThemePreference;
+  /** Theme used by 'system' while the OS is in dark mode. */
+  preferredDarkTheme: ThemeId;
+  /** Theme used by 'system' while the OS is in light mode. */
+  preferredLightTheme: ThemeId;
   /** true: updates download in the background and install when the app quits. false: the user is asked first. */
   autoUpdate: boolean;
   /** In-app shortcuts changed by the user, by shortcut id; absent = default (the renderer owns the id list). */
@@ -41,6 +104,12 @@ export interface AppSettings {
   trailingLine: boolean;
   /** true: the h1/h2/h3 outline is shown on the right of the open note. */
   showOutline: boolean;
+  /** true: the editor scrollbar only shows while the mouse is over it. */
+  hideScrollbar: boolean;
+  /** true: a note opens in preview (rendered, read-only) instead of its markdown source. */
+  openInPreview: boolean;
+  /** Folder names never listed in the collections (hidden folders are always skipped). */
+  collectionsExclude: string[];
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -54,6 +123,7 @@ export const OVERLAY_MIN_HEIGHT = 200;
 export const OVERLAY_MAX_HEIGHT = 1200;
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: DEFAULT_LANGUAGE,
   globalShortcut: 'CommandOrControl+Alt+N',
   shortcutMode: 'overlay',
   overlayWidth: 250,
@@ -61,16 +131,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enterToSend: true,
   launchAtStartup: false,
   theme: 'dark',
+  preferredDarkTheme: 'dark',
+  preferredLightTheme: 'light',
   autoUpdate: false,
   appShortcuts: {},
   formattingBarEnabled: true,
   formattingBarMode: 'full',
-  formattingBarStyle: 'pinned',
+  formattingBarStyle: 'floating',
   formattingBarPosition: 'top',
-  showLineNumbers: true,
+  showLineNumbers: false,
   wordWrap: true,
   trailingLine: false,
-  showOutline: true,
+  showOutline: false,
+  hideScrollbar: false,
+  openInPreview: false,
+  collectionsExclude: DEFAULT_COLLECTIONS_EXCLUDE,
   overlayPosition: null,
 };
 
@@ -116,12 +191,15 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
   const mode = raw['shortcutMode'] === 'overlay' || raw['shortcutMode'] === 'app' ? raw['shortcutMode'] : base.shortcutMode;
 
   return {
+    language: isLanguage(raw['language']) ? raw['language'] : base.language,
     globalShortcut: shortcut || base.globalShortcut,
     shortcutMode: mode,
     overlayWidth: clampInt(raw['overlayWidth'], OVERLAY_MIN_WIDTH, OVERLAY_MAX_WIDTH, base.overlayWidth),
     overlayHeight: clampInt(raw['overlayHeight'], OVERLAY_MIN_HEIGHT, OVERLAY_MAX_HEIGHT, base.overlayHeight),
     enterToSend: typeof raw['enterToSend'] === 'boolean' ? raw['enterToSend'] : base.enterToSend,
-    theme: THEME_PREFERENCES.find(theme => theme === raw['theme']) ?? base.theme,
+    theme: sanitizeThemePreference(raw['theme'], base.theme),
+    preferredDarkTheme: sanitizeThemeOfKind(raw['preferredDarkTheme'], 'dark', base.preferredDarkTheme),
+    preferredLightTheme: sanitizeThemeOfKind(raw['preferredLightTheme'], 'light', base.preferredLightTheme),
     launchAtStartup: typeof raw['launchAtStartup'] === 'boolean' ? raw['launchAtStartup'] : base.launchAtStartup,
     autoUpdate: typeof raw['autoUpdate'] === 'boolean' ? raw['autoUpdate'] : base.autoUpdate,
     appShortcuts: sanitizeAppShortcuts(raw['appShortcuts'], base.appShortcuts),
@@ -133,6 +211,9 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     wordWrap: typeof raw['wordWrap'] === 'boolean' ? raw['wordWrap'] : base.wordWrap,
     trailingLine: typeof raw['trailingLine'] === 'boolean' ? raw['trailingLine'] : base.trailingLine,
     showOutline: typeof raw['showOutline'] === 'boolean' ? raw['showOutline'] : base.showOutline,
+    hideScrollbar: typeof raw['hideScrollbar'] === 'boolean' ? raw['hideScrollbar'] : base.hideScrollbar,
+    openInPreview: typeof raw['openInPreview'] === 'boolean' ? raw['openInPreview'] : base.openInPreview,
+    collectionsExclude: sanitizeExcludes(raw['collectionsExclude'], base.collectionsExclude),
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

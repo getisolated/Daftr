@@ -1,5 +1,5 @@
 import {
-  Component, inject, OnDestroy, signal, computed, effect,
+  Component, inject, OnDestroy, signal, computed, effect, untracked,
   ViewChild, ElementRef, ChangeDetectionStrategy
 } from '@angular/core';
 
@@ -9,7 +9,13 @@ import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { LayoutService } from '../../core/services/layout.service';
-import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.model';
+import { CollectionsService } from '../../core/services/collections.service';
+import { NoteExportService } from '../../core/services/note-export.service';
+import { ThemeService } from '../../core/services/theme.service';
+import { PaletteResult } from '../../core/models/note.model';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { noteDisplayTitle } from '../../core/utils/note-title.util';
+import { buildThemePickerItems } from '../../core/utils/theme.util';
 
 @Component({
   selector: 'app-palette',
@@ -45,7 +51,7 @@ import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.mode
                   class="palette-item"
                   [class.selected]="i === selectedIndex()"
                   (click)="execute(result)"
-                  (mouseenter)="selectedIndex.set(i)"
+                  (mouseenter)="onItemHover(i)"
                 >
                   @if (result.type === 'command') {
                     <div class="item-icon">
@@ -71,7 +77,7 @@ import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.mode
                       </svg>
                     </div>
                     <div class="item-content">
-                      <span class="item-label">{{ result.note!.title }}</span>
+                      <span class="item-label">{{ noteTitle(result.note!.title) }}</span>
                       @if (result.note!.preview) {
                         <span class="item-desc">{{ result.note!.preview }}</span>
                       }
@@ -85,6 +91,20 @@ import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.mode
                     }
                   }
 
+                  @if (result.type === 'file') {
+                    <div class="item-icon file-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M2 10h20"/>
+                      </svg>
+                    </div>
+                    <div class="item-content">
+                      <span class="item-label">{{ result.file!.label }}</span>
+                      @if (result.file!.preview) {
+                        <span class="item-desc">{{ result.file!.preview }}</span>
+                      }
+                    </div>
+                  }
+
                   @if (result.type === 'tag') {
                     <div class="item-icon">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -93,14 +113,27 @@ import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.mode
                     </div>
                     <div class="item-content">
                       <span class="item-label">#{{ result.tag }}</span>
-                      <span class="item-desc">Filter by tag</span>
+                      <span class="item-desc">{{ i18n.t('workspace.palette.filterByTag') }}</span>
+                    </div>
+                  }
+
+                  @if (result.type === 'theme') {
+                    <div class="item-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/>
+                        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.97 6.01 17.46 2 12 2z"/>
+                      </svg>
+                    </div>
+                    <div class="item-content">
+                      <span class="item-label">{{ result.theme!.label }}</span>
+                      <span class="item-desc">{{ result.theme!.detail }}</span>
                     </div>
                   }
                 </div>
               }
             </div>
           } @else if (query && !loading()) {
-            <div class="palette-empty">No results for "{{ query }}"</div>
+            <div class="palette-empty">{{ i18n.t('workspace.palette.noResults', { query }) }}</div>
           }
         </div>
       </div>
@@ -109,11 +142,17 @@ import { OVERLAY_NOTES_TAB_ID, PaletteResult } from '../../core/models/note.mode
   styleUrls: ['./palette.component.scss'],
 })
 export class PaletteComponent implements OnDestroy {
+  protected readonly i18n = inject(I18nService);
   private palette = inject(PaletteService);
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
   private settings = inject(SettingsService);
   private layout = inject(LayoutService);
+  private collections = inject(CollectionsService);
+  /** Stops the content search of the collections still running for the previous query. */
+  private cancelFileSearch: (() => void) | null = null;
+  private noteExport = inject(NoteExportService);
+  private themeService = inject(ThemeService);
 
   @ViewChild('inputEl') inputEl!: ElementRef<HTMLInputElement>;
 
@@ -130,9 +169,10 @@ export class PaletteComponent implements OnDestroy {
 
   readonly placeholder = computed(() => {
     switch (this.mode()) {
-      case 'search': return 'Search all notes... (or #tag to filter)';
-      case 'tag': return 'Filter by tag...';
-      default: return 'Type a command or note name...';
+      case 'search': return this.i18n.t('workspace.palette.placeholderSearch');
+      case 'tag': return this.i18n.t('workspace.palette.placeholderTag');
+      case 'theme': return this.i18n.t('workspace.palette.placeholderTheme');
+      default: return this.i18n.t('workspace.palette.placeholderCommand');
     }
   });
 
@@ -142,72 +182,81 @@ export class PaletteComponent implements OnDestroy {
       {
         type: 'command',
         command: {
-          id: 'new-note', label: 'New Note', shortcut: this.settings.shortcutLabel('note.new'),
-          description: 'Create a new empty note', category: 'note',
+          id: 'new-note', label: this.i18n.t('workspace.palette.cmd.newNote'), shortcut: this.settings.shortcutLabel('note.new'),
+          description: this.i18n.t('workspace.palette.cmd.newNoteDesc'), category: 'note',
           action: () => this.createNote(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'global-search', label: 'Search Notes', shortcut: this.settings.shortcutLabel('search.global'),
-          description: 'Search across all notes', category: 'note',
+          id: 'global-search', label: this.i18n.t('workspace.palette.cmd.searchNotes'), shortcut: this.settings.shortcutLabel('search.global'),
+          description: this.i18n.t('workspace.palette.cmd.searchNotesDesc'), category: 'note',
           action: () => { this.palette.open('search'); }
         }
       },
       {
         type: 'command',
         command: {
-          id: 'overlay-notes', label: 'Overlay Notes',
-          description: 'Open every quick note in a single document', category: 'note',
-          action: () => this.tabs.openOverlayNotes(),
+          id: 'quick-notes', label: this.i18n.t('workspace.palette.cmd.quickNotes'),
+          description: this.i18n.t('workspace.palette.cmd.quickNotesDesc'), category: 'note',
+          action: () => this.tabs.openQuickNotes(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'graph-view', label: 'Graph View',
-          description: 'Show the links between notes on the home page', category: 'note',
+          id: 'graph-view', label: this.i18n.t('workspace.palette.cmd.graphView'),
+          description: this.i18n.t('workspace.palette.cmd.graphViewDesc'), category: 'note',
           action: () => this.openGraphView(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'copy-note-link', label: 'Copy Note Link',
-          description: 'Copy the note:// link to the current note', category: 'note',
+          id: 'copy-note-link', label: this.i18n.t('workspace.palette.cmd.copyNoteLink'),
+          description: this.i18n.t('workspace.palette.cmd.copyNoteLinkDesc'), category: 'note',
           action: () => { void this.copyNoteLink(); },
         }
       },
+      ...this.exportCommands(),
       {
         type: 'command',
         command: {
-          id: 'close-tab', label: 'Close Tab', shortcut: this.settings.shortcutLabel('tab.close'),
-          description: 'Close the current tab', category: 'action',
+          id: 'close-tab', label: this.i18n.t('workspace.palette.cmd.closeTab'), shortcut: this.settings.shortcutLabel('tab.close'),
+          description: this.i18n.t('workspace.palette.cmd.closeTabDesc'), category: 'action',
           action: () => this.tabs.closeActiveTab(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'next-tab', label: 'Next Tab', shortcut: this.settings.shortcutLabel('tab.next'),
-          description: 'Switch to next tab', category: 'action',
+          id: 'next-tab', label: this.i18n.t('workspace.palette.cmd.nextTab'), shortcut: this.settings.shortcutLabel('tab.next'),
+          description: this.i18n.t('workspace.palette.cmd.nextTabDesc'), category: 'action',
           action: () => this.tabs.nextTab(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'prev-tab', label: 'Previous Tab', shortcut: this.settings.shortcutLabel('tab.prev'),
-          description: 'Switch to previous tab', category: 'action',
+          id: 'prev-tab', label: this.i18n.t('workspace.palette.cmd.prevTab'), shortcut: this.settings.shortcutLabel('tab.prev'),
+          description: this.i18n.t('workspace.palette.cmd.prevTabDesc'), category: 'action',
           action: () => this.tabs.prevTab(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'settings', label: 'Settings', shortcut: this.settings.shortcutLabel('settings.open'),
-          description: 'Global shortcut and quick-note overlay', category: 'settings',
+          id: 'color-theme', label: this.i18n.t('workspace.palette.cmd.colorTheme'), shortcut: this.settings.shortcutLabel('theme.select'),
+          description: this.i18n.t('workspace.palette.cmd.colorThemeDesc'), category: 'settings',
+          action: () => this.palette.open('theme'),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'settings', label: this.i18n.t('workspace.palette.cmd.settings'), shortcut: this.settings.shortcutLabel('settings.open'),
+          description: this.i18n.t('workspace.palette.cmd.settingsDesc'), category: 'settings',
           action: () => this.settings.open(),
         }
       },
@@ -231,11 +280,20 @@ export class PaletteComponent implements OnDestroy {
         this.selectedIndex.set(0);
       }
     });
+
+    // The theme picker previews the highlighted theme; anything else (closing included) shows the saved one again
+    effect(() => {
+      const highlighted = this.isOpen() && this.mode() === 'theme' ? this.results()[this.selectedIndex()]?.theme : undefined;
+      untracked(() => this.themeService.preview(highlighted?.id ?? null));
+    });
   }
 
   ngOnDestroy(): void {
     if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    this.cancelFileSearch?.();
   }
+
+  protected noteTitle(title: string): string { return noteDisplayTitle(title, this.i18n.t); }
 
   close(): void { this.palette.close(); }
   clearQuery(): void { this.query = ''; this.onQueryChange(''); }
@@ -248,6 +306,13 @@ export class PaletteComponent implements OnDestroy {
 
   private async search(query: string): Promise<void> {
     const mode = this.mode();
+    this.cancelFileSearch?.();
+    this.cancelFileSearch = null;
+
+    if (mode === 'theme') {
+      this.searchThemes(query);
+      return;
+    }
 
     if (mode === 'command' && !query.trim()) {
       this._results.set(this.commands);
@@ -283,13 +348,76 @@ export class PaletteComponent implements OnDestroy {
       const cmdResults = this.commands.filter(r =>
         r.command!.label.toLowerCase().includes(query.toLowerCase())
       );
-      this._results.set([...cmdResults, ...noteResults]);
+      this._results.set([...cmdResults, ...noteResults, ...this.fileNameResults(query)]);
     } else {
-      this._results.set(noteResults);
+      this._results.set([...noteResults, ...this.fileNameResults(query)]);
+      void this.searchFileContents(query);
+    }
+  }
+
+  /** Collection files whose name matches: instant, from the trees already loaded. */
+  private fileNameResults(query: string): PaletteResult[] {
+    const needle = query.trim().toLowerCase();
+
+    if (!needle) {
+      return [];
+    }
+
+    return this.collections.files()
+      .filter(file => file.ref.path.toLowerCase().includes(needle))
+      .slice(0, 8)
+      .map(file => ({ type: 'file', file: { ref: file.ref, label: file.label } }));
+  }
+
+  /** Then the lines of their content (read by the collections worker), appended as they arrive. */
+  private async searchFileContents(query: string): Promise<void> {
+    if (!query.trim()) {
+      return;
+    }
+
+    const cancel = await this.collections.searchFiles(query, hit => {
+      const shown = new Set(this._results().filter(r => r.type === 'file').map(r => `${r.file!.ref.root}\u0000${r.file!.ref.path}\u0000${r.file!.preview ?? ''}`));
+      const additions: PaletteResult[] = hit.matches
+        .map(match => ({ type: 'file' as const, file: { ref: hit.ref, label: `${hit.label}:${match.line}`, preview: match.text.trim() } }))
+        .filter(result => !shown.has(`${result.file.ref.root}\u0000${result.file.ref.path}\u0000${result.file.preview}`));
+
+      if (additions.length > 0 && this.query === query) {
+        this._results.update(results => [...results, ...additions]);
+      }
+    }, () => undefined);
+
+    this.cancelFileSearch = cancel;
+  }
+
+  private searchThemes(query: string): void {
+    const settings = this.settings.settings();
+    const systemThemes = { dark: settings.preferredDarkTheme, light: settings.preferredLightTheme };
+    const needle = query.trim().toLowerCase();
+    const items = buildThemePickerItems(systemThemes, settings.theme, this.i18n.t).filter(item => item.label.toLowerCase().includes(needle));
+
+    this._results.set(items.map(item => ({ type: 'theme', theme: item })));
+
+    // Opens on the current theme, like VS Code
+    if (!needle) {
+      this.selectedIndex.set(Math.max(0, items.findIndex(item => item.id === settings.theme)));
+    }
+  }
+
+  /** In the theme picker the mouse does not move the highlight: it would preview every theme it crosses. */
+  onItemHover(index: number): void {
+    if (this.mode() !== 'theme') {
+      this.selectedIndex.set(index);
     }
   }
 
   async execute(result: PaletteResult): Promise<void> {
+    if (result.type === 'theme') {
+      // Saved before closing: closing ends the preview, which would otherwise flash the previous theme
+      await this.themeService.select(result.theme!.id);
+      this.palette.close();
+      return;
+    }
+
     this.palette.close();
     await new Promise(r => setTimeout(r, 10));
 
@@ -299,6 +427,8 @@ export class PaletteComponent implements OnDestroy {
       this.tabs.openNote(result.note!.id, result.note!.title);
     } else if (result.type === 'tag') {
       this.palette.open('search', '#' + result.tag);
+    } else if (result.type === 'file') {
+      this.collections.open(result.file!.ref);
     }
   }
 
@@ -327,6 +457,32 @@ export class PaletteComponent implements OnDestroy {
     }
   }
 
+  /** Copy / export of the note being edited (none on the home page or the quick notes). */
+  private exportCommands(): PaletteResult[] {
+    const noteId = this.tabs.activeNoteId();
+
+    if (noteId === null || !this.noteExport.canExport(noteId)) {
+      return [];
+    }
+
+    const command = (id: string, key: 'copyNoteContent' | 'exportNoteMd' | 'exportNoteHtml', actionId: string): PaletteResult => ({
+      type: 'command',
+      command: {
+        id,
+        label: this.i18n.t(`workspace.palette.cmd.${key}`),
+        description: this.i18n.t(`workspace.palette.cmd.${key}Desc`),
+        category: 'note',
+        action: () => { void this.noteExport.runNoteAction(actionId, noteId); },
+      },
+    });
+
+    return [
+      command('copy-note-content', 'copyNoteContent', 'export:copy'),
+      command('export-note-md', 'exportNoteMd', 'export:md'),
+      command('export-note-html', 'exportNoteHtml', 'export:html'),
+    ];
+  }
+
   private openGraphView(): void {
     this.layout.setHomeView('graph');
     this.tabs.goHome();
@@ -335,13 +491,14 @@ export class PaletteComponent implements OnDestroy {
   private async copyNoteLink(): Promise<void> {
     const noteId = this.tabs.activeNoteId();
 
-    if (noteId !== null && noteId !== OVERLAY_NOTES_TAB_ID) {
+    // Only real notes (positive ids) have a note:// link: not the quick notes, nor the collection files
+    if (noteId !== null && noteId > 0) {
       await navigator.clipboard.writeText(`note://${noteId}`);
     }
   }
 
   private async createNote(): Promise<void> {
     const note = await this.notes.create();
-    this.tabs.openNote(note.id, note.title || 'Untitled');
+    this.tabs.openNote(note.id, note.title);
   }
 }

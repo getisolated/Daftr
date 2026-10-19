@@ -1,155 +1,234 @@
+import { LANGUAGES } from '../../core/i18n/language.model';
+import { TranslationParams, Translator } from '../../core/i18n/translate';
+import { TranslationKey } from '../../core/i18n/translations';
 import { APP_SHORTCUTS } from '../../core/models/app-shortcuts.model';
+import { THEMES, ThemeKind } from '../../core/models/theme.model';
 
-export type SettingControl = 'checkbox' | 'number' | 'select' | 'shortcut';
+export type SettingControl = 'checkbox' | 'number' | 'select' | 'shortcut' | 'list';
+
+/** Option of a select setting: a translated `labelKey`, or a literal `label` that is never translated (a language named in itself). */
+export interface SettingOption {
+  value: string;
+  labelKey?: TranslationKey;
+  label?: string;
+}
 
 export interface SettingDefinition {
   /** AppSettings key, or `shortcut:<id>` for a rebindable in-app shortcut. */
   key: string;
   /** Set for in-app shortcuts: the APP_SHORTCUTS id this entry rebinds. */
   shortcutId?: string;
-  category: string;
-  title: string;
-  description: string;
+  categoryKey: TranslationKey;
+  titleKey: TranslationKey;
+  titleParams?: TranslationParams;
+  descriptionKey: TranslationKey;
   control: SettingControl;
   min?: number;
   max?: number;
   step?: number;
-  options?: { value: string; label: string }[];
+  options?: SettingOption[];
 }
 
 export interface SettingsSection {
+  /** Translation key of the category: stable whatever the language, it identifies the section. */
+  categoryKey: TranslationKey;
+  /** Translated name of the category. */
   category: string;
   settings: SettingDefinition[];
+}
+
+export function settingTitle(def: SettingDefinition, t: Translator): string {
+  return t(def.titleKey, def.titleParams);
+}
+
+export function settingDescription(def: SettingDefinition, t: Translator): string {
+  return t(def.descriptionKey);
+}
+
+/** Options of a select setting, translated. */
+export function settingOptions(def: SettingDefinition, t: Translator): { value: string; label: string }[] {
+  return (def.options ?? []).map(option => ({ value: option.value, label: option.labelKey ? t(option.labelKey) : option.label ?? option.value }));
+}
+
+function themeOptionsOfKind(kind: ThemeKind): SettingOption[] {
+  return THEMES.filter(theme => theme.kind === kind).map(theme => ({ value: theme.id, labelKey: theme.labelKey }));
 }
 
 /** Single source of truth for the settings editor: adding a setting = adding an entry here. */
 const APP_SHORTCUT_DEFINITIONS: SettingDefinition[] = APP_SHORTCUTS.map(shortcut => ({
   key: `shortcut:${shortcut.id}`,
   shortcutId: shortcut.id,
-  category: 'Keyboard Shortcuts',
-  title: shortcut.label,
-  description: 'Click, then press the new key combination.',
+  categoryKey: 'settings.category.shortcuts' as const,
+  titleKey: shortcut.labelKey,
+  titleParams: shortcut.labelParams,
+  descriptionKey: 'settings.shortcut.description' as const,
   control: 'shortcut' as const,
 }));
 
 export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
+    key: 'language',
+    categoryKey: 'settings.category.general',
+    titleKey: 'settings.language.title',
+    descriptionKey: 'settings.language.description',
+    control: 'select',
+    options: LANGUAGES.map(language => ({ value: language.id, label: language.label })),
+  },
+  {
     key: 'launchAtStartup',
-    category: 'General',
-    title: 'Launch At Startup',
-    description: 'Start Everything Note silently in the system tray when you log in to Windows.',
+    categoryKey: 'settings.category.general',
+    titleKey: 'settings.launchAtStartup.title',
+    descriptionKey: 'settings.launchAtStartup.description',
     control: 'checkbox',
   },
   {
     key: 'autoUpdate',
-    category: 'General',
-    title: 'Automatic Updates',
-    description: 'Download new versions in the background and install them when the app closes. When unchecked, you are asked before anything is downloaded.',
+    categoryKey: 'settings.category.general',
+    titleKey: 'settings.autoUpdate.title',
+    descriptionKey: 'settings.autoUpdate.description',
     control: 'checkbox',
   },
   {
     key: 'theme',
-    category: 'Appearance',
-    title: 'Theme',
-    description: 'Color theme of the app. System follows the Windows light/dark setting.',
+    categoryKey: 'settings.category.appearance',
+    titleKey: 'settings.theme.title',
+    descriptionKey: 'settings.theme.description',
     control: 'select',
     options: [
-      { value: 'dark', label: 'Dark' },
-      { value: 'light', label: 'Light' },
-      { value: 'system', label: 'System' },
+      ...THEMES.map(theme => ({ value: theme.id, labelKey: theme.labelKey })),
+      { value: 'system', labelKey: 'settings.theme.system' },
     ],
   },
   {
+    key: 'preferredDarkTheme',
+    categoryKey: 'settings.category.appearance',
+    titleKey: 'settings.preferredDarkTheme.title',
+    descriptionKey: 'settings.preferredDarkTheme.description',
+    control: 'select',
+    options: themeOptionsOfKind('dark'),
+  },
+  {
+    key: 'preferredLightTheme',
+    categoryKey: 'settings.category.appearance',
+    titleKey: 'settings.preferredLightTheme.title',
+    descriptionKey: 'settings.preferredLightTheme.description',
+    control: 'select',
+    options: themeOptionsOfKind('light'),
+  },
+  {
     key: 'showLineNumbers',
-    category: 'Editor',
-    title: 'Line Numbers',
-    description: 'Show the line numbers on the left of the editor.',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.showLineNumbers.title',
+    descriptionKey: 'settings.showLineNumbers.description',
     control: 'checkbox',
   },
   {
     key: 'wordWrap',
-    category: 'Editor',
-    title: 'Word Wrap',
-    description: 'Wrap long lines at the edge of the editor. When unchecked, they scroll horizontally.',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.wordWrap.title',
+    descriptionKey: 'settings.wordWrap.description',
     control: 'checkbox',
   },
   {
     key: 'trailingLine',
-    category: 'Editor',
-    title: 'Trailing Line',
-    description: 'Always keep an empty line at the end of a note, added automatically.',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.trailingLine.title',
+    descriptionKey: 'settings.trailingLine.description',
     control: 'checkbox',
   },
   {
     key: 'showOutline',
-    category: 'Editor',
-    title: 'Outline',
-    description: 'Show the h1, h2 and h3 headings of the note on the right of the editor, to jump to a chapter.',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.showOutline.title',
+    descriptionKey: 'settings.showOutline.description',
+    control: 'checkbox',
+  },
+  {
+    key: 'hideScrollbar',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.hideScrollbar.title',
+    descriptionKey: 'settings.hideScrollbar.description',
+    control: 'checkbox',
+  },
+  {
+    key: 'openInPreview',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.openInPreview.title',
+    descriptionKey: 'settings.openInPreview.description',
     control: 'checkbox',
   },
   {
     key: 'formattingBarEnabled',
-    category: 'Formatting Bar',
-    title: 'Show Formatting Bar',
-    description: 'Toolbar with the main formatting actions (headings, bold, lists…). Uncheck to hide it for good; the shortcut toggles it too.',
+    categoryKey: 'settings.category.formattingBar',
+    titleKey: 'settings.formattingBarEnabled.title',
+    descriptionKey: 'settings.formattingBarEnabled.description',
     control: 'checkbox',
   },
   {
     key: 'formattingBarMode',
-    category: 'Formatting Bar',
-    title: 'Size',
-    description: 'Full shows separators between groups; Compact is smaller, with tighter spacing.',
+    categoryKey: 'settings.category.formattingBar',
+    titleKey: 'settings.formattingBarMode.title',
+    descriptionKey: 'settings.formattingBarMode.description',
     control: 'select',
     options: [
-      { value: 'full', label: 'Full' },
-      { value: 'compact', label: 'Compact' },
+      { value: 'full', labelKey: 'settings.option.full' },
+      { value: 'compact', labelKey: 'settings.option.compact' },
     ],
   },
   {
     key: 'formattingBarStyle',
-    category: 'Formatting Bar',
-    title: 'Style',
-    description: 'Pinned is attached to the window edges; Floating is detached from them, with rounded corners.',
+    categoryKey: 'settings.category.formattingBar',
+    titleKey: 'settings.formattingBarStyle.title',
+    descriptionKey: 'settings.formattingBarStyle.description',
     control: 'select',
     options: [
-      { value: 'pinned', label: 'Pinned' },
-      { value: 'floating', label: 'Floating' },
+      { value: 'pinned', labelKey: 'settings.option.pinned' },
+      { value: 'floating', labelKey: 'settings.option.floating' },
     ],
   },
   {
     key: 'formattingBarPosition',
-    category: 'Formatting Bar',
-    title: 'Position',
-    description: 'Above or below the editing area.',
+    categoryKey: 'settings.category.formattingBar',
+    titleKey: 'settings.formattingBarPosition.title',
+    descriptionKey: 'settings.formattingBarPosition.description',
     control: 'select',
     options: [
-      { value: 'top', label: 'Top' },
-      { value: 'bottom', label: 'Bottom' },
+      { value: 'top', labelKey: 'settings.option.top' },
+      { value: 'bottom', labelKey: 'settings.option.bottom' },
+      { value: 'left', labelKey: 'settings.option.left' },
+      { value: 'right', labelKey: 'settings.option.right' },
     ],
   },
   {
+    key: 'collectionsExclude',
+    categoryKey: 'settings.category.collections',
+    titleKey: 'settings.collectionsExclude.title',
+    descriptionKey: 'settings.collectionsExclude.description',
+    control: 'list',
+  },
+  {
     key: 'globalShortcut',
-    category: 'Global Shortcut',
-    title: 'Shortcut',
-    description: 'System-wide shortcut that works even when the app is in the tray. Click, then press the new key combination.',
+    categoryKey: 'settings.category.globalShortcut',
+    titleKey: 'settings.globalShortcut.title',
+    descriptionKey: 'settings.globalShortcut.description',
     control: 'shortcut',
   },
   {
     key: 'shortcutMode',
-    category: 'Global Shortcut',
-    title: 'Action',
-    description: 'What the global shortcut opens.',
+    categoryKey: 'settings.category.globalShortcut',
+    titleKey: 'settings.shortcutMode.title',
+    descriptionKey: 'settings.shortcutMode.description',
     control: 'select',
     options: [
-      { value: 'overlay', label: 'Quick-note overlay' },
-      { value: 'app', label: 'Full app' },
+      { value: 'overlay', labelKey: 'settings.option.overlay' },
+      { value: 'app', labelKey: 'settings.option.app' },
     ],
   },
   {
     key: 'overlayWidth',
-    category: 'Quick Note Overlay',
-    title: 'Width',
-    description: 'Width of the overlay, in pixels.',
+    categoryKey: 'settings.category.overlay',
+    titleKey: 'settings.overlayWidth.title',
+    descriptionKey: 'settings.overlayWidth.description',
     control: 'number',
     min: 200,
     max: 800,
@@ -157,9 +236,9 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   },
   {
     key: 'overlayHeight',
-    category: 'Quick Note Overlay',
-    title: 'Height',
-    description: 'Height of the overlay, in pixels.',
+    categoryKey: 'settings.category.overlay',
+    titleKey: 'settings.overlayHeight.title',
+    descriptionKey: 'settings.overlayHeight.description',
     control: 'number',
     min: 200,
     max: 1200,
@@ -167,33 +246,33 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   },
   {
     key: 'enterToSend',
-    category: 'Quick Note Overlay',
-    title: 'Enter To Send',
-    description: 'Enter sends the note (Shift+Enter inserts a new line). When unchecked, Enter inserts a new line and Ctrl+Enter sends.',
+    categoryKey: 'settings.category.overlay',
+    titleKey: 'settings.enterToSend.title',
+    descriptionKey: 'settings.enterToSend.description',
     control: 'checkbox',
   },
   ...APP_SHORTCUT_DEFINITIONS,
 ];
 
-/** Case-insensitive match on category, title, description or key; every word of the query must match. */
-export function filterSettings(definitions: SettingDefinition[], query: string): SettingDefinition[] {
+/** Case-insensitive match on the translated category, title, description or key; every word of the query must match. */
+export function filterSettings(definitions: SettingDefinition[], query: string, t: Translator): SettingDefinition[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return definitions;
   return definitions.filter(def => {
     // Shortcut entries have synthetic keys (`shortcut:search.global`) that would only add false matches
     const key = def.shortcutId ? '' : def.key;
-    const haystack = `${def.category} ${def.title} ${def.description} ${key}`.toLowerCase();
+    const haystack = `${t(def.categoryKey)} ${settingTitle(def, t)} ${settingDescription(def, t)} ${key}`.toLowerCase();
     return words.every(word => haystack.includes(word));
   });
 }
 
 /** Groups definitions by category, keeping the declaration order. */
-export function groupByCategory(definitions: SettingDefinition[]): SettingsSection[] {
-  const sections = new Map<string, SettingDefinition[]>();
+export function groupByCategory(definitions: SettingDefinition[], t: Translator): SettingsSection[] {
+  const sections = new Map<TranslationKey, SettingDefinition[]>();
   for (const def of definitions) {
-    const list = sections.get(def.category) ?? [];
+    const list = sections.get(def.categoryKey) ?? [];
     list.push(def);
-    sections.set(def.category, list);
+    sections.set(def.categoryKey, list);
   }
-  return [...sections].map(([category, settings]) => ({ category, settings }));
+  return [...sections].map(([categoryKey, settings]) => ({ categoryKey, category: t(categoryKey), settings }));
 }

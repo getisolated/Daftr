@@ -1,4 +1,5 @@
 import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
+import { I18nService } from '../i18n/i18n.service';
 import { UpdateInfo, UpdateProgress } from '../models/update.model';
 import { ElectronBridgeService } from './electron-bridge.service';
 
@@ -9,6 +10,7 @@ import { ElectronBridgeService } from './electron-bridge.service';
 @Injectable({ providedIn: 'root' })
 export class UpdateService implements OnDestroy {
   private readonly bridge = inject(ElectronBridgeService);
+  private readonly i18n = inject(I18nService);
   private readonly _info = signal<UpdateInfo | null>(null);
   private readonly _progress = signal<UpdateProgress | null>(null);
   private readonly _applying = signal(false);
@@ -23,10 +25,12 @@ export class UpdateService implements OnDestroy {
   readonly label = computed(() => {
     const progress = this._progress();
     if (progress) {
-      return progress.percent >= 0 ? `Downloading update… ${progress.percent}%` : 'Downloading update…';
+      return progress.percent >= 0
+        ? this.i18n.t('ui.update.downloadingPercent', { percent: progress.percent })
+        : this.i18n.t('ui.update.downloading');
     }
-    if (this._applying()) return 'Installing update…';
-    return this._info()?.downloaded ? 'Restart to update' : 'Update available';
+    if (this._applying()) return this.i18n.t('ui.update.installing');
+    return this._info()?.downloaded ? this.i18n.t('ui.update.restart') : this.i18n.t('ui.update.available');
   });
 
   constructor() {

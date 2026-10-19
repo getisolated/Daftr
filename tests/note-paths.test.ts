@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   PathFolder, PathNote, createLinkResolver, listPathCompletions, needsAngleBrackets, normalizeLinkTarget, notePath,
 } from '../src/app/core/utils/note-paths.util';
+import { TranslationKey } from '../src/app/core/i18n/translations';
+import { TranslationParams, translate } from '../src/app/core/i18n/translate';
 import { buildNoteGraph, extractLinkExcerpt, extractNoteLinks, findBacklinks } from '../src/app/core/utils/note-links.util';
+
+const t = (key: TranslationKey, params?: TranslationParams): string => translate('en', key, params);
 
 // Work(1) > Projects(2) ; Perso(3)
 const FOLDERS: PathFolder[] = [
@@ -115,7 +119,7 @@ describe('markdown links as links between notes', () => {
   it('feeds the backlinks, with the excerpt of the link', () => {
     const notes = [note(10, 'Roadmap', 2), note(11, 'Meeting', 1, 'see [the plan](<Work/Projects/Roadmap>) now')];
 
-    expect(findBacklinks(notes, 10, createLinkResolver(notes, FOLDERS))).toEqual([
+    expect(findBacklinks(notes, 10, t, createLinkResolver(notes, FOLDERS))).toEqual([
       { noteId: 11, title: 'Meeting', excerpt: 'see [the plan](<Work/Projects/Roadmap>) now' },
     ]);
     expect(extractLinkExcerpt('x [p](Todo) y', 12, resolve)).toBe('x [p](Todo) y');
@@ -123,7 +127,7 @@ describe('markdown links as links between notes', () => {
 
   it('feeds the graph', () => {
     const notes = [note(10, 'Roadmap', 2), note(12, 'Todo', null, '[r](Work/Projects/Roadmap)')];
-    const graph = buildNoteGraph(notes, { resolve: createLinkResolver(notes, FOLDERS) });
+    const graph = buildNoteGraph(notes, t, { resolve: createLinkResolver(notes, FOLDERS) });
 
     expect(graph.links).toEqual([{ source: 12, target: 10 }]);
   });

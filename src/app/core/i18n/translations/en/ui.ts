@@ -1,0 +1,15 @@
+export const EN_UI = {
+  'ui.colorPicker.title': 'Pick a color',
+  'ui.colorPicker.hex': 'Hexadecimal color',
+  'ui.colorPicker.presets': 'Presets',
+  'ui.colorPicker.recent': 'Recent',
+  'ui.colorPicker.recentColors': 'Recent colors',
+  'ui.colorPicker.none': 'No color',
+  'ui.colorPicker.apply': 'Apply',
+  'ui.splitter.title': 'Drag to resize, double-click to reset',
+  'ui.update.downloadingPercent': 'Downloading update… {percent}%',
+  'ui.update.downloading': 'Downloading update…',
+  'ui.update.installing': 'Installing update…',
+  'ui.update.restart': 'Restart to update',
+  'ui.update.available': 'Update available',
+} as const;

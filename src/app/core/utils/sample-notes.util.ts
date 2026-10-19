@@ -1,4 +1,4 @@
-import { Folder, GETTING_STARTED_FOLDER_NAME, TreeNote } from '../models/folder.model';
+import { Folder, GETTING_STARTED_FOLDER_NAMES, TreeNote } from '../models/folder.model';
 
 /**
  * Sample notes created before the folders existed sit at the root of an existing database.
@@ -7,7 +7,7 @@ import { Folder, GETTING_STARTED_FOLDER_NAME, TreeNote } from '../models/folder.
  * moves back to the root stays there.
  */
 export function findSampleNotesToGather(folders: Folder[], notes: TreeNote[], sampleTitles: string[]): TreeNote[] {
-  if (folders.some(f => f.name === GETTING_STARTED_FOLDER_NAME)) {
+  if (folders.some(f => GETTING_STARTED_FOLDER_NAMES.includes(f.name))) {
     return [];
   }
 

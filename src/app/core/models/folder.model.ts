@@ -8,6 +8,8 @@ export interface Folder {
   isDefault: boolean;
   /** Manual position among the siblings; `null` until the user reorders (then alphabetical, after the ordered ones). */
   sortOrder: number | null;
+  /** `#rrggbb` chosen in the sidebar, `null` for none. */
+  color: string | null;
 }
 
 /** What the sidebar needs to know about a note to place it in the tree. */
@@ -16,6 +18,7 @@ export interface TreeNote {
   title: string;
   folderId: number | null;
   sortOrder: number | null;
+  color?: string | null;
 }
 
 export interface FolderTreeNode {
@@ -47,7 +50,20 @@ export type DropPlacement =
 /** Confirmation the sidebar is waiting for. */
 export type SidebarDialogState =
   | { kind: 'deleteFolder'; folderId: number }
-  | { kind: 'deepFolder'; parentId: number };
+  | { kind: 'deepFolder'; parentId: number }
+  | { kind: 'emptyFolder'; folderId: number }
+  /** Several selected items at once (already reduced to the top-level ones). */
+  | { kind: 'bulkDelete'; items: SidebarDragItem[] };
+
+/** One destination of the "Move to…" dialog. */
+export interface FolderOption {
+  /** `null` for the root of the tree. */
+  id: number | null;
+  label: string;
+  depth: number;
+  /** A folder cannot go into itself or one of its own sub-folders. */
+  disabled: boolean;
+}
 
 /** What happens to the content of a deleted folder (its sub-folders are always deleted). */
 export type FolderDeleteMode = 'moveToRoot' | 'deleteAll';
@@ -57,4 +73,8 @@ export const FOLDER_RECOMMENDED_MAX_DEPTH = 4;
 
 export const DEFAULT_FOLDER_NAME = 'Inbox';
 
+/** Name of the sample notes folder in English; the folder is recognised by its name, whichever language created it. */
 export const GETTING_STARTED_FOLDER_NAME = 'Getting started';
+
+/** Every name the sample notes folder may have been created with (one per language). */
+export const GETTING_STARTED_FOLDER_NAMES: readonly string[] = [GETTING_STARTED_FOLDER_NAME, 'Premiers pas'];

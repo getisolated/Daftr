@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractNoteTitle as extractTitle } from '../src/app/core/utils/note-title.util';
+import { extractNoteTitle as extractTitle, noteDisplayTitle } from '../src/app/core/utils/note-title.util';
 
 
 describe('extractTitle', () => {
@@ -17,14 +17,14 @@ describe('extractTitle', () => {
     expect(extractTitle('###### H6 Title')).toBe('H6 Title');
   });
 
-  it('returns "Untitled" for empty content', () => {
-    expect(extractTitle('')).toBe('Untitled');
-    expect(extractTitle('\n\n')).toBe('Untitled');
+  it('returns an empty title for empty content', () => {
+    expect(extractTitle('')).toBe('');
+    expect(extractTitle('\n\n')).toBe('');
   });
 
-  it('returns "Untitled" for heading with no text', () => {
-    expect(extractTitle('# ')).toBe('Untitled');
-    expect(extractTitle('##')).toBe('Untitled');
+  it('returns an empty title for heading with no text', () => {
+    expect(extractTitle('# ')).toBe('');
+    expect(extractTitle('##')).toBe('');
   });
 
   it('trims whitespace around title', () => {
@@ -48,8 +48,22 @@ describe('extractTitle', () => {
     expect(extractTitle('<!--\nmeta: 1\n-->\nTitle')).toBe('Title');
   });
 
-  it('returns "Untitled" when only comments remain', () => {
-    expect(extractTitle('<!-- draft -->\n<!-- /draft -->')).toBe('Untitled');
-    expect(extractTitle('<!-- unclosed')).toBe('Untitled');
+  it('returns an empty title when only comments remain', () => {
+    expect(extractTitle('<!-- draft -->\n<!-- /draft -->')).toBe('');
+    expect(extractTitle('<!-- unclosed')).toBe('');
+  });
+});
+
+describe('noteDisplayTitle', () => {
+  const t = (key: string): string => `[${key}]`;
+
+  it('keeps a real title', () => {
+    expect(noteDisplayTitle('My Note', t)).toBe('My Note');
+  });
+
+  it('falls back to the translated placeholder for an empty or legacy title', () => {
+    expect(noteDisplayTitle('', t)).toBe('[common.untitled]');
+    expect(noteDisplayTitle(null, t)).toBe('[common.untitled]');
+    expect(noteDisplayTitle('Untitled', t)).toBe('[common.untitled]');
   });
 });
