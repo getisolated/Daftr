@@ -8,6 +8,17 @@ interface PersistedSidebarState {
   width: number;
   expandedIds: number[];
   selectedFolderId: number | null;
+  /** Heights set by dragging the separators, by section key; a section missing here takes its natural height. */
+  sectionHeights: Record<string, number>;
+}
+
+function readHeights(value: unknown): Record<string, number> {
+  if (typeof value !== 'object' || value === null) {
+    return {};
+  }
+
+  const entries = Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
+  return Object.fromEntries(entries);
 }
 
 /** Layout and navigation state of the sidebar, restored from the localStorage at startup. */
@@ -20,6 +31,7 @@ export class SidebarStateService {
   private readonly _expandedIds = signal<ReadonlySet<number>>(new Set(this.restored.expandedIds));
   private readonly _selectedFolderId = signal<number | null>(this.restored.selectedFolderId);
   private readonly _activeTag = signal<string | null>(null);
+  private readonly _sectionHeights = signal<Readonly<Record<string, number>>>(this.restored.sectionHeights);
 
   readonly visible = this._visible.asReadonly();
   readonly width = this._width.asReadonly();
@@ -27,6 +39,7 @@ export class SidebarStateService {
   /** Folder whose notes are listed on the home page; `null` lists every note. */
   readonly selectedFolderId = this._selectedFolderId.asReadonly();
   readonly activeTag = this._activeTag.asReadonly();
+  readonly sectionHeights = this._sectionHeights.asReadonly();
 
   toggleVisible(): void {
     this._visible.update(visible => !visible);
@@ -36,6 +49,23 @@ export class SidebarStateService {
   /** Called on every pointer move while resizing: only the final value is worth persisting. */
   setWidth(width: number, persist = true): void {
     this._width.set(clampSidebarWidth(width));
+
+    if (persist) {
+      this.persist();
+    }
+  }
+
+  /** `null` gives the section its natural height back. Persisted only at the end of the drag, like the width. */
+  setSectionHeight(key: string, height: number | null, persist = true): void {
+    const next = { ...this._sectionHeights() };
+
+    if (height === null) {
+      delete next[key];
+    } else {
+      next[key] = height;
+    }
+
+    this._sectionHeights.set(next);
 
     if (persist) {
       this.persist();
@@ -99,6 +129,7 @@ export class SidebarStateService {
       width: this._width(),
       expandedIds: [...this._expandedIds()],
       selectedFolderId: this._selectedFolderId(),
+      sectionHeights: this._sectionHeights(),
     };
 
     try {
@@ -112,6 +143,7 @@ export class SidebarStateService {
       width: SIDEBAR_DEFAULT_WIDTH,
       expandedIds: [],
       selectedFolderId: null,
+      sectionHeights: {},
     };
 
     try {
@@ -126,6 +158,7 @@ export class SidebarStateService {
         width: clampSidebarWidth(raw.width),
         expandedIds: Array.isArray(raw.expandedIds) ? raw.expandedIds.filter(id => typeof id === 'number') : [],
         selectedFolderId: typeof raw.selectedFolderId === 'number' ? raw.selectedFolderId : null,
+        sectionHeights: readHeights(raw.sectionHeights),
       };
     } catch {
       return fallback;

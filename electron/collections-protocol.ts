@@ -6,7 +6,6 @@ export type CollectionKind = 'folder' | 'file';
 export type WorkerRequest =
   | { type: 'watch'; root: string; kind: CollectionKind }
   | { type: 'unwatch'; root: string }
-  | { type: 'rescan'; root: string }
   | { type: 'setExcludes'; excludes: string[] }
   | { type: 'search'; requestId: number; query: string }
   | { type: 'cancelSearch'; requestId: number }

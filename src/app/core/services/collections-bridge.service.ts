@@ -16,7 +16,7 @@ interface CollectionsApi {
   removeCollection: (root: string) => Promise<boolean>;
   renameCollection: (root: string, name: string) => Promise<CollectionRow | null>;
   relocateCollection: (root: string) => Promise<CollectionRow | null>;
-  rescanCollection: (root: string) => Promise<boolean>;
+  loadCollection: (root: string) => Promise<boolean>;
   readCollectionFile: (root: string, path: string) => Promise<string>;
   writeCollectionFile: (root: string, path: string, content: string) => Promise<boolean>;
   createCollectionFile: (root: string, folder: string, name: string) => Promise<string>;
@@ -43,7 +43,7 @@ export class CollectionsBridgeService {
   remove(root: string): Promise<boolean> { return this.api?.removeCollection(root) ?? Promise.resolve(false); }
   rename(root: string, name: string): Promise<CollectionRow | null> { return this.api?.renameCollection(root, name) ?? Promise.resolve(null); }
   relocate(root: string): Promise<CollectionRow | null> { return this.api?.relocateCollection(root) ?? Promise.resolve(null); }
-  rescan(root: string): Promise<boolean> { return this.api?.rescanCollection(root) ?? Promise.resolve(false); }
+  load(root: string): Promise<boolean> { return this.api?.loadCollection(root) ?? Promise.resolve(false); }
   read(ref: CollectionFileRef): Promise<string> { return this.api?.readCollectionFile(ref.root, ref.path) ?? Promise.resolve(''); }
   write(ref: CollectionFileRef, content: string): Promise<boolean> { return this.api?.writeCollectionFile(ref.root, ref.path, content) ?? Promise.resolve(false); }
   createFile(root: string, folder: string, name: string): Promise<string> { return this.api?.createCollectionFile(root, folder, name) ?? Promise.reject(new Error('Not in Electron')); }

@@ -78,7 +78,10 @@ export class CollectionsService {
     const rows = await this.bridge.list();
     const previous = new Map(this.raw().map(state => [state.collection.path, state]));
 
-    this.raw.set(rows.map(row => previous.get(row.path) ?? { collection: toCollection(row), status: 'loading', tree: [], error: null, truncated: false }));
+    this.raw.set(rows.map(row => previous.get(row.path) ?? { collection: toCollection(row), status: 'unloaded', tree: [], error: null, truncated: false }));
+
+    // A file collection costs nothing to load: only the folders wait to be expanded
+    this.raw().filter(state => state.status === 'unloaded' && state.collection.kind === 'file').forEach(state => void this.load(state.collection.path));
   }
 
   /** Selects a collection (its graph shows on the home page); null goes back to the notes. */
@@ -90,12 +93,20 @@ export class CollectionsService {
     }
   }
 
-  async add(kind: CollectionKind): Promise<void> {
+  /** Scans the collection in the background (also to refresh it): its tree arrives as a worker event. */
+  async load(root: string): Promise<void> {
+    this.updateState(root, state => ({ ...state, status: 'loading' }));
+    await this.bridge.load(root);
+  }
+
+  /** Returns the collections added (an already opened one included). */
+  async add(kind: CollectionKind): Promise<Collection[]> {
     const rows = await this.bridge.pick(kind);
     await this.reload();
 
     // A markdown file opened on its own is opened in the editor right away
     rows.filter(row => row.kind === 'file').forEach(row => this.open({ root: row.path, path: baseName(row.path) }));
+    return rows.map(toCollection);
   }
 
   /** Files and folders dropped on the window, or passed by Windows. */
@@ -130,6 +141,7 @@ export class CollectionsService {
     if (row) {
       this.fileDocs.idsUnder(root).forEach(id => this.tabs.closeByNoteId(id));
       await this.reload();
+      await this.load(row.path);
     }
   }
 

@@ -3,6 +3,7 @@ import { Folder } from '../src/app/core/models/folder.model';
 import {
   buildFolderTree,
   canMoveFolder,
+  clampSectionHeight,
   clampSidebarWidth,
   collectSubtreeIds,
   flattenVisibleTree,
@@ -12,6 +13,7 @@ import {
   resolveFolderRowDrop,
   resolveNoteRowDrop,
   isFolderDescendant,
+  SECTION_MIN_HEIGHT,
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
@@ -269,5 +271,20 @@ describe('insertSibling', () => {
 
   it('appends when the anchor is unknown', () => {
     expect(insertSibling([1, 2], 9, 99, 'before')).toEqual([1, 2, 9]);
+  });
+});
+
+describe('clampSectionHeight', () => {
+  it('keeps a height within the bounds, rounded', () => {
+    expect(clampSectionHeight(120.6, 400)).toBe(121);
+  });
+
+  it('clamps to the minimum and to the given maximum', () => {
+    expect(clampSectionHeight(10, 400)).toBe(SECTION_MIN_HEIGHT);
+    expect(clampSectionHeight(900, 400)).toBe(400);
+  });
+
+  it('prefers the minimum when the maximum is smaller (tiny window)', () => {
+    expect(clampSectionHeight(100, 20)).toBe(SECTION_MIN_HEIGHT);
   });
 });

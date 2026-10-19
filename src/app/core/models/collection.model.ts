@@ -23,9 +23,10 @@ export interface CollectionFileRef {
   path: string;
 }
 
-export type CollectionStatus = 'loading' | 'ready' | 'error';
+/** `unloaded`: not scanned yet, a folder collection is only read once expanded. */
+export type CollectionStatus = 'unloaded' | 'loading' | 'ready' | 'error';
 
-/** A collection as the sidebar shows it: loaded in the background, possibly missing from the disk. */
+/** A collection as the sidebar shows it: loaded in the background when expanded, possibly missing from the disk. */
 export interface CollectionState {
   collection: Collection;
   status: CollectionStatus;
