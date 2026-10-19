@@ -16,6 +16,7 @@ export class FormattingBarService {
   private readonly _view = signal<EditorView | null>(null);
   private readonly _readOnly = signal(false);
   private readonly _activeFormats = signal<ReadonlySet<FormatId>>(new Set(), { equal: sameFormats });
+  private readonly _previewOnly = signal(false);
 
   /** false: the user does not want the bar at all. */
   readonly visible = computed(() => this.settingsService.settings().formattingBarEnabled);
@@ -24,6 +25,8 @@ export class FormattingBarService {
   readonly position = computed(() => this.settingsService.settings().formattingBarPosition);
 
   readonly activeFormats = this._activeFormats.asReadonly();
+  /** The note is shown rendered only (no source): there is nothing to format, the bar is hidden. */
+  readonly previewOnly = this._previewOnly.asReadonly();
   /** The notes sent from the overlay are shown read-only: nothing to format. */
   readonly canEdit = computed(() => this._view() !== null && !this._readOnly());
 
@@ -41,6 +44,11 @@ export class FormattingBarService {
   /** Called on every selection or document change of the editor. */
   refresh(state: EditorState): void {
     this._activeFormats.set(detectActiveFormats(state));
+  }
+
+  /** Called by the editor when its view mode changes. */
+  setPreviewOnly(previewOnly: boolean): void {
+    this._previewOnly.set(previewOnly);
   }
 
   run(execute: (view: EditorView) => void): void {

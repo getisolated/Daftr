@@ -253,6 +253,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   constructor() {
+    // Full preview: the formatting bar has nothing to act on
+    effect(() => this.formattingBar.setPreviewOnly(this.viewMode() === 'preview'));
     // The quick notes document follows new notes sent from the overlay while it is open
     effect(() => {
       const document = this.notes.quickNotesDocument();

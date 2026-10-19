@@ -151,7 +151,8 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly wideMode = this.layoutService.wideMode;
   readonly sidebarVisible = this.sidebarState.visible;
   /** Only worth its room when there is a note to format (not on the home page). */
-  readonly formattingBarShown = computed(() => this.formattingBar.visible() && this.activeNoteId() !== null);
+  readonly formattingBarShown = computed(() =>
+    this.formattingBar.visible() && this.activeNoteId() !== null && !this.formattingBar.previewOnly());
   readonly formattingBarPosition = this.formattingBar.position;
 
   /** The read-only quick notes document has no identity of its own to be linked to. */
