@@ -1,7 +1,7 @@
 ; Hooks de l'installeur NSIS de Tauri.
 ;
 ; Avant d'installer, la version Electron (electron-builder, installée dans un autre dossier)
-; est désinstallée en silence, en gardant les données de %APPDATA%\Everything Note que la
+; est désinstallée en silence, en gardant les données de %APPDATA%\everything-note que la
 ; version Tauri reprend. Sa clé est l'UUID v5 de l'appId « com.everything.note ».
 
 !define ELECTRON_APP_GUID "34a98de4-b3ab-55df-9174-cd1780189c35"

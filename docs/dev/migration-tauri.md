@@ -8,7 +8,7 @@ Renderer Angular conservé ; le main process (`electron/` (supprimé), ~3000 lig
 | Sujet                 | Choix                                                                                                          |
 | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Arborescence          | Angular déplacé dans `frontend/` (`git mv`), Rust dans `src-tauri/`                                            |
-| Données               | Même dossier qu'Electron : `%APPDATA%/Everything Note/` (`evnote.db`, `settings.json`), schéma SQLite inchangé |
+| Données               | Même dossier qu'Electron : `%APPDATA%/everything-note/` (champ `name` du `package.json`) (`evnote.db`, `settings.json`), schéma SQLite inchangé |
 | Mise à jour           | `tauri-plugin-updater` (signature minisign, `latest.json` au format Tauri)                                     |
 | Bindings TS           | `ts-rs` (stable, simple) plutôt que `specta` (tauri-specta encore en RC)                                       |
 | `domain`              | std seul ; DTO miroirs (serde + ts-rs) dans `presentation`, conversions `From`                                 |
@@ -95,7 +95,7 @@ Tests : 219 tests Rust (spécification portée depuis les tests TS du main proce
 - **Fond flouté de l'overlay** : la capture `desktopCapturer` disparaît ; sans acrylique, panneau translucide uni.
 - **Sonde acrylique** (économiseur de batterie, transparence) : portée telle quelle via `powershell.exe` (`std::process::Command`), sans `unsafe`.
 - **Dossier manquant** : une collection dont le dossier a disparu émet désormais l'événement `error` (état « déplacé » du renderer) ; Electron rendait un arbre vide.
-- **localStorage** (onglets ouverts, état de la sidebar, vue d'accueil) : l'origine change, il sera vide au premier lancement Tauri. La base SQLite et `settings.json` (`%APPDATA%/Everything Note`) sont repris.
+- **localStorage** (onglets ouverts, état de la sidebar, vue d'accueil) : l'origine change, il sera vide au premier lancement Tauri. La base SQLite et `settings.json` (`%APPDATA%/everything-note`) sont repris.
 - **Utilisateurs Electron existants** :
   - hook NSIS ([hooks.nsh](../../src-tauri/crates/desktop/windows/hooks.nsh)) : désinstalle en silence la version Electron (clé `34a98de4-…`, UUID v5 de l'appId), données conservées ;
   - `latest.json` hybride ([update-manifest.mjs](../../scripts/update-manifest.mjs)) : champs Tauri (`platforms`) + champs Electron (`path`, `url`, `sha512`) pointant sur le même installeur. Le plugin Tauri tolère les champs inconnus (vérifié dans ses sources).
