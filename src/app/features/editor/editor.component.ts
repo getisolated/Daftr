@@ -29,6 +29,8 @@ import { createLinkResolver } from '../../core/utils/note-paths.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
+import { insertLink } from '../../shared/codemirror/formatting-commands';
+import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
 import { LinkRenameService } from '../../core/services/link-rename.service';
@@ -132,6 +134,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private readonly themeCompartment = new Compartment();
   private readonly lineNumbersCompartment = new Compartment();
   private readonly wrapCompartment = new Compartment();
+  private readonly scrollbarCompartment = new Compartment();
   private readonly trailingLineCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
@@ -149,7 +152,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     });
 
     effect(() => {
-      this.themeService.theme();
+      this.themeService.kind();
       untracked(() => {
         this.editorView?.dispatch({ effects: this.themeCompartment.reconfigure(this.buildThemeMode()) });
       });
@@ -159,12 +162,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.settingsService.settings().showLineNumbers;
       this.settingsService.settings().wordWrap;
       this.settingsService.settings().trailingLine;
+      this.settingsService.settings().hideScrollbar;
       untracked(() => {
         this.editorView?.dispatch({
           effects: [
             this.trailingLineCompartment.reconfigure(this.buildTrailingLine()),
             this.lineNumbersCompartment.reconfigure(this.buildLineNumbers()),
             this.wrapCompartment.reconfigure(this.buildWrapping()),
+            this.scrollbarCompartment.reconfigure(this.buildScrollbar()),
           ],
         });
       });
@@ -395,6 +400,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.shortcutsCompartment.of(this.buildShortcutsKeymap()),
       updateListener,
       this.wrapCompartment.of(this.buildWrapping()),
+      this.scrollbarCompartment.of(this.buildScrollbar()),
       this.lineNumbersCompartment.of(this.buildLineNumbers()),
       this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
@@ -530,6 +536,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return this.settingsService.settings().wordWrap ? EditorView.lineWrapping : [];
   }
 
+  private buildScrollbar(): Extension {
+    return this.settingsService.settings().hideScrollbar ? hiddenScrollbar : [];
+  }
+
   /** Ctrl+click on a link: a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
   private followLink(target: string): void {
     const noteUrl = /^note:\/\/(?<id>\d+)$/.exec(target.trim());
@@ -551,7 +561,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private buildThemeMode(): Extension {
-    return EditorView.darkTheme.of(this.themeService.theme() === 'dark');
+    return EditorView.darkTheme.of(this.themeService.kind() === 'dark');
   }
 
   /** Formatting/save bindings use the accelerators configured in the settings (reconfigured live, see constructor). */
@@ -574,13 +584,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       {
         key: keyFor('editor.link'),
         run: (view) => {
-          const sel = view.state.selection.main;
-          const selected = view.state.sliceDoc(sel.from, sel.to);
-          const insert = selected ? `[${selected}](url)` : '[text](url)';
-          view.dispatch({
-            changes: { from: sel.from, to: sel.to, insert },
-            selection: { anchor: sel.from + insert.length - 4, head: sel.from + insert.length - 1 },
-          });
+          insertLink(view);
           return true;
         },
       },

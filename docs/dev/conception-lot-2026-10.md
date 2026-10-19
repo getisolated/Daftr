@@ -40,7 +40,7 @@ Justification des regroupements non évidents :
 
 ---
 
-## 1. Gris sombre légèrement bleuté 🟢
+## 1. Gris sombre légèrement bleuté ✅
 
 **Actuel** : `--evn-bg-panel: #252526` (sidebar, titlebar), `--evn-bg: #1e1e1e`, etc. ([styles.scss](../../src/styles.scss)).
 
@@ -50,7 +50,7 @@ Justification des regroupements non évidents :
 - Les couleurs d'accent, de syntaxe et sémantiques (erreur, succès…) ne bougent pas.
 - Les nouveaux thèmes sombres (#20) ne sont pas concernés.
 
-## 2. Défauts : numéros de ligne et sommaire décochés 🟢
+## 2. Défauts : numéros de ligne et sommaire décochés ✅
 
 `DEFAULT_SETTINGS.showLineNumbers` et `showOutline` passent à `false`. Pas de migration : les utilisateurs existants gardent leur valeur.
 
@@ -78,21 +78,21 @@ Le document reste une **concaténation** de N notes (une par bloc, en-tête time
 - Pas de création depuis l'app (uniquement depuis l'overlay), pas de fusion / scission de blocs.
 - Hors édition, le document reste en lecture seule.
 
-## 7. Barre de formatage : tailles 🟢
+## 7. Barre de formatage : tailles ✅
 
 On garde `'compact' | 'full'`, défaut `full`. Pur CSS, pas de migration.
 - `compact` = dimensions de l'actuel `full`.
 - `full` = nouvelles dimensions plus grandes (boutons, icônes, police, espacements).
 
-## 8. Barre de formatage : floating par défaut + 4 positions 🟢
+## 8. Barre de formatage : floating par défaut + 4 positions ✅
 
 - Défaut : `formattingBarEnabled: true` (déjà), `formattingBarStyle: 'floating'`.
 - `FormattingBarPosition` : `'top' | 'bottom' | 'left' | 'right'`.
 - Le conteneur de la barre devient la **zone de page**, pas la fenêtre : `bottom` = bas de la zone de page, **au-dessus** du panneau backlinks ; `left` / `right` = verticale, au bord intérieur de la page, centrée verticalement ; `right` se place **à droite du sommaire**.
 - En vertical : icônes seules + tooltip, quelle que soit la taille ; le sélecteur de titres s'ouvre latéralement.
-- `pinned` + `left`/`right` : la barre réserve sa largeur. `floating` : elle flotte par-dessus, avec une ombre.
+- `pinned` + `left`/`right` : la barre occupe toute la hauteur, collée au bord. `floating` : détachée (marges, coins arrondis, ombre), centrée verticalement ; dans les deux cas elle réserve sa place (aucun texte masqué).
 
-## 9. Barre de formatage : actions manquantes 🟢
+## 9. Barre de formatage : actions manquantes ✅
 
 - **Titres** : liste déroulante Paragraphe / H1 → H6 (remplace les boutons de titre actuels).
 - **Ajouts**, dans la barre **et** dans les slash commands : lien (`[]()`), image (`![]()`), souligné (`<u>`), exposant (`<sup>`), indice (`<sub>`), effacer le formatage.
@@ -232,7 +232,7 @@ Réglage `tabsStyle` (catégorie « Expérimental ») :
 
 Pin, drag & drop et restauration de session ne sont garantis que dans **pills**.
 
-## 20. Nouveaux thèmes 🟢
+## 20. Nouveaux thèmes ✅
 
 **Actuel** : `ThemePreference = 'dark' | 'light' | 'system'`, un bloc `:root[data-theme='…']` par thème dans [styles.scss](../../src/styles.scss) ; `oppositeTheme()` suppose deux thèmes seulement ([theme.util.ts](../../src/app/core/utils/theme.util.ts)).
 
@@ -245,7 +245,7 @@ Pin, drag & drop et restauration de session ne sont garantis que dans **pills**.
 
 **Décisions** : Solarized en version light uniquement ; Violet light composé ; le gris bleuté (#1) ne touche que `dark`.
 
-## 21. Chord sans timeout + sélecteur de thème 🟢
+## 21. Chord sans timeout + sélecteur de thème ✅
 
 **Actuel** ([shortcuts.service.ts](../../src/app/core/services/shortcuts.service.ts)) : après `Ctrl+K`, la 2ᵉ touche est attendue **2 s** (`CHORD_TIMEOUT_MS`), et `Ctrl+K Ctrl+T` bascule directement dark ↔ light.
 
@@ -270,7 +270,7 @@ Pin, drag & drop et restauration de session ne sont garantis que dans **pills**.
 
 Un lien local (note, `note://ID`, chemin relatif de collection) qui ne pointe vers rien est affiché en **rouge** (couleur d'erreur du thème) au lieu de la couleur de lien, dans l'éditeur et dans la preview. Tooltip « Lien introuvable ». Mis à jour quand la cible est créée, renommée ou supprimée.
 
-## 23. Masquer la scrollbar 🟢
+## 23. Masquer la scrollbar ✅
 
 - Réglage `hideScrollbar: boolean` (défaut `false`), catégorie « Éditeur ».
 - Concerne **uniquement la scrollbar de l'éditeur**.

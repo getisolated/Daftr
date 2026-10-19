@@ -28,6 +28,17 @@
       height: 100%;
     }
 
+    // "Hide Scrollbar" setting: the thumb only shows over its band (see hidden-scrollbar.ts)
+    .cm-scrollbar-hidden .cm-scroller::-webkit-scrollbar-thumb {
+      background: transparent;
+    }
+
+    .cm-scrollbar-hidden .cm-scroller.cm-scrollbar-visible::-webkit-scrollbar-thumb {
+      background: var(--evn-scrollbar);
+
+      &:hover { background: var(--evn-scrollbar-hover); }
+    }
+
     // Only CodeMirror's hidden search panel lives there (see hiddenSearchPanel): no empty bar under the text
     .cm-panels {
       display: none;
