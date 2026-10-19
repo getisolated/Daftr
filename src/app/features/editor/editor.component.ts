@@ -24,6 +24,7 @@ import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/con
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
+import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
@@ -506,13 +507,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
         color: 'var(--evn-text-faint)',
         userSelect: 'none',
       },
-      // Numbers hug the text, left-aligned like in VS Code: the gutter and the content are centered together
+      // Numbers hug the text, right-aligned like in VS Code: the gutter and the content are centered together
       '.cm-lineNumbers .cm-gutterElement': {
         padding: '0 0 0 8px',
-        textAlign: 'left',
         // Centered on the line: the headings are taller than the text
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'flex-end',
         fontSize: '12px',
       },
       '&.cm-with-numbers .cm-content': {
@@ -601,6 +602,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.lineNumbersCompartment.of(this.buildLineNumbers()),
       this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
+      cursorResync,
       EditorView.domEventHandlers({
         scroll: (_event, view) => {
           this.refreshActiveHeading(view);

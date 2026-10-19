@@ -149,6 +149,10 @@ function buildDecorations(view: EditorView): DecorationSet {
 
         // ── Links ─────────────────────────────────────────────────
         case 'Link': {
+          // Lezer also parses a lone `[text]` as a (shortcut reference) link: only `[label](target)` is one here
+          const closeMark = node.node.getChildren('LinkMark')[1];
+          if (!closeMark || doc.sliceString(closeMark.to, closeMark.to + 1) !== '(') break;
+
           const target = node.node.getChild('URL');
           const broken = target !== null && view.state.facet(linkStatusFacet)(doc.sliceString(target.from, target.to)) === 'broken';
           pending.push({ from, to, deco: broken ? brokenLinkMark : linkMark });
