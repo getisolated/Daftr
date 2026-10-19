@@ -20,7 +20,6 @@ import { editorHighlight } from '../../shared/codemirror/editor-highlight';
 import { linkStatusFacet, markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
-import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
@@ -66,7 +65,7 @@ const PREVIEW_REFRESH_MS = 150;
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FindPanelComponent, MarkdownPreviewComponent],
+  imports: [ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (fileBanner(); as banner) {
@@ -151,14 +150,6 @@ const PREVIEW_REFRESH_MS = 150;
         </div>
       }
     </div>
-    @if (quickNoteToDelete() !== null) {
-      <app-confirm-dialog
-        title="Delete this quick note?"
-        message="It is deleted for good."
-        [actions]="deleteQuickNoteActions"
-        (chosen)="onDeleteQuickNoteChoice($event)"
-      />
-    }
     @if (ctxMenu(); as menu) {
       <app-context-menu
         [items]="menu.items"
@@ -225,9 +216,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return target => linkStatus(target, resolve, id => ids.has(id));
   });
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
-  /** Quick note whose deletion waits for a confirmation. */
-  protected readonly quickNoteToDelete = signal<number | null>(null);
-  protected readonly deleteQuickNoteActions: ConfirmDialogAction[] = [{ id: 'delete', label: 'Delete', danger: true }];
 
   private editorView: EditorView | null = null;
   private readonly shortcutsCompartment = new Compartment();
@@ -687,19 +675,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private quickNoteHandlers(): QuickNoteHandlers {
     return {
       save: (id, text) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text) }); },
-      remove: id => this.quickNoteToDelete.set(id),
+      remove: id => { void this.notes.delete(id); },
       copy: text => { void navigator.clipboard.writeText(text); },
       editEnded: () => this.refreshQuickNotesView(this.notes.quickNotesDocument()),
     };
-  }
-
-  protected async onDeleteQuickNoteChoice(choice: string | null): Promise<void> {
-    const id = this.quickNoteToDelete();
-    this.quickNoteToDelete.set(null);
-
-    if (choice === 'delete' && id !== null) {
-      await this.notes.delete(id);
-    }
   }
 
   private contextMenuHandler(): Extension {
