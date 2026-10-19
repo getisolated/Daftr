@@ -61,4 +61,8 @@ describe('resolveRelativeLink', () => {
     expect(resolveRelativeLink('a.md', '#top')).toBeNull();
     expect(resolveRelativeLink('a.md', '../outside.md')).toBeNull();
   });
+
+  it('refuses files of another extension', () => {
+    expect(resolveRelativeLink('a.md', 'src/WMSAlign.Enum.al')).toBeNull();
+  });
 });

@@ -169,7 +169,8 @@ export function extractLinkTargets(content: string): string[] {
 
 /**
  * Path (inside the collection) a relative link of `fromFile` designates; `null` for web addresses, anchors and paths
- * leaving the collection. Mirrors resolveRelativeLink of collection.util.ts on the renderer side.
+ * leaving the collection. Mirrors resolveRelativeLink of collection.util.ts on the renderer side, except that files of
+ * another extension are kept (shown as unloaded nodes of the graph).
  */
 export function resolveCollectionLink(fromFile: string, target: string): string | null {
   let cleaned = target.trim().replace(/^<|>$/g, '').split('#')[0] ?? '';
@@ -199,7 +200,8 @@ export function resolveCollectionLink(fromFile: string, target: string): string 
   }
 
   const resolved = segments.join('/');
-  return /\.md$/i.test(resolved) ? resolved : `${resolved}.md`;
+  // Only an extension-less target is a markdown page; other extensions designate files as written
+  return /\.[^./]+$/.test(segments[segments.length - 1] ?? '') ? resolved : `${resolved}.md`;
 }
 
 export interface CollectionGraphNode {

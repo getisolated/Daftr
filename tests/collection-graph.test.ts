@@ -13,6 +13,11 @@ describe('resolveCollectionLink', () => {
     expect(resolveCollectionLink('intro.md', 'https://x.dev')).toBeNull();
     expect(resolveCollectionLink('intro.md', '../out.md')).toBeNull();
   });
+
+  it('adds .md only to extension-less targets', () => {
+    expect(resolveCollectionLink('docs/intro.md', 'Other%20page')).toBe('docs/Other page.md');
+    expect(resolveCollectionLink('README.md', 'src/WMSAlign.Enum.al')).toBe('src/WMSAlign.Enum.al');
+  });
 });
 
 describe('buildCollectionGraph', () => {
