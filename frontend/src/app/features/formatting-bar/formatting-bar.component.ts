@@ -1,11 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, signal,
+} from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { FormattingBarService } from '../../core/services/formatting-bar.service';
 import { SettingsService } from '../../core/services/settings.service';
-import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { TranslationKey } from '../../core/i18n/translations';
-import { isFormattingBarCondensed } from '../../core/utils/formatting-bar.util';
+import { shouldCondense } from '../../core/utils/formatting-bar.util';
 import { FORMATTING_BAR_GROUPS, FORMAT_ACTIONS, FormatAction } from '../../shared/codemirror/formatting-commands';
 import {
   FormatId, FormattingBarGroup, FormattingBarGroupId, FormattingBarItem, HEADING_FORMATS, HeadingFormat,
@@ -59,7 +60,6 @@ function isFormat(item: FormattingBarItem): item is FormatId {
     '[attr.data-position]': 'bar.position()',
     '[class.condensed]': 'condensed()',
     '[class.disabled]': '!bar.canEdit()',
-    '(window:resize)': 'onResize()',
     // A click on the bar must not take the focus (nor the selection) away from the editor
     '(mousedown)': '$event.preventDefault()',
   },
@@ -122,7 +122,9 @@ export class FormattingBarComponent {
   protected readonly bar = inject(FormattingBarService);
   protected readonly i18n = inject(I18nService);
   private readonly settingsService = inject(SettingsService);
-  private readonly sidebar = inject(SidebarStateService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly sanitizer = inject(DomSanitizer);
 
@@ -135,13 +137,13 @@ export class FormattingBarComponent {
     Object.entries(GROUP_ICONS).map(([id, icon]) => [id, this.sanitizer.bypassSecurityTrustHtml(icon)]),
   ) as Record<CondensedGroupId, SafeHtml>;
 
-  private readonly windowSize = signal({ width: window.innerWidth, height: window.innerHeight });
+  /** Length of the full bar along its axis (width, or height when vertical), `null` until measured. */
+  private readonly fullLength = signal<number | null>(null);
+  /** Room the page gives the bar along that axis. */
+  private readonly available = signal(Number.POSITIVE_INFINITY);
 
-  /** Narrow window: one drop-down per group, to keep the bar short. */
-  protected readonly condensed = computed(() => {
-    const sidebarWidth = this.sidebar.visible() ? this.sidebar.width() : 0;
-    return isFormattingBarCondensed(this.bar.position(), this.windowSize(), sidebarWidth);
-  });
+  /** The full bar does not fit: one drop-down per group, to keep it short. */
+  protected readonly condensed = computed(() => shouldCondense(this.fullLength(), this.available()));
 
   protected readonly actions = FORMAT_ACTIONS;
   protected readonly groups = FORMATTING_BAR_GROUPS;
@@ -164,14 +166,57 @@ export class FormattingBarComponent {
     return HEADING_FORMATS.find(id => id !== 'paragraph' && active.has(id)) ?? 'paragraph';
   });
 
+  constructor() {
+    afterNextRender(() => this.observeRoom());
+
+    // Another size, side or language changes the length of the full bar: shown full again to be measured
+    effect(() => {
+      this.bar.mode();
+      this.bar.position();
+      this.i18n.language();
+      this.fullLength.set(null);
+      afterNextRender(() => this.measure(), { injector: this.injector });
+    });
+  }
+
+  /** Measures again whenever the page (sidebar, window, panels) or the bar itself is resized. */
+  private observeRoom(): void {
+    const observer = new ResizeObserver(() => this.measure());
+    const page = this.host.nativeElement.parentElement;
+
+    observer.observe(this.host.nativeElement);
+    if (page) {
+      observer.observe(page);
+    }
+    this.destroyRef.onDestroy(() => observer.disconnect());
+  }
+
+  /** Room along the axis of the bar (the page's content box, minus the bar's own margins) and, while full, its length. */
+  private measure(): void {
+    const bar = this.host.nativeElement;
+    const page = bar.parentElement;
+    if (!page) {
+      return;
+    }
+
+    const vertical = this.vertical();
+    const own = getComputedStyle(bar);
+    const box = getComputedStyle(page);
+    const px = (value: string): number => Number.parseFloat(value) || 0;
+    const room = vertical
+      ? page.clientHeight - px(box.paddingTop) - px(box.paddingBottom) - px(own.marginTop) - px(own.marginBottom)
+      : page.clientWidth - px(box.paddingLeft) - px(box.paddingRight) - px(own.marginLeft) - px(own.marginRight);
+
+    this.available.set(room);
+    if (!this.condensed()) {
+      this.fullLength.set(vertical ? bar.scrollHeight : bar.scrollWidth);
+    }
+  }
+
   protected tooltip(item: FormatAction): string {
     const shortcutId = SHORTCUT_IDS[item.id];
     const label = this.i18n.t(item.labelKey);
     return shortcutId ? `${label} (${this.settingsService.shortcutLabel(shortcutId)})` : label;
-  }
-
-  protected onResize(): void {
-    this.windowSize.set({ width: window.innerWidth, height: window.innerHeight });
   }
 
   protected groupLabel(group: FormattingBarGroup): string {
