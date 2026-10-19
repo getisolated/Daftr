@@ -11,6 +11,7 @@ export const EN_EDITOR = {
   'editor.viewMode.split': 'Preview to the side',
   'editor.viewMode.preview': 'Preview',
   'editor.toc.label': 'Table of contents',
+  'editor.preview.diagramLoading': 'Loading diagram…',
   'editor.empty.title': 'No note open',
   'editor.empty.press': 'Press',
   'editor.empty.toCreate': 'to create a new note',

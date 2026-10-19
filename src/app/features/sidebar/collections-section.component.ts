@@ -347,7 +347,6 @@ export class CollectionsSectionComponent {
     // Like a folder of the notes: browsed on the home page (its graph), and expanded / collapsed
     this.sidebarState.selectFolder(null);
     this.collections.select(state.collection.path);
-    this.toggle(nodeKey(state.collection.path, ''));
     this.tabs.goHome();
   }
 

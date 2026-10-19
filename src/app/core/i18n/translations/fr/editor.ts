@@ -13,6 +13,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   'editor.viewMode.split': 'Aperçu à côté',
   'editor.viewMode.preview': 'Aperçu',
   'editor.toc.label': 'Table des matières',
+  'editor.preview.diagramLoading': 'Chargement du diagramme…',
   'editor.empty.title': 'Aucune note ouverte',
   'editor.empty.press': 'Appuyez sur',
   'editor.empty.toCreate': 'pour créer une note',

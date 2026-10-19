@@ -484,14 +484,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
         fontSize: '14px',
         fontFamily: 'Consolas, "Courier New", monospace',
       },
+      // The right padding belongs to the content so unwrapped lines keep their gap when scrolled to the end
       '.cm-content': {
-        padding: '32px 48px',
+        padding: '32px 48px 32px 16px',
         minHeight: '100%',
         caretColor: 'var(--evn-caret)',
-        maxWidth: '780px',
+        boxSizing: 'border-box',
       },
       '.cm-scroller': {
-        justifyContent: 'center',
         fontFamily: 'Consolas, "Courier New", monospace',
         lineHeight: '1.65',
         overflow: 'auto',
@@ -513,9 +513,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
         alignItems: 'center',
         justifyContent: 'flex-end',
         fontSize: '12px',
-      },
-      '&.cm-with-numbers .cm-content': {
-        paddingLeft: '16px',
       },
       '&.cm-focused .cm-cursor': {
         borderLeftColor: 'var(--evn-caret)',

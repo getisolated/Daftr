@@ -125,9 +125,14 @@
       tr:nth-child(2n) { background: rgba(var(--evn-hover-rgb), 0.03); }
     }
 
-    img {
+    img, video, iframe {
       max-width: 100%;
+      max-height: 70vh;
       box-sizing: content-box;
+    }
+
+    img, video {
+      object-fit: contain;
     }
 
     kbd {
@@ -185,8 +190,32 @@
       justify-content: center;
       overflow-x: auto;
 
-      svg { max-width: 100%; height: auto; }
+      // Mermaid draws text and shapes large: zoom shrinks both, unlike a max-width (svg is width 100%)
+      svg { max-width: 100%; height: auto; zoom: 0.75; }
     }
+
+    // Mermaid's default drop shadow shows as a white halo on a dark background
+    .mermaid-diagram svg * { filter: none !important; }
+
+    .mermaid-loading {
+      align-items: center;
+      gap: 10px;
+      padding: 24px 0;
+      color: var(--evn-text-dimmed);
+      font-size: 13px;
+
+      &::before {
+        content: '';
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--evn-border);
+        border-top-color: var(--evn-accent);
+        border-radius: 50%;
+        animation: mermaid-spin 0.8s linear infinite;
+      }
+    }
+
+    @keyframes mermaid-spin { to { transform: rotate(360deg); } }
 
     .mermaid-error {
       display: block;
