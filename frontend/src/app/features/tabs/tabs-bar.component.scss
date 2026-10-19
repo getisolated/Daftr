@@ -262,3 +262,28 @@
     color: #fff;
   }
 }
+
+// ── GitHub themes: flat tabs underlined like GitHub's navigation, instead of pills ──
+
+@mixin github-tabs($underline) {
+  .tabs-container {
+    gap: 0;
+    align-items: stretch;
+  }
+
+  .tab {
+    height: auto;
+    border-radius: 0;
+
+    &.active {
+      background: transparent;
+      border-radius: 0;
+      // Inset shadow rather than a border: the tab keeps its height, ::before / ::after stay for the drop marks
+      box-shadow: inset 0 -2px 0 $underline;
+    }
+  }
+}
+
+// Active underline colors of GitHub (light / dark dimmed)
+:host-context([data-theme='github-light']) { @include github-tabs(#fd8c73); }
+:host-context([data-theme='github-dark-dimmed']) { @include github-tabs(#ec775c); }
