@@ -78,7 +78,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  min-width: 100px;
+  // As wide as its name (the close button floats over it), up to a limit
   max-width: 200px;
   height: 24px;
   background: transparent;
