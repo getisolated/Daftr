@@ -135,12 +135,12 @@ export class FormattingBarComponent {
     Object.entries(GROUP_ICONS).map(([id, icon]) => [id, this.sanitizer.bypassSecurityTrustHtml(icon)]),
   ) as Record<CondensedGroupId, SafeHtml>;
 
-  private readonly windowWidth = signal(window.innerWidth);
+  private readonly windowSize = signal({ width: window.innerWidth, height: window.innerHeight });
 
   /** Narrow window: one drop-down per group, to keep the bar short. */
   protected readonly condensed = computed(() => {
     const sidebarWidth = this.sidebar.visible() ? this.sidebar.width() : 0;
-    return isFormattingBarCondensed(this.bar.position(), this.windowWidth(), sidebarWidth);
+    return isFormattingBarCondensed(this.bar.position(), this.windowSize(), sidebarWidth);
   });
 
   protected readonly actions = FORMAT_ACTIONS;
@@ -171,7 +171,7 @@ export class FormattingBarComponent {
   }
 
   protected onResize(): void {
-    this.windowWidth.set(window.innerWidth);
+    this.windowSize.set({ width: window.innerWidth, height: window.innerHeight });
   }
 
   protected groupLabel(group: FormattingBarGroup): string {
