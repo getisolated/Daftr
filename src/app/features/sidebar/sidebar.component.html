@@ -35,7 +35,7 @@
 >
   <div
     class="row all-notes"
-    [class.selected]="selectedFolderId() === null && activeNoteId() === null"
+    [class.selected]="selectedFolderId() === null && activeNoteId() === null && !collectionSelected()"
     tabindex="0"
     (click)="selectAllNotes()"
     (keydown.enter)="selectAllNotes()"
@@ -52,7 +52,7 @@
     @if (row.kind === 'folder') {
       <div
         class="row folder"
-        [class.selected]="selectedFolderId() === row.node.folder.id && activeNoteId() === null"
+        [class.selected]="selectedFolderId() === row.node.folder.id && activeNoteId() === null && !collectionSelected()"
         [class.multi-selected]="isMultiSelected('f' + row.node.folder.id)"
         [class.colored]="!!row.node.folder.color"
         [style.--item-color]="row.node.folder.color"
@@ -157,6 +157,10 @@
   }
 </div>
 
+<!-- Folders and files of the disk, apart from the notes -->
+<app-section-splitter key="collections" />
+<app-collections-section />
+
 <!-- Outside of the tree: notes sent from the quick-note overlay -->
 @if (quickNotesCount() > 0) {
   <div class="section">
@@ -172,7 +176,8 @@
 }
 
 @if (tags().length > 0) {
-  <div class="section tags-section">
+  <app-section-splitter key="tags" />
+  <div class="section tags-section" [class.open]="tagsExpanded()">
     <button class="section-header" (click)="toggleTags()">
       <svg class="chevron" [class.open]="tagsExpanded()" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="9 6 15 12 9 18"/>

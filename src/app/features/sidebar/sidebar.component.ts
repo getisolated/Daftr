@@ -18,6 +18,7 @@ import { SettingsService } from '../../core/services/settings.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { UpdateService } from '../../core/services/update.service';
+import { CollectionsService } from '../../core/services/collections.service';
 import { FOLDER_EXPORT_MENU, NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
 import {
   buildFolderTree,
@@ -35,6 +36,8 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
 import { ColorPickerComponent } from '../../shared/ui/color-picker.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
+import { SectionSplitterComponent } from '../../shared/ui/section-splitter.component';
+import { CollectionsSectionComponent } from './collections-section.component';
 import { MoveToDialogComponent } from './move-to-dialog.component';
 
 const NEW_FOLDER_NAME = 'New folder';
@@ -50,7 +53,10 @@ const ICON_EMPTY = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, ColorPickerComponent, MoveToDialogComponent],
+  imports: [
+    ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, ColorPickerComponent, MoveToDialogComponent,
+    CollectionsSectionComponent, SectionSplitterComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[style.width.px]': 'width()',
@@ -66,6 +72,7 @@ export class SidebarComponent {
   private readonly palette = inject(PaletteService);
   private readonly settings = inject(SettingsService);
   private readonly updates = inject(UpdateService);
+  private readonly collections = inject(CollectionsService);
   private readonly noteExport = inject(NoteExportService);
 
   protected readonly updateInfo = this.updates.info;
@@ -76,6 +83,7 @@ export class SidebarComponent {
   protected readonly selectedFolderId = this.state.selectedFolderId;
   protected readonly activeTag = this.state.activeTag;
   protected readonly activeNoteId = this.tabs.activeNoteId;
+  protected readonly collectionSelected = computed(() => this.collections.selectedRoot() !== null);
 
   // The quick notes have their own entry, they never appear inside the tree
   private readonly treeNotes = computed<TreeNote[]>(() =>
@@ -281,6 +289,7 @@ export class SidebarComponent {
   // ── Selection ──────────────────────────────────────────────────────────────
 
   protected selectAllNotes(): void {
+    this.collections.select(null);
     this.state.selectFolder(null);
     this.tabs.goHome();
   }
@@ -290,6 +299,7 @@ export class SidebarComponent {
       return;
     }
 
+    this.collections.select(null);
     this.state.selectFolder(node.folder.id);
     this.state.toggleExpanded(node.folder.id);
     this.tabs.goHome();

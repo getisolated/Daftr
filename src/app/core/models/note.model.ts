@@ -1,3 +1,4 @@
+import { CollectionFileRef } from './collection.model';
 import { ThemePickerItem } from './theme.model';
 
 export interface Note {
@@ -25,10 +26,13 @@ export interface NotePreview {
 }
 
 export interface Tab {
+  /** Note id; for a collection file, the session id given by FileDocsService (negative). */
   noteId: number;
   title: string;
   isDirty: boolean;
   isPinned: boolean;
+  /** Set for a file of a collection: what the tab shows (kept across sessions, unlike its id). */
+  file?: CollectionFileRef;
 }
 
 export type PaletteMode = 'command' | 'search' | 'tag' | 'theme';
@@ -43,11 +47,20 @@ export interface PaletteCommand {
 }
 
 export interface PaletteResult {
-  type: 'command' | 'note' | 'tag' | 'theme';
+  type: 'command' | 'note' | 'tag' | 'file' | 'theme';
   command?: PaletteCommand;
   note?: NotePreview;
   tag?: string;
+  file?: PaletteFileResult;
   theme?: ThemePickerItem;
+}
+
+/** A file of a collection found by the palette (by its name, or a line of its content). */
+export interface PaletteFileResult {
+  ref: CollectionFileRef;
+  label: string;
+  /** Matching line, when found by content. */
+  preview?: string;
 }
 
 /** Pseudo note id of the read-only tab that concatenates every note sent from the quick-note overlay. */

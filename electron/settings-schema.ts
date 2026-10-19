@@ -35,6 +35,23 @@ const FORMATTING_BAR_MODES: readonly FormattingBarMode[] = ['full', 'compact'];
 const FORMATTING_BAR_STYLES: readonly FormattingBarStyle[] = ['pinned', 'floating'];
 const FORMATTING_BAR_POSITIONS: readonly FormattingBarPosition[] = ['top', 'bottom', 'left', 'right'];
 
+/** Folders skipped when scanning a collection (mirrors DEFAULT_COLLECTION_EXCLUDES of collections-scan.ts). */
+const DEFAULT_COLLECTIONS_EXCLUDE = [
+  'node_modules', 'bin', 'obj', 'build', 'dist', 'out', 'target', 'coverage', 'vendor',
+  '__pycache__', 'venv', '.venv', '.git', '.angular', '.next', '.nuxt', '.vs', '.vscode', '.idea',
+];
+const MAX_EXCLUDES = 100;
+const MAX_EXCLUDE_LENGTH = 100;
+
+function sanitizeExcludes(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const names = value.filter((name): name is string => typeof name === 'string').map(name => name.trim())
+    .filter(name => name.length > 0 && name.length <= MAX_EXCLUDE_LENGTH && !/[\\/]/.test(name));
+  return [...new Set(names)].slice(0, MAX_EXCLUDES);
+}
+
 export interface OverlayPosition {
   x: number;
   y: number;
@@ -72,6 +89,8 @@ export interface AppSettings {
   hideScrollbar: boolean;
   /** true: a note opens in preview (rendered, read-only) instead of its markdown source. */
   openInPreview: boolean;
+  /** Folder names never listed in the collections (hidden folders are always skipped). */
+  collectionsExclude: string[];
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -106,6 +125,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showOutline: false,
   hideScrollbar: false,
   openInPreview: false,
+  collectionsExclude: DEFAULT_COLLECTIONS_EXCLUDE,
   overlayPosition: null,
 };
 
@@ -172,6 +192,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     showOutline: typeof raw['showOutline'] === 'boolean' ? raw['showOutline'] : base.showOutline,
     hideScrollbar: typeof raw['hideScrollbar'] === 'boolean' ? raw['hideScrollbar'] : base.hideScrollbar,
     openInPreview: typeof raw['openInPreview'] === 'boolean' ? raw['openInPreview'] : base.openInPreview,
+    collectionsExclude: sanitizeExcludes(raw['collectionsExclude'], base.collectionsExclude),
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }

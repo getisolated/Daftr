@@ -41,6 +41,8 @@ export interface AppSettings {
   hideScrollbar: boolean;
   /** true: a note opens in preview (rendered, read-only) instead of its markdown source. */
   openInPreview: boolean;
+  /** Folder names never listed in the collections (hidden folders are always skipped). */
+  collectionsExclude: string[];
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -73,6 +75,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showOutline: false,
   hideScrollbar: false,
   openInPreview: false,
+  collectionsExclude: [
+    'node_modules', 'bin', 'obj', 'build', 'dist', 'out', 'target', 'coverage', 'vendor',
+    '__pycache__', 'venv', '.venv', '.git', '.angular', '.next', '.nuxt', '.vs', '.vscode', '.idea',
+  ],
 };
 
 /** Tag of the notes sent from the quick-note overlay (formerly `overlay`, migrated by the main process). */

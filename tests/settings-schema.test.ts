@@ -46,6 +46,11 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ theme: 42 }, { ...DEFAULT_SETTINGS, theme: 'light' }).theme).toBe('light');
   });
 
+  it('keeps a clean list of excluded collection folders', () => {
+    expect(sanitizeSettings({ collectionsExclude: [' build ', 'build', '', 'a/b', 42, 'tmp'] }).collectionsExclude).toEqual(['build', 'tmp']);
+    expect(sanitizeSettings({ collectionsExclude: 'node_modules' }).collectionsExclude).toEqual(DEFAULT_SETTINGS.collectionsExclude);
+  });
+
   it('keeps the system themes only when they belong to the matching family', () => {
     expect(sanitizeSettings({ preferredDarkTheme: 'github-dark-dimmed', preferredLightTheme: 'solarized-light' })).toMatchObject({
       preferredDarkTheme: 'github-dark-dimmed', preferredLightTheme: 'solarized-light',
