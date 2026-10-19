@@ -8,6 +8,6 @@ export function loadRenderer(win: BrowserWindow, hash?: string): void {
   if (isDev) {
     win.loadURL(`http://localhost:4200${hash ? `/#${hash}` : ''}`);
   } else {
-    win.loadFile(path.join(__dirname, '../dist/browser/index.html'), hash ? { hash } : undefined);
+    win.loadFile(path.join(__dirname, '../frontend/dist/browser/index.html'), hash ? { hash } : undefined);
   }
 }

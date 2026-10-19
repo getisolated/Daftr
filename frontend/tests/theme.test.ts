@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { THEMES } from '../src/app/core/models/theme.model';
-import { THEME_KINDS } from '../electron/settings-schema';
+import { THEME_KINDS } from '../../electron/settings-schema';
 import { translate } from '../src/app/core/i18n/translate';
 import { Translator } from '../src/app/core/i18n/translate';
 import { buildThemePickerItems, findTheme, resolveTheme, themeKind, themeLabel } from '../src/app/core/utils/theme.util';

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { inflateRawSync } from 'zlib';
-import { safeFileName, zipPaths } from '../electron/export';
-import { createZip } from '../electron/zip';
+import { safeFileName, zipPaths } from '../../electron/export';
+import { createZip } from '../../electron/zip';
 
 describe('safeFileName', () => {
   it('replaces the characters Windows forbids and trims trailing dots and spaces', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeLike } from '../electron/database';
+import { escapeLike } from '../../electron/database';
 
 describe('escapeLike', () => {
   it('returns plain text unchanged', () => {

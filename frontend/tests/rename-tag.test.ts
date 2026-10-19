@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renameTag } from '../electron/database';
+import { renameTag } from '../../electron/database';
 
 describe('renameTag', () => {
   it('renames the tag and keeps the others in place', () => {

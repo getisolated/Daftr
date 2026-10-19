@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isNewerVersion, parseManifest } from '../electron/update-manifest';
+import { isNewerVersion, parseManifest } from '../../electron/update-manifest';
 
 const SHA = 'a'.repeat(128);
 

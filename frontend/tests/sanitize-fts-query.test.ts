@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeFtsQuery } from '../electron/database';
+import { sanitizeFtsQuery } from '../../electron/database';
 
 describe('sanitizeFtsQuery', () => {
   it('wraps single word in quotes', () => {

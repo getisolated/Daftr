@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCollectionGraph, extractLinkTargets, resolveCollectionLink } from '../electron/collections-scan';
+import { buildCollectionGraph, extractLinkTargets, resolveCollectionLink } from '../../electron/collections-scan';
 
 describe('extractLinkTargets', () => {
   it('finds inline links, skips images', () => {

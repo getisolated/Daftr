@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { LANGUAGES, isLanguage, resolveLanguage } from '../src/app/core/i18n/language.model';
 import { translate, translatePlural } from '../src/app/core/i18n/translate';
 import { EN, TRANSLATIONS, TranslationKey } from '../src/app/core/i18n/translations';
-import { DEFAULT_SETTINGS, isLanguage as isSchemaLanguage, resolveLanguage as resolveSchemaLanguage, sanitizeSettings } from '../electron/settings-schema';
-import { message } from '../electron/i18n';
+import { DEFAULT_SETTINGS, isLanguage as isSchemaLanguage, resolveLanguage as resolveSchemaLanguage, sanitizeSettings } from '../../electron/settings-schema';
+import { message } from '../../electron/i18n';
 
 const PLACEHOLDER = /\{(\w+)\}/g;
 

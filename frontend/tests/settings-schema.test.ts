@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_SETTINGS, sanitizeSettings } from '../electron/settings-schema';
+import { DEFAULT_SETTINGS, sanitizeSettings } from '../../electron/settings-schema';
 
 describe('sanitizeSettings', () => {
   it('returns defaults for garbage input', () => {

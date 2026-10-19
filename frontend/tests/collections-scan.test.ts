@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import * as path from 'path';
 import {
   DEFAULT_COLLECTION_EXCLUDES, findInText, isExcludedFolder, resolveInside, scanFolder,
-} from '../electron/collections-scan';
+} from '../../electron/collections-scan';
 
 describe('scanFolder', () => {
   let root: string;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { hexToHsv, hsvToHex, normalizeHex } from '../src/app/core/utils/color.util';
-import { normalizeColor } from '../electron/database';
+import { normalizeColor } from '../../electron/database';
 
 describe('normalizeHex', () => {
   it('accepts short and long forms, with or without #', () => {

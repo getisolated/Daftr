@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MAX_FOLDER_NAME_LENGTH, normalizeFolderName } from '../electron/database';
+import { MAX_FOLDER_NAME_LENGTH, normalizeFolderName } from '../../electron/database';
 
 describe('normalizeFolderName', () => {
   it('trims the name', () => {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { app } from 'electron/main';
-import { loadSettings } from '../electron/settings';
+import { loadSettings } from '../../electron/settings';
 
 describe('loadSettings language', () => {
   let directory = '';
