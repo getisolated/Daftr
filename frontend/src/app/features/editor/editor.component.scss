@@ -156,6 +156,7 @@ app-find-panel {
   flex: 0 0 280px;
   width: 280px;
   margin-left: 8px;
+  padding-top: 56px; // clears the view-mode buttons above, like the outline it replaces
 }
 
 // ── Table of contents ─────────────────────────────────────────────────────────
