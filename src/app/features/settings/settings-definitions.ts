@@ -1,4 +1,5 @@
 import { APP_SHORTCUTS } from '../../core/models/app-shortcuts.model';
+import { THEMES, ThemeKind } from '../../core/models/theme.model';
 
 export type SettingControl = 'checkbox' | 'number' | 'select' | 'shortcut' | 'list';
 
@@ -20,6 +21,10 @@ export interface SettingDefinition {
 export interface SettingsSection {
   category: string;
   settings: SettingDefinition[];
+}
+
+function themeOptionsOfKind(kind: ThemeKind): { value: string; label: string }[] {
+  return THEMES.filter(theme => theme.kind === kind).map(theme => ({ value: theme.id, label: theme.label }));
 }
 
 /** Single source of truth for the settings editor: adding a setting = adding an entry here. */
@@ -51,13 +56,28 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'theme',
     category: 'Appearance',
     title: 'Theme',
-    description: 'Color theme of the app. System follows the Windows light/dark setting.',
+    description: 'Color theme of the app. System follows the Windows light/dark setting, with the preferred themes below.',
     control: 'select',
     options: [
-      { value: 'dark', label: 'Dark' },
-      { value: 'light', label: 'Light' },
+      ...THEMES.map(theme => ({ value: theme.id, label: theme.label })),
       { value: 'system', label: 'System' },
     ],
+  },
+  {
+    key: 'preferredDarkTheme',
+    category: 'Appearance',
+    title: 'Preferred Dark Theme',
+    description: 'Theme used by System while Windows is in dark mode.',
+    control: 'select',
+    options: themeOptionsOfKind('dark'),
+  },
+  {
+    key: 'preferredLightTheme',
+    category: 'Appearance',
+    title: 'Preferred Light Theme',
+    description: 'Theme used by System while Windows is in light mode.',
+    control: 'select',
+    options: themeOptionsOfKind('light'),
   },
   {
     key: 'showLineNumbers',
@@ -88,6 +108,20 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'hideScrollbar',
+    category: 'Editor',
+    title: 'Hide Scrollbar',
+    description: 'Hide the scrollbar of the editor; it shows again while the mouse is over its edge. Scrolling keeps working.',
+    control: 'checkbox',
+  },
+  {
+    key: 'openInPreview',
+    category: 'Editor',
+    title: 'Open Notes In Preview',
+    description: 'Open a note rendered like on GitHub (read-only) instead of its markdown source. The buttons at the top right of the note switch between source, side by side and preview.',
+    control: 'checkbox',
+  },
+  {
     key: 'formattingBarEnabled',
     category: 'Formatting Bar',
     title: 'Show Formatting Bar',
@@ -98,7 +132,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'formattingBarMode',
     category: 'Formatting Bar',
     title: 'Size',
-    description: 'Full shows separators between groups; Compact is smaller, with tighter spacing.',
+    description: 'Full has large buttons with separators between groups; Compact is smaller, with tighter spacing.',
     control: 'select',
     options: [
       { value: 'full', label: 'Full' },
@@ -109,7 +143,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'formattingBarStyle',
     category: 'Formatting Bar',
     title: 'Style',
-    description: 'Pinned is attached to the window edges; Floating is detached from them, with rounded corners.',
+    description: 'Pinned is attached to the edges of the page; Floating is detached from them, with rounded corners.',
     control: 'select',
     options: [
       { value: 'pinned', label: 'Pinned' },
@@ -120,11 +154,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'formattingBarPosition',
     category: 'Formatting Bar',
     title: 'Position',
-    description: 'Above or below the editing area.',
+    description: 'Side of the page the bar sits on. Left and Right show it vertically, inside the page.',
     control: 'select',
     options: [
       { value: 'top', label: 'Top' },
       { value: 'bottom', label: 'Bottom' },
+      { value: 'left', label: 'Left' },
+      { value: 'right', label: 'Right' },
     ],
   },
   {

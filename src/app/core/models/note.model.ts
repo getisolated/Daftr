@@ -1,4 +1,5 @@
 import { CollectionFileRef } from './collection.model';
+import { ThemePickerItem } from './theme.model';
 
 export interface Note {
   id: number;
@@ -9,6 +10,8 @@ export interface Note {
   folderId: number | null;
   /** Manual position among the notes of the same folder; `null` until the user reorders. */
   sortOrder: number | null;
+  /** `#rrggbb` chosen in the sidebar, `null` for none. */
+  color: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,7 +35,7 @@ export interface Tab {
   file?: CollectionFileRef;
 }
 
-export type PaletteMode = 'command' | 'search' | 'tag';
+export type PaletteMode = 'command' | 'search' | 'tag' | 'theme';
 
 export interface PaletteCommand {
   id: string;
@@ -44,11 +47,12 @@ export interface PaletteCommand {
 }
 
 export interface PaletteResult {
-  type: 'command' | 'note' | 'tag' | 'file';
+  type: 'command' | 'note' | 'tag' | 'file' | 'theme';
   command?: PaletteCommand;
   note?: NotePreview;
   tag?: string;
   file?: PaletteFileResult;
+  theme?: ThemePickerItem;
 }
 
 /** A file of a collection found by the palette (by its name, or a line of its content). */
@@ -60,4 +64,6 @@ export interface PaletteFileResult {
 }
 
 /** Pseudo note id of the read-only tab that concatenates every note sent from the quick-note overlay. */
-export const OVERLAY_NOTES_TAB_ID = -1;
+export const QUICK_NOTES_TAB_ID = -1;
+
+export const QUICK_NOTES_TITLE = 'Quick notes';

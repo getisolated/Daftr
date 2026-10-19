@@ -5,11 +5,11 @@ import {
 
 import { TabsService } from '../../core/services/tabs.service';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
-import { PaletteService } from '../../core/services/palette.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
+import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
 
 @Component({
   selector: 'app-tabs-bar',
@@ -93,16 +93,9 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
         }
       </div>
 
-      <!-- Search icon -->
-      <button class="search-icon-btn" (click)="openSearch()" (dblclick)="$event.stopPropagation()" [title]="'Search notes (' + shortcutLabel('search.global') + ')'">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-      </button>
-
       <!-- Wide mode toggle -->
       <button
-        class="search-icon-btn"
+        class="titlebar-icon-btn"
         (click)="toggleWideMode()"
         (dblclick)="$event.stopPropagation()"
         [title]="(wideMode() ? 'Centered layout (' : 'Full width layout (') + shortcutLabel('layout.toggle') + ')'"
@@ -156,7 +149,6 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
 export class TabsBarComponent {
   private tabs$ = inject(TabsService);
   private electron = inject(ElectronBridgeService);
-  private palette = inject(PaletteService);
   private layout = inject(LayoutService);
   private settings = inject(SettingsService);
   private sidebarState = inject(SidebarStateService);
@@ -175,12 +167,12 @@ export class TabsBarComponent {
   readonly dragSide = signal<'left' | 'right' | null>(null);
 
   // ── Context menu state ─────────────────────────────────────────────────────
+  private readonly noteExport = inject(NoteExportService);
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number; tabIndex: number } | null>(null);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
   goHome(): void { this.tabs$.goHome(); }
-  openSearch(): void { this.palette.open('search'); }
   selectTab(index: number): void { this.tabs$.setActiveIndex(index); }
   toggleWideMode(): void { this.layout.toggle(); }
 
@@ -298,6 +290,10 @@ export class TabsBarComponent {
       { id: 'closeAll', label: 'Close All Tabs', icon: closeIcon, disabled: !hasClosableTab },
     ];
 
+    if (this.noteExport.canExport(tab.noteId)) {
+      items.push({ divider: true }, NOTE_EXPORT_MENU);
+    }
+
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, tabIndex: index });
   }
 
@@ -305,6 +301,11 @@ export class TabsBarComponent {
     const menu = this.ctxMenu();
     if (!menu) return;
     const index = menu.tabIndex;
+    const noteId = this.tabs()[index]?.noteId;
+
+    if (noteId !== undefined && actionId.startsWith('export:')) {
+      void this.noteExport.runNoteAction(actionId, noteId);
+    }
 
     switch (actionId) {
       case 'pin':

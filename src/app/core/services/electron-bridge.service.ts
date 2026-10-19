@@ -14,6 +14,7 @@ interface NoteRow {
   folder_id?: number | null;
   folderId?: number | null;
   sort_order?: number | null;
+  color?: string | null;
   created_at?: string;
   createdAt?: string;
   updated_at?: string;
@@ -26,6 +27,7 @@ interface FolderRow {
   parent_id: number | null;
   is_default: number;
   sort_order: number | null;
+  color?: string | null;
   created_at: string;
 }
 
@@ -45,12 +47,16 @@ interface ElectronAPI {
   renameFolder: (id: number, name: string) => Promise<FolderRow | null>;
   moveFolder: (id: number, parentId: number | null) => Promise<FolderRow | null>;
   deleteFolder: (id: number, mode: FolderDeleteMode) => Promise<number[] | null>;
+  emptyFolder: (id: number) => Promise<number[] | null>;
+  setFoldersColor: (ids: number[], color: string | null) => Promise<boolean>;
+  setNotesColor: (ids: number[], color: string | null) => Promise<boolean>;
   updateNote: (id: number, data: { title?: string; content?: string; tags?: string }) => Promise<NoteRow | null>;
   deleteNote: (id: number) => Promise<boolean>;
   searchNotes: (query: string) => Promise<NoteRow[]>;
   getNotesByTag: (tag: string) => Promise<NoteRow[]>;
   getAllTags: () => Promise<string[]>;
   openExternal: (url: string) => Promise<void>;
+  saveExport: (kind: 'md' | 'html' | 'zip', suggestedName: string, payload: unknown) => Promise<string | null>;
   getSettings: () => Promise<AppSettings>;
   setSettings: (patch: SettingsPatch) => Promise<SettingsUpdateResult>;
   getUpdateInfo: () => Promise<UpdateInfo | null>;
@@ -75,6 +81,7 @@ function mapRow(row: NoteRow): Note {
     tags: typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags ?? []),
     folderId: row.folder_id ?? row.folderId ?? null,
     sortOrder: row.sort_order ?? null,
+    color: row.color ?? null,
     createdAt: row.created_at ?? row.createdAt ?? '',
     updatedAt: row.updated_at ?? row.updatedAt ?? '',
   };
@@ -88,6 +95,7 @@ function mapFolderRow(row: FolderRow): Folder {
     createdAt: row.created_at,
     isDefault: row.is_default === 1,
     sortOrder: row.sort_order ?? null,
+    color: row.color ?? null,
   };
 }
 
@@ -106,6 +114,11 @@ export class ElectronBridgeService {
   isMaximized(): Promise<boolean> { return this.api?.isMaximized() ?? Promise.resolve(false); }
 
   openExternal(url: string): Promise<void> { return this.api?.openExternal(url) ?? Promise.resolve(); }
+
+  /** Asks where to save the export, then writes it: the written path, `null` when cancelled (or outside Electron). */
+  saveExport(kind: 'md' | 'html' | 'zip', suggestedName: string, payload: string | { path: string; content: string }[]): Promise<string | null> {
+    return this.api?.saveExport(kind, suggestedName, payload) ?? Promise.resolve(null);
+  }
 
   // Notes
   async getAllNotes(): Promise<Note[]> {
@@ -207,6 +220,22 @@ export class ElectronBridgeService {
   async deleteFolder(id: number, mode: FolderDeleteMode): Promise<number[] | null> {
     if (!this.api) return null;
     return this.api.deleteFolder(id, mode);
+  }
+
+  /** Deletes the content of the folder, keeping it. Returns the ids of the deleted notes, `null` when refused. */
+  async emptyFolder(id: number): Promise<number[] | null> {
+    if (!this.api) return null;
+    return this.api.emptyFolder(id);
+  }
+
+  async setFoldersColor(ids: number[], color: string | null): Promise<boolean> {
+    if (!this.api) return false;
+    return this.api.setFoldersColor(ids, color);
+  }
+
+  async setNotesColor(ids: number[], color: string | null): Promise<boolean> {
+    if (!this.api) return false;
+    return this.api.setNotesColor(ids, color);
   }
 
   // Settings

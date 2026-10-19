@@ -1,5 +1,5 @@
 import {
-  Component, inject, OnDestroy, signal, computed, effect,
+  Component, inject, OnDestroy, signal, computed, effect, untracked,
   ViewChild, ElementRef, ChangeDetectionStrategy
 } from '@angular/core';
 
@@ -10,7 +10,10 @@ import { TabsService } from '../../core/services/tabs.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { CollectionsService } from '../../core/services/collections.service';
+import { NoteExportService } from '../../core/services/note-export.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { PaletteResult } from '../../core/models/note.model';
+import { buildThemePickerItems } from '../../core/utils/theme.util';
 
 @Component({
   selector: 'app-palette',
@@ -46,7 +49,7 @@ import { PaletteResult } from '../../core/models/note.model';
                   class="palette-item"
                   [class.selected]="i === selectedIndex()"
                   (click)="execute(result)"
-                  (mouseenter)="selectedIndex.set(i)"
+                  (mouseenter)="onItemHover(i)"
                 >
                   @if (result.type === 'command') {
                     <div class="item-icon">
@@ -111,6 +114,19 @@ import { PaletteResult } from '../../core/models/note.model';
                       <span class="item-desc">Filter by tag</span>
                     </div>
                   }
+
+                  @if (result.type === 'theme') {
+                    <div class="item-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/>
+                        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.97 6.01 17.46 2 12 2z"/>
+                      </svg>
+                    </div>
+                    <div class="item-content">
+                      <span class="item-label">{{ result.theme!.label }}</span>
+                      <span class="item-desc">{{ result.theme!.detail }}</span>
+                    </div>
+                  }
                 </div>
               }
             </div>
@@ -132,6 +148,8 @@ export class PaletteComponent implements OnDestroy {
   private collections = inject(CollectionsService);
   /** Stops the content search of the collections still running for the previous query. */
   private cancelFileSearch: (() => void) | null = null;
+  private noteExport = inject(NoteExportService);
+  private themeService = inject(ThemeService);
 
   @ViewChild('inputEl') inputEl!: ElementRef<HTMLInputElement>;
 
@@ -150,6 +168,7 @@ export class PaletteComponent implements OnDestroy {
     switch (this.mode()) {
       case 'search': return 'Search all notes... (or #tag to filter)';
       case 'tag': return 'Filter by tag...';
+      case 'theme': return 'Select Color Theme (Up/Down Keys to Preview)';
       default: return 'Type a command or note name...';
     }
   });
@@ -176,9 +195,9 @@ export class PaletteComponent implements OnDestroy {
       {
         type: 'command',
         command: {
-          id: 'overlay-notes', label: 'Overlay Notes',
+          id: 'quick-notes', label: 'Quick Notes',
           description: 'Open every quick note in a single document', category: 'note',
-          action: () => this.tabs.openOverlayNotes(),
+          action: () => this.tabs.openQuickNotes(),
         }
       },
       {
@@ -197,6 +216,7 @@ export class PaletteComponent implements OnDestroy {
           action: () => { void this.copyNoteLink(); },
         }
       },
+      ...this.exportCommands(),
       {
         type: 'command',
         command: {
@@ -219,6 +239,14 @@ export class PaletteComponent implements OnDestroy {
           id: 'prev-tab', label: 'Previous Tab', shortcut: this.settings.shortcutLabel('tab.prev'),
           description: 'Switch to previous tab', category: 'action',
           action: () => this.tabs.prevTab(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
+          id: 'color-theme', label: 'Color Theme', shortcut: this.settings.shortcutLabel('theme.select'),
+          description: 'Pick the color theme, previewed as you move', category: 'settings',
+          action: () => this.palette.open('theme'),
         }
       },
       {
@@ -249,6 +277,12 @@ export class PaletteComponent implements OnDestroy {
         this.selectedIndex.set(0);
       }
     });
+
+    // The theme picker previews the highlighted theme; anything else (closing included) shows the saved one again
+    effect(() => {
+      const highlighted = this.isOpen() && this.mode() === 'theme' ? this.results()[this.selectedIndex()]?.theme : undefined;
+      untracked(() => this.themeService.preview(highlighted?.id ?? null));
+    });
   }
 
   ngOnDestroy(): void {
@@ -269,6 +303,11 @@ export class PaletteComponent implements OnDestroy {
     const mode = this.mode();
     this.cancelFileSearch?.();
     this.cancelFileSearch = null;
+
+    if (mode === 'theme') {
+      this.searchThemes(query);
+      return;
+    }
 
     if (mode === 'command' && !query.trim()) {
       this._results.set(this.commands);
@@ -345,7 +384,35 @@ export class PaletteComponent implements OnDestroy {
     this.cancelFileSearch = cancel;
   }
 
+  private searchThemes(query: string): void {
+    const settings = this.settings.settings();
+    const systemThemes = { dark: settings.preferredDarkTheme, light: settings.preferredLightTheme };
+    const needle = query.trim().toLowerCase();
+    const items = buildThemePickerItems(systemThemes, settings.theme).filter(item => item.label.toLowerCase().includes(needle));
+
+    this._results.set(items.map(item => ({ type: 'theme', theme: item })));
+
+    // Opens on the current theme, like VS Code
+    if (!needle) {
+      this.selectedIndex.set(Math.max(0, items.findIndex(item => item.id === settings.theme)));
+    }
+  }
+
+  /** In the theme picker the mouse does not move the highlight: it would preview every theme it crosses. */
+  onItemHover(index: number): void {
+    if (this.mode() !== 'theme') {
+      this.selectedIndex.set(index);
+    }
+  }
+
   async execute(result: PaletteResult): Promise<void> {
+    if (result.type === 'theme') {
+      // Saved before closing: closing ends the preview, which would otherwise flash the previous theme
+      await this.themeService.select(result.theme!.id);
+      this.palette.close();
+      return;
+    }
+
     this.palette.close();
     await new Promise(r => setTimeout(r, 10));
 
@@ -383,6 +450,26 @@ export class PaletteComponent implements OnDestroy {
         this.close();
         break;
     }
+  }
+
+  /** Copy / export of the note being edited (none on the home page or the quick notes). */
+  private exportCommands(): PaletteResult[] {
+    const noteId = this.tabs.activeNoteId();
+
+    if (noteId === null || !this.noteExport.canExport(noteId)) {
+      return [];
+    }
+
+    const command = (id: string, label: string, description: string, actionId: string): PaletteResult => ({
+      type: 'command',
+      command: { id, label, description, category: 'note', action: () => { void this.noteExport.runNoteAction(actionId, noteId); } },
+    });
+
+    return [
+      command('copy-note-content', 'Copy Note Content', 'Copy the markdown of the current note', 'export:copy'),
+      command('export-note-md', 'Export Note as Markdown…', 'Save the current note as a .md file', 'export:md'),
+      command('export-note-html', 'Export Note as HTML…', 'Save the current note as a standalone web page', 'export:html'),
+    ];
   }
 
   private openGraphView(): void {

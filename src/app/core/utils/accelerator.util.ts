@@ -45,12 +45,24 @@ function keyName(key: string, code: string): string | null {
   return NAMED_KEYS[code] ?? null;
 }
 
+const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'AltGraph', 'Meta']);
+
+/** True while the key pressed is a modifier alone (the start of typing a combination). */
+export function isModifierKey(event: Pick<KeyEventLike, 'key'>): boolean {
+  return MODIFIER_KEYS.has(event.key);
+}
+
+export interface AcceleratorOptions {
+  /** Accept a key without modifier: the second key of a chord (`Ctrl+K, V`) does not need one. */
+  allowBareKey?: boolean;
+}
+
 /**
  * Converts a keydown event into an Electron accelerator (e.g. `CommandOrControl+Alt+N`).
  * Returns null while only modifiers are pressed, or when the combination is not usable as a global
  * shortcut (a bare key without modifier would hijack normal typing system-wide; F-keys are the exception).
  */
-export function keyEventToAccelerator(event: KeyEventLike): string | null {
+export function keyEventToAccelerator(event: KeyEventLike, options: AcceleratorOptions = {}): string | null {
   const key = keyName(event.key, event.code);
   if (!key) {
     return null;
@@ -71,7 +83,7 @@ export function keyEventToAccelerator(event: KeyEventLike): string | null {
   }
 
   const isFunctionKey = /^F\d+$/.test(key);
-  if (parts.length === 0 && !isFunctionKey) {
+  if (parts.length === 0 && !isFunctionKey && !options.allowBareKey) {
     return null;
   }
   return [...parts, key].join('+');

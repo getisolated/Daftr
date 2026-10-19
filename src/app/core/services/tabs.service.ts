@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { CollectionFileRef } from '../models/collection.model';
-import { OVERLAY_NOTES_TAB_ID, Tab } from '../models/note.model';
+import { QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE, Tab } from '../models/note.model';
 import { FileDocsService } from './file-docs.service';
 import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
 
@@ -43,9 +43,16 @@ export class TabsService {
       if (raw) {
         const parsed = JSON.parse(raw) as { tabs: Tab[]; activeIndex: number };
         const validTabs = parsed.tabs
-          .filter(t => validNoteIds.has(t.noteId) || t.noteId === OVERLAY_NOTES_TAB_ID || !!t.file)
-          // File ids only last a session: the saved file gets a fresh one (a missing file shows an error when opened)
-          .map(t => ({ ...t, isPinned: t.isPinned ?? false, isDirty: false, noteId: t.file ? this.fileDocs.idFor(t.file) : t.noteId }));
+          .filter(t => validNoteIds.has(t.noteId) || t.noteId === QUICK_NOTES_TAB_ID || !!t.file)
+          // File ids only last a session: the saved file gets a fresh one (a missing file shows an error when opened).
+          // Sessions saved before the rename still say "Overlay notes"
+          .map(t => ({
+            ...t,
+            isPinned: t.isPinned ?? false,
+            isDirty: false,
+            noteId: t.file ? this.fileDocs.idFor(t.file) : t.noteId,
+            title: t.noteId === QUICK_NOTES_TAB_ID ? QUICK_NOTES_TITLE : t.title,
+          }));
         if (validTabs.length > 0) {
           this._tabs.set(validTabs);
           const clamped = Math.min(Math.max(parsed.activeIndex, -1), validTabs.length - 1);
@@ -88,8 +95,8 @@ export class TabsService {
     this.persist();
   }
 
-  openOverlayNotes(): void {
-    this.openNote(OVERLAY_NOTES_TAB_ID, 'Overlay notes');
+  openQuickNotes(): void {
+    this.openNote(QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE);
   }
 
   closeTab(index: number): void {

@@ -19,28 +19,47 @@ describe('sanitizeSettings', () => {
   it('keeps valid formatting bar preferences and falls back to the current ones otherwise', () => {
     const valid = { formattingBarEnabled: false, formattingBarMode: 'compact', formattingBarStyle: 'floating', formattingBarPosition: 'bottom' };
     expect(sanitizeSettings(valid)).toMatchObject(valid);
-    expect(sanitizeSettings({ formattingBarEnabled: 'no', formattingBarMode: 'huge', formattingBarStyle: 1, formattingBarPosition: 'left' })).toMatchObject({
-      formattingBarEnabled: true, formattingBarMode: 'full', formattingBarStyle: 'pinned', formattingBarPosition: 'top',
+    expect(sanitizeSettings({ formattingBarPosition: 'left' }).formattingBarPosition).toBe('left');
+    expect(sanitizeSettings({ formattingBarPosition: 'right' }).formattingBarPosition).toBe('right');
+    expect(sanitizeSettings({ formattingBarEnabled: 'no', formattingBarMode: 'huge', formattingBarStyle: 1, formattingBarPosition: 'middle' })).toMatchObject({
+      formattingBarEnabled: true, formattingBarMode: 'full', formattingBarStyle: 'floating', formattingBarPosition: 'top',
     });
   });
 
   it('keeps valid editor preferences and falls back to the current ones otherwise', () => {
-    expect(sanitizeSettings({ showOutline: false })).toMatchObject({ showOutline: false });
-    expect(sanitizeSettings({ showOutline: 'no' })).toMatchObject({ showOutline: true });
-    expect(sanitizeSettings({ showLineNumbers: false, wordWrap: false })).toMatchObject({ showLineNumbers: false, wordWrap: false });
-    expect(sanitizeSettings({ showLineNumbers: 'no', wordWrap: 0 })).toMatchObject({ showLineNumbers: true, wordWrap: true });
+    expect(sanitizeSettings({ showOutline: true })).toMatchObject({ showOutline: true });
+    expect(sanitizeSettings({ showOutline: 'no' })).toMatchObject({ showOutline: false });
+    expect(sanitizeSettings({ showLineNumbers: true, wordWrap: false })).toMatchObject({ showLineNumbers: true, wordWrap: false });
+    expect(sanitizeSettings({ showLineNumbers: 'no', wordWrap: 0 })).toMatchObject({ showLineNumbers: false, wordWrap: true });
+    expect(sanitizeSettings({ hideScrollbar: true })).toMatchObject({ hideScrollbar: true });
+    expect(sanitizeSettings({ hideScrollbar: 'yes' })).toMatchObject({ hideScrollbar: false });
+    expect(sanitizeSettings({ openInPreview: true })).toMatchObject({ openInPreview: true });
+    expect(sanitizeSettings({ openInPreview: 'yes' })).toMatchObject({ openInPreview: false });
   });
 
   it('keeps a valid theme and falls back to the current one otherwise', () => {
     expect(sanitizeSettings({ theme: 'light' }).theme).toBe('light');
     expect(sanitizeSettings({ theme: 'system' }).theme).toBe('system');
+    expect(sanitizeSettings({ theme: 'github-dark-dimmed' }).theme).toBe('github-dark-dimmed');
     expect(sanitizeSettings({ theme: 'solarized' }).theme).toBe('dark');
+    expect(sanitizeSettings({ theme: 'toString' }).theme).toBe('dark');
     expect(sanitizeSettings({ theme: 42 }, { ...DEFAULT_SETTINGS, theme: 'light' }).theme).toBe('light');
   });
 
   it('keeps a clean list of excluded collection folders', () => {
     expect(sanitizeSettings({ collectionsExclude: [' build ', 'build', '', 'a/b', 42, 'tmp'] }).collectionsExclude).toEqual(['build', 'tmp']);
     expect(sanitizeSettings({ collectionsExclude: 'node_modules' }).collectionsExclude).toEqual(DEFAULT_SETTINGS.collectionsExclude);
+  });
+
+  it('keeps the system themes only when they belong to the matching family', () => {
+    expect(sanitizeSettings({ preferredDarkTheme: 'github-dark-dimmed', preferredLightTheme: 'solarized-light' })).toMatchObject({
+      preferredDarkTheme: 'github-dark-dimmed', preferredLightTheme: 'solarized-light',
+    });
+    expect(sanitizeSettings({ preferredDarkTheme: 'violet-light', preferredLightTheme: 'dark' })).toMatchObject({
+      preferredDarkTheme: 'dark', preferredLightTheme: 'light',
+    });
+    const base = { ...DEFAULT_SETTINGS, preferredDarkTheme: 'github-dark-dimmed' as const };
+    expect(sanitizeSettings({ preferredDarkTheme: 'nope' }, base).preferredDarkTheme).toBe('github-dark-dimmed');
   });
 
   it('clamps the overlay size to its bounds', () => {
