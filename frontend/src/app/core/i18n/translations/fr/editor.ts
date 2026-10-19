@@ -134,8 +134,8 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   'editor.draft.discard': 'Rejeter',
   'editor.quickNote.edit': 'Modifier',
 
-  // Rétroliens
-  'editor.backlinks.title': 'Rétroliens',
+  // Références (rétroliens)
+  'editor.backlinks.title': 'Références',
   'editor.backlinks.empty': 'Aucune note ne pointe vers celle-ci pour le moment.',
   'editor.graph.missingNote': 'Note manquante {id}',
 
