@@ -28,6 +28,9 @@ pub enum Refusal {
     /// Un fichier ou dossier porte déjà ce nom.
     #[error("A file or folder with this name already exists")]
     NameTaken,
+    /// Seules les images d'une collection sont servies à l'aperçu.
+    #[error("Not an image")]
+    NotAnImage,
     /// Demande d'export malformée.
     #[error("Invalid export request")]
     InvalidExport,

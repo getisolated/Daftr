@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { baseName, collectionLinkStatus, flattenFiles, knownFiles, labelCollections, movedPath, parentPath, resolveRelativeLink } from '../src/app/core/utils/collection.util';
+import { baseName, collectionLinkStatus, flattenFiles, knownFiles, labelCollections, movedPath, parentPath, resolveRelativeLink, resolveRelativePath } from '../src/app/core/utils/collection.util';
 
 const collection = (path: string, displayName = baseName(path)) => ({ path, kind: 'folder' as const, displayName, sortOrder: 0 });
 
@@ -94,5 +94,28 @@ describe('collectionLinkStatus', () => {
     expect(collectionLinkStatus('docs/events.md', 'diagram.png', files)).toBe('note');
     expect(collectionLinkStatus('docs/events.md', 'https://example.com', files)).toBe('external');
     expect(collectionLinkStatus('docs/events.md', '#section', files)).toBe('anchor');
+  });
+});
+
+describe('resolveRelativePath', () => {
+  it('resolves an image next to the open file, or from the root of the collection', () => {
+    expect(resolveRelativePath('doc/v28/index.md', 'Images/plan.gif')).toBe('doc/v28/Images/plan.gif');
+    expect(resolveRelativePath('doc/v28/index.md', '../shared/logo%20bleu.png')).toBe('doc/shared/logo bleu.png');
+    expect(resolveRelativePath('doc/v28/index.md', '/assets/a.png')).toBe('assets/a.png');
+  });
+
+  it('leaves web addresses and paths leaving the collection', () => {
+    expect(resolveRelativePath('a.md', 'https://x.dev/a.png')).toBeNull();
+    expect(resolveRelativePath('a.md', 'data:image/png;base64,AAA')).toBeNull();
+    expect(resolveRelativePath('a.md', '../out.png')).toBeNull();
+  });
+});
+
+describe('resolveRelativeLink to a folder', () => {
+  it('opens the index page of the folder, as index.html on the web', () => {
+    expect(resolveRelativeLink('doc/guide/a.md', '../')).toBe('doc/index.md');
+    expect(resolveRelativeLink('doc/a.md', './api/')).toBe('doc/api/index.md');
+    expect(resolveRelativeLink('doc/a.md', '..')).toBe('index.md');
+    expect(resolveRelativeLink('a.md', '../')).toBeNull();
   });
 });

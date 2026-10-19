@@ -96,6 +96,8 @@ pub trait CollectionFiles: Send + Sync {
     fn entry_kind(&self, path: &Path) -> Option<EntryKind>;
     /// Lit un fichier texte (UTF-8).
     fn read_text(&self, path: &Path) -> AppResult<String>;
+    /// Lit un fichier binaire (images de l'aperçu).
+    fn read_bytes(&self, path: &Path) -> AppResult<Vec<u8>>;
     /// Écrit un fichier texte (UTF-8).
     fn write_text(&self, path: &Path, content: &str) -> AppResult<()>;
     /// Crée un fichier vide, sans jamais écraser un fichier existant.

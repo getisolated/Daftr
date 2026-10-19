@@ -116,6 +116,14 @@ pub fn resolve_collection_link(from_file: &str, target: &str) -> Option<String> 
     let resolved = segments.join("/");
     let last = segments.last().map(String::as_str).unwrap_or_default();
 
+    // Un lien vers un dossier (`../`, `./guide/`) ouvre sa page d'index, comme index.html
+    if points_to_folder(&cleaned) {
+        return Some(if resolved.is_empty() {
+            "index.md".to_owned()
+        } else {
+            format!("{resolved}/index.md")
+        });
+    }
     Some(if has_extension(last) {
         resolved
     } else {
@@ -159,6 +167,12 @@ fn join_segments(from_file: &str, cleaned: &str) -> Option<Vec<String>> {
     Some(segments)
 }
 
+/// La cible désigne un dossier : elle finit par `/`, ou par `.` ou `..`.
+fn points_to_folder(cleaned: &str) -> bool {
+    let last = cleaned.rsplit('/').next().unwrap_or_default();
+    cleaned.ends_with('/') || last == "." || last == ".."
+}
+
 /// `^[a-z][a-z0-9+.-]*:` sans tenir compte de la casse (`https:`, `mailto:`, `note:`…).
 fn has_scheme(target: &str) -> bool {
     let Some((scheme, _)) = target.split_once(':') else {
@@ -181,7 +195,11 @@ fn has_extension(segment: &str) -> bool {
 }
 
 /// Décodage `%XX` ; `None` si une séquence est invalide (le texte est alors gardé tel quel).
-fn percent_decode(text: &str) -> Option<String> {
+///
+/// ```
+/// assert_eq!(domain::collection::percent_decode("a%20b").as_deref(), Some("a b"));
+/// ```
+pub fn percent_decode(text: &str) -> Option<String> {
     let bytes = text.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
     let mut index = 0;
@@ -244,6 +262,21 @@ mod tests {
             resolve_collection_link("README.md", "src/WMSAlign.Enum.al").as_deref(),
             Some("src/WMSAlign.Enum.al"),
         );
+    }
+
+    #[test]
+    fn a_link_to_a_folder_opens_its_index_page() {
+        let resolve = |from: &str, target: &str| resolve_collection_link(from, target);
+        assert_eq!(
+            resolve("docs/guide/a.md", "../").as_deref(),
+            Some("docs/index.md")
+        );
+        assert_eq!(
+            resolve("docs/a.md", "./api/").as_deref(),
+            Some("docs/api/index.md")
+        );
+        assert_eq!(resolve("docs/a.md", "..").as_deref(), Some("index.md"));
+        assert_eq!(resolve("a.md", "../"), None);
     }
 
     #[test]

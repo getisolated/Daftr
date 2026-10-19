@@ -4,8 +4,8 @@
 use std::path::{Path, PathBuf};
 
 use domain::collection::{
-    Collection, CollectionKind, entry_name, is_markdown_file, is_same_or_inside, relative_path,
-    resolve_inside, with_markdown_extension,
+    Collection, CollectionKind, entry_name, image_mime, is_markdown_file, is_same_or_inside,
+    relative_path, resolve_inside, with_markdown_extension,
 };
 
 use super::{CollectionsService, file_name};
@@ -17,6 +17,15 @@ impl CollectionsService {
     pub fn read(&self, root: &str, relative: &str) -> AppResult<String> {
         let (_, absolute) = self.resolve(root, relative)?;
         self.files.read_text(&absolute)
+    }
+
+    /// Lit une image de la collection (affichée par l'aperçu) ; rend son contenu et son type
+    /// MIME. Tout autre fichier est refusé.
+    pub fn read_image(&self, root: &str, relative: &str) -> AppResult<(Vec<u8>, &'static str)> {
+        let (_, absolute) = self.resolve(root, relative)?;
+        let mime = image_mime(&file_name(&absolute)).ok_or(Refusal::NotAnImage)?;
+
+        Ok((self.files.read_bytes(&absolute)?, mime))
     }
 
     /// Écrit un fichier markdown de la collection.

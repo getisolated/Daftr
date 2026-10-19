@@ -69,13 +69,47 @@ export function flattenFiles(root: string, nodes: readonly CollectionNode[]): Co
  * is not a local markdown file (web address, anchor) or leaves the collection.
  */
 export function resolveRelativeLink(fromFile: string, target: string): string | null {
-  let cleaned = target.trim().replace(/^<|>$/g, '').split('#')[0] ?? '';
+  const resolved = resolveRelativePath(fromFile, target);
+
+  if (resolved === null) {
+    return null;
+  }
+  // A link to a folder (`../`, `./guide/`) opens its index page, as a web server serves index.html
+  if (pointsToFolder(cleanTarget(target))) {
+    return resolved ? `${resolved}/index.md` : 'index.md';
+  }
+  if (/\.md$/i.test(resolved)) {
+    return resolved;
+  }
+
+  // A file of another extension is not a markdown page of the collection
+  return /\.[^./]+$/.test(baseName(resolved)) ? null : `${resolved}.md`;
+}
+
+/** The target without its angle brackets and anchor, percent-decoded when it is. */
+function cleanTarget(target: string): string {
+  const cleaned = target.trim().replace(/^<|>$/g, '').split('#')[0] ?? '';
 
   try {
-    cleaned = decodeURIComponent(cleaned);
+    return decodeURIComponent(cleaned);
   } catch {
     // Not percent-encoded: kept as written
+    return cleaned;
   }
+}
+
+function pointsToFolder(cleaned: string): boolean {
+  const last = cleaned.split('/').pop() ?? '';
+  return cleaned.endsWith('/') || last === '.' || last === '..';
+}
+
+/**
+ * Path inside the collection of a relative target (link, image) of `fromFile`, as written: `''` for the root of the
+ * collection, `null` for web addresses, anchors alone and paths leaving the collection. A target starting with `/` is
+ * relative to the root.
+ */
+export function resolveRelativePath(fromFile: string, target: string): string | null {
+  const cleaned = cleanTarget(target);
 
   if (!cleaned || /^[a-z][a-z0-9+.-]*:/i.test(cleaned)) {
     return null;
@@ -94,14 +128,7 @@ export function resolveRelativeLink(fromFile: string, target: string): string | 
     }
   }
 
-  const resolved = segments.join('/');
-
-  if (/\.md$/i.test(resolved)) {
-    return resolved;
-  }
-
-  // A file of another extension is not a markdown page of the collection
-  return /\.[^./]+$/.test(segments[segments.length - 1] ?? '') ? null : `${resolved}.md`;
+  return segments.join('/');
 }
 
 /** Paths (lower case) of the markdown files of a loaded collection, `null` while its tree is not known. */

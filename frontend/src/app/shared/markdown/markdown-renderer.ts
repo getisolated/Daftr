@@ -143,13 +143,31 @@ export function createMarkdownRenderer(context: MarkdownRenderContext): Markdown
   return md;
 }
 
+/** Address of an image of the page (`src` as written), `null` to keep it as written. */
+export type ImageResolver = (src: string) => string | null;
+
 /**
  * HTML of a note, sanitized: the markdown may come from anywhere (pasted, imported, a file on disk), and raw HTML
  * is allowed in it, so scripts, event handlers and `javascript:` links are stripped before it reaches the page.
+ * `resolveImage` rewrites the image addresses (markdown and `<img>` alike), e.g. the relative ones of a collection file.
  */
-export function renderMarkdown(md: MarkdownIt, source: string): string {
-  return DOMPurify.sanitize(md.render(source), {
-    ADD_ATTR: ['data-line', 'data-href', 'data-mermaid'],
-    FORBID_TAGS: ['style', 'form'],
-  });
+export function renderMarkdown(md: MarkdownIt, source: string, resolveImage?: ImageResolver): string {
+  const rewrite = (node: Element): void => {
+    const src = node.tagName === 'IMG' ? node.getAttribute('src') : null;
+    const resolved = src && resolveImage ? resolveImage(src) : null;
+    if (resolved) {
+      node.setAttribute('src', resolved);
+    }
+  };
+
+  // Hooks are global to DOMPurify: this one only lives for this call
+  DOMPurify.addHook('afterSanitizeAttributes', rewrite);
+  try {
+    return DOMPurify.sanitize(md.render(source), {
+      ADD_ATTR: ['data-line', 'data-href', 'data-mermaid'],
+      FORBID_TAGS: ['style', 'form'],
+    });
+  } finally {
+    DOMPurify.removeHook('afterSanitizeAttributes', rewrite);
+  }
 }

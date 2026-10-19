@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, comp
 import { PreviewScrollRequest } from '../../core/models/editor.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LinkStatus } from '../../core/utils/note-paths.util';
-import { createMarkdownRenderer, renderMarkdown } from '../../shared/markdown/markdown-renderer';
+import { ImageResolver, createMarkdownRenderer, renderMarkdown } from '../../shared/markdown/markdown-renderer';
 import { highlightCodeBlocks, renderMermaidBlocks } from '../../shared/markdown/preview-enhancers';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -31,6 +31,8 @@ export class MarkdownPreviewComponent {
   readonly content = input('');
   /** Whether a link target exists (same rule as the editor): broken local links are drawn in red. */
   readonly linkStatus = input<(target: string) => LinkStatus>(() => 'note');
+  /** Rewrites the image addresses (relative images of a collection file); `null` keeps them as written. */
+  readonly resolveImage = input<ImageResolver | null>(null);
   /** The editor scrolled (side by side): the preview follows. */
   readonly scrollRequest = input<PreviewScrollRequest | null>(null);
 
@@ -45,7 +47,7 @@ export class MarkdownPreviewComponent {
   private readonly renderer = computed(() => createMarkdownRenderer({ linkStatus: this.linkStatus(), t: this.i18n.t }));
 
   /** Sanitized by DOMPurify in renderMarkdown, so Angular's own (stricter) sanitizer must not strip the classes and inputs. */
-  protected readonly html = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.renderer(), this.content())));
+  protected readonly html = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.renderer(), this.content(), this.resolveImage() ?? undefined)));
 
   constructor() {
     effect(() => {

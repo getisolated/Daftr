@@ -4,13 +4,15 @@
 
 mod graph;
 mod links;
+mod media;
 mod names;
 mod path;
 mod text_search;
 mod tree;
 
 pub use graph::{CollectionGraph, FileContent, GraphLink, GraphNode, build_collection_graph};
-pub use links::{extract_link_targets, resolve_collection_link};
+pub use links::{extract_link_targets, percent_decode, resolve_collection_link};
+pub use media::image_mime;
 pub use names::{MAX_DISPLAY_NAME_LENGTH, display_name, entry_name, with_markdown_extension};
 pub use path::{is_same_or_inside, relative_path, resolve_inside};
 pub use text_search::{FileMatch, contains_ignore_case, find_in_text};

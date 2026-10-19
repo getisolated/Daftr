@@ -331,6 +331,10 @@ impl CollectionFiles for FakeFiles {
             .ok_or_else(|| AppError::file_system("missing"))
     }
 
+    fn read_bytes(&self, path: &Path) -> AppResult<Vec<u8>> {
+        self.read_text(path).map(String::into_bytes)
+    }
+
     fn write_text(&self, path: &Path, content: &str) -> AppResult<()> {
         self.record(format!("write {}", path.display()));
         self.add_file(path, content);

@@ -389,3 +389,29 @@ fn relocates_to_a_new_path_unless_already_open() {
         root_of(&moved)
     );
 }
+
+#[test]
+fn serves_only_the_images_of_the_collection() {
+    let fixture = fixture();
+    let root = root_of(&fixture.repo);
+    fixture.service.add(&fixture.repo).unwrap();
+    fixture.files.add_file(
+        &fixture.repo.join("docs").join("Images").join("plan.PNG"),
+        "png",
+    );
+
+    let (bytes, mime) = fixture
+        .service
+        .read_image(&root, "docs/Images/plan.PNG")
+        .unwrap();
+
+    assert_eq!((bytes.as_slice(), mime), (b"png".as_slice(), "image/png"));
+    assert_eq!(
+        refusal(fixture.service.read_image(&root, "README.md")),
+        Refusal::NotAnImage
+    );
+    assert_eq!(
+        refusal(fixture.service.read_image(&root, "../image.png")),
+        Refusal::OutsideCollection
+    );
+}

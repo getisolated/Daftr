@@ -25,6 +25,10 @@ impl CollectionFiles for DiskFiles {
         std::fs::read_to_string(path).map_err(AppError::file_system)
     }
 
+    fn read_bytes(&self, path: &Path) -> AppResult<Vec<u8>> {
+        std::fs::read(path).map_err(AppError::file_system)
+    }
+
     fn write_text(&self, path: &Path, content: &str) -> AppResult<()> {
         std::fs::write(path, content).map_err(AppError::file_system)
     }

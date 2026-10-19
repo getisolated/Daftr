@@ -49,7 +49,13 @@ import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/n
 import { CollectionFileRef } from '../../core/models/collection.model';
 import { CollectionsService } from '../../core/services/collections.service';
 import { FileDocsService } from '../../core/services/file-docs.service';
-import { baseName, collectionLinkStatus, knownFiles, resolveRelativeLink } from '../../core/utils/collection.util';
+import { baseName, collectionLinkStatus, knownFiles, resolveRelativeLink, resolveRelativePath } from '../../core/utils/collection.util';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { inDesktop } from '../../core/services/desktop-api';
+import { ImageResolver } from '../../shared/markdown/markdown-renderer';
+
+/** Protocol of the main process serving the images of the collections (crate `desktop`, file_protocol.rs). */
+const COLLECTION_FILE_SCHEME = 'collection-file';
 import { FindService } from '../../core/services/find.service';
 import { FindPanelComponent } from '../find/find-panel.component';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -114,6 +120,7 @@ const PREVIEW_REFRESH_MS = 150;
               class="preview"
               [content]="previewContent()"
               [linkStatus]="linkStatusOf()"
+              [resolveImage]="imageResolver()"
               [scrollRequest]="previewScroll()"
               (linkClicked)="followLink($event)"
               (scrolledToLine)="syncEditorToLine($event)"
@@ -217,6 +224,18 @@ export class EditorComponent implements OnDestroy, OnChanges {
     { id: 'split', labelKey: 'editor.viewMode.split', shortcut: 'editor.previewSide' },
     { id: 'preview', labelKey: 'editor.viewMode.preview', shortcut: 'editor.preview' },
   ];
+
+  /** In a collection file, relative images are read from the disk, next to the file (see the `collection-file` protocol). */
+  protected readonly imageResolver = computed<ImageResolver | null>(() => {
+    const file = this.fileDocs.refFor(this.activeNote()?.id ?? null);
+    if (!file || !inDesktop()) {
+      return null;
+    }
+    return src => {
+      const path = resolveRelativePath(file.path, src);
+      return path ? convertFileSrc(`${file.root}\n${path}`, COLLECTION_FILE_SCHEME) : null;
+    };
+  });
 
   /** Whether a link target exists, shared by the editor decorations and the preview. */
   protected readonly linkStatusOf = computed<(target: string) => LinkStatus>(() => {

@@ -7,6 +7,7 @@
 mod commands;
 mod data_dir;
 mod events;
+mod file_protocol;
 mod lifecycle;
 mod open_args;
 mod settings_effects;
@@ -36,6 +37,7 @@ fn main() -> anyhow::Result<()> {
             Some(vec![startup::HIDDEN_ARG]),
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .register_asynchronous_uri_scheme_protocol(file_protocol::SCHEME, file_protocol::handle)
         .setup(|app| setup::run(app).map_err(Into::into))
         .invoke_handler(commands::handler())
         .build(tauri::generate_context!())?;
