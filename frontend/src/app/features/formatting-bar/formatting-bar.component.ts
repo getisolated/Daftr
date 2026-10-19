@@ -46,6 +46,22 @@ function isFormat(item: FormattingBarItem): item is FormatId {
   return item !== 'heading';
 }
 
+/**
+ * Length of the buttons along the axis of the bar, with its padding: what it needs, whatever the room it is given
+ * (`scrollWidth` would only be the room itself as long as everything fits).
+ */
+function contentLength(bar: HTMLElement, style: CSSStyleDeclaration, vertical: boolean): number {
+  const rects = Array.from(bar.children, child => child.getBoundingClientRect());
+  if (rects.length === 0) {
+    return 0;
+  }
+  const px = (value: string): number => Number.parseFloat(value) || 0;
+  const start = Math.min(...rects.map(rect => (vertical ? rect.top : rect.left)));
+  const end = Math.max(...rects.map(rect => (vertical ? rect.bottom : rect.right)));
+  const padding = vertical ? px(style.paddingTop) + px(style.paddingBottom) : px(style.paddingLeft) + px(style.paddingRight);
+  return Math.ceil(end - start + padding);
+}
+
 @Component({
   selector: 'app-formatting-bar',
   standalone: true,
@@ -209,7 +225,7 @@ export class FormattingBarComponent {
 
     this.available.set(room);
     if (!this.condensed()) {
-      this.fullLength.set(vertical ? bar.scrollHeight : bar.scrollWidth);
+      this.fullLength.set(contentLength(bar, own, vertical));
     }
   }
 
