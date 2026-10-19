@@ -3,7 +3,7 @@ import { FormattingBarPosition } from '../models/formatting-bar.model';
 /** A vertical bar (left / right) is condensed below this window height: its buttons would not fit. */
 export const VERTICAL_CONDENSED_BELOW_PX = 870;
 
-/** A horizontal bar (top / bottom) is condensed below this window width, minus the width of the open sidebar. */
+/** A horizontal bar (top / bottom) is condensed when the editor (the window without the open sidebar) is narrower. */
 export const HORIZONTAL_CONDENSED_BELOW_PX = 1200;
 
 export interface WindowSize {
@@ -19,5 +19,5 @@ export function isFormattingBarCondensed(position: FormattingBarPosition, window
   if (position === 'left' || position === 'right') {
     return window.height < VERTICAL_CONDENSED_BELOW_PX;
   }
-  return window.width < HORIZONTAL_CONDENSED_BELOW_PX - sidebarWidth;
+  return window.width - sidebarWidth < HORIZONTAL_CONDENSED_BELOW_PX;
 }

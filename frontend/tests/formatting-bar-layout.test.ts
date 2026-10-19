@@ -11,11 +11,12 @@ describe('isFormattingBarCondensed', () => {
     expect(isFormattingBarCondensed('right', size(700, 870), 0)).toBe(false);
   });
 
-  it('condenses a horizontal bar below 1200px of width minus the open sidebar width', () => {
+  it('condenses a horizontal bar when the editor (window minus the open sidebar) is below 1200px', () => {
     expect(isFormattingBarCondensed('top', size(1199, 2000), 0)).toBe(true);
     expect(isFormattingBarCondensed('bottom', size(1200, 500), 0)).toBe(false);
-    expect(isFormattingBarCondensed('top', size(950, 800), 250)).toBe(false);
-    expect(isFormattingBarCondensed('top', size(949, 800), 250)).toBe(true);
+    expect(isFormattingBarCondensed('top', size(1153, 717), 300)).toBe(true);
+    expect(isFormattingBarCondensed('top', size(1500, 800), 300)).toBe(false);
+    expect(isFormattingBarCondensed('top', size(1499, 800), 300)).toBe(true);
   });
 });
 

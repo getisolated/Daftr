@@ -93,8 +93,10 @@
     pointer-events: none;
   }
 
-  // Narrow window: one drop-down per group, as short as its name (or its icon, when vertical)
-  &.condensed .heading-select ::ng-deep .trigger { width: auto; }
+  // Narrow window, horizontal bar: the heading drop-down as short as its label (a vertical bar keeps button widths)
+  &.condensed:not([data-position='left']):not([data-position='right']) .heading-select ::ng-deep .trigger {
+    width: auto;
+  }
 }
 
 .group {
