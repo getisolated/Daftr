@@ -137,15 +137,23 @@ fn clean_target(target: &str) -> String {
     let unwrapped = unwrapped.strip_suffix('>').unwrap_or(unwrapped);
     let without_anchor = unwrapped.split('#').next().unwrap_or_default();
 
-    percent_decode(without_anchor).unwrap_or_else(|| without_anchor.to_owned())
+    let decoded = percent_decode(without_anchor).unwrap_or_else(|| without_anchor.to_owned());
+    // `~` seul est la racine de la collection, comme `~/`
+    if decoded == "~" {
+        "~/".to_owned()
+    } else {
+        decoded
+    }
 }
 
+/// Segments du chemin désigné ; `/…` et `~/…` (convention DocFX) partent de la racine.
 fn join_segments(from_file: &str, cleaned: &str) -> Option<Vec<String>> {
     let directory = from_file
         .rsplit_once('/')
         .map(|(directory, _)| directory)
         .unwrap_or_default();
-    let mut segments: Vec<String> = if cleaned.starts_with('/') {
+    let from_root = cleaned.strip_prefix("~/");
+    let mut segments: Vec<String> = if cleaned.starts_with('/') || from_root.is_some() {
         Vec::new()
     } else {
         directory
@@ -155,7 +163,7 @@ fn join_segments(from_file: &str, cleaned: &str) -> Option<Vec<String>> {
             .collect()
     };
 
-    for segment in cleaned.split('/') {
+    for segment in from_root.unwrap_or(cleaned).split('/') {
         match segment {
             ".." => {
                 segments.pop()?;
@@ -277,6 +285,18 @@ mod tests {
         );
         assert_eq!(resolve("docs/a.md", "..").as_deref(), Some("index.md"));
         assert_eq!(resolve("a.md", "../"), None);
+    }
+
+    #[test]
+    fn resolves_tilde_from_the_root_of_the_collection() {
+        let resolve = |target: &str| resolve_collection_link("doc/v28/a.md", target);
+        assert_eq!(
+            resolve("~/doc/v27/index.md").as_deref(),
+            Some("doc/v27/index.md")
+        );
+        assert_eq!(resolve("~/doc/guide").as_deref(), Some("doc/guide.md"));
+        assert_eq!(resolve("~/").as_deref(), Some("index.md"));
+        assert_eq!(resolve("~").as_deref(), Some("index.md"));
     }
 
     #[test]

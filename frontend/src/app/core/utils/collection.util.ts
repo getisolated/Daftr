@@ -86,16 +86,17 @@ export function resolveRelativeLink(fromFile: string, target: string): string | 
   return /\.[^./]+$/.test(baseName(resolved)) ? null : `${resolved}.md`;
 }
 
-/** The target without its angle brackets and anchor, percent-decoded when it is. */
+/** The target without its angle brackets and anchor, percent-decoded when it is; `~` alone is the root folder. */
 function cleanTarget(target: string): string {
   const cleaned = target.trim().replace(/^<|>$/g, '').split('#')[0] ?? '';
+  let decoded = cleaned;
 
   try {
-    return decodeURIComponent(cleaned);
+    decoded = decodeURIComponent(cleaned);
   } catch {
     // Not percent-encoded: kept as written
-    return cleaned;
   }
+  return decoded === '~' ? '~/' : decoded;
 }
 
 function pointsToFolder(cleaned: string): boolean {
@@ -105,8 +106,8 @@ function pointsToFolder(cleaned: string): boolean {
 
 /**
  * Path inside the collection of a relative target (link, image) of `fromFile`, as written: `''` for the root of the
- * collection, `null` for web addresses, anchors alone and paths leaving the collection. A target starting with `/` is
- * relative to the root.
+ * collection, `null` for web addresses, anchors alone and paths leaving the collection. A target starting with `/` or
+ * `~/` is relative to the root of the collection (`~/` as in DocFX).
  */
 export function resolveRelativePath(fromFile: string, target: string): string | null {
   const cleaned = cleanTarget(target);
@@ -115,9 +116,10 @@ export function resolveRelativePath(fromFile: string, target: string): string | 
     return null;
   }
 
-  const segments = cleaned.startsWith('/') ? [] : parentPath(fromFile).split('/').filter(Boolean);
+  const fromRoot = cleaned.startsWith('/') || cleaned.startsWith('~/');
+  const segments = fromRoot ? [] : parentPath(fromFile).split('/').filter(Boolean);
 
-  for (const segment of cleaned.split('/')) {
+  for (const segment of (cleaned.startsWith('~/') ? cleaned.slice(2) : cleaned).split('/')) {
     if (segment === '..') {
       if (segments.length === 0) {
         return null;

@@ -102,6 +102,7 @@ describe('resolveRelativePath', () => {
     expect(resolveRelativePath('doc/v28/index.md', 'Images/plan.gif')).toBe('doc/v28/Images/plan.gif');
     expect(resolveRelativePath('doc/v28/index.md', '../shared/logo%20bleu.png')).toBe('doc/shared/logo bleu.png');
     expect(resolveRelativePath('doc/v28/index.md', '/assets/a.png')).toBe('assets/a.png');
+    expect(resolveRelativePath('doc/v28/index.md', '~/assets/a.png')).toBe('assets/a.png');
   });
 
   it('leaves web addresses and paths leaving the collection', () => {
@@ -117,5 +118,12 @@ describe('resolveRelativeLink to a folder', () => {
     expect(resolveRelativeLink('doc/a.md', './api/')).toBe('doc/api/index.md');
     expect(resolveRelativeLink('doc/a.md', '..')).toBe('index.md');
     expect(resolveRelativeLink('a.md', '../')).toBeNull();
+  });
+
+  it('resolves ~/ from the root of the collection', () => {
+    expect(resolveRelativeLink('doc/v28/a.md', '~/doc/v27/index.md')).toBe('doc/v27/index.md');
+    expect(resolveRelativeLink('doc/v28/a.md', '~/doc/guide')).toBe('doc/guide.md');
+    expect(resolveRelativeLink('doc/v28/a.md', '~/')).toBe('index.md');
+    expect(resolveRelativeLink('doc/v28/a.md', '~')).toBe('index.md');
   });
 });
