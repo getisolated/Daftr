@@ -146,4 +146,5 @@ export const EN_EDITOR = {
   'editor.alert.important': 'Important',
   'editor.alert.warning': 'Warning',
   'editor.alert.caution': 'Caution',
+  'editor.alert.new': 'New',
 } as const;

@@ -148,4 +148,5 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   'editor.alert.important': 'Important',
   'editor.alert.warning': 'Avertissement',
   'editor.alert.caution': 'Attention',
+  'editor.alert.new': 'Nouveau',
 };

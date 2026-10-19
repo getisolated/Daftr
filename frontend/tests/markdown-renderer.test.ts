@@ -56,3 +56,30 @@ describe('createMarkdownRenderer', () => {
     expect(render('Text[^1]\n\n[^1]: Note')).toContain('class="footnotes"');
   });
 });
+
+describe('[!NEW] badges', () => {
+  const badge = '<span class="badge-new">New</span>';
+
+  it('frames a quote it opens, with the badge first', () => {
+    const html = render('> [!NEW]\n> Synchronised in the background.');
+    expect(html).toMatch(/<blockquote[^>]* class="new-block"/);
+    expect(html).toContain(`${badge}Synchronised in the background.`);
+    expect(html).not.toContain('[!NEW]');
+  });
+
+  it('frames a paragraph of its own, marker on the line above or in front', () => {
+    expect(render('[!NEW]\nThe app prints by itself.')).toMatch(new RegExp(`<p[^>]* class="new-block"[^>]*>${badge}The app prints by itself.`));
+    expect(render('[!NEW] The app prints by itself.')).toMatch(/<p[^>]* class="new-block"/);
+  });
+
+  it('keeps the badge inline in headings, list items and table cells', () => {
+    expect(render('### [!NEW] Language')).toContain(`${badge}Language</h3>`);
+    expect(render('- [!NEW] the **turnover**')).toContain(`<li>${badge}the <strong>turnover</strong></li>`);
+    expect(render('| a |\n| - |\n| [!NEW] Amount |')).toContain(`<td>${badge}Amount</td>`);
+    expect(render('- item\n\n- [!NEW] loose')).not.toContain('new-block');
+  });
+
+  it('translates the badge', () => {
+    expect(mdFr.render('### [!NEW] Langue')).toContain('<span class="badge-new">Nouveau</span>');
+  });
+});

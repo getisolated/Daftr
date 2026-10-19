@@ -24,6 +24,8 @@ img { max-width: 100%; }
 .markdown-alert { padding: 8px 16px; border-left: .25em solid var(--alert); } .markdown-alert-title { margin-bottom: 4px; font-weight: 500; color: var(--alert); }
 .markdown-alert-note { --alert: #0969da; } .markdown-alert-tip { --alert: #1a7f37; } .markdown-alert-important { --alert: #8250df; }
 .markdown-alert-warning { --alert: #9a6700; } .markdown-alert-caution { --alert: #d1242f; }
+.badge-new { display: inline-block; margin-right: .5em; padding: .3em .75em .25em; font-size: .68rem; font-weight: 600; line-height: 1.5; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; vertical-align: .1em; color: #fff; background: #7344f5; border-radius: 999px; }
+.new-block { position: relative; margin-top: 28px; padding: 26px 12px 10px; background: #7344f511; border: 1px solid #7344f555; border-radius: 8px; } .new-block .badge-new { position: absolute; top: 0; left: 10px; margin: 0; transform: translateY(-50%); } .new-block > :last-child { margin-bottom: 0; }
 .footnotes { font-size: 12px; color: #59636e; border-top: 1px solid #d1d9e0; }
 .mermaid-diagram { display: flex; justify-content: center; } .mermaid-diagram svg { max-width: 100%; height: auto; }
 .mermaid-error { color: #d1242f; font-family: Consolas, monospace; white-space: pre-wrap; }

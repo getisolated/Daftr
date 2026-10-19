@@ -170,6 +170,44 @@
     .markdown-alert-warning { --alert-color: #d29922; }
     .markdown-alert-caution { --alert-color: #f85149; }
 
+    // ── « New » badges ([!NEW]), as on the CAP Vision documentation ──
+    .badge-new {
+      display: inline-block;
+      margin-right: 0.5em;
+      padding: 0.3em 0.75em 0.25em;
+      font-size: 0.68rem;
+      font-weight: 600;
+      line-height: 1.5;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      vertical-align: 0.1em;
+      color: #fff;
+      background: #7344f5;
+      border-radius: 999px;
+    }
+
+    // A quote opened by [!NEW], or a paragraph of its own: a framed box, the badge sitting on its border
+    .new-block {
+      position: relative;
+      margin-top: 28px;
+      padding: 26px 12px 10px;
+      color: inherit;
+      background: rgba(115, 68, 245, 0.07);
+      border: 1px solid rgba(115, 68, 245, 0.35);
+      border-radius: 8px;
+
+      .badge-new {
+        position: absolute;
+        top: 0;
+        left: 10px;
+        margin: 0;
+        transform: translateY(-50%);
+      }
+
+      > :last-child { margin-bottom: 0; }
+    }
+
     // ── Footnotes ──
     .footnotes {
       font-size: 12px;

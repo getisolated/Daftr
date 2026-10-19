@@ -113,6 +113,54 @@ function linkTargets(md: MarkdownIt, context: MarkdownRenderContext): void {
   };
 }
 
+const NEW_MARKER = /^\s*\[!NEW\][ \t]*/;
+
+/**
+ * `[!NEW]` at the start of a block becomes a « New » badge (convention of the CAP Vision documentation). A quote it
+ * opens (`> [!NEW]`) or a paragraph of its own turns into a framed box with the badge on its border; in a heading, a
+ * list item or a table cell, the badge stays inline.
+ */
+function newBadges(md: MarkdownIt, context: MarkdownRenderContext): void {
+  md.core.ruler.push('new_badges', (state: StateCore) => {
+    const tokens = state.tokens;
+
+    for (let i = 1; i < tokens.length; i++) {
+      const inline = tokens[i] as Token;
+      const first = inline.type === 'inline' ? inline.children?.[0] : undefined;
+
+      if (!inline.children || first?.type !== 'text' || !NEW_MARKER.test(first.content)) {
+        continue;
+      }
+
+      first.content = first.content.replace(NEW_MARKER, '');
+      // `[!NEW]` alone on its line, the content below: the line break goes with the marker
+      if (first.content === '' && inline.children[1]?.type === 'softbreak') {
+        inline.children.splice(0, 2);
+      }
+
+      const badge = new state.Token('html_inline', '', 0);
+      badge.content = `<span class="badge-new">${md.utils.escapeHtml(context.t('editor.alert.new'))}</span>`;
+      inline.children.unshift(badge);
+      frameNewBlock(tokens, i);
+    }
+  });
+}
+
+/** The box around a `[!NEW]` block: the quote it opens, or its own paragraph (not in a list item nor a cell). */
+function frameNewBlock(tokens: Token[], inlineIndex: number): void {
+  const open = tokens[inlineIndex - 1];
+  const parent = tokens[inlineIndex - 2];
+
+  if (open?.type !== 'paragraph_open' || open.hidden) {
+    return;
+  }
+  if (parent?.type === 'blockquote_open') {
+    parent.attrJoin('class', 'new-block');
+  } else if (parent?.type !== 'list_item_open') {
+    open.attrJoin('class', 'new-block');
+  }
+}
+
 /** Mermaid blocks are left as their source, flagged: the preview draws them once mermaid is loaded. */
 function mermaidFences(md: MarkdownIt): void {
   const fallback: RendererRule = md.renderer.rules['fence'] ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
@@ -137,6 +185,7 @@ export function createMarkdownRenderer(context: MarkdownRenderContext): Markdown
   md.use(sourceLines);
   md.use(taskLists);
   md.use(alerts, context);
+  md.use(newBadges, context);
   md.use(mermaidFences);
   linkTargets(md, context);
 
