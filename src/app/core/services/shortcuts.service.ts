@@ -1,11 +1,8 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
-import { keyEventToAccelerator } from '../utils/accelerator.util';
+import { isModifierKey, keyEventToAccelerator } from '../utils/accelerator.util';
 import { SettingsService } from './settings.service';
 
 type ShortcutHandler = (event: KeyboardEvent) => void;
-
-/** Time left to press the second key of a chord. */
-const CHORD_TIMEOUT_MS = 2000;
 
 interface ShortcutDef {
   key: string;
@@ -22,13 +19,15 @@ export class ShortcutsService implements OnDestroy {
   private shortcuts: ShortcutDef[] = [];
   private actions = new Map<string, ShortcutHandler>();
   private boundListener: (e: KeyboardEvent) => void;
-  /** First key of a chord already pressed (e.g. Ctrl+K), waiting for the second one. */
+  private readonly blurListener = (): void => this.clearChord();
+  /** First key of a chord already pressed (e.g. Ctrl+K), waiting — with no time limit, like VS Code — for the second one. */
   private pendingChord: string | null = null;
-  private chordTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.boundListener = this.handleKeydown.bind(this);
     window.addEventListener('keydown', this.boundListener, true);
+    // The second key cannot come from another window: leaving the app cancels the chord
+    window.addEventListener('blur', this.blurListener);
   }
 
   register(def: ShortcutDef): () => void {
@@ -52,19 +51,20 @@ export class ShortcutsService implements OnDestroy {
     const resolved = this.settings.appShortcuts();
 
     if (this.pendingChord !== null) {
-      if (event.key === 'Escape') {
-        this.clearChord();
-        return;
-      }
       // A lone modifier press is part of typing the second key
-      if (!accelerator) {
+      if (isModifierKey(event)) {
         return;
       }
-      const chord = `${this.pendingChord}, ${accelerator}`;
+      const first = this.pendingChord;
+      const second = keyEventToAccelerator(event, { allowBareKey: true });
       this.clearChord();
-      // Whatever follows the first key is consumed, even when it completes no chord (same as VS Code)
+      // Whatever follows the first key is consumed, even when it completes no chord (same as VS Code): Escape cancels it
       event.preventDefault();
       event.stopPropagation();
+      if (!second) {
+        return;
+      }
+      const chord = `${first}, ${second}`;
       for (const [id, handler] of this.actions) {
         if (resolved[id] === chord) {
           handler(event);
@@ -79,7 +79,7 @@ export class ShortcutsService implements OnDestroy {
         // Keeps the key from reaching the editor, which would run its own binding
         event.preventDefault();
         event.stopPropagation();
-        this.startChord(accelerator);
+        this.pendingChord = accelerator;
         return;
       }
       for (const [id, handler] of this.actions) {
@@ -106,21 +106,13 @@ export class ShortcutsService implements OnDestroy {
     }
   }
 
-  private startChord(first: string): void {
-    this.pendingChord = first;
-    this.chordTimer = setTimeout(() => this.clearChord(), CHORD_TIMEOUT_MS);
-  }
-
   private clearChord(): void {
     this.pendingChord = null;
-    if (this.chordTimer) {
-      clearTimeout(this.chordTimer);
-      this.chordTimer = null;
-    }
   }
 
   ngOnDestroy(): void {
     this.clearChord();
     window.removeEventListener('keydown', this.boundListener, true);
+    window.removeEventListener('blur', this.blurListener);
   }
 }

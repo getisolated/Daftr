@@ -23,7 +23,7 @@ import { UpdateService } from './core/services/update.service';
 import { FormattingBarService } from './core/services/formatting-bar.service';
 import { ThemeService } from './core/services/theme.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
-import { OVERLAY_NOTES_TAB_ID } from './core/models/note.model';
+import { QUICK_NOTES_TAB_ID } from './core/models/note.model';
 import { GETTING_STARTED_FOLDER_NAME } from './core/models/folder.model';
 import { SAMPLE_NOTES } from './core/data/sample-notes';
 import { findSampleNotesToGather } from './core/utils/sample-notes.util';
@@ -41,18 +41,20 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
           <app-sidebar />
         }
         <div class="app-main">
-          <!-- Placed above or below the editor by its own CSS order -->
-          @if (formattingBarShown()) {
-            <app-formatting-bar />
-          }
-          <div class="app-content" [class.wide]="wideMode()">
-            <!-- Always keep both in DOM to avoid editor teardown on home navigation -->
-            <app-home [style.display]="activeNoteId() !== null ? 'none' : 'flex'" />
-            <app-editor
-              #editor
-              [noteId]="activeNoteId()"
-              [style.display]="activeNoteId() === null ? 'none' : 'flex'"
-            />
+          <!-- The page: the formatting bar sits on one of its sides (see data-bar-position), above the backlinks -->
+          <div class="app-page" [attr.data-bar-position]="formattingBarPosition()">
+            @if (formattingBarShown()) {
+              <app-formatting-bar />
+            }
+            <div class="app-content" [class.wide]="wideMode()">
+              <!-- Always keep both in DOM to avoid editor teardown on home navigation -->
+              <app-home [style.display]="activeNoteId() !== null ? 'none' : 'flex'" />
+              <app-editor
+                #editor
+                [noteId]="activeNoteId()"
+                [style.display]="activeNoteId() === null ? 'none' : 'flex'"
+              />
+            </div>
           </div>
           @if (backlinksShown()) {
             <app-backlinks-panel />
@@ -95,6 +97,17 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       min-height: 0;
       min-width: 0;
     }
+    .app-page {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+      min-width: 0;
+    }
+    .app-page[data-bar-position='bottom'] { flex-direction: column-reverse; }
+    .app-page[data-bar-position='left'] { flex-direction: row; }
+    .app-page[data-bar-position='right'] { flex-direction: row-reverse; }
     .app-content {
       display: flex;
       flex: 1;
@@ -123,7 +136,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private foldersService = inject(FoldersService);
   private sidebarState = inject(SidebarStateService);
   private updateService = inject(UpdateService);
-  private themeService = inject(ThemeService);
+  // Injected eagerly: it applies the theme to the document from the first render
+  private readonly themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
@@ -131,11 +145,12 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly sidebarVisible = this.sidebarState.visible;
   /** Only worth its room when there is a note to format (not on the home page). */
   readonly formattingBarShown = computed(() => this.formattingBar.visible() && this.activeNoteId() !== null);
+  readonly formattingBarPosition = this.formattingBar.position;
 
-  /** The read-only overlay notes document has no identity of its own to be linked to. */
+  /** The read-only quick notes document has no identity of its own to be linked to. */
   readonly backlinksShown = computed(() => {
     const id = this.activeNoteId();
-    return id !== null && id !== OVERLAY_NOTES_TAB_ID;
+    return id !== null && id !== QUICK_NOTES_TAB_ID;
   });
 
   /** Popup offering the update found by the main process; null when closed. */
@@ -252,11 +267,15 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('tab.prev', () => this.tabsService.prevTab());
     bind('search.global', () => this.paletteService.open('search'));
     bind('editor.find', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(); });
+    bind('editor.replace', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(true); });
     bind('editor.preview', () => { if (this.activeNoteId() !== null) this.editorRef?.togglePreview(); });
     bind('editor.previewSide', () => { if (this.activeNoteId() !== null) this.editorRef?.togglePreviewSide(); });
     bind('settings.open', () => this.settingsService.open());
     bind('layout.toggle', () => this.layoutService.toggle());
-    bind('theme.toggle', () => { void this.themeService.toggle(); });
+    bind('editor.wordWrap', () => {
+      void this.settingsService.update({ wordWrap: !this.settingsService.settings().wordWrap });
+    });
+    bind('theme.select', () => this.paletteService.open('theme'));
     bind('formattingBar.toggle', () => this.formattingBar.toggle());
     bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
     bind('tab.pin', () => this.tabsService.togglePinActiveTab());
