@@ -22,7 +22,9 @@
   display: flex;
   gap: 1px;
   padding: 2px;
-  background: var(--evn-bg-panel);
+  // Translucent so that the content scrolling under it shows blurred
+  background: color-mix(in srgb, var(--evn-bg-panel) 60%, transparent);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--evn-border-soft);
   border-radius: 6px;
   opacity: 0.6;
@@ -71,8 +73,12 @@
   min-height: 0;
 
   ::ng-deep {
+    // Centered reading zone with its own scroller: a long line scrolls inside it instead of widening it
+    // (the wide layout lifts the limit, see app.component)
     .cm-editor {
       height: 100%;
+      max-width: 860px;
+      margin: 0 auto;
       outline: none;
     }
 

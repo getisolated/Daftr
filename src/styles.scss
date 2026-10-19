@@ -428,6 +428,10 @@ html.overlay-mode body {
   height: 6px;
 }
 ::-webkit-scrollbar-track { background: transparent; }
+// No white square where both scrollbars meet
+::-webkit-scrollbar-corner { background: transparent; }
+// No arrow buttons at the ends of the track
+::-webkit-scrollbar-button { display: none; }
 ::-webkit-scrollbar-thumb {
   background: var(--evn-scrollbar);
   border-radius: 3px;

@@ -63,7 +63,7 @@ export class MarkdownPreviewComponent {
       // Every theme block of styles.scss sets color-scheme: the diagrams follow it
       const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
       void highlightCodeBlocks(root);
-      void renderMermaidBlocks(root, dark);
+      void renderMermaidBlocks(root, dark, this.i18n.t('editor.preview.diagramLoading'));
     });
   }
 

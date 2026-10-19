@@ -122,8 +122,8 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       min-height: 0;
       min-width: 0;
     }
-    .app-content.wide ::ng-deep .cm-content {
-      max-width: 100% !important;
+    .app-content.wide ::ng-deep .cm-editor {
+      max-width: none !important;
     }
     .app-content.wide ::ng-deep .home-inner {
       max-width: 100%;
