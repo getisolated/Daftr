@@ -1,0 +1,44 @@
+//! Avant/après d'un changement de réglages.
+
+use domain::settings::AppSettings;
+
+/// Réglages avant et après un changement ; l'appelant en déduit les effets à appliquer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SettingsChange {
+    /// Réglages avant.
+    pub before: AppSettings,
+    /// Réglages après.
+    pub after: AppSettings,
+}
+
+impl SettingsChange {
+    /// Le raccourci global a changé.
+    pub fn shortcut_changed(&self) -> bool {
+        self.before.global_shortcut != self.after.global_shortcut
+    }
+
+    /// La taille de l'overlay a changé.
+    pub fn overlay_size_changed(&self) -> bool {
+        self.before.overlay_size() != self.after.overlay_size()
+    }
+
+    /// Le lancement au démarrage a changé.
+    pub fn launch_at_startup_changed(&self) -> bool {
+        self.before.launch_at_startup != self.after.launch_at_startup
+    }
+
+    /// La langue a changé.
+    pub fn language_changed(&self) -> bool {
+        self.before.language != self.after.language
+    }
+
+    /// Les mises à jour automatiques ont changé.
+    pub fn auto_update_changed(&self) -> bool {
+        self.before.auto_update != self.after.auto_update
+    }
+
+    /// Les dossiers ignorés des collections ont changé.
+    pub fn collections_exclude_changed(&self) -> bool {
+        self.before.collections_exclude != self.after.collections_exclude
+    }
+}
