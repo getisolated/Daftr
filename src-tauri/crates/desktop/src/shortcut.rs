@@ -1,4 +1,4 @@
-//! Raccourci global (par défaut `Ctrl+Alt+N`).
+//! Raccourci global (par défaut `Ctrl+Alt+Q`).
 
 use std::sync::Mutex;
 

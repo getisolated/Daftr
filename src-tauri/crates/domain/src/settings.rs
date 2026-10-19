@@ -31,7 +31,7 @@ pub const OVERLAY_MAX_HEIGHT: u32 = 1200;
 pub struct AppSettings {
     /// Langue de l'interface ; choisie d'après la locale de l'OS au premier lancement.
     pub language: Language,
-    /// Raccourci global (format accélérateur, ex. `CommandOrControl+Alt+N`).
+    /// Raccourci global (format accélérateur, ex. `CommandOrControl+Alt+Q`).
     pub global_shortcut: String,
     /// Ce qu'ouvre le raccourci global.
     pub shortcut_mode: ShortcutMode,
@@ -93,7 +93,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             language: DEFAULT_LANGUAGE,
-            global_shortcut: "CommandOrControl+Alt+N".to_owned(),
+            global_shortcut: "CommandOrControl+Alt+Q".to_owned(),
             shortcut_mode: ShortcutMode::Overlay,
             overlay_width: 250,
             overlay_height: 350,

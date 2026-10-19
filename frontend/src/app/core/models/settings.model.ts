@@ -58,7 +58,7 @@ export interface SettingsUpdateResult {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   language: DEFAULT_LANGUAGE,
-  globalShortcut: 'CommandOrControl+Alt+N',
+  globalShortcut: 'CommandOrControl+Alt+Q',
   shortcutMode: 'overlay',
   overlayWidth: 250,
   overlayHeight: 350,
