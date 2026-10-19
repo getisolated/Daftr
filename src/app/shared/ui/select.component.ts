@@ -5,7 +5,12 @@ export interface SelectOption {
   label: string;
 }
 
+/** Where the list opens: under the trigger (above when there is no room), or beside it (vertical toolbars). */
+export type SelectPlacement = 'below' | 'right' | 'left';
+
 const PANEL_GAP_PX = 2;
+const SIDE_PANEL_WIDTH_PX = 180;
+const VIEWPORT_MARGIN_PX = 8;
 const PANEL_MAX_HEIGHT_PX = 240;
 const OPTION_HEIGHT_PX = 28;
 const PANEL_PADDING_PX = 8;
@@ -30,7 +35,7 @@ const PANEL_PADDING_PX = 8;
       (click)="toggle()"
       (keydown)="onKeydown($event)"
     >
-      <span class="current">{{ currentLabel() }}</span>
+      <span class="current">{{ triggerLabel() ?? currentLabel() }}</span>
       <svg class="chevron" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="3 6 8 11 13 6" />
       </svg>
@@ -67,6 +72,9 @@ export class SelectComponent {
 
   readonly value = input('');
   readonly options = input<SelectOption[]>([]);
+  readonly placement = input<SelectPlacement>('below');
+  /** Text of the closed drop-down instead of the current option's label (e.g. a short one in a narrow toolbar). */
+  readonly triggerLabel = input<string | null>(null);
   readonly valueChange = output<string>();
 
   protected readonly isOpen = signal(false);
@@ -144,13 +152,25 @@ export class SelectComponent {
 
   private open(): void {
     const trigger = this.host.nativeElement.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - trigger.bottom;
     const panelHeight = Math.min(PANEL_MAX_HEIGHT_PX, this.options().length * OPTION_HEIGHT_PX + PANEL_PADDING_PX);
-    // Opens upwards when there is no room below
-    const top = spaceBelow >= panelHeight + PANEL_GAP_PX ? trigger.bottom + PANEL_GAP_PX : trigger.top - panelHeight - PANEL_GAP_PX;
-    this.panelRect.set({ left: trigger.left, top, width: trigger.width });
+    this.panelRect.set(this.placement() === 'below' ? this.panelBelow(trigger, panelHeight) : this.panelBeside(trigger, panelHeight));
     this.highlightedIndex.set(Math.max(0, this.options().findIndex(option => option.value === this.value())));
     this.isOpen.set(true);
     window.addEventListener('scroll', this.closeOnScroll, true);
+  }
+
+  private panelBelow(trigger: DOMRect, panelHeight: number): { left: number; top: number; width: number } {
+    const spaceBelow = window.innerHeight - trigger.bottom;
+    // Opens upwards when there is no room below
+    const top = spaceBelow >= panelHeight + PANEL_GAP_PX ? trigger.bottom + PANEL_GAP_PX : trigger.top - panelHeight - PANEL_GAP_PX;
+    return { left: trigger.left, top, width: trigger.width };
+  }
+
+  /** Beside the trigger, aligned on its top and kept inside the window. */
+  private panelBeside(trigger: DOMRect, panelHeight: number): { left: number; top: number; width: number } {
+    const left = this.placement() === 'right' ? trigger.right + PANEL_GAP_PX : trigger.left - SIDE_PANEL_WIDTH_PX - PANEL_GAP_PX;
+    const maxTop = window.innerHeight - panelHeight - VIEWPORT_MARGIN_PX;
+    const top = Math.max(VIEWPORT_MARGIN_PX, Math.min(trigger.top, maxTop));
+    return { left, top, width: SIDE_PANEL_WIDTH_PX };
   }
 }

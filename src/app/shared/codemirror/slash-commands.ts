@@ -6,7 +6,7 @@ import { StateField, StateEffect, EditorState, Transaction } from '@codemirror/s
 import { syntaxTree } from '@codemirror/language';
 import { FormatId } from '../../core/models/formatting-bar.model';
 import {
-  FORMAT_ACTIONS, insertCodeBlock, insertHorizontalRule, insertLinePrefix, insertTable, insertWrap,
+  FORMAT_ACTIONS, clearInlineFormatting, insertCodeBlock, insertHorizontalRule, insertLinePrefix, insertTable, insertWrap,
 } from './formatting-commands';
 
 // ─── Slash Command Definitions ───────────────────────────────────────────────
@@ -37,6 +37,8 @@ export const slashCommands: SlashCommand[] = [
   slashCommand('h2', 'Style', (view, range) => insertLinePrefix(view, range, '## ')),
   slashCommand('h3', 'Style', (view, range) => insertLinePrefix(view, range, '### ')),
   slashCommand('h4', 'Style', (view, range) => insertLinePrefix(view, range, '#### ')),
+  slashCommand('h5', 'Style', (view, range) => insertLinePrefix(view, range, '##### ')),
+  slashCommand('h6', 'Style', (view, range) => insertLinePrefix(view, range, '###### ')),
   slashCommand('bulletList', 'Style', (view, range) => insertLinePrefix(view, range, '- ')),
   slashCommand('orderedList', 'Style', (view, range) => insertLinePrefix(view, range, '1. ')),
   slashCommand('taskList', 'Style', (view, range) => insertLinePrefix(view, range, '- [ ] ')),
@@ -47,9 +49,19 @@ export const slashCommands: SlashCommand[] = [
   slashCommand('italic', 'Formatage', (view, range) => insertWrap(view, range, '*', '*', 'texte')),
   slashCommand('strikethrough', 'Formatage', (view, range) => insertWrap(view, range, '~~', '~~', 'texte')),
   slashCommand('inlineCode', 'Formatage', (view, range) => insertWrap(view, range, '`', '`', 'code')),
+  slashCommand('underline', 'Formatage', (view, range) => insertWrap(view, range, '<u>', '</u>', 'texte')),
+  slashCommand('superscript', 'Formatage', (view, range) => insertWrap(view, range, '<sup>', '</sup>', 'texte')),
+  slashCommand('subscript', 'Formatage', (view, range) => insertWrap(view, range, '<sub>', '</sub>', 'texte')),
+  slashCommand('clearFormatting', 'Formatage', (view, range) => {
+    // The typed `/query` goes first, then the caret line is cleared
+    view.dispatch({ changes: { from: range.from, to: range.to } });
+    clearInlineFormatting(view);
+  }),
   // ── Insérer ──
   slashCommand('hr', 'Insérer', (view, range) => insertHorizontalRule(view, range)),
   slashCommand('table', 'Insérer', (view, range) => insertTable(view, range)),
+  slashCommand('link', 'Insérer', (view, range) => insertWrap(view, range, '[', '](url)', 'texte')),
+  slashCommand('image', 'Insérer', (view, range) => insertWrap(view, range, '![', '](url)', 'image')),
 ];
 
 /** Label, icon and description come from the shared formatting actions, so the slash menu and the toolbar never drift. */
