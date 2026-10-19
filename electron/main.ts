@@ -15,6 +15,7 @@ import {
   moveCollectionPath, openPaths, pickCollections, readCollectionFile, relocateCollection, removeCollection,
   renameCollection, renameCollectionPath, loadCollection, revealCollectionPath, searchCollections,
   setCollectionExcludes, stopCollections, trashCollectionPath, writeCollectionFile,
+  requestCollectionGraph,
 } from './collections';
 import { promises as fs } from 'fs';
 
@@ -268,6 +269,7 @@ safeHandle('collections:trash', async (_e, root: unknown, relative: unknown) => 
 });
 safeHandle('collections:reveal', (_e, root: unknown, relative: unknown) => { revealCollectionPath(root, relative); return true; });
 safeHandle('collections:search', (_e, query: unknown) => searchCollections(query));
+safeHandle('collections:graph', (_e, root: unknown) => { requestCollectionGraph(root); return true; });
 safeHandle('collections:cancelSearch', (_e, requestId: unknown) => { cancelCollectionSearch(requestId); return true; });
 
 // ── Settings & overlay ───────────────────────────────────────────────────────

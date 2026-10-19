@@ -94,5 +94,11 @@ export function resolveRelativeLink(fromFile: string, target: string): string | 
   }
 
   const resolved = segments.join('/');
-  return /\.md$/i.test(resolved) ? resolved : `${resolved}.md`;
+
+  if (/\.md$/i.test(resolved)) {
+    return resolved;
+  }
+
+  // A file of another extension is not a markdown page of the collection
+  return /\.[^./]+$/.test(segments[segments.length - 1] ?? '') ? null : `${resolved}.md`;
 }
