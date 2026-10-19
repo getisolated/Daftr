@@ -27,6 +27,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **Themes** — Dark (default), Light, GitHub Light, Solarized Light, Violet Light and GitHub Dark Dimmed. **Settings → Appearance → Theme**, or `Ctrl+K Ctrl+T` for a VS Code-like picker: the arrow keys preview each theme live, `Enter` keeps it, `Escape` restores the previous one. `System` follows the Windows light/dark mode with the *Preferred Dark / Light Theme* settings. Chords (`Ctrl+K` then a second key) wait for the second key with no time limit; `Escape` or any other key cancels them. Every color is a CSS variable `--evn-*` defined per `data-theme` in `src/styles.scss` (the editor syntax colors too, so CodeMirror needs no per-theme extension): a new theme = a new `:root[data-theme='…']` block, registered in `theme.model.ts` (a test checks every block defines every token). The choice lives in `settings.json` and is mirrored in localStorage so an inline script in `index.html` applies it before the first paint. The quick-note overlay keeps its own dark translucent look
 - **Formatting bar** — Word-like toolbar (styles, bold/italic/strike/code, blocks, lists) between the tabs and the editor, buttons reflect the formatting under the caret (read from the syntax tree) and never steal the editor focus. `Alt+T` toggles it; **Settings → Formatting Bar** turns it off for good and sets its size (Full / Compact), style (Pinned / Floating) and position (Top / Bottom)
 - **Find & replace** — `Ctrl+F` / `Ctrl+H` open a panel in the right column (in place of the outline while open, like Word): match case / whole word / regular expression toggles (`Alt+C` / `Alt+W` / `Alt+R`), `3 of 12` counter, icon buttons, and the list of every match with its line and context (click to jump). `Enter` / `Shift+Enter` go to the next / previous match, `Enter` in the replace field replaces, `Ctrl+Alt+Enter` replaces all, `Escape` closes. CodeMirror's search state drives it (highlights, commands); its native panel is hidden
+- **Preview** — GitHub-like rendering of a note (markdown-it, sanitized by DOMPurify): tables, task lists, footnotes, GitHub alerts (`> [!NOTE]`…), code colored with the editor's Lezer parsers, **Mermaid** diagrams (` ```mermaid `, loaded on demand, following the theme). The buttons at the top right of a note switch between *Source*, *side by side* (scrolls synchronized both ways) and *Preview*; `Ctrl+Shift+V` toggles the preview, `Ctrl+K V` the side-by-side view. **Settings → Editor → Open Notes In Preview** opens notes rendered. Local links pointing to nothing are shown in red, in the editor and in the preview
 - **Keyboard-first** — every action has a shortcut (see below)
 - **Local storage** — all data stays on your machine in a SQLite database
 
@@ -92,6 +93,8 @@ Every in-app shortcut below is a default and can be rebound in **Settings → Ke
 | `Ctrl+W` | Close tab |
 | `Ctrl+F` | Find in the note (panel on the right, with the list of matches) |
 | `Ctrl+H` | Find & replace in the note |
+| `Ctrl+Shift+V` | Toggle the preview |
+| `Ctrl+K` `V` (chord) | Toggle the preview to the side |
 | `Ctrl+Shift+F` | Search all notes |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+S` | Save note |

@@ -70,6 +70,8 @@ export interface AppSettings {
   showOutline: boolean;
   /** true: the editor scrollbar only shows while the mouse is over it. */
   hideScrollbar: boolean;
+  /** true: a note opens in preview (rendered, read-only) instead of its markdown source. */
+  openInPreview: boolean;
   /** Last position chosen by the user; null until the overlay has been moved once. */
   overlayPosition: OverlayPosition | null;
 }
@@ -103,6 +105,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trailingLine: false,
   showOutline: false,
   hideScrollbar: false,
+  openInPreview: false,
   overlayPosition: null,
 };
 
@@ -168,6 +171,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
     trailingLine: typeof raw['trailingLine'] === 'boolean' ? raw['trailingLine'] : base.trailingLine,
     showOutline: typeof raw['showOutline'] === 'boolean' ? raw['showOutline'] : base.showOutline,
     hideScrollbar: typeof raw['hideScrollbar'] === 'boolean' ? raw['hideScrollbar'] : base.hideScrollbar,
+    openInPreview: typeof raw['openInPreview'] === 'boolean' ? raw['openInPreview'] : base.openInPreview,
     overlayPosition: 'overlayPosition' in raw ? sanitizePosition(raw['overlayPosition']) : base.overlayPosition,
   };
 }
