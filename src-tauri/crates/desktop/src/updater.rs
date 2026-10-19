@@ -61,7 +61,7 @@ fn check_forever(app: &AppHandle) {
         let next = match tauri::async_runtime::block_on(check(app)) {
             Ok(()) => CHECK_INTERVAL,
             Err(error) => {
-                tracing::warn!(error = %format!("{error:#}"), "vérification des mises à jour échouée");
+                tracing::warn!(error = %format!("{error:#}"), "vérification échouée");
                 RETRY_DELAY
             }
         };
