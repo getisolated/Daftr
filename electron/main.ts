@@ -10,6 +10,7 @@ import { sanitizeSettings, SettingsPatch, ThemeId } from './settings-schema';
 import { applyLaunchAtStartup, launchedHidden } from './startup';
 import { createTray, destroyTray } from './tray';
 import { applyUpdate, getUpdateInfo, onAutoUpdateChanged, startUpdater, stopUpdater } from './updater';
+import { isExportKind, saveExport } from './export';
 
 const isDev = process.env['NODE_ENV'] === 'development';
 let mainWindow: BrowserWindow | null = null;
@@ -261,6 +262,14 @@ safeHandle('overlay:hide', () => hideOverlay());
 // ── Updates ──────────────────────────────────────────────────────────────────
 safeHandle('update:getInfo', () => getUpdateInfo());
 safeHandle('update:apply', () => applyUpdate());
+
+// ── Export ───────────────────────────────────────────────────────────────────
+safeHandle('export:save', (e, kind: unknown, suggestedName: unknown, payload: unknown) => {
+  if (!isExportKind(kind) || typeof suggestedName !== 'string') {
+    throw new Error('Invalid export request');
+  }
+  return saveExport(BrowserWindow.fromWebContents(e.sender), kind, suggestedName, payload);
+});
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 safeHandle('shell:openExternal', (_e, url: string) => {

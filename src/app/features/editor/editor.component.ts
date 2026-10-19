@@ -30,6 +30,7 @@ import { ElectronBridgeService } from '../../core/services/electron-bridge.servi
 import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
 import { EditorViewMode, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
+import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
 import { FoldersService } from '../../core/services/folders.service';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
@@ -76,13 +77,7 @@ const PREVIEW_REFRESH_MS = 150;
               (mousedown)="$event.preventDefault()"
               (click)="setViewMode(mode.id)"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                @switch (mode.id) {
-                  @case ('source') { <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" /> }
-                  @case ('split') { <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 3v18" /> }
-                  @case ('preview') { <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /> }
-                }
-              </svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="mode.icon"></svg>
             </button>
           }
         </div>
@@ -171,6 +166,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected settingsService = inject(SettingsService);
   private themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
+  private noteExport = inject(NoteExportService);
   protected readonly find = inject(FindService);
 
   readonly activeNote = signal<Note | null>(null);
@@ -191,10 +187,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Set while the editor scrolls because of the preview: that scroll must not be echoed back. */
   private syncingFromPreview = false;
 
-  protected readonly viewModes: { id: EditorViewMode; label: string; shortcut: string | null }[] = [
-    { id: 'source', label: 'Source', shortcut: null },
-    { id: 'split', label: 'Preview to the side', shortcut: 'editor.previewSide' },
-    { id: 'preview', label: 'Preview', shortcut: 'editor.preview' },
+  protected readonly viewModes: { id: EditorViewMode; label: string; shortcut: string | null; icon: string }[] = [
+    { id: 'source', label: 'Source', shortcut: null, icon: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>' },
+    { id: 'split', label: 'Preview to the side', shortcut: 'editor.previewSide', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/>' },
+    { id: 'preview', label: 'Preview', shortcut: 'editor.preview', icon: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>' },
   ];
 
   /** Whether a link target exists, shared by the editor decorations and the preview. */
@@ -686,6 +682,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
           );
         }
 
+        if (this.noteExport.canExport(this.activeNote()?.id ?? null)) {
+          items.push({ divider: true }, NOTE_EXPORT_MENU);
+        }
+
         this.ctxMenu.set({ items, x: event.clientX, y: event.clientY });
         return true;
       },
@@ -694,7 +694,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   protected onCtxAction(id: string): void {
     const view = this.editorView;
-    if (id === 'draft' && view) {
+    const noteId = this.activeNote()?.id;
+
+    if (id.startsWith('export:') && noteId !== undefined) {
+      // What was typed in the last second is not saved yet: the export must include it
+      void this.flushPendingSave().then(() => this.noteExport.runNoteAction(id, noteId));
+    } else if (id === 'draft' && view) {
       toggleDraft(view);
       view.focus();
     } else if (id.startsWith('table:') && view) {
