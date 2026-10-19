@@ -175,6 +175,12 @@ fn join_segments(from_file: &str, cleaned: &str) -> Option<Vec<String>> {
     Some(segments)
 }
 
+/// La cible d'un lien désigne un dossier (`../`, `./guide/`, `~/`) plutôt qu'un fichier.
+pub fn is_folder_link(target: &str) -> bool {
+    let cleaned = clean_target(target);
+    !cleaned.is_empty() && !has_scheme(&cleaned) && points_to_folder(&cleaned)
+}
+
 /// La cible désigne un dossier : elle finit par `/`, ou par `.` ou `..`.
 fn points_to_folder(cleaned: &str) -> bool {
     let last = cleaned.rsplit('/').next().unwrap_or_default();

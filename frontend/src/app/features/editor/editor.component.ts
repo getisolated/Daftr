@@ -49,7 +49,9 @@ import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/n
 import { CollectionFileRef } from '../../core/models/collection.model';
 import { CollectionsService } from '../../core/services/collections.service';
 import { FileDocsService } from '../../core/services/file-docs.service';
-import { baseName, collectionLinkStatus, knownFiles, resolveRelativeLink, resolveRelativePath } from '../../core/utils/collection.util';
+import {
+  CollectionIndex, CollectionTarget, baseName, collectionLinkStatus, folderPage, indexCollection, resolveRelativeLink, resolveRelativePath,
+} from '../../core/utils/collection.util';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { inDesktop } from '../../core/services/desktop-api';
 import { ImageResolver } from '../../shared/markdown/markdown-renderer';
@@ -271,10 +273,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
     // In a collection file, links lead to the other files of the collection (as `followLink` does)
     const file = this.fileDocs.refFor(this.activeNote()?.id ?? null);
     if (file) {
-      const state = this.collections.states().find(candidate => candidate.collection.path === file.root);
-      const loaded = state?.status === 'ready' && state.collection.kind === 'folder';
-      const files = loaded ? knownFiles(state.tree) : null;
-      return target => collectionLinkStatus(file.path, target, files);
+      const index = this.collectionIndex(file.root);
+      return target => collectionLinkStatus(file.path, target, index);
     }
 
     const notes = this.notes.notes();
@@ -831,7 +831,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const relative = file && !/^[a-z][a-z0-9+.-]*:/i.test(target.trim()) ? resolveRelativeLink(file.path, target) : null;
 
     if (file && relative !== null) {
-      this.collections.open({ root: file.root, path: relative });
+      this.openCollectionTarget(file.root, relative);
       return;
     }
 
@@ -850,6 +850,29 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     if (note) {
       this.tabs.openNote(note.id, note.title);
+    }
+  }
+
+  /** Files and folders of a loaded folder collection, `null` until its tree is read. */
+  private collectionIndex(root: string): CollectionIndex | null {
+    const state = this.collections.states().find(candidate => candidate.collection.path === root);
+    const loaded = state?.status === 'ready' && state.collection.kind === 'folder';
+    return loaded ? indexCollection(state.tree) : null;
+  }
+
+  /** A file opens in a tab; a folder opens its index.md or README.md, or is shown in the sidebar when it has none. */
+  private openCollectionTarget(root: string, target: CollectionTarget): void {
+    if (target.kind === 'file') {
+      this.collections.open({ root, path: target.path });
+      return;
+    }
+    const index = this.collectionIndex(root);
+    const page = index ? folderPage(index, target.path) : null;
+
+    if (page) {
+      this.collections.open({ root, path: page });
+    } else {
+      this.collections.revealFolder(root, index?.folders.get(target.path.toLowerCase()) ?? target.path);
     }
   }
 

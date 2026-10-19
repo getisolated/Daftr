@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, untracked,
+} from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslationKey } from '../../core/i18n/translations';
 import { CollectionEditing, CollectionRow } from '../../core/models/collection-tree.model';
@@ -134,6 +136,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
               class="row"
               role="treeitem"
               tabindex="0"
+              [attr.data-key]="row.key"
               [attr.aria-selected]="isActive(row.root, row.node)"
               [attr.aria-expanded]="row.node.kind === 'folder' ? isExpanded(row.key) : null"
               [draggable]="!isEditing('renamePath', row.root, row.node.path)"
@@ -219,6 +222,8 @@ export class CollectionsSectionComponent {
 
   protected readonly open = signal(!readSet(SECTION_KEY).has('closed'));
   private readonly expanded = signal<ReadonlySet<string>>(readSet(EXPANDED_KEY));
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   protected readonly editing = signal<CollectionEditing | null>(null);
   protected readonly menu = signal<{ items: ContextMenuEntry[]; x: number; y: number; target: { root: string; node: CollectionNode | null } } | null>(null);
   protected readonly dropKey = signal<string | null>(null);
@@ -255,6 +260,37 @@ export class CollectionsSectionComponent {
 
     return rows;
   });
+
+  constructor() {
+    // A link to a folder without an index page shows that folder here
+    effect(() => {
+      const request = this.collections.folderToReveal();
+      if (request) {
+        untracked(() => this.revealFolder(request.root, request.path));
+      }
+    });
+  }
+
+  /** Opens the section and the collection, expands the folder and its parents, then scrolls to it and focuses it. */
+  private revealFolder(root: string, path: string): void {
+    const state = this.collections.states().find(candidate => candidate.collection.path === root);
+    if (!state) {
+      return;
+    }
+    if (!this.open()) {
+      this.toggleSection();
+    }
+    this.openCollection(state);
+
+    const segments = path.split('/').filter(Boolean);
+    segments.forEach((_, index) => this.expand(nodeKey(root, segments.slice(0, index + 1).join('/'))));
+
+    afterNextRender(() => {
+      const row = this.host.nativeElement.querySelector<HTMLElement>(`[data-key="${CSS.escape(nodeKey(root, path))}"]`);
+      row?.scrollIntoView({ block: 'nearest' });
+      row?.focus();
+    }, { injector: this.injector });
+  }
 
   protected toggleSection(): void {
     this.open.update(open => !open);

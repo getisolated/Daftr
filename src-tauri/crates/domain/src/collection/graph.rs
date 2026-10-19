@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::{extract_link_targets, resolve_collection_link};
+use super::{extract_link_targets, is_folder_link, resolve_collection_link};
 
 /// Un fichier lu : son chemin relatif et son texte.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,8 +49,13 @@ pub fn build_collection_graph(files: &[FileContent]) -> CollectionGraph {
 
     for file in files {
         for target in extract_link_targets(&file.content) {
-            if let Some(resolved) = resolve_collection_link(&file.path, &target) {
+            let Some(resolved) = resolve_collection_link(&file.path, &target) else {
+                continue;
+            };
+            if !is_folder_link(&target) {
                 builder.add_link(&file.path, &resolved);
+            } else if let Some(page) = builder.folder_page(&resolved) {
+                builder.add_link(&file.path, &page);
             }
         }
     }
@@ -81,6 +86,21 @@ impl GraphBuilder {
             builder.node_index(&file.path, false);
         }
         builder
+    }
+
+    /// Page qu'ouvre un lien vers un dossier (`resolved` = `<dossier>/index.md`) : son index.md,
+    /// sinon son README.md ; aucune si le dossier existe sans l'une ni l'autre (le lien n'est pas
+    /// cassé, il n'a juste pas de page à relier), l'index.md manquant si le dossier n'existe pas.
+    fn folder_page(&self, resolved: &str) -> Option<String> {
+        let folder = resolved.strip_suffix("index.md").unwrap_or(resolved);
+        let lower = folder.to_lowercase();
+        let page = |name: &str| self.existing.get(&format!("{lower}{name}")).cloned();
+
+        if let Some(found) = page("index.md").or_else(|| page("readme.md")) {
+            return Some(found);
+        }
+        let folder_exists = self.existing.keys().any(|path| path.starts_with(&lower));
+        (!folder_exists).then(|| resolved.to_owned())
     }
 
     fn add_link(&mut self, source: &str, resolved: &str) {
@@ -175,6 +195,25 @@ mod tests {
                 node("docs/guide.md", 2, false),
                 node("docs/alone.md", 0, false),
                 node("docs/gone.md", 1, true),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_folder_link_leads_to_its_index_or_readme_page() {
+        let graph = build_collection_graph(&[
+            file(
+                "a/v26/client.md",
+                "[root](../) [guide](../../guide/) [gone](../../nothing/)",
+            ),
+            file("guide/README.md", ""),
+        ]);
+
+        assert_eq!(
+            graph.links,
+            [
+                link("a/v26/client.md", "guide/README.md"),
+                link("a/v26/client.md", "nothing/index.md"),
             ]
         );
     }

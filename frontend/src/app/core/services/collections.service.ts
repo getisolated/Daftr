@@ -43,6 +43,10 @@ export class CollectionsService {
     return raw.map((state, index) => ({ ...state, label: labels[index]?.label ?? state.collection.displayName, hint: labels[index]?.hint ?? null }));
   });
 
+  private readonly _folderToReveal = signal<{ root: string; path: string } | null>(null);
+  /** Folder to show in the sidebar (a link to a folder without an index page): expanded, scrolled to. */
+  readonly folderToReveal = this._folderToReveal.asReadonly();
+
   /** Collection selected in the sidebar: the home page draws its graph instead of the notes'. */
   readonly selectedRoot = this._selectedRoot.asReadonly();
 
@@ -136,6 +140,11 @@ export class CollectionsService {
       await this.reload();
       await this.load(row.path);
     }
+  }
+
+  /** Asks the sidebar to expand the folder (and its parents) and to scroll to it. */
+  revealFolder(root: string, path: string): void {
+    this._folderToReveal.set({ root, path });
   }
 
   reveal(ref: CollectionFileRef): void {

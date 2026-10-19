@@ -68,23 +68,26 @@ export function flattenFiles(root: string, nodes: readonly CollectionNode[]): Co
  * Target of a relative markdown link written in a collection file, as a path of the same collection; `null` for what
  * is not a local markdown file (web address, anchor) or leaves the collection.
  */
-export function resolveRelativeLink(fromFile: string, target: string): string | null {
+export function resolveRelativeLink(fromFile: string, target: string): CollectionTarget | null {
   const resolved = resolveRelativePath(fromFile, target);
 
   if (resolved === null) {
     return null;
   }
-  // A link to a folder (`../`, `./guide/`) opens its index page, as a web server serves index.html
+  // A link to a folder (`../`, `./guide/`): its index page, as a web server serves index.html (see folderPage)
   if (pointsToFolder(cleanTarget(target))) {
-    return resolved ? `${resolved}/index.md` : 'index.md';
+    return { kind: 'folder', path: resolved };
   }
   if (/\.md$/i.test(resolved)) {
-    return resolved;
+    return { kind: 'file', path: resolved };
   }
 
   // A file of another extension is not a markdown page of the collection
-  return /\.[^./]+$/.test(baseName(resolved)) ? null : `${resolved}.md`;
+  return /\.[^./]+$/.test(baseName(resolved)) ? null : { kind: 'file', path: `${resolved}.md` };
 }
+
+/** What a link of a collection file designates: a markdown file, or a folder (`''` for the root). */
+export type CollectionTarget = { kind: 'file' | 'folder'; path: string };
 
 /** The target without its angle brackets and anchor, percent-decoded when it is; `~` alone is the root folder. */
 function cleanTarget(target: string): string {
@@ -133,20 +136,37 @@ export function resolveRelativePath(fromFile: string, target: string): string | 
   return segments.join('/');
 }
 
-/** Paths (lower case) of the markdown files of a loaded collection, `null` while its tree is not known. */
-export type KnownFiles = ReadonlySet<string> | null;
+/** Files and folders of a loaded collection, by lower-case path (the disk is case-insensitive), to their real path. */
+export interface CollectionIndex {
+  files: ReadonlyMap<string, string>;
+  folders: ReadonlyMap<string, string>;
+}
 
-/** Lower-case paths of the files of a collection tree, for {@link collectionLinkStatus}. */
-export function knownFiles(nodes: readonly CollectionNode[]): Set<string> {
-  return new Set(flattenFiles('', nodes).map(ref => ref.path.toLowerCase()));
+/** Index of a collection tree, for {@link collectionLinkStatus} and {@link folderPage}; the root folder is `''`. */
+export function indexCollection(nodes: readonly CollectionNode[]): CollectionIndex {
+  const files = new Map<string, string>();
+  const folders = new Map<string, string>([['', '']]);
+  const pending = [...nodes];
+
+  for (let node = pending.pop(); node; node = pending.pop()) {
+    (node.kind === 'folder' ? folders : files).set(node.path.toLowerCase(), node.path);
+    pending.push(...(node.children ?? []));
+  }
+  return { files, folders };
+}
+
+/** The page a link to `folder` opens: its index.md, else its README.md; `null` when it has neither. */
+export function folderPage(index: CollectionIndex, folder: string): string | null {
+  const inFolder = (name: string): string => (folder ? `${folder}/${name}` : name).toLowerCase();
+  return index.files.get(inFolder('index.md')) ?? index.files.get(inFolder('readme.md')) ?? null;
 }
 
 /**
  * Status of a link written in a collection file: a relative (or extension-less) target is resolved from that file,
- * inside its collection. Only a markdown page missing from the loaded tree is `broken`; files of another extension
- * (images, sources) are not listed in the tree and cannot be checked, nor can anything before the tree is loaded.
+ * inside its collection. Only a markdown page or a folder missing from the loaded tree is `broken`; files of another
+ * extension (images, sources) are not listed in the tree and cannot be checked, nor can anything before it is loaded.
  */
-export function collectionLinkStatus(fromFile: string, rawTarget: string, files: KnownFiles): LinkStatus {
+export function collectionLinkStatus(fromFile: string, rawTarget: string, index: CollectionIndex | null): LinkStatus {
   const target = rawTarget.trim();
 
   if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
@@ -158,8 +178,10 @@ export function collectionLinkStatus(fromFile: string, rawTarget: string, files:
 
   const resolved = resolveRelativeLink(fromFile, target);
 
-  if (resolved === null || files === null) {
+  if (resolved === null || index === null) {
     return 'note';
   }
-  return files.has(resolved.toLowerCase()) ? 'note' : 'broken';
+  // A folder is a valid target as soon as it exists, with or without an index page
+  const known = resolved.kind === 'folder' ? index.folders : index.files;
+  return known.has(resolved.path.toLowerCase()) ? 'note' : 'broken';
 }
