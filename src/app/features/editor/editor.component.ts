@@ -10,7 +10,7 @@ import { Compartment, EditorState, Extension, Prec } from '@codemirror/state';
 import {
   defaultKeymap, history, historyKeymap, indentWithTab,
 } from '@codemirror/commands';
-import { searchKeymap, search, openSearchPanel, closeSearchPanel } from '@codemirror/search';
+import { searchKeymap, search } from '@codemirror/search';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
@@ -19,6 +19,8 @@ import { bracketMatching, syntaxTree } from '@codemirror/language';
 import { editorHighlight } from '../../shared/codemirror/editor-highlight';
 import { linkStatusFacet, markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
+import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
+import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
@@ -30,8 +32,10 @@ import { EditorViewMode, PreviewScrollRequest } from '../../core/models/editor.m
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
 import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
 import { FoldersService } from '../../core/services/folders.service';
-import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
+import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
+import { insertLink } from '../../shared/codemirror/formatting-commands';
+import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
 import { LinkRenameService } from '../../core/services/link-rename.service';
@@ -40,7 +44,16 @@ import { FormattingBarService } from '../../core/services/formatting-bar.service
 import { ThemeService } from '../../core/services/theme.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { acceleratorToCodeMirrorKey } from '../../core/utils/accelerator.util';
-import { Note, OVERLAY_NOTES_TAB_ID } from '../../core/models/note.model';
+import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/note.model';
+import { FindService } from '../../core/services/find.service';
+import { FindPanelComponent } from '../find/find-panel.component';
+
+/** CodeMirror's search needs a panel to keep its matches highlighted: an empty, hidden one (the find panel is the UI). */
+function hiddenSearchPanel(): HTMLElement {
+  const dom = document.createElement('div');
+  dom.hidden = true;
+  return dom;
+}
 
 /** Delay before the preview follows the text being typed. */
 const PREVIEW_REFRESH_MS = 150;
@@ -48,7 +61,7 @@ const PREVIEW_REFRESH_MS = 150;
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [ContextMenuComponent, MarkdownPreviewComponent],
+  imports: [ContextMenuComponent, ConfirmDialogComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="editor-wrapper" [attr.data-view-mode]="viewMode()">
@@ -82,7 +95,10 @@ const PREVIEW_REFRESH_MS = 150;
             />
           }
         }
-        @if (settingsService.settings().showOutline && headings().length) {
+        <!-- Right column: the find panel takes the place of the outline while it is open -->
+        @if (find.isOpen()) {
+          <app-find-panel />
+        } @else if (outlineShown()) {
           <nav class="toc" aria-label="Table of contents">
             @for (heading of headings(); track heading.from; let i = $index) {
               <button
@@ -118,6 +134,14 @@ const PREVIEW_REFRESH_MS = 150;
         </div>
       }
     </div>
+    @if (quickNoteToDelete() !== null) {
+      <app-confirm-dialog
+        title="Delete this quick note?"
+        message="It is deleted for good."
+        [actions]="deleteQuickNoteActions"
+        (chosen)="onDeleteQuickNoteChoice($event)"
+      />
+    }
     @if (ctxMenu(); as menu) {
       <app-context-menu
         [items]="menu.items"
@@ -143,10 +167,15 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
   private noteExport = inject(NoteExportService);
+  protected readonly find = inject(FindService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
   readonly activeHeading = signal(-1);
+  /** The quick notes are a list of short notes: an outline of their headings would mean nothing. */
+  protected readonly outlineShown = computed(() =>
+    this.settingsService.settings().showOutline && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
+  );
 
   /** Source, preview, or both side by side. Not remembered per note: each opened note starts as the settings say. */
   protected readonly viewMode = signal<EditorViewMode>('source');
@@ -167,17 +196,21 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Whether a link target exists, shared by the editor decorations and the preview. */
   protected readonly linkStatusOf = computed<(target: string) => LinkStatus>(() => {
     const notes = this.notes.notes();
-    const resolve = createLinkResolver(notes.filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)), this.folders.folders());
+    const resolve = createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders());
     const ids = new Set(notes.map(n => n.id));
     return target => linkStatus(target, resolve, id => ids.has(id));
   });
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
+  /** Quick note whose deletion waits for a confirmation. */
+  protected readonly quickNoteToDelete = signal<number | null>(null);
+  protected readonly deleteQuickNoteActions: ConfirmDialogAction[] = [{ id: 'delete', label: 'Delete', danger: true }];
 
   private editorView: EditorView | null = null;
   private readonly shortcutsCompartment = new Compartment();
   private readonly themeCompartment = new Compartment();
   private readonly lineNumbersCompartment = new Compartment();
   private readonly wrapCompartment = new Compartment();
+  private readonly scrollbarCompartment = new Compartment();
   private readonly trailingLineCompartment = new Compartment();
   private readonly linkStatusCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -189,14 +222,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   constructor() {
-    // The overlay notes document follows new notes sent from the overlay while it is open
+    // The quick notes document follows new notes sent from the overlay while it is open
     effect(() => {
-      const document = this.notes.overlayNotesDocument();
-      untracked(() => this.refreshOverlayNotesView(document));
+      const document = this.notes.quickNotesDocument();
+      untracked(() => this.refreshQuickNotesView(document));
     });
 
     effect(() => {
-      this.themeService.theme();
+      this.themeService.kind();
       untracked(() => {
         this.editorView?.dispatch({ effects: this.themeCompartment.reconfigure(this.buildThemeMode()) });
       });
@@ -206,12 +239,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.settingsService.settings().showLineNumbers;
       this.settingsService.settings().wordWrap;
       this.settingsService.settings().trailingLine;
+      this.settingsService.settings().hideScrollbar;
       untracked(() => {
         this.editorView?.dispatch({
           effects: [
             this.trailingLineCompartment.reconfigure(this.buildTrailingLine()),
             this.lineNumbersCompartment.reconfigure(this.buildLineNumbers()),
             this.wrapCompartment.reconfigure(this.buildWrapping()),
+            this.scrollbarCompartment.reconfigure(this.buildScrollbar()),
           ],
         });
       });
@@ -322,7 +357,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     if (generation !== this.loadGeneration) return;
 
     // A note whose tab was just closed while still empty (e.g. Ctrl+N then Ctrl+W) is not worth keeping
-    if (previousId !== null && previousId !== id && previousId !== OVERLAY_NOTES_TAB_ID && !this.tabs.isOpen(previousId)) {
+    if (previousId !== null && previousId !== id && previousId !== QUICK_NOTES_TAB_ID && !this.tabs.isOpen(previousId)) {
       await this.notes.deleteIfEmpty(previousId);
     }
 
@@ -333,7 +368,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
 
     try {
-      const note = id === OVERLAY_NOTES_TAB_ID ? this.buildOverlayNotesDocument() : await this.notes.getById(id);
+      const note = id === QUICK_NOTES_TAB_ID ? this.buildQuickNotesDocument() : await this.notes.getById(id);
       // Abort if a newer load was started while fetching
       if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
@@ -342,7 +377,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       // Wait for DOM to update
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
-        this.initEditor(note?.content ?? '', id === OVERLAY_NOTES_TAB_ID);
+        this.initEditor(note?.content ?? '', id === QUICK_NOTES_TAB_ID);
       }, 0);
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
@@ -366,6 +401,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.headings.set([]);
     this.activeHeading.set(-1);
     this.formattingBar.attach(null);
+    this.find.attach(null);
   }
 
   private initEditor(content: string, readOnly = false): void {
@@ -376,6 +412,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       if (update.docChanged || update.selectionSet) {
         this.formattingBar.refresh(update.state);
       }
+      this.find.refresh(update);
       if (update.docChanged) {
         this.refreshOutline(update.view);
         this.schedulePreviewRefresh(update.view);
@@ -383,7 +420,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
       if (update.docChanged && !this.isUpdatingFromModel) {
         const content = update.state.doc.toString();
         const note = this.activeNote();
-        if (!note) return;
+        // The quick notes are saved one by one, by their own edit (see quickNoteHandlers)
+        if (!note || note.id === QUICK_NOTES_TAB_ID) return;
 
         // Extract title from first line
         const title = this.notes.extractTitle(content);
@@ -448,11 +486,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
       '.cm-activeLine': {
         background: 'rgba(var(--evn-hover-rgb), 0.02)',
       },
-      '.cm-search': {
-        background: 'var(--evn-bg-chip)',
-        border: '1px solid var(--evn-border)',
-        borderRadius: '4px',
-      },
     });
 
     // Returns true if cursor is inside a fenced code block
@@ -482,14 +515,15 @@ export class EditorComponent implements OnDestroy, OnChanges {
       ...slashCommandExtensions,
       ...tableExtensions,
       noteLinkCompletion({
-        notes: () => this.notes.notes().filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)),
+        notes: () => this.notes.notes().filter(n => !n.tags.includes(QUICK_NOTE_TAG)),
         folders: () => this.folders.folders(),
       }),
       drawSelection(),
       dropCursor(),
       highlightActiveLine(),
       bracketMatching(),
-      search({ top: false }),
+      // CodeMirror keeps the search state (query, highlights); the UI is the find panel of the right column
+      search({ createPanel: () => ({ dom: hiddenSearchPanel() }) }),
       keymap.of([
         ...closeBracketsKeymap,
         ...defaultKeymap,
@@ -522,6 +556,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.shortcutsCompartment.of(this.buildShortcutsKeymap()),
       updateListener,
       this.wrapCompartment.of(this.buildWrapping()),
+      this.scrollbarCompartment.of(this.buildScrollbar()),
       this.lineNumbersCompartment.of(this.buildLineNumbers()),
       this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
@@ -532,9 +567,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
         },
       }),
       this.linkStatusCompartment.of(linkStatusFacet.of(this.linkStatusOf())),
-      // The concatenated overlay notes cannot be mapped back to their individual notes, hence no drafts either
+      // The quick notes are edited one at a time, from their hover actions: no drafts, no context menu
       ...(readOnly
-        ? [EditorState.readOnly.of(true), EditorView.editable.of(false), noteTimestamps, noteTimestampsTheme]
+        ? [noteTimestamps, noteTimestampsTheme, quickNotesEditing(this.quickNoteHandlers())]
         : [draftBlocks, this.contextMenuHandler()]),
     ];
 
@@ -545,10 +580,11 @@ export class EditorComponent implements OnDestroy, OnChanges {
     });
 
     this.formattingBar.attach(this.editorView, readOnly);
+    this.find.attach(this.editorView, readOnly);
     this.refreshOutline(this.editorView);
 
     if (readOnly) {
-      this.editorView.dispatch({ effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()) });
+      this.editorView.dispatch({ effects: setTimestampBlocks.of(this.notes.quickNoteBlocks()) });
     }
 
     // Focus the editor
@@ -583,23 +619,44 @@ export class EditorComponent implements OnDestroy, OnChanges {
     view.contentDOM.focus({ preventScroll: true });
   }
 
-  private buildOverlayNotesDocument(): Note {
+  private buildQuickNotesDocument(): Note {
     const now = new Date().toISOString();
     return {
-      id: OVERLAY_NOTES_TAB_ID, title: 'Overlay notes', content: this.notes.overlayNotesDocument(),
-      tags: [], folderId: null, sortOrder: null, createdAt: now, updatedAt: now,
+      id: QUICK_NOTES_TAB_ID, title: QUICK_NOTES_TITLE, content: this.notes.quickNotesDocument(),
+      tags: [], folderId: null, sortOrder: null, color: null, createdAt: now, updatedAt: now,
     };
   }
 
-  private refreshOverlayNotesView(document: string): void {
+  private refreshQuickNotesView(document: string): void {
     const view = this.editorView;
-    if (!view || this.activeNote()?.id !== OVERLAY_NOTES_TAB_ID || view.state.doc.toString() === document) {
+    // A note being edited is not overwritten: the document catches up once the edit ends
+    if (!view || this.activeNote()?.id !== QUICK_NOTES_TAB_ID || editingQuickNote(view.state) !== null || view.state.doc.toString() === document) {
       return;
     }
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: document },
-      effects: setTimestampBlocks.of(this.notes.overlayNoteBlocks()),
+      effects: setTimestampBlocks.of(this.notes.quickNoteBlocks()),
+      // The edit guard of the quick notes only lets the edited note change
+      filter: false,
     });
+  }
+
+  private quickNoteHandlers(): QuickNoteHandlers {
+    return {
+      save: (id, text) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text) }); },
+      remove: id => this.quickNoteToDelete.set(id),
+      copy: text => { void navigator.clipboard.writeText(text); },
+      editEnded: () => this.refreshQuickNotesView(this.notes.quickNotesDocument()),
+    };
+  }
+
+  protected async onDeleteQuickNoteChoice(choice: string | null): Promise<void> {
+    const id = this.quickNoteToDelete();
+    this.quickNoteToDelete.set(null);
+
+    if (choice === 'delete' && id !== null) {
+      await this.notes.delete(id);
+    }
   }
 
   private contextMenuHandler(): Extension {
@@ -650,8 +707,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
   }
 
+  /** Never in the quick notes document: its lines are notes, not a file. */
   private buildLineNumbers(): Extension {
-    return this.settingsService.settings().showLineNumbers
+    return this.settingsService.settings().showLineNumbers && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
       ? [lineNumbers(), EditorView.editorAttributes.of({ class: 'cm-with-numbers' })]
       : [];
   }
@@ -671,6 +729,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return this.settingsService.settings().wordWrap ? EditorView.lineWrapping : [];
   }
 
+  private buildScrollbar(): Extension {
+    return this.settingsService.settings().hideScrollbar ? hiddenScrollbar : [];
+  }
+
   /** Ctrl+click on a link (or a click in the preview): a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
   protected followLink(target: string): void {
     const noteUrl = /^note:\/\/(?<id>\d+)$/.exec(target.trim());
@@ -682,7 +744,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       return;
     }
 
-    noteId ??= createLinkResolver(notes.filter(n => !n.tags.includes(OVERLAY_NOTE_TAG)), this.folders.folders())(target);
+    noteId ??= createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders())(target);
 
     const note = notes.find(n => n.id === noteId);
 
@@ -692,7 +754,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private buildThemeMode(): Extension {
-    return EditorView.darkTheme.of(this.themeService.theme() === 'dark');
+    return EditorView.darkTheme.of(this.themeService.kind() === 'dark');
   }
 
   /** Formatting/save bindings use the accelerators configured in the settings (reconfigured live, see constructor). */
@@ -715,13 +777,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       {
         key: keyFor('editor.link'),
         run: (view) => {
-          const sel = view.state.selection.main;
-          const selected = view.state.sliceDoc(sel.from, sel.to);
-          const insert = selected ? `[${selected}](url)` : '[text](url)';
-          view.dispatch({
-            changes: { from: sel.from, to: sel.to, insert },
-            selection: { anchor: sel.from + insert.length - 4, head: sel.from + insert.length - 1 },
-          });
+          insertLink(view);
           return true;
         },
       },
@@ -750,7 +806,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private async saveNote(id: number, content: string): Promise<void> {
-    if (id === OVERLAY_NOTES_TAB_ID) return;
+    if (id === QUICK_NOTES_TAB_ID) return;
     try {
       const title = this.notes.extractTitle(content);
       const previousTitle = this.notes.notes().find(n => n.id === id)?.title;
@@ -768,16 +824,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
   }
 
-  openSearch(): void {
-    if (this.editorView) {
-      openSearchPanel(this.editorView);
-    }
+  /** Ctrl+F (find only) / Ctrl+H (with replace). */
+  openSearch(withReplace = false): void {
+    this.find.open(withReplace);
   }
 
   closeSearch(): void {
-    if (this.editorView) {
-      closeSearchPanel(this.editorView);
-    }
+    this.find.close();
   }
 
   focusEditor(): void {

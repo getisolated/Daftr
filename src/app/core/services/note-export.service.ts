@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { OVERLAY_NOTES_TAB_ID } from '../models/note.model';
+import { QUICK_NOTES_TAB_ID } from '../models/note.model';
 import { buildHtmlDocument } from '../../shared/markdown/export-html';
 import { collectSubtreeIds } from '../utils/folder-tree.util';
 import { ElectronBridgeService } from './electron-bridge.service';
@@ -33,7 +33,7 @@ export class NoteExportService {
 
   /** The quick notes document is made of other notes: it has no content of its own to export. */
   canExport(noteId: number | null): boolean {
-    return noteId !== null && noteId !== OVERLAY_NOTES_TAB_ID && this.notes.notes().some(note => note.id === noteId);
+    return noteId !== null && noteId !== QUICK_NOTES_TAB_ID && this.notes.notes().some(note => note.id === noteId);
   }
 
   /** Runs a NOTE_EXPORT_MENU entry on a note; false when the id is not one of them. */
