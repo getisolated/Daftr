@@ -2,11 +2,11 @@ import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { formatAccelerator } from '../utils/accelerator.util';
 import { resolveAppShortcuts } from '../models/app-shortcuts.model';
 import { AppSettings, DEFAULT_SETTINGS, SettingsPatch, SettingsUpdateResult } from '../models/settings.model';
-import { ElectronBridgeService } from './electron-bridge.service';
+import { DesktopBridgeService } from './desktop-bridge.service';
 
 @Injectable({ providedIn: 'root' })
 export class SettingsService implements OnDestroy {
-  private bridge = inject(ElectronBridgeService);
+  private bridge = inject(DesktopBridgeService);
   private readonly _settings = signal<AppSettings>(DEFAULT_SETTINGS);
   private readonly _isOpen = signal(false);
   private readonly _loaded = signal(false);

@@ -26,7 +26,7 @@ import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared
 import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
-import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
+import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
 import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
 import { EditorViewMode, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
@@ -178,7 +178,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private notes = inject(NotesService);
   private linkRename = inject(LinkRenameService);
   private folders = inject(FoldersService);
-  private bridge = inject(ElectronBridgeService);
+  private bridge = inject(DesktopBridgeService);
   private tabs = inject(TabsService);
   protected settingsService = inject(SettingsService);
   protected readonly i18n = inject(I18nService);

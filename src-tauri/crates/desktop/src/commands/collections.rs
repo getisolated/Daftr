@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use domain::collection::CollectionKind;
 use domain::i18n::{DEFAULT_LANGUAGE, Language, MessageKey, message};
-use presentation::dto::{CollectionDto, CollectionFileRefDto};
+use presentation::dto::CollectionDto;
 use presentation::{IpcError, IpcResult, collections};
 use tauri::{AppHandle, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FileDialogBuilder, FilePath};
@@ -33,15 +33,6 @@ pub async fn collections_pick(
     let paths = pick(&app, &window, kind, Some(language), true);
 
     collections::add_all(&desktop(&app).services.collections, &paths)
-}
-
-#[tauri::command]
-pub async fn collections_open_paths(
-    app: AppHandle,
-    paths: Vec<String>,
-) -> IpcResult<Vec<CollectionFileRefDto>> {
-    let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
-    collections::open_paths(&desktop(&app).services.collections, &paths)
 }
 
 #[tauri::command]

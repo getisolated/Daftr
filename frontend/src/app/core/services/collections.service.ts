@@ -109,13 +109,6 @@ export class CollectionsService {
     return rows.map(toCollection);
   }
 
-  /** Files and folders dropped on the window, or passed by Windows. */
-  async addPaths(paths: string[]): Promise<void> {
-    const refs = await this.bridge.openPaths(paths);
-    await this.reload();
-    refs.forEach(ref => this.open(ref));
-  }
-
   async remove(root: string): Promise<void> {
     await this.bridge.remove(root);
     this.fileDocs.idsUnder(root).forEach(id => this.tabs.closeByNoteId(id));

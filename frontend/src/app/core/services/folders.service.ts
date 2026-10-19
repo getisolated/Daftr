@@ -1,10 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Folder, FolderDeleteMode } from '../models/folder.model';
-import { ElectronBridgeService } from './electron-bridge.service';
+import { DesktopBridgeService } from './desktop-bridge.service';
 
 @Injectable({ providedIn: 'root' })
 export class FoldersService {
-  private bridge = inject(ElectronBridgeService);
+  private bridge = inject(DesktopBridgeService);
   private readonly _folders = signal<Folder[]>([]);
 
   readonly folders = this._folders.asReadonly();

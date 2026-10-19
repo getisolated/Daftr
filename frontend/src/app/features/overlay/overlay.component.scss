@@ -14,28 +14,8 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   position: relative;
-  // Fallback when there is neither acrylic nor a desktop capture to blur: a plain, mostly opaque panel
+  // Without acrylic (older Windows, Battery Saver, transparency off): a plain, mostly opaque panel
   background: rgba(30, 30, 30, 0.9);
-
-  // Everything but the screenshot sits above it
-  > :not(.backdrop) {
-    position: relative;
-  }
-
-  // Blurred desktop capture standing in for the acrylic (no OS support, Battery Saver, transparency off)
-  &.has-backdrop {
-    background: transparent;
-  }
-}
-
-.backdrop {
-  position: absolute;
-  top: 0;
-  left: 0;
-  max-width: none;
-  pointer-events: none;
-  // brightness() is the dark tint: a CSS background would sit beneath the image
-  filter: blur(22px) saturate(1.4) brightness(0.55);
 }
 
 // The OS paints the (rather light grey) acrylic behind the window: a flat anthracite tint darkens it
@@ -49,7 +29,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  -webkit-app-region: drag;
+  // Dragged through `data-tauri-drag-region` (the handle and its grip)
   cursor: move;
 }
 

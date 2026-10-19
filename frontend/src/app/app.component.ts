@@ -14,7 +14,7 @@ import { NotesService } from './core/services/notes.service';
 import { TabsService } from './core/services/tabs.service';
 import { PaletteService } from './core/services/palette.service';
 import { ShortcutsService } from './core/services/shortcuts.service';
-import { ElectronBridgeService } from './core/services/electron-bridge.service';
+import { DesktopBridgeService } from './core/services/desktop-bridge.service';
 import { LayoutService } from './core/services/layout.service';
 import { SettingsService } from './core/services/settings.service';
 import { FoldersService } from './core/services/folders.service';
@@ -23,7 +23,6 @@ import { UpdateService } from './core/services/update.service';
 import { FormattingBarService } from './core/services/formatting-bar.service';
 import { FileDocsService } from './core/services/file-docs.service';
 import { CollectionsService } from './core/services/collections.service';
-import { CollectionsBridgeService } from './core/services/collections-bridge.service';
 import { ThemeService } from './core/services/theme.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
 import { QUICK_NOTES_TAB_ID } from './core/models/note.model';
@@ -37,8 +36,6 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
   imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, FormattingBarComponent, BacklinksPanelComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    '(document:dragover)': 'onFilesDragOver($event)',
-    '(document:drop)': 'onFilesDrop($event)',
   },
   template: `
     <div class="app-shell">
@@ -138,7 +135,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private tabsService = inject(TabsService);
   private paletteService = inject(PaletteService);
   private shortcutsService = inject(ShortcutsService);
-  private bridge = inject(ElectronBridgeService);
+  private bridge = inject(DesktopBridgeService);
   private layoutService = inject(LayoutService);
   private settingsService = inject(SettingsService);
   private foldersService = inject(FoldersService);
@@ -149,7 +146,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private formattingBar = inject(FormattingBarService);
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
-  private collectionsBridge = inject(CollectionsBridgeService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
@@ -205,27 +201,6 @@ export class AppComponent implements OnInit, OnDestroy {
     // Notes sent from the quick-note overlay show up without restarting the app
     this.unsubscribeNotesChanged = this.bridge.onNotesChanged(() => { void this.reloadNotesAndFolders(); });
     this.registerShortcuts();
-  }
-
-  /** Files dragged from the Explorer (not the sidebar's own drags): the window accepts them. */
-  protected onFilesDragOver(event: DragEvent): void {
-    if (event.dataTransfer?.types.includes('Files')) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'copy';
-    }
-  }
-
-  /** Dropped folders and markdown files become collections; the files open in tabs. */
-  protected onFilesDrop(event: DragEvent): void {
-    const files = Array.from(event.dataTransfer?.files ?? []);
-
-    if (files.length === 0) {
-      return;
-    }
-
-    event.preventDefault();
-    const paths = files.map(file => this.collectionsBridge.pathForFile(file)).filter((path): path is string => !!path);
-    void this.collections.addPaths(paths);
   }
 
   onUpdateChoice(choice: string | null): void {

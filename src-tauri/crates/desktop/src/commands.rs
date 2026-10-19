@@ -37,7 +37,6 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         folders::folders_set_color,
         collections::collections_list,
         collections::collections_pick,
-        collections::collections_open_paths,
         collections::collections_remove,
         collections::collections_rename,
         collections::collections_relocate,

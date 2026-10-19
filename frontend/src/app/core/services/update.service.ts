@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { I18nService } from '../i18n/i18n.service';
 import { UpdateInfo, UpdateProgress } from '../models/update.model';
-import { ElectronBridgeService } from './electron-bridge.service';
+import { DesktopBridgeService } from './desktop-bridge.service';
 
 /**
  * Update state of the main window. The main process finds the updates (at startup, then hourly)
@@ -9,7 +9,7 @@ import { ElectronBridgeService } from './electron-bridge.service';
  */
 @Injectable({ providedIn: 'root' })
 export class UpdateService implements OnDestroy {
-  private readonly bridge = inject(ElectronBridgeService);
+  private readonly bridge = inject(DesktopBridgeService);
   private readonly i18n = inject(I18nService);
   private readonly _info = signal<UpdateInfo | null>(null);
   private readonly _progress = signal<UpdateProgress | null>(null);

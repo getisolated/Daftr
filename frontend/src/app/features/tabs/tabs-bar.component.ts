@@ -4,7 +4,7 @@ import {
 } from '@angular/core';
 
 import { TabsService } from '../../core/services/tabs.service';
-import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
+import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -20,7 +20,8 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
   imports: [ContextMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="tabs-bar" (dblclick)="onTitleBarDblClick()">
+    <!-- Title bar: drags the window, double-click maximizes (Tauri drag region; tabs and buttons excluded) -->
+    <div class="tabs-bar" data-tauri-drag-region="deep">
       <!-- Sidebar toggle -->
       <button
         class="home-btn"
@@ -56,6 +57,7 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
         @for (tab of tabs(); track tab.noteId; let i = $index) {
           <div
             class="tab"
+            data-tauri-drag-region="false"
             [class.active]="i === activeIndex()"
             [class.dirty]="tab.isDirty"
             [class.pinned]="tab.isPinned"
@@ -152,7 +154,7 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
 export class TabsBarComponent {
   protected readonly i18n = inject(I18nService);
   private tabs$ = inject(TabsService);
-  private electron = inject(ElectronBridgeService);
+  private desktop = inject(DesktopBridgeService);
   private layout = inject(LayoutService);
   private settings = inject(SettingsService);
   private sidebarState = inject(SidebarStateService);
@@ -211,11 +213,9 @@ export class TabsBarComponent {
     }
   }
 
-  minimize(): void { this.electron.minimize(); }
-  async toggleMaximize(): Promise<void> { await this.electron.maximize(); }
-  closeWindow(): void { this.electron.close(); }
-  async onTitleBarDblClick(): Promise<void> { await this.electron.maximize(); }
-
+  minimize(): void { this.desktop.minimize(); }
+  async toggleMaximize(): Promise<void> { await this.desktop.maximize(); }
+  closeWindow(): void { this.desktop.close(); }
   // ── Drag and drop ──────────────────────────────────────────────────────────
 
   onDragStart(event: DragEvent, index: number): void {

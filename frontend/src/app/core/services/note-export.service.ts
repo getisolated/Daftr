@@ -5,7 +5,7 @@ import { noteDisplayTitle } from '../utils/note-title.util';
 import { QUICK_NOTES_TAB_ID } from '../models/note.model';
 import { buildHtmlDocument } from '../../shared/markdown/export-html';
 import { collectSubtreeIds } from '../utils/folder-tree.util';
-import { ElectronBridgeService } from './electron-bridge.service';
+import { DesktopBridgeService } from './desktop-bridge.service';
 import { FoldersService } from './folders.service';
 import { NotesService } from './notes.service';
 import { ContextMenuItem } from '../../shared/context-menu/context-menu.component';
@@ -36,7 +36,7 @@ export function folderExportMenu(t: Translator): ContextMenuItem {
 export class NoteExportService {
   private readonly notes = inject(NotesService);
   private readonly folders = inject(FoldersService);
-  private readonly bridge = inject(ElectronBridgeService);
+  private readonly bridge = inject(DesktopBridgeService);
   private readonly i18n = inject(I18nService);
 
   /** The quick notes document is made of other notes: it has no content of its own to export. */

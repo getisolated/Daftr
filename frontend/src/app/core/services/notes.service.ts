@@ -5,7 +5,7 @@ import { joinBlocks, TimestampedBlock } from '../../shared/codemirror/note-times
 import { extractNoteTitle } from '../utils/note-title.util';
 import { formatNoteTimestamp } from '../utils/note-timestamp.util';
 import { I18nService } from '../i18n/i18n.service';
-import { ElectronBridgeService } from './electron-bridge.service';
+import { DesktopBridgeService } from './desktop-bridge.service';
 import { FoldersService } from './folders.service';
 
 const PREVIEW_MAX_LENGTH = 120;
@@ -23,7 +23,7 @@ function toPreview(n: Note): NotePreview {
 
 @Injectable({ providedIn: 'root' })
 export class NotesService {
-  private bridge = inject(ElectronBridgeService);
+  private bridge = inject(DesktopBridgeService);
   private folders = inject(FoldersService);
   private readonly i18n = inject(I18nService);
   private readonly _notes = signal<Note[]>([]);
