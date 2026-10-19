@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, inject, input } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { clampSectionHeight } from '../../core/utils/folder-tree.util';
 
@@ -18,7 +19,7 @@ const TREE_RESERVED_HEIGHT = 120;
   host: {
     role: 'separator',
     'aria-orientation': 'horizontal',
-    title: 'Drag to resize, double-click to reset',
+    '[attr.title]': "i18n.t('ui.splitter.title')",
     '(pointerdown)': 'onStart($event)',
     '(pointermove)': 'onMove($event)',
     '(pointerup)': 'onEnd($event)',
@@ -53,6 +54,7 @@ export class SectionSplitterComponent {
   /** Key under which the height of the section is saved. */
   readonly key = input.required<string>();
 
+  protected readonly i18n = inject(I18nService);
   protected readonly state = inject(SidebarStateService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private drag: { y: number; height: number } | null = null;

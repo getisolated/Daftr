@@ -1,11 +1,14 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { SettingsService } from '../../core/services/settings.service';
-import { APP_SHORTCUTS, findShortcutConflict } from '../../core/models/app-shortcuts.model';
+import { APP_SHORTCUTS, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
 import { DEFAULT_SETTINGS, SettingsPatch } from '../../core/models/settings.model';
 import { formatAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
-import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory } from './settings-definitions';
+import {
+  SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
+} from './settings-definitions';
 
 @Component({
   selector: 'app-settings',
@@ -15,17 +18,17 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
   template: `
     @if (isOpen()) {
       <div class="backdrop" (mousedown)="close()">
-        <div class="modal" role="dialog" aria-label="Settings" (mousedown)="$event.stopPropagation()">
+        <div class="modal" role="dialog" [attr.aria-label]="i18n.t('settings.modal.title')" (mousedown)="$event.stopPropagation()">
           <div class="header">
             <div class="title-row">
-              <span class="title">Settings</span>
-              <button class="icon-btn" (click)="close()" title="Close (Esc)">✕</button>
+              <span class="title">{{ i18n.t('settings.modal.title') }}</span>
+              <button class="icon-btn" (click)="close()" [title]="i18n.t('settings.modal.close')">✕</button>
             </div>
             <div class="search">
               <input
                 #search
                 type="text"
-                placeholder="Search settings"
+                [placeholder]="i18n.t('settings.modal.search')"
                 spellcheck="false"
                 [value]="query()"
                 (input)="query.set(search.value)"
@@ -36,36 +39,36 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
 
           <div class="body">
             <nav class="toc">
-              @for (section of sections(); track section.category) {
+              @for (section of sections(); track section.categoryKey) {
                 <button
                   class="toc-item"
-                  [class.active]="section.category === activeCategory()"
-                  (click)="scrollToCategory(section.category)"
+                  [class.active]="section.categoryKey === activeCategory()"
+                  (click)="scrollToCategory(section.categoryKey)"
                 >{{ section.category }}</button>
               }
             </nav>
 
             <div class="list" #list (scroll)="onListScroll()">
-              @for (section of sections(); track section.category) {
-                <section [attr.data-category]="section.category">
+              @for (section of sections(); track section.categoryKey) {
+                <section [attr.data-category]="section.categoryKey">
                   <h2>{{ section.category }}</h2>
                   @for (def of section.settings; track def.key) {
                     <div class="setting" [class.modified]="isModified(def)">
                       <div class="setting-title">
-                        <span class="category">{{ section.category }}: </span><b>{{ def.title }}</b>
+                        <span class="category">{{ section.category }}: </span><b>{{ titleOf(def) }}</b>
                         @if (isModified(def)) {
-                          <button class="reset" (click)="reset(def)" title="Reset to default">↺</button>
+                          <button class="reset" (click)="reset(def)" [title]="i18n.t('settings.modal.reset')">↺</button>
                         }
                       </div>
 
                       @switch (def.control) {
                         @case ('checkbox') {
                           <app-checkbox [checked]="valueOf(def) === true" (checkedChange)="onCheckboxChange(def, $event)">
-                            <span class="description">{{ def.description }}</span>
+                            <span class="description">{{ descriptionOf(def) }}</span>
                           </app-checkbox>
                         }
                         @case ('number') {
-                          <div class="description">{{ def.description }}</div>
+                          <div class="description">{{ descriptionOf(def) }}</div>
                           <input
                             class="control"
                             type="number"
@@ -77,7 +80,7 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
                           />
                         }
                         @case ('list') {
-                          <div class="description">{{ def.description }}</div>
+                          <div class="description">{{ descriptionOf(def) }}</div>
                           <input
                             class="control list"
                             type="text"
@@ -87,11 +90,11 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
                           />
                         }
                         @case ('select') {
-                          <div class="description">{{ def.description }}</div>
-                          <app-select [value]="stringValueOf(def)" [options]="def.options ?? []" (valueChange)="onSelectChange(def, $event)" />
+                          <div class="description">{{ descriptionOf(def) }}</div>
+                          <app-select [value]="stringValueOf(def)" [options]="optionsOf(def)" (valueChange)="onSelectChange(def, $event)" />
                         }
                         @case ('shortcut') {
-                          <div class="description">{{ def.description }}</div>
+                          <div class="description">{{ descriptionOf(def) }}</div>
                           <button
                             class="control shortcut"
                             data-shortcut-recorder
@@ -99,7 +102,7 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
                             (click)="startRecording(def)"
                             (keydown)="onShortcutKeydown(def, $event)"
                             (blur)="recording.set(null)"
-                          >{{ recording() === def.key ? 'Press the new shortcut… (Esc to cancel)' : shortcutLabel(def) }}</button>
+                          >{{ recording() === def.key ? i18n.t('settings.modal.recording') : shortcutLabel(def) }}</button>
                           @if (shortcutError()?.key === def.key) {
                             <div class="error">{{ shortcutError()?.message }}</div>
                           }
@@ -109,7 +112,7 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
                   }
                 </section>
               } @empty {
-                <div class="empty">No settings found.</div>
+                <div class="empty">{{ i18n.t('settings.modal.empty') }}</div>
               }
             </div>
           </div>
@@ -121,6 +124,7 @@ import { SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory
 })
 export class SettingsComponent {
   private settingsService = inject(SettingsService);
+  protected readonly i18n = inject(I18nService);
 
   @ViewChild('search') searchRef?: ElementRef<HTMLInputElement>;
   @ViewChild('list') listRef?: ElementRef<HTMLElement>;
@@ -131,18 +135,18 @@ export class SettingsComponent {
   /** Key of the shortcut setting waiting for a key combination. */
   readonly recording = signal<string | null>(null);
   readonly shortcutError = signal<{ key: string; message: string } | null>(null);
-  readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query())));
+  readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query(), this.i18n.t), this.i18n.t));
   private readonly scrolledCategory = signal<string | null>(null);
   // Falls back to the first visible section when the scrolled one has been filtered out
   readonly activeCategory = computed(() => {
-    const categories = this.sections().map(s => s.category);
+    const categories = this.sections().map(s => s.categoryKey);
     const scrolled = this.scrolledCategory();
-    return scrolled && categories.includes(scrolled) ? scrolled : categories[0] ?? null;
+    return scrolled && categories.some(key => key === scrolled) ? scrolled : categories[0] ?? null;
   });
   readonly countLabel = computed(() => {
     if (!this.query().trim()) return '';
     const count = this.sections().reduce((total, s) => total + s.settings.length, 0);
-    return `${count} setting${count === 1 ? '' : 's'} found`;
+    return this.i18n.plural('settings.modal.count', count);
   });
 
   constructor() {
@@ -171,6 +175,12 @@ export class SettingsComponent {
     const value = this.valueOf(def);
     return Array.isArray(value) ? value.join(', ') : '';
   }
+
+  titleOf(def: SettingDefinition): string { return settingTitle(def, this.i18n.t); }
+
+  descriptionOf(def: SettingDefinition): string { return settingDescription(def, this.i18n.t); }
+
+  optionsOf(def: SettingDefinition): { value: string; label: string }[] { return settingOptions(def, this.i18n.t); }
 
   shortcutLabel(def: SettingDefinition): string {
     const accelerator = def.shortcutId ? this.settingsService.appShortcuts()[def.shortcutId] : this.settings().globalShortcut;
@@ -260,7 +270,7 @@ export class SettingsComponent {
     if (def.shortcutId) {
       const conflict = findShortcutConflict(def.shortcutId, accelerator, this.settingsService.appShortcuts());
       if (conflict) {
-        this.shortcutError.set({ key: def.key, message: `${formatAccelerator(accelerator)} is already used by "${conflict.label}".` });
+        this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutConflict', { shortcut: formatAccelerator(accelerator), label: shortcutLabel(conflict, this.i18n.t) }) });
         return;
       }
       await this.setAppShortcut(def.shortcutId, accelerator);
@@ -269,7 +279,7 @@ export class SettingsComponent {
 
     const result = await this.settingsService.update({ globalShortcut: accelerator });
     if (result && !result.ok) {
-      this.shortcutError.set({ key: def.key, message: `${formatAccelerator(accelerator)} is unavailable (already used by another application?).` });
+      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut: formatAccelerator(accelerator) }) });
     }
   }
 

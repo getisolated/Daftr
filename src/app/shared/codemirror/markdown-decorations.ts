@@ -4,6 +4,7 @@ import {
 import { Facet, RangeSetBuilder } from '@codemirror/state';
 import { LinkStatus } from '../../core/utils/note-paths.util';
 import { syntaxTree } from '@codemirror/language';
+import { translatorOf } from './translator';
 import { CheckboxWidget, EXTERNAL_URL, ExternalLinkWidget } from './markdown-widgets';
 
 // Check if cursor is within [from, to]
@@ -20,7 +21,7 @@ export const linkStatusFacet = Facet.define<(target: string) => LinkStatus, (tar
 });
 
 const linkMark = Decoration.mark({ class: 'cm-md-link' });
-const brokenLinkMark = Decoration.mark({ class: 'cm-md-link cm-md-link-broken', attributes: { title: 'Link target not found' } });
+const brokenLinkMark = (title: string): Decoration => Decoration.mark({ class: 'cm-md-link cm-md-link-broken', attributes: { title } });
 
 interface PendingDeco {
   from: number;
@@ -155,7 +156,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 
           const target = node.node.getChild('URL');
           const broken = target !== null && view.state.facet(linkStatusFacet)(doc.sliceString(target.from, target.to)) === 'broken';
-          pending.push({ from, to, deco: broken ? brokenLinkMark : linkMark });
+          pending.push({ from, to, deco: broken ? brokenLinkMark(translatorOf(view.state)('editor.link.broken')) : linkMark });
 
           // Off the link, only its label shows: `[` and `](target)` are hidden, like the other marks
           if (!cursorInRange(view, from, to)) {

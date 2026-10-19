@@ -1,3 +1,5 @@
+import { Translator } from '../i18n/translate';
+import { noteDisplayTitle } from './note-title.util';
 import { LinkResolver, needsAngleBrackets, normalizeLinkTarget, pathKey } from './note-paths.util';
 
 /** Minimal shape of a note needed to analyse its links (a `Note` satisfies it). */
@@ -138,7 +140,7 @@ export function extractLinkExcerpt(content: string, targetId: number, resolve?: 
 }
 
 /** Notes linking to `targetId`, sorted by title. A note never backlinks itself. */
-export function findBacklinks(notes: readonly LinkableNote[], targetId: number, resolve?: LinkResolver): Backlink[] {
+export function findBacklinks(notes: readonly LinkableNote[], targetId: number, t: Translator, resolve?: LinkResolver): Backlink[] {
   const backlinks: Backlink[] = [];
 
   for (const note of notes) {
@@ -146,7 +148,7 @@ export function findBacklinks(notes: readonly LinkableNote[], targetId: number, 
       continue;
     }
 
-    backlinks.push({ noteId: note.id, title: note.title || 'Untitled', excerpt: extractLinkExcerpt(note.content, targetId, resolve) });
+    backlinks.push({ noteId: note.id, title: noteDisplayTitle(note.title, t), excerpt: extractLinkExcerpt(note.content, targetId, resolve) });
   }
 
   return backlinks.sort((a, b) => a.title.localeCompare(b.title));
@@ -186,7 +188,7 @@ function collectNeighbourhood(links: readonly GraphLink[], focusId: number, dept
  * Graph of the links between notes. A link to a note that does not exist gives a `missing` node.
  * Two notes linking each other keep one link per direction (A→B and B→A), so a cycle stays visible.
  */
-export function buildNoteGraph(notes: readonly LinkableNote[], options: GraphOptions = {}): NoteGraph {
+export function buildNoteGraph(notes: readonly LinkableNote[], t: Translator, options: GraphOptions = {}): NoteGraph {
   const { folderId = null, focusId = null, hideOrphans = false, resolve } = options;
   const scoped = folderId === null ? notes : notes.filter(n => n.folderId === folderId);
   const known = new Map(scoped.map(n => [n.id, n]));
@@ -229,12 +231,12 @@ export function buildNoteGraph(notes: readonly LinkableNote[], options: GraphOpt
       continue;
     }
 
-    nodes.push({ id, title: note.title || 'Untitled', degree, missing: false });
+    nodes.push({ id, title: noteDisplayTitle(note.title, t), degree, missing: false });
   }
 
   for (const id of missing) {
     if (!neighbourhood || neighbourhood.has(id)) {
-      nodes.push({ id, title: `Missing note ${id}`, degree: degrees.get(id) ?? 0, missing: true });
+      nodes.push({ id, title: t('editor.graph.missingNote', { id }), degree: degrees.get(id) ?? 0, missing: true });
     }
   }
 

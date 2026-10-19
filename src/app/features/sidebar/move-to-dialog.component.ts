@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { FolderOption } from '../../core/models/folder.model';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 
@@ -18,7 +19,7 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
       <input
         class="filter"
         appFocusSelect
-        placeholder="Filter folders"
+        [placeholder]="i18n.t('sidebar.moveTo.filter')"
         spellcheck="false"
         [value]="query()"
         (input)="query.set($any($event.target).value)"
@@ -43,17 +44,19 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
             <span class="option-label">{{ option.label }}</span>
           </button>
         } @empty {
-          <div class="empty">No folder matches</div>
+          <div class="empty">{{ i18n.t('sidebar.moveTo.empty') }}</div>
         }
       </div>
       <div class="actions">
-        <button type="button" class="btn" (click)="closed.emit()">Cancel</button>
+        <button type="button" class="btn" (click)="closed.emit()">{{ i18n.t('common.cancel') }}</button>
       </div>
     </div>
   `,
   styleUrls: ['./move-to-dialog.component.scss'],
 })
 export class MoveToDialogComponent {
+  protected readonly i18n = inject(I18nService);
+
   readonly title = input.required<string>();
   readonly options = input.required<FolderOption[]>();
   /** The destination: a folder id, `null` for the root. */

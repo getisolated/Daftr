@@ -1,3 +1,4 @@
+import { DEFAULT_LANGUAGE, Language } from '../i18n/language.model';
 import { FormattingBarMode, FormattingBarPosition, FormattingBarStyle } from './formatting-bar.model';
 import { ThemeChoice, ThemeId } from './theme.model';
 
@@ -7,6 +8,8 @@ export type ShortcutMode = 'overlay' | 'app';
 export type ThemePreference = ThemeChoice;
 
 export interface AppSettings {
+  /** Language of the interface; chosen from the OS locale on the first launch (see the main process). */
+  language: Language;
   globalShortcut: string;
   shortcutMode: ShortcutMode;
   overlayWidth: number;
@@ -54,6 +57,7 @@ export interface SettingsUpdateResult {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: DEFAULT_LANGUAGE,
   globalShortcut: 'CommandOrControl+Alt+N',
   shortcutMode: 'overlay',
   overlayWidth: 250,

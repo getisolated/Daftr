@@ -3,11 +3,15 @@ import type { MarkdownIt, RendererRule, StateCore, Token } from 'markdown-it';
 import footnote from 'markdown-it-footnote';
 import DOMPurify from 'dompurify';
 import { LinkStatus } from '../../core/utils/note-paths.util';
+import { Translator } from '../../core/i18n/translate';
+import { TranslationKey } from '../../core/i18n/translations';
 
 /** Everything the preview needs to know about the app to render a note. */
 export interface MarkdownRenderContext {
   /** Whether a link target exists: local links pointing to nothing are drawn as broken. */
   linkStatus: (target: string) => LinkStatus;
+  /** Texts generated in the page (alert titles, tooltips), in the language of the app. */
+  t: Translator;
 }
 
 type AlertType = 'note' | 'tip' | 'important' | 'warning' | 'caution';
@@ -55,7 +59,7 @@ function taskLists(md: MarkdownIt): void {
 }
 
 /** GitHub alerts: a quote starting with `[!NOTE]` (TIP, IMPORTANT, WARNING, CAUTION) becomes a titled callout. */
-function alerts(md: MarkdownIt): void {
+function alerts(md: MarkdownIt, context: MarkdownRenderContext): void {
   md.core.ruler.push('alerts', (state: StateCore) => {
     const tokens = state.tokens;
 
@@ -83,7 +87,7 @@ function alerts(md: MarkdownIt): void {
       }
 
       const title = new state.Token('html_block', '', 0);
-      title.content = `<p class="markdown-alert-title">${type[0]?.toUpperCase()}${type.slice(1)}</p>\n`;
+      title.content = `<p class="markdown-alert-title">${md.utils.escapeHtml(context.t(`editor.alert.${type}` as TranslationKey))}</p>\n`;
       tokens.splice(i + 1, 0, title);
     }
   });
@@ -102,7 +106,7 @@ function linkTargets(md: MarkdownIt, context: MarkdownRenderContext): void {
     token.attrJoin('class', status === 'broken' ? 'link-broken' : `link-${status}`);
 
     if (status === 'broken') {
-      token.attrSet('title', 'Link target not found');
+      token.attrSet('title', context.t('editor.link.broken'));
     }
 
     return fallback(tokens, idx, options, env, self);
@@ -132,7 +136,7 @@ export function createMarkdownRenderer(context: MarkdownRenderContext): Markdown
   md.use(footnote as unknown as (md: MarkdownIt) => void);
   md.use(sourceLines);
   md.use(taskLists);
-  md.use(alerts);
+  md.use(alerts, context);
   md.use(mermaidFences);
   linkTargets(md, context);
 

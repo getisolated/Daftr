@@ -1,0 +1,20 @@
+/** Words shared by several screens: reuse these keys instead of repeating the text. */
+export const EN_COMMON = {
+  'common.untitled': 'Untitled',
+  'common.cancel': 'Cancel',
+  'common.close': 'Close',
+  'common.delete': 'Delete',
+  'common.rename': 'Rename',
+  'common.save': 'Save',
+  'common.open': 'Open',
+  'common.copy': 'Copy',
+  'common.search': 'Search',
+  'common.settings': 'Settings',
+  'common.loading': 'Loading…',
+  'common.notes': 'Notes',
+  'common.folders': 'Folders',
+  'common.tags': 'Tags',
+  'common.newNote': 'New Note',
+  'common.newFolder': 'New Folder',
+  'common.quickNotes': 'Quick notes',
+} as const;

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { FormattingBarService } from '../../core/services/formatting-bar.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { FORMATTING_BAR_GROUPS, FORMAT_ACTIONS, FormatAction } from '../../shared/codemirror/formatting-commands';
@@ -21,7 +22,7 @@ const HEADING_SHORT_LABELS: Record<HeadingFormat, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     role: 'toolbar',
-    'aria-label': 'Formatting',
+    '[attr.aria-label]': 'i18n.t("editor.formatBar.label")',
     '[attr.aria-orientation]': 'vertical() ? "vertical" : "horizontal"',
     '[attr.data-mode]': 'bar.mode()',
     '[attr.data-style]': 'bar.style()',
@@ -40,9 +41,9 @@ const HEADING_SHORT_LABELS: Record<HeadingFormat, string> = {
           @if (item === 'heading') {
             <app-select
               class="heading-select"
-              title="Style"
+              [title]="i18n.t('editor.formatBar.style')"
               [value]="currentHeading()"
-              [options]="headingOptions"
+              [options]="headingOptions()"
               [placement]="selectPlacement()"
               [triggerLabel]="vertical() ? headingShortLabels[currentHeading()] : null"
               (valueChange)="applyHeading($event)"
@@ -54,7 +55,7 @@ const HEADING_SHORT_LABELS: Record<HeadingFormat, string> = {
               class="tool"
               [class.active]="bar.activeFormats().has(action.id)"
               [attr.aria-pressed]="bar.activeFormats().has(action.id)"
-              [attr.aria-label]="action.label"
+              [attr.aria-label]="i18n.t(action.labelKey)"
               [title]="tooltip(action)"
               [disabled]="!bar.canEdit()"
               tabindex="-1"
@@ -71,6 +72,7 @@ const HEADING_SHORT_LABELS: Record<HeadingFormat, string> = {
 })
 export class FormattingBarComponent {
   protected readonly bar = inject(FormattingBarService);
+  protected readonly i18n = inject(I18nService);
   private readonly settingsService = inject(SettingsService);
 
   private readonly sanitizer = inject(DomSanitizer);
@@ -83,7 +85,7 @@ export class FormattingBarComponent {
   protected readonly actions = FORMAT_ACTIONS;
   protected readonly groups = FORMATTING_BAR_GROUPS;
   protected readonly headingShortLabels = HEADING_SHORT_LABELS;
-  protected readonly headingOptions: SelectOption[] = HEADING_FORMATS.map(id => ({ value: id, label: FORMAT_ACTIONS[id].label }));
+  protected readonly headingOptions = computed<SelectOption[]>(() => HEADING_FORMATS.map(id => ({ value: id, label: this.i18n.t(FORMAT_ACTIONS[id].labelKey) })));
 
   protected readonly vertical = computed(() => this.bar.position() === 'left' || this.bar.position() === 'right');
 
@@ -103,7 +105,8 @@ export class FormattingBarComponent {
 
   protected tooltip(item: FormatAction): string {
     const shortcutId = SHORTCUT_IDS[item.id];
-    return shortcutId ? `${item.label} (${this.settingsService.shortcutLabel(shortcutId)})` : item.label;
+    const label = this.i18n.t(item.labelKey);
+    return shortcutId ? `${label} (${this.settingsService.shortcutLabel(shortcutId)})` : label;
   }
 
   protected apply(item: FormatAction): void {

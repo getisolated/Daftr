@@ -9,6 +9,7 @@ import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 const MAX_DISPLAYED_NOTES = 50;
 const MAX_INPUT_HEIGHT_PX = 140;
@@ -30,7 +31,7 @@ interface OverlayMessage {
         <!-- Desktop screenshot kept aligned with the screen while the window moves, then blurred by the CSS -->
         <img class="backdrop" alt="" [src]="backdrop.dataUrl" [style.width.px]="backdrop.width" [style.height.px]="backdrop.height" [style.transform]="backdropTransform()" />
       }
-      <div class="drag-handle" title="Drag to move"><span class="grip"></span></div>
+      <div class="drag-handle" [title]="i18n.t('workspace.overlay.dragToMove')"><span class="grip"></span></div>
 
       <!-- column-reverse: newest message first in the DOM, rendered at the bottom, scroll anchored to the bottom -->
       <div class="messages">
@@ -56,6 +57,7 @@ interface OverlayMessage {
   styleUrls: ['./overlay.component.scss'],
 })
 export class OverlayComponent implements OnInit, OnDestroy {
+  protected readonly i18n = inject(I18nService);
   private bridge = inject(ElectronBridgeService);
   private notesService = inject(NotesService);
   private settingsService = inject(SettingsService);
@@ -70,8 +72,8 @@ export class OverlayComponent implements OnInit, OnDestroy {
   readonly draft = signal('');
   readonly placeholder = computed(() =>
     this.settingsService.settings().enterToSend
-      ? 'Write a note… (Enter to send)'
-      : 'Write a note… (Ctrl+Enter to send)');
+      ? this.i18n.t('workspace.overlay.placeholderEnter')
+      : this.i18n.t('workspace.overlay.placeholderCtrlEnter'));
 
   private unsubscribers: (() => void)[] = [];
   private trackingFrame = 0;
@@ -92,7 +94,7 @@ export class OverlayComponent implements OnInit, OnDestroy {
   }
 
   protected formatTime(createdAt: string): string {
-    return formatNoteTimestamp(createdAt);
+    return formatNoteTimestamp(createdAt, this.i18n.language());
   }
 
   onDraftChange(value: string): void {

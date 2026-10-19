@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 export interface ConfirmDialogAction {
   id: string;
@@ -23,16 +24,19 @@ export interface ConfirmDialogAction {
         @for (action of actions(); track action.id) {
           <button class="btn" [class.danger]="action.danger" (click)="chosen.emit(action.id)">{{ action.label }}</button>
         }
-        <button class="btn cancel" (click)="chosen.emit(null)">{{ cancelLabel() }}</button>
+        <button class="btn cancel" (click)="chosen.emit(null)">{{ cancelLabel() ?? i18n.t('common.cancel') }}</button>
       </div>
     </div>
   `,
   styleUrls: ['./confirm-dialog.component.scss'],
 })
 export class ConfirmDialogComponent {
+  protected readonly i18n = inject(I18nService);
+
   readonly title = input.required<string>();
   readonly message = input.required<string>();
   readonly actions = input.required<ConfirmDialogAction[]>();
-  readonly cancelLabel = input('Cancel');
+  /** Text of the cancel button; the translated "Cancel" when not set. */
+  readonly cancelLabel = input<string | null>(null);
   readonly chosen = output<string | null>();
 }

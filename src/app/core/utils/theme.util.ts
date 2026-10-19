@@ -1,3 +1,4 @@
+import { Translator, translate } from '../i18n/translate';
 import { ThemePreference } from '../models/settings.model';
 import { THEMES, ThemeChoice, ThemeDefinition, ThemeId, ThemeKind, ThemePickerItem } from '../models/theme.model';
 
@@ -28,14 +29,31 @@ export function themeKind(id: ThemeId): ThemeKind {
   return findTheme(id)?.kind ?? 'dark';
 }
 
+/** Translated name of a theme ('system' included); an unknown id is shown as is. */
+export function themeLabel(id: ThemeChoice, t: Translator): string {
+  if (id === 'system') {
+    return t('settings.theme.system');
+  }
+  const theme = findTheme(id);
+  return theme ? t(theme.labelKey) : id;
+}
+
+const ENGLISH: Translator = (key, params) => translate('en', key, params);
+
 /** Entries of the theme picker: 'system' first (with what it resolves to), then every theme; the current choice is flagged. */
-export function buildThemePickerItems(systemThemes: SystemThemes, current: ThemeChoice): ThemePickerItem[] {
-  const darkLabel = findTheme(systemThemes.dark)?.label ?? systemThemes.dark;
-  const lightLabel = findTheme(systemThemes.light)?.label ?? systemThemes.light;
+export function buildThemePickerItems(systemThemes: SystemThemes, current: ThemeChoice, t: Translator = ENGLISH): ThemePickerItem[] {
   const choices: ThemePickerItem[] = [
-    { id: 'system', label: 'System', detail: `Follows Windows: ${darkLabel} / ${lightLabel}` },
-    ...THEMES.map(theme => ({ id: theme.id, label: theme.label, detail: theme.kind === 'dark' ? 'Dark theme' : 'Light theme' })),
+    {
+      id: 'system',
+      label: themeLabel('system', t),
+      detail: t('settings.theme.followsWindows', { dark: themeLabel(systemThemes.dark, t), light: themeLabel(systemThemes.light, t) }),
+    },
+    ...THEMES.map(theme => ({
+      id: theme.id,
+      label: t(theme.labelKey),
+      detail: t(theme.kind === 'dark' ? 'settings.theme.darkKind' : 'settings.theme.lightKind'),
+    })),
   ];
 
-  return choices.map(item => (item.id === current ? { ...item, detail: `${item.detail} · Current` } : item));
+  return choices.map(item => (item.id === current ? { ...item, detail: t('settings.theme.current', { detail: item.detail }) } : item));
 }

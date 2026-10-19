@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslationKey } from '../../core/i18n/translations';
 import { CollectionEditing, CollectionRow } from '../../core/models/collection-tree.model';
 import { CollectionFileRef, CollectionNode, CollectionState } from '../../core/models/collection.model';
 import { CollectionsService } from '../../core/services/collections.service';
@@ -34,6 +36,18 @@ function readSet(key: string): Set<string> {
 }
 
 /** "Collections" section of the sidebar: folders and markdown files of the disk, apart from the notes. */
+/** Messages thrown by the main process (electron/collections.ts) that reach the user. */
+const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
+  'Unknown collection': 'sidebar.collections.error.unknownCollection',
+  'Path outside of the collection': 'sidebar.collections.error.outsideCollection',
+  'Invalid name': 'sidebar.collections.error.invalidName',
+  'Only markdown files can be written': 'sidebar.collections.error.markdownOnly',
+  'Files can only be created in a folder collection': 'sidebar.collections.error.createInFolderOnly',
+  'Rename the file from its folder collection': 'sidebar.collections.error.renameFromFolder',
+  'Cannot move a folder into itself': 'sidebar.collections.error.moveIntoItself',
+  'A file or folder with this name already exists': 'sidebar.collections.error.nameTaken',
+};
+
 @Component({
   selector: 'app-collections-section',
   standalone: true,
@@ -43,18 +57,18 @@ function readSet(key: string): Set<string> {
     <div class="header">
       <button type="button" class="section-toggle" [attr.aria-expanded]="open()" (click)="toggleSection()">
         <svg class="chevron" [class.open]="open()" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-        Collections
+        {{ i18n.t('sidebar.collections.title') }}
       </button>
-      <button type="button" class="icon-btn" title="Open Folder…" (click)="addFolder()">
+      <button type="button" class="icon-btn" [title]="i18n.t('sidebar.collections.openFolder')" (click)="addFolder()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14h6"/></svg>
       </button>
-      <button type="button" class="icon-btn" title="Open Markdown File…" (click)="collections.add('file')">
+      <button type="button" class="icon-btn" [title]="i18n.t('sidebar.collections.openFile')" (click)="collections.add('file')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6"/></svg>
       </button>
     </div>
 
     @if (open()) {
-      <div class="rows" role="tree" aria-label="Collections">
+      <div class="rows" role="tree" [attr.aria-label]="i18n.t('sidebar.collections.title')">
         @for (row of rows(); track row.key) {
           @if (row.kind === 'collection') {
             <div
@@ -97,13 +111,13 @@ function readSet(key: string): Set<string> {
                 }
                 @switch (row.state.status) {
                   @case ('error') {
-                    <span class="status" title="Not found on disk">!</span>
+                    <span class="status" [title]="i18n.t('sidebar.collections.notFound')">!</span>
                   }
                   @case ('loading') {
-                    <span class="spinner" role="status" aria-label="Loading"></span>
+                    <span class="spinner" role="status" [attr.aria-label]="i18n.t('common.loading')"></span>
                   }
                   @case ('unloaded') {
-                    <span class="status unloaded" title="Not loaded: expand it to load it">N</span>
+                    <span class="status unloaded" [title]="i18n.t('sidebar.collections.notLoaded')">N</span>
                   }
                 }
               }
@@ -112,7 +126,7 @@ function readSet(key: string): Set<string> {
               <div class="row" [style.padding-left.px]="22">
                 <span class="chevron-space"></span>
                 <svg class="row-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path [attr.d]="iconFile"/></svg>
-                <input class="inline-input" appFocusSelect placeholder="File name" (keydown.enter)="commitEditing($event)" (keydown.escape)="editing.set(null)" (blur)="commitEditing($event)" />
+                <input class="inline-input" appFocusSelect [placeholder]="i18n.t('sidebar.collections.fileName')" (keydown.enter)="commitEditing($event)" (keydown.escape)="editing.set(null)" (blur)="commitEditing($event)" />
               </div>
             }
           } @else {
@@ -160,12 +174,12 @@ function readSet(key: string): Set<string> {
               <div class="row" [style.padding-left.px]="22 + row.depth * 14">
                 <span class="chevron-space"></span>
                 <svg class="row-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path [attr.d]="iconFile"/></svg>
-                <input class="inline-input" appFocusSelect placeholder="File name" (keydown.enter)="commitEditing($event)" (keydown.escape)="editing.set(null)" (blur)="commitEditing($event)" />
+                <input class="inline-input" appFocusSelect [placeholder]="i18n.t('sidebar.collections.fileName')" (keydown.enter)="commitEditing($event)" (keydown.escape)="editing.set(null)" (blur)="commitEditing($event)" />
               </div>
             }
           }
         } @empty {
-          <div class="empty">Open a folder or a markdown file of your disk: it is listed here, apart from your notes.</div>
+          <div class="empty">{{ i18n.t('sidebar.collections.empty') }}</div>
         }
       </div>
     }
@@ -176,9 +190,9 @@ function readSet(key: string): Set<string> {
 
     @if (confirmTrash(); as target) {
       <app-confirm-dialog
-        [title]="'Move ' + baseName(target.path) + ' to the Recycle Bin?'"
-        message="It is deleted from the disk; it can still be restored from the Windows Recycle Bin."
-        [actions]="trashActions"
+        [title]="i18n.t('sidebar.collections.trash.title', { name: baseName(target.path) })"
+        [message]="i18n.t('sidebar.collections.trash.message')"
+        [actions]="trashActions()"
         (chosen)="onTrashChoice($event)"
       />
     }
@@ -191,13 +205,16 @@ function readSet(key: string): Set<string> {
   host: { '[class.open]': 'open()' },
 })
 export class CollectionsSectionComponent {
+  protected readonly i18n = inject(I18nService);
   protected readonly collections = inject(CollectionsService);
   private readonly fileDocs = inject(FileDocsService);
   protected readonly tabs = inject(TabsService);
   private readonly sidebarState = inject(SidebarStateService);
 
   protected readonly iconFile = ICON_FILE;
-  protected readonly trashActions: ConfirmDialogAction[] = [{ id: 'trash', label: 'Move to Recycle Bin', danger: true }];
+  protected readonly trashActions = computed<ConfirmDialogAction[]>(() => [
+    { id: 'trash', label: this.i18n.t('sidebar.collections.trash.confirm'), danger: true },
+  ]);
   protected readonly baseName = baseName;
 
   protected readonly open = signal(!readSet(SECTION_KEY).has('closed'));
@@ -396,7 +413,10 @@ export class CollectionsSectionComponent {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // Electron prefixes IPC errors with the channel: only the reason matters
-      this.failure.set(message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
+      const reason = message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+      // The reasons the main process raises itself are translated; system errors (disk, permissions) show as they are
+      const key = COLLECTION_ERROR_KEYS[reason];
+      this.failure.set(key ? this.i18n.t(key) : reason);
     }
   }
 
@@ -404,21 +424,22 @@ export class CollectionsSectionComponent {
 
   protected onCollectionMenu(event: MouseEvent, state: CollectionState): void {
     event.preventDefault();
+    const t = this.i18n.t;
     const isFolder = state.collection.kind === 'folder';
     const items: ContextMenuEntry[] = [];
 
     if (state.status === 'error') {
-      items.push({ id: 'relocate', label: 'Locate on Disk…', icon: ICON_REVEAL }, { divider: true });
+      items.push({ id: 'relocate', label: t('sidebar.collections.menu.locate'), icon: ICON_REVEAL }, { divider: true });
     } else if (isFolder) {
-      items.push({ id: 'newFile', label: 'New File', icon: ICON_FILE }, { divider: true });
+      items.push({ id: 'newFile', label: t('sidebar.collections.menu.newFile'), icon: ICON_FILE }, { divider: true });
     }
 
     items.push(
-      { id: 'renameCollection', label: 'Rename Collection', icon: ICON_RENAME, shortcut: 'F2' },
-      { id: 'reveal', label: 'Reveal in File Explorer', icon: ICON_REVEAL, disabled: state.status === 'error' },
-      { id: 'refresh', label: 'Refresh', icon: ICON_REFRESH, disabled: !isFolder },
+      { id: 'renameCollection', label: t('sidebar.collections.menu.renameCollection'), icon: ICON_RENAME, shortcut: 'F2' },
+      { id: 'reveal', label: t('sidebar.collections.menu.reveal'), icon: ICON_REVEAL, disabled: state.status === 'error' },
+      { id: 'refresh', label: t('sidebar.collections.menu.refresh'), icon: ICON_REFRESH, disabled: !isFolder },
       { divider: true },
-      { id: 'remove', label: 'Remove from Collections', icon: ICON_REMOVE },
+      { id: 'remove', label: t('sidebar.collections.menu.remove'), icon: ICON_REMOVE },
     );
 
     this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root: state.collection.path, node: null } });
@@ -427,17 +448,18 @@ export class CollectionsSectionComponent {
   protected onNodeMenu(event: MouseEvent, root: string, node: CollectionNode): void {
     event.preventDefault();
     event.stopPropagation();
+    const t = this.i18n.t;
     const items: ContextMenuEntry[] = [];
 
     if (node.kind === 'folder') {
-      items.push({ id: 'newFile', label: 'New File', icon: ICON_FILE }, { divider: true });
+      items.push({ id: 'newFile', label: t('sidebar.collections.menu.newFile'), icon: ICON_FILE }, { divider: true });
     }
 
     items.push(
-      { id: 'renamePath', label: 'Rename', icon: ICON_RENAME, shortcut: 'F2' },
-      { id: 'reveal', label: 'Reveal in File Explorer', icon: ICON_REVEAL },
+      { id: 'renamePath', label: t('common.rename'), icon: ICON_RENAME, shortcut: 'F2' },
+      { id: 'reveal', label: t('sidebar.collections.menu.reveal'), icon: ICON_REVEAL },
       { divider: true },
-      { id: 'trash', label: 'Delete', icon: ICON_DELETE, danger: true, shortcut: 'Del' },
+      { id: 'trash', label: t('common.delete'), icon: ICON_DELETE, danger: true, shortcut: 'Del' },
     );
 
     this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root, node } });

@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, input, OnInit, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { Hsv, hexToHsv, hsvToHex, normalizeHex } from '../../core/utils/color.util';
 
 const RECENT_COLORS_KEY = 'evn-recent-colors';
@@ -20,7 +21,7 @@ const PRESET_COLORS = ['#e5534b', '#f69d50', '#d4a72c', '#57ab5a', '#39c5cf', '#
   },
   template: `
     <div class="backdrop" (click)="closed.emit()" (contextmenu)="$event.preventDefault(); closed.emit()"></div>
-    <div class="panel" role="dialog" aria-label="Pick a color" [style.left.px]="position().left" [style.top.px]="position().top">
+    <div class="panel" role="dialog" [attr.aria-label]="i18n.t('ui.colorPicker.title')" [style.left.px]="position().left" [style.top.px]="position().top">
       <div
         class="sv-area"
         [style.background-color]="hueColor()"
@@ -44,7 +45,7 @@ const PRESET_COLORS = ['#e5534b', '#f69d50', '#d4a72c', '#57ab5a', '#39c5cf', '#
         <span class="preview" [style.background]="hex()"></span>
         <input
           class="hex-input"
-          aria-label="Hexadecimal color"
+          [attr.aria-label]="i18n.t('ui.colorPicker.hex')"
           spellcheck="false"
           maxlength="7"
           [value]="hex()"
@@ -53,14 +54,14 @@ const PRESET_COLORS = ['#e5534b', '#f69d50', '#d4a72c', '#57ab5a', '#39c5cf', '#
         />
       </div>
 
-      <div class="swatches" aria-label="Presets">
+      <div class="swatches" [attr.aria-label]="i18n.t('ui.colorPicker.presets')">
         @for (color of presets; track color) {
           <button type="button" class="swatch" [style.background]="color" [title]="color" (click)="choose(color)"></button>
         }
       </div>
       @if (recent().length) {
-        <div class="swatches-label">Recent</div>
-        <div class="swatches" aria-label="Recent colors">
+        <div class="swatches-label">{{ i18n.t('ui.colorPicker.recent') }}</div>
+        <div class="swatches" [attr.aria-label]="i18n.t('ui.colorPicker.recentColors')">
           @for (color of recent(); track color) {
             <button type="button" class="swatch" [style.background]="color" [title]="color" (click)="choose(color)"></button>
           }
@@ -68,16 +69,18 @@ const PRESET_COLORS = ['#e5534b', '#f69d50', '#d4a72c', '#57ab5a', '#39c5cf', '#
       }
 
       <div class="actions">
-        <button type="button" class="btn link" (click)="picked.emit(null)">No color</button>
+        <button type="button" class="btn link" (click)="picked.emit(null)">{{ i18n.t('ui.colorPicker.none') }}</button>
         <span class="spacer"></span>
-        <button type="button" class="btn" (click)="closed.emit()">Cancel</button>
-        <button type="button" class="btn primary" (click)="apply()">Apply</button>
+        <button type="button" class="btn" (click)="closed.emit()">{{ i18n.t('common.cancel') }}</button>
+        <button type="button" class="btn primary" (click)="apply()">{{ i18n.t('ui.colorPicker.apply') }}</button>
       </div>
     </div>
   `,
   styleUrls: ['./color-picker.component.scss'],
 })
 export class ColorPickerComponent implements OnInit {
+  protected readonly i18n = inject(I18nService);
+
   /** Color shown when opening; null starts from the first preset. */
   readonly value = input<string | null>(null);
   /** Viewport point the popover opens at (kept inside the window). */

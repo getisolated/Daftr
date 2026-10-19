@@ -1,3 +1,5 @@
+import { Language } from '../../core/i18n/language.model';
+
 /** Standalone stylesheet of an exported page: GitHub's light look, whatever the theme of the app. */
 const EXPORT_CSS = `
 body { margin: 0; background: #fff; color: #1f2328; font-family: -apple-system, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; }
@@ -36,11 +38,11 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** A self-contained HTML page (inline style, no script) around an already sanitized note body. */
-export function buildHtmlDocument(title: string, bodyHtml: string): string {
+/** A self-contained HTML page (inline style, no script) around an already sanitized note body, declared in `language`. */
+export function buildHtmlDocument(title: string, bodyHtml: string, language: Language): string {
   return [
     '<!doctype html>',
-    '<html lang="en">',
+    `<html lang="${language}">`,
     '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',

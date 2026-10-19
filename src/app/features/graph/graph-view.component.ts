@@ -13,6 +13,7 @@ import { ThemeService } from '../../core/services/theme.service';
 import { FileDocsService } from '../../core/services/file-docs.service';
 import { CollectionsService } from '../../core/services/collections.service';
 import { NoteGraph } from '../../core/utils/note-links.util';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 interface SimNode extends SimulationNodeDatum {
   id: number;
@@ -78,17 +79,17 @@ function nodeRadius(degree: number): number {
 
       <div class="graph-toolbar">
         <button type="button" class="graph-btn" [class.active]="hideOrphans()" (click)="backlinks.toggleHideOrphans()"
-          title="Hide the notes without any link">Hide orphans</button>
-        <button type="button" class="graph-btn" (click)="fit()" title="Fit the graph in the view (double-click)">Fit</button>
+          [title]="i18n.t('workspace.graph.hideOrphansTitle')">{{ i18n.t('workspace.graph.hideOrphans') }}</button>
+        <button type="button" class="graph-btn" (click)="fit()" [title]="i18n.t('workspace.graph.fitTitle')">{{ i18n.t('workspace.graph.fit') }}</button>
       </div>
 
       @if (graph().nodes.length === 0) {
-        <div class="graph-empty">{{ collections.selectedRoot() !== null ? 'No markdown file to show.' : 'No notes to show.' }}</div>
+        <div class="graph-empty">{{ i18n.t(collections.selectedRoot() !== null ? 'workspace.graph.emptyFiles' : 'workspace.graph.emptyNotes') }}</div>
       } @else {
         <div class="graph-legend">
-          <span>{{ graph().nodes.length }} notes · {{ graph().links.length }} links</span>
+          <span>{{ i18n.plural('workspace.graph.noteCount', graph().nodes.length) }} · {{ i18n.plural('workspace.graph.linkCount', graph().links.length) }}</span>
           @if (graph().links.length === 0) {
-            <span>Link notes by typing <kbd>note://ID</kbd> — see the <em>Copy Note Link</em> command</span>
+            <span>{{ i18n.t('workspace.graph.hintBefore') }} <kbd>note://ID</kbd> {{ i18n.t('workspace.graph.hintMiddle') }} <em>{{ i18n.t('workspace.palette.cmd.copyNoteLink') }}</em> {{ i18n.t('workspace.graph.hintAfter') }}</span>
           }
         </div>
       }
@@ -97,6 +98,7 @@ function nodeRadius(degree: number): number {
   styleUrl: './graph-view.component.scss',
 })
 export class GraphViewComponent implements OnDestroy {
+  protected readonly i18n = inject(I18nService);
   protected readonly backlinks = inject(BacklinksService);
   private readonly tabs = inject(TabsService);
   private readonly fileDocs = inject(FileDocsService);

@@ -5,6 +5,8 @@ import type { SyntaxNode } from '@lezer/common';
 import { FormatId, FormattingBarItem } from '../../core/models/formatting-bar.model';
 import { findDraftBlocks, toggleDraft } from './draft-blocks';
 import { createEmptyTable } from './markdown-table';
+import { TranslationKey } from '../../core/i18n/translations';
+import { translatorOf } from './translator';
 
 // ─── Slash menu primitives: they replace the `/query` range typed by the user ──
 
@@ -301,11 +303,11 @@ export function clearInlineFormatting(view: EditorView): void {
   view.focus();
 }
 
-/** Turns the selection into the label of a link or an image (a placeholder label otherwise), the `url` placeholder selected. */
+/** Turns the selection into the label of a link or an image (a placeholder label, in the editor's language, otherwise), the `url` placeholder selected. */
 export function insertLink(view: EditorView, image = false): void {
   const main = view.state.selection.main;
   const selected = view.state.sliceDoc(main.from, main.to);
-  const placeholder = image ? 'image' : 'text';
+  const placeholder = translatorOf(view.state)(image ? 'editor.insert.image' : 'editor.insert.text');
   const prefix = image ? '!' : '';
   const insert = `${prefix}[${selected || placeholder}](url)`;
   const urlFrom = main.from + insert.length - 4;
@@ -451,43 +453,49 @@ export function detectActiveFormats(state: EditorState): Set<FormatId> {
 
 export interface FormatAction {
   id: FormatId;
-  label: string;
-  description: string;
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
   /** SVG path(s) for a 24x24 viewBox. */
   icon: string;
   toggle: (view: EditorView) => void;
 }
 
-function action(id: FormatId, label: string, description: string, toggle: FormatAction['toggle']): [FormatId, FormatAction] {
-  return [id, { id, label, description, icon: ICONS[id], toggle }];
+function action(id: FormatId, toggle: FormatAction['toggle']): [FormatId, FormatAction] {
+  return [id, {
+    id,
+    labelKey: `editor.format.${id}.label` as TranslationKey,
+    descriptionKey: `editor.format.${id}.description` as TranslationKey,
+    icon: ICONS[id],
+    toggle,
+  }];
 }
 
 export const FORMAT_ACTIONS = Object.fromEntries([
-  action('paragraph', 'Paragraphe', 'Texte normal', view => toggleLineKind(view, 'paragraph')),
-  action('h1', 'Titre 1', 'Titre principal', view => toggleLineKind(view, 'h1')),
-  action('h2', 'Titre 2', 'Sous-titre', view => toggleLineKind(view, 'h2')),
-  action('h3', 'Titre 3', 'Sous-section', view => toggleLineKind(view, 'h3')),
-  action('h4', 'Titre 4', 'Sous-sous-section', view => toggleLineKind(view, 'h4')),
-  action('h5', 'Titre 5', 'Titre de niveau 5', view => toggleLineKind(view, 'h5')),
-  action('h6', 'Titre 6', 'Titre de niveau 6', view => toggleLineKind(view, 'h6')),
-  action('bulletList', 'Liste à puces', 'Liste non ordonnée', view => toggleLineKind(view, 'bulletList')),
-  action('orderedList', 'Liste numérotée', 'Liste ordonnée', view => toggleLineKind(view, 'orderedList')),
-  action('taskList', 'Liste de tâches', 'Case à cocher', view => toggleLineKind(view, 'taskList')),
-  action('quote', 'Citation', 'Bloc de citation', view => toggleLineKind(view, 'quote')),
-  action('codeBlock', 'Bloc de code', 'Bloc de code multi-ligne', toggleCodeBlock),
-  action('bold', 'Gras', 'Texte en gras', view => toggleInlineMark(view, '**', 'StrongEmphasis')),
-  action('italic', 'Italique', 'Texte en italique', view => toggleInlineMark(view, '*', 'Emphasis')),
-  action('underline', 'Souligné', 'Texte souligné', view => toggleHtmlTag(view, 'u')),
-  action('strikethrough', 'Barré', 'Texte barré', view => toggleInlineMark(view, '~~', 'Strikethrough')),
-  action('inlineCode', 'Code', 'Code en ligne', view => toggleInlineMark(view, '`', 'InlineCode')),
-  action('superscript', 'Exposant', 'Texte en exposant', view => toggleHtmlTag(view, 'sup')),
-  action('subscript', 'Indice', 'Texte en indice', view => toggleHtmlTag(view, 'sub')),
-  action('clearFormatting', 'Effacer la mise en forme', 'Retire gras, italique, code…', clearInlineFormatting),
-  action('link', 'Lien', 'Lien vers une adresse', view => insertLink(view)),
-  action('image', 'Image', 'Image depuis une adresse', view => insertLink(view, true)),
-  action('hr', 'Séparateur', 'Ligne horizontale', insertRuleBelow),
-  action('table', 'Tableau', 'Tableau 2×2', insertTableBelow),
-  action('draft', 'Brouillon', 'Bloc de brouillon', toggleDraftAndFocus),
+  action('paragraph', view => toggleLineKind(view, 'paragraph')),
+  action('h1', view => toggleLineKind(view, 'h1')),
+  action('h2', view => toggleLineKind(view, 'h2')),
+  action('h3', view => toggleLineKind(view, 'h3')),
+  action('h4', view => toggleLineKind(view, 'h4')),
+  action('h5', view => toggleLineKind(view, 'h5')),
+  action('h6', view => toggleLineKind(view, 'h6')),
+  action('bulletList', view => toggleLineKind(view, 'bulletList')),
+  action('orderedList', view => toggleLineKind(view, 'orderedList')),
+  action('taskList', view => toggleLineKind(view, 'taskList')),
+  action('quote', view => toggleLineKind(view, 'quote')),
+  action('codeBlock', toggleCodeBlock),
+  action('bold', view => toggleInlineMark(view, '**', 'StrongEmphasis')),
+  action('italic', view => toggleInlineMark(view, '*', 'Emphasis')),
+  action('underline', view => toggleHtmlTag(view, 'u')),
+  action('strikethrough', view => toggleInlineMark(view, '~~', 'Strikethrough')),
+  action('inlineCode', view => toggleInlineMark(view, '`', 'InlineCode')),
+  action('superscript', view => toggleHtmlTag(view, 'sup')),
+  action('subscript', view => toggleHtmlTag(view, 'sub')),
+  action('clearFormatting', clearInlineFormatting),
+  action('link', view => insertLink(view)),
+  action('image', view => insertLink(view, true)),
+  action('hr', insertRuleBelow),
+  action('table', insertTableBelow),
+  action('draft', toggleDraftAndFocus),
 ]) as Record<FormatId, FormatAction>;
 
 /** Toolbar layout: one array per visual group. */

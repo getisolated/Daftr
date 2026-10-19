@@ -1,5 +1,22 @@
 export type ShortcutMode = 'overlay' | 'app';
 
+/** Languages of the interface (mirrors language.model.ts on the renderer side). */
+export type Language = 'en' | 'fr';
+
+export const DEFAULT_LANGUAGE: Language = 'en';
+const LANGUAGES: readonly Language[] = ['en', 'fr'];
+
+export function isLanguage(value: unknown): value is Language {
+  return LANGUAGES.some(language => language === value);
+}
+
+/** Language matching a locale such as `fr-FR` or `en_US`; English when the locale is not (yet) translated. */
+export function resolveLanguage(locale: string | null | undefined): Language {
+  const primary = (locale ?? '').toLowerCase().split(/[-_]/)[0];
+
+  return LANGUAGES.find(language => language === primary) ?? DEFAULT_LANGUAGE;
+}
+
 export type ThemeId = 'dark' | 'light' | 'solarized-light' | 'violet-light' | 'github-light' | 'github-dark-dimmed';
 export type ThemeKind = 'dark' | 'light';
 export type ThemePreference = ThemeId | 'system';
@@ -58,6 +75,8 @@ export interface OverlayPosition {
 }
 
 export interface AppSettings {
+  /** Language of the interface; chosen from the OS locale on the first launch. */
+  language: Language;
   globalShortcut: string;
   shortcutMode: ShortcutMode;
   overlayWidth: number;
@@ -104,6 +123,7 @@ export const OVERLAY_MIN_HEIGHT = 200;
 export const OVERLAY_MAX_HEIGHT = 1200;
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: DEFAULT_LANGUAGE,
   globalShortcut: 'CommandOrControl+Alt+N',
   shortcutMode: 'overlay',
   overlayWidth: 250,
@@ -171,6 +191,7 @@ export function sanitizeSettings(input: unknown, base: AppSettings = DEFAULT_SET
   const mode = raw['shortcutMode'] === 'overlay' || raw['shortcutMode'] === 'app' ? raw['shortcutMode'] : base.shortcutMode;
 
   return {
+    language: isLanguage(raw['language']) ? raw['language'] : base.language,
     globalShortcut: shortcut || base.globalShortcut,
     shortcutMode: mode,
     overlayWidth: clampInt(raw['overlayWidth'], OVERLAY_MIN_WIDTH, OVERLAY_MAX_WIDTH, base.overlayWidth),

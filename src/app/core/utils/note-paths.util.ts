@@ -54,7 +54,10 @@ export function linkStatus(rawTarget: string, resolve: LinkResolver, noteExists:
   return resolve(target) === null ? 'broken' : 'note';
 }
 
-/** Segment of a path: slashes and angle brackets would break the path or the link, so they become dashes. */
+/**
+ * Segment of a path: slashes and angle brackets would break the path or the link, so they become dashes.
+ * The segment of an untitled note is written in the links: it stays `Untitled` whatever the language, or they would break.
+ */
 export function toPathSegment(name: string): string {
   return name.replace(UNSAFE_IN_SEGMENT, '-').trim() || 'Untitled';
 }

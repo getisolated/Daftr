@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { createMarkdownRenderer } from '../src/app/shared/markdown/markdown-renderer';
+import { translate } from '../src/app/core/i18n/translate';
 import { LinkStatus } from '../src/app/core/utils/note-paths.util';
 
 const statuses: Record<string, LinkStatus> = { 'Folder/Here': 'note', 'Gone': 'broken', 'https://x.dev': 'external' };
-const md = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 'note' });
+const md = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 'note', t: (key, params) => translate('en', key, params) });
+const mdFr = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 'note', t: (key, params) => translate('fr', key, params) });
 const render = (source: string): string => md.render(source);
 
 describe('createMarkdownRenderer', () => {
@@ -24,6 +26,12 @@ describe('createMarkdownRenderer', () => {
     expect(html).toContain('class="task-list-item"');
     expect(html).toContain('<input type="checkbox" class="task-list-item-checkbox" disabled> todo');
     expect(html).toContain('disabled checked> done');
+  });
+
+  it('titles the alerts and the broken links in the language of the renderer', () => {
+    expect(mdFr.render('> [!WARNING]\n> Careful')).toContain('<p class="markdown-alert-title">Avertissement</p>');
+    expect(mdFr.render('> [!TIP]\n> x')).toContain('<p class="markdown-alert-title">Astuce</p>');
+    expect(mdFr.render('[x](Gone)')).toContain('title="Cible du lien introuvable"');
   });
 
   it('turns GitHub alerts into titled callouts', () => {

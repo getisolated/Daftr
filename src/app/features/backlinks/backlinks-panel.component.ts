@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
 
+import { I18nService } from '../../core/i18n/i18n.service';
 import { BacklinksService } from '../../core/services/backlinks.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { Backlink } from '../../core/utils/note-links.util';
@@ -17,7 +18,7 @@ const STORAGE_KEY = 'evnote-backlinks-open';
         <svg class="chevron" [class.open]="open()" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
           <polyline points="9 18 15 12 9 6"/>
         </svg>
-        <span>Backlinks</span>
+        <span>{{ i18n.t('editor.backlinks.title') }}</span>
         <span class="count">{{ backlinks().length }}</span>
       </button>
 
@@ -31,7 +32,7 @@ const STORAGE_KEY = 'evnote-backlinks-open';
               }
             </div>
           } @empty {
-            <p class="backlinks-empty">No note links here yet.</p>
+            <p class="backlinks-empty">{{ i18n.t('editor.backlinks.empty') }}</p>
           }
         </div>
       }
@@ -40,6 +41,7 @@ const STORAGE_KEY = 'evnote-backlinks-open';
   styleUrl: './backlinks-panel.component.scss',
 })
 export class BacklinksPanelComponent {
+  protected readonly i18n = inject(I18nService);
   private readonly service = inject(BacklinksService);
   private readonly tabs = inject(TabsService);
 

@@ -1,5 +1,6 @@
 import { EditorState, Extension, Range, StateField, Text } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
+import { translatorOf } from './translator';
 
 /** Markers persisted in the note's markdown: a draft block is the lines between them. */
 export const DRAFT_START = '<!-- draft -->';
@@ -87,10 +88,11 @@ class DraftActionsWidget extends WidgetType {
 
   override toDOM(view: EditorView): HTMLElement {
     const container = document.createElement('div');
+    const t = translatorOf(view.state);
     container.className = 'cm-draft-actions';
     container.append(
-      this.button(view, 'cm-draft-confirm', '✓', 'Confirm', confirmDraft),
-      this.button(view, 'cm-draft-discard', '✕', 'Discard', discardDraft),
+      this.button(view, 'cm-draft-confirm', '✓', t('editor.draft.confirm'), confirmDraft),
+      this.button(view, 'cm-draft-discard', '✕', t('editor.draft.discard'), discardDraft),
     );
     return container;
   }
