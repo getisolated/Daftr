@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Coquille Tauri : fenêtres, tray, commandes IPC"
+description = "Coquille Tauri : fenêtres, tray, raccourci global, commandes IPC"
 
 [lints]
 workspace = true
@@ -14,6 +14,23 @@ workspace = true
 tauri-build.workspace = true
 
 [dependencies]
+adapter-fs.workspace = true
+adapter-sqlite.workspace = true
+app.workspace = true
+domain.workspace = true
+platform.workspace = true
+presentation.workspace = true
+
 anyhow.workspace = true
+serde_json.workspace = true
+sys-locale.workspace = true
 tauri.workspace = true
+tauri-plugin-autostart.workspace = true
+tauri-plugin-dialog.workspace = true
+tauri-plugin-global-shortcut.workspace = true
+tauri-plugin-opener.workspace = true
+tauri-plugin-single-instance.workspace = true
+tauri-plugin-updater.workspace = true
+serde.workspace = true
 tracing.workspace = true
+window-vibrancy.workspace = true
