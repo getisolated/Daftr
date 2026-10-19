@@ -87,7 +87,10 @@ export function resolveRelativeLink(fromFile: string, target: string): Collectio
 }
 
 /** What a link of a collection file designates: a markdown file, or a folder (`''` for the root). */
-export type CollectionTarget = { kind: 'file' | 'folder'; path: string };
+export interface CollectionTarget {
+  kind: 'file' | 'folder';
+  path: string;
+}
 
 /** The target without its angle brackets and anchor, percent-decoded when it is; `~` alone is the root folder. */
 function cleanTarget(target: string): string {
