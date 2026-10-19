@@ -2,7 +2,7 @@ import { EditorSelection, EditorState, Line } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import type { SyntaxNode } from '@lezer/common';
-import { FormatId, FormattingBarItem } from '../../core/models/formatting-bar.model';
+import { FormatId, FormattingBarGroup } from '../../core/models/formatting-bar.model';
 import { findDraftBlocks, toggleDraft } from './draft-blocks';
 import { createEmptyTable } from './markdown-table';
 import { TranslationKey } from '../../core/i18n/translations';
@@ -498,11 +498,11 @@ export const FORMAT_ACTIONS = Object.fromEntries([
   action('draft', toggleDraftAndFocus),
 ]) as Record<FormatId, FormatAction>;
 
-/** Toolbar layout: one array per visual group. */
-export const FORMATTING_BAR_GROUPS: FormattingBarItem[][] = [
-  ['heading'],
-  ['bold', 'italic', 'underline', 'strikethrough', 'inlineCode', 'superscript', 'subscript', 'clearFormatting'],
-  ['link', 'image'],
-  ['codeBlock', 'quote', 'hr', 'table', 'draft'],
-  ['bulletList', 'orderedList', 'taskList'],
+/** Toolbar layout: the visual groups, in order. */
+export const FORMATTING_BAR_GROUPS: FormattingBarGroup[] = [
+  { id: 'heading', items: ['heading'] },
+  { id: 'text', items: ['bold', 'italic', 'underline', 'strikethrough', 'inlineCode', 'superscript', 'subscript', 'clearFormatting'] },
+  { id: 'insert', items: ['link', 'image'] },
+  { id: 'blocks', items: ['codeBlock', 'quote', 'hr', 'table', 'draft'] },
+  { id: 'lists', items: ['bulletList', 'orderedList', 'taskList'] },
 ];

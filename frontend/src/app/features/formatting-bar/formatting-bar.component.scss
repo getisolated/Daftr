@@ -66,7 +66,8 @@
       margin: var(--separator-margin) 0;
     }
 
-    .heading-select ::ng-deep .trigger {
+    .heading-select ::ng-deep .trigger,
+    .group-select ::ng-deep .trigger {
       width: var(--tool-width);
       justify-content: center;
       padding: 0;
@@ -86,10 +87,14 @@
     align-self: stretch;
   }
 
-  &.disabled .heading-select {
+  &.disabled .heading-select,
+  &.disabled .group-select {
     opacity: 0.4;
     pointer-events: none;
   }
+
+  // Narrow window: one drop-down per group, as short as its name (or its icon, when vertical)
+  &.condensed .heading-select ::ng-deep .trigger { width: auto; }
 }
 
 .group {
@@ -142,8 +147,9 @@
   }
 }
 
-// The heading drop-down blends into the bar: no input look until hovered
-.heading-select ::ng-deep .trigger {
+// The drop-downs blend into the bar: no input look until hovered
+.heading-select ::ng-deep .trigger,
+.group-select ::ng-deep .trigger {
   min-width: 0;
   width: 118px;
   height: var(--tool-height);
@@ -158,5 +164,21 @@
     border-color: transparent;
     background: rgba(var(--evn-hover-rgb), 0.07);
     color: var(--evn-text);
+  }
+}
+
+.group-select ::ng-deep .trigger {
+  width: auto;
+  gap: 4px;
+
+  // One of the toggles of the group is in effect under the caret, as for a pressed button
+  &.active {
+    background: rgba(var(--evn-accent-strong-rgb), 0.35);
+    color: var(--evn-accent-text);
+  }
+
+  .trigger-icon {
+    width: var(--tool-icon);
+    height: var(--tool-icon);
   }
 }

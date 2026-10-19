@@ -1,8 +1,13 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, output, signal } from '@angular/core';
+import { SafeHtml } from '@angular/platform-browser';
 
 export interface SelectOption {
   value: string;
   label: string;
+  /** SVG content (24x24 viewBox) shown before the label. */
+  icon?: SafeHtml;
+  /** Checked whatever the value: a drop-down used as a menu of toggles (formatting bar) marks the ones in effect. */
+  active?: boolean;
 }
 
 /** Where the list opens: under the trigger (above when there is no room), or beside it (vertical toolbars). */
@@ -32,10 +37,16 @@ const PANEL_PADDING_PX = 8;
       aria-haspopup="listbox"
       [attr.aria-expanded]="isOpen()"
       [class.open]="isOpen()"
+      [class.active]="triggerActive()"
+      [attr.aria-label]="ariaLabel()"
       (click)="toggle()"
       (keydown)="onKeydown($event)"
     >
-      <span class="current">{{ triggerLabel() ?? currentLabel() }}</span>
+      @if (triggerIcon(); as icon) {
+        <svg class="trigger-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" [innerHTML]="icon"></svg>
+      } @else {
+        <span class="current">{{ triggerLabel() ?? currentLabel() }}</span>
+      }
       <svg class="chevron" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="3 6 8 11 13 6" />
       </svg>
@@ -47,15 +58,18 @@ const PANEL_PADDING_PX = 8;
           <div
             class="option"
             role="option"
-            [attr.aria-selected]="option.value === value()"
-            [class.selected]="option.value === value()"
+            [attr.aria-selected]="isChecked(option)"
+            [class.selected]="isChecked(option)"
             [class.highlighted]="i === highlightedIndex()"
             (mouseenter)="highlightedIndex.set(i)"
             (mousedown)="$event.preventDefault()"
             (click)="choose(option)"
           >
+            @if (option.icon) {
+              <svg class="option-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" [innerHTML]="option.icon"></svg>
+            }
             <span class="option-label">{{ option.label }}</span>
-            @if (option.value === value()) {
+            @if (isChecked(option)) {
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 8.5 6.5 12 13 4.5" />
               </svg>
@@ -75,6 +89,12 @@ export class SelectComponent {
   readonly placement = input<SelectPlacement>('below');
   /** Text of the closed drop-down instead of the current option's label (e.g. a short one in a narrow toolbar). */
   readonly triggerLabel = input<string | null>(null);
+  /** Icon of the closed drop-down instead of any text (icon-only toolbars). */
+  readonly triggerIcon = input<SafeHtml | null>(null);
+  /** Highlights the closed drop-down (e.g. one of its toggles is in effect). */
+  readonly triggerActive = input(false);
+  /** Accessible name of the trigger, needed when it only shows an icon. */
+  readonly ariaLabel = input<string | null>(null);
   readonly valueChange = output<string>();
 
   protected readonly isOpen = signal(false);
@@ -97,6 +117,10 @@ export class SelectComponent {
     if (!this.isOpen()) return;
     this.isOpen.set(false);
     window.removeEventListener('scroll', this.closeOnScroll, true);
+  }
+
+  protected isChecked(option: SelectOption): boolean {
+    return option.active ?? option.value === this.value();
   }
 
   protected choose(option: SelectOption): void {

@@ -56,6 +56,10 @@ export const EN_EDITOR = {
   // Formatting bar
   'editor.formatBar.label': 'Formatting',
   'editor.formatBar.style': 'Style',
+  'editor.formatBar.group.text': 'Text',
+  'editor.formatBar.group.insert': 'Insert',
+  'editor.formatBar.group.blocks': 'Blocks',
+  'editor.formatBar.group.lists': 'Lists',
 
   // Formatting actions (formatting bar and slash menu)
   'editor.format.paragraph.label': 'Paragraph',

@@ -17,3 +17,11 @@ export type HeadingFormat = typeof HEADING_FORMATS[number];
 
 /** One slot of the bar: a formatting button, or the heading drop-down. */
 export type FormattingBarItem = FormatId | 'heading';
+
+/** Groups of the bar; once condensed (narrow window), each one becomes a single drop-down. */
+export type FormattingBarGroupId = 'heading' | 'text' | 'insert' | 'blocks' | 'lists';
+
+export interface FormattingBarGroup {
+  id: FormattingBarGroupId;
+  items: FormattingBarItem[];
+}

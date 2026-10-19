@@ -58,6 +58,10 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   // Barre de mise en forme
   'editor.formatBar.label': 'Mise en forme',
   'editor.formatBar.style': 'Style',
+  'editor.formatBar.group.text': 'Texte',
+  'editor.formatBar.group.insert': 'Insérer',
+  'editor.formatBar.group.blocks': 'Blocs',
+  'editor.formatBar.group.lists': 'Listes',
 
   // Actions de mise en forme (barre et menu slash)
   'editor.format.paragraph.label': 'Paragraphe',

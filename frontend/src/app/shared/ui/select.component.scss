@@ -32,6 +32,18 @@
 
 .trigger.open .chevron { transform: rotate(180deg); }
 
+.trigger-icon,
+.option-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.option-icon {
+  margin-right: -4px;
+  color: var(--evn-text-soft);
+}
+
 .panel {
   position: fixed;
   z-index: 2100;
@@ -65,3 +77,6 @@
   &.highlighted { background: var(--evn-bg-selected); color: var(--evn-text-bright); }
   &.selected { color: var(--evn-text-bright); }
 }
+
+// With an icon, the label takes the room and the check mark stays at the end
+.option-label { flex: 1; }
