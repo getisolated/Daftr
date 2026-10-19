@@ -4,8 +4,8 @@
 //! utilisable (acrylique ou panneau translucide) a changé depuis.
 
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 use app::settings::SettingsChange;
 use domain::overlay::{Size, anchor_bottom_right, resolve_overlay_position};
@@ -27,6 +27,12 @@ pub const OVERLAY: &str = "overlay";
 /// `dragging` déclenche `Moved` en continu : la position n'est enregistrée qu'au repos.
 const POSITION_SAVE_DELAY: Duration = Duration::from_millis(300);
 
+/// Délai entre deux vérifications après une perte de focus.
+const BLUR_CHECK_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Un déplacement plus récent : la fenêtre est en train d'être glissée par sa poignée.
+const DRAG_GRACE: Duration = Duration::from_millis(400);
+
 /// Le renderer ne peint alors aucun fond et laisse voir l'acrylique.
 const ACRYLIC_SCRIPT: &str = "document.addEventListener('DOMContentLoaded', () => \
                               document.documentElement.classList.add('overlay-acrylic'));";
@@ -38,6 +44,32 @@ pub struct OverlayState {
     acrylic: Mutex<Option<bool>>,
     /// Numéro du dernier déplacement : seul le plus récent enregistre la position.
     move_generation: AtomicU64,
+    /// Moment du dernier déplacement (glisser la poignée retire un instant le focus).
+    last_moved: Mutex<Option<Instant>>,
+    /// Une perte de focus est en cours d'examen.
+    watching_blur: AtomicBool,
+}
+
+/// Suite à donner à une perte de focus de l'overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BlurOutcome {
+    /// Le focus est revenu : rien à faire.
+    Keep,
+    /// La fenêtre est glissée : on attend la fin du déplacement.
+    Wait,
+    /// Un clic ailleurs sur l'écran : l'overlay se cache.
+    Hide,
+}
+
+/// Glisser la fenêtre par sa poignée passe par la boucle de déplacement de Windows, qui retire
+/// le focus le temps du geste : l'overlay ne se cache que s'il ne l'a pas retrouvé et ne bouge
+/// plus.
+fn blur_outcome(focused: bool, moved_recently: bool) -> BlurOutcome {
+    match (focused, moved_recently) {
+        (true, _) => BlurOutcome::Keep,
+        (false, true) => BlurOutcome::Wait,
+        (false, false) => BlurOutcome::Hide,
+    }
 }
 
 /// Crée l'overlay caché sans retarder le démarrage (la sonde de l'acrylique peut durer).
@@ -161,14 +193,53 @@ fn apply_material(window: &WebviewWindow, use_acrylic: bool) {
 
 fn on_window_event(window: &WebviewWindow, event: &WindowEvent) {
     match event {
-        // Un clic ailleurs sur l'écran : l'overlay se cache, le brouillon reste
-        WindowEvent::Focused(false) => hide(window.app_handle()),
+        // Un clic ailleurs sur l'écran cache l'overlay (le brouillon reste), pas un glisser
+        WindowEvent::Focused(false) => watch_blur(window),
         WindowEvent::Moved(physical) => {
+            *lock(&desktop(window.app_handle()).overlay.last_moved) = Some(Instant::now());
             let position = geometry::logical_position(window, *physical);
             schedule_position_save(window, position);
         }
         _ => {}
     }
+}
+
+/// Examine une perte de focus en arrière-plan, une seule à la fois.
+fn watch_blur(window: &WebviewWindow) {
+    if desktop(window.app_handle())
+        .overlay
+        .watching_blur
+        .swap(true, Ordering::Relaxed)
+    {
+        return;
+    }
+    let window = window.clone();
+
+    spawn("overlay-blur", move || {
+        settle_blur(&window);
+        desktop(window.app_handle())
+            .overlay
+            .watching_blur
+            .store(false, Ordering::Relaxed);
+    });
+}
+
+fn settle_blur(window: &WebviewWindow) {
+    loop {
+        std::thread::sleep(BLUR_CHECK_INTERVAL);
+        let focused = window.is_focused().unwrap_or(false);
+
+        match blur_outcome(focused, moved_recently(window)) {
+            BlurOutcome::Keep => return,
+            BlurOutcome::Wait => {}
+            BlurOutcome::Hide => return hide(window.app_handle()),
+        }
+    }
+}
+
+fn moved_recently(window: &WebviewWindow) -> bool {
+    let last_moved = *lock(&desktop(window.app_handle()).overlay.last_moved);
+    last_moved.is_some_and(|moment| moment.elapsed() < DRAG_GRACE)
 }
 
 fn schedule_position_save(window: &WebviewWindow, position: domain::overlay::Position) {
@@ -231,5 +302,18 @@ fn set_bounds(window: &WebviewWindow, position: domain::overlay::Position, size:
 fn spawn(name: &str, job: impl FnOnce() + Send + 'static) {
     if let Err(error) = std::thread::Builder::new().name(name.to_owned()).spawn(job) {
         tracing::error!(%error, name, "thread non démarré");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hides_only_after_a_real_blur() {
+        assert_eq!(blur_outcome(true, false), BlurOutcome::Keep);
+        assert_eq!(blur_outcome(true, true), BlurOutcome::Keep);
+        assert_eq!(blur_outcome(false, true), BlurOutcome::Wait);
+        assert_eq!(blur_outcome(false, false), BlurOutcome::Hide);
     }
 }
