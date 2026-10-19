@@ -10,3 +10,11 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+app.workspace = true
+domain.workspace = true
+platform.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
