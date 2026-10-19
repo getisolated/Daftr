@@ -49,7 +49,7 @@ import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/n
 import { CollectionFileRef } from '../../core/models/collection.model';
 import { CollectionsService } from '../../core/services/collections.service';
 import { FileDocsService } from '../../core/services/file-docs.service';
-import { baseName, resolveRelativeLink } from '../../core/utils/collection.util';
+import { baseName, collectionLinkStatus, knownFiles, resolveRelativeLink } from '../../core/utils/collection.util';
 import { FindService } from '../../core/services/find.service';
 import { FindPanelComponent } from '../find/find-panel.component';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -220,6 +220,15 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   /** Whether a link target exists, shared by the editor decorations and the preview. */
   protected readonly linkStatusOf = computed<(target: string) => LinkStatus>(() => {
+    // In a collection file, links lead to the other files of the collection (as `followLink` does)
+    const file = this.fileDocs.refFor(this.activeNote()?.id ?? null);
+    if (file) {
+      const state = this.collections.states().find(candidate => candidate.collection.path === file.root);
+      const loaded = state?.status === 'ready' && state.collection.kind === 'folder';
+      const files = loaded ? knownFiles(state.tree) : null;
+      return target => collectionLinkStatus(file.path, target, files);
+    }
+
     const notes = this.notes.notes();
     const resolve = createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders());
     const ids = new Set(notes.map(n => n.id));

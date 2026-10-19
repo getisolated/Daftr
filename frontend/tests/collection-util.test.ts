@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { baseName, flattenFiles, labelCollections, movedPath, parentPath, resolveRelativeLink } from '../src/app/core/utils/collection.util';
+import { baseName, collectionLinkStatus, flattenFiles, knownFiles, labelCollections, movedPath, parentPath, resolveRelativeLink } from '../src/app/core/utils/collection.util';
 
 const collection = (path: string, displayName = baseName(path)) => ({ path, kind: 'folder' as const, displayName, sortOrder: 0 });
 
@@ -64,5 +64,35 @@ describe('resolveRelativeLink', () => {
 
   it('refuses files of another extension', () => {
     expect(resolveRelativeLink('a.md', 'src/WMSAlign.Enum.al')).toBeNull();
+  });
+});
+
+describe('collectionLinkStatus', () => {
+  const files = knownFiles([
+    { name: 'README.md', path: 'README.md', kind: 'file' },
+    {
+      name: 'docs', path: 'docs', kind: 'folder', children: [
+        { name: 'events.md', path: 'docs/events.md', kind: 'file' },
+        { name: 'Navigation.md', path: 'docs/Navigation.md', kind: 'file' },
+      ],
+    },
+  ]);
+
+  it('resolves a relative or extension-less target from the open file', () => {
+    expect(collectionLinkStatus('docs/events.md', 'navigation.md', files)).toBe('note');
+    expect(collectionLinkStatus('docs/events.md', './navigation', files)).toBe('note');
+    expect(collectionLinkStatus('docs/events.md', '../README.md#top', files)).toBe('note');
+  });
+
+  it('flags a markdown page missing from the collection', () => {
+    expect(collectionLinkStatus('docs/events.md', 'missing.md', files)).toBe('broken');
+    expect(collectionLinkStatus('docs/events.md', 'README.md', files)).toBe('broken');
+  });
+
+  it('never flags what it cannot check', () => {
+    expect(collectionLinkStatus('docs/events.md', 'missing.md', null)).toBe('note');
+    expect(collectionLinkStatus('docs/events.md', 'diagram.png', files)).toBe('note');
+    expect(collectionLinkStatus('docs/events.md', 'https://example.com', files)).toBe('external');
+    expect(collectionLinkStatus('docs/events.md', '#section', files)).toBe('anchor');
   });
 });

@@ -1,4 +1,5 @@
 import { Collection, CollectionFileRef, CollectionNode } from '../models/collection.model';
+import { LinkStatus } from './note-paths.util';
 
 /** Last segment of a path, whatever its separators. */
 export function baseName(path: string): string {
@@ -101,4 +102,35 @@ export function resolveRelativeLink(fromFile: string, target: string): string | 
 
   // A file of another extension is not a markdown page of the collection
   return /\.[^./]+$/.test(segments[segments.length - 1] ?? '') ? null : `${resolved}.md`;
+}
+
+/** Paths (lower case) of the markdown files of a loaded collection, `null` while its tree is not known. */
+export type KnownFiles = ReadonlySet<string> | null;
+
+/** Lower-case paths of the files of a collection tree, for {@link collectionLinkStatus}. */
+export function knownFiles(nodes: readonly CollectionNode[]): Set<string> {
+  return new Set(flattenFiles('', nodes).map(ref => ref.path.toLowerCase()));
+}
+
+/**
+ * Status of a link written in a collection file: a relative (or extension-less) target is resolved from that file,
+ * inside its collection. Only a markdown page missing from the loaded tree is `broken`; files of another extension
+ * (images, sources) are not listed in the tree and cannot be checked, nor can anything before the tree is loaded.
+ */
+export function collectionLinkStatus(fromFile: string, rawTarget: string, files: KnownFiles): LinkStatus {
+  const target = rawTarget.trim();
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
+    return 'external';
+  }
+  if (target.startsWith('#')) {
+    return 'anchor';
+  }
+
+  const resolved = resolveRelativeLink(fromFile, target);
+
+  if (resolved === null || files === null) {
+    return 'note';
+  }
+  return files.has(resolved.toLowerCase()) ? 'note' : 'broken';
 }
