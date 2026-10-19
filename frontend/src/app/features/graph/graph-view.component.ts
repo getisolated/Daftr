@@ -110,13 +110,6 @@ function overlaps(a: LabelBox, b: LabelBox): boolean {
         <div class="graph-empty">{{ i18n.t(collections.selectedRoot() !== null ? 'workspace.graph.emptyFiles' : 'workspace.graph.emptyNotes') }}</div>
       } @else {
         <div class="graph-legend">
-          @if (groupLegend().length > 1) {
-            <div class="graph-groups">
-              @for (group of groupLegend(); track group.name) {
-                <span class="graph-group" [title]="group.name"><span class="swatch" [style.background]="group.color"></span>{{ group.name }}</span>
-              }
-            </div>
-          }
           <span>{{ i18n.plural('workspace.graph.noteCount', graph().nodes.length) }} · {{ i18n.plural('workspace.graph.linkCount', graph().links.length) }}</span>
           @if (graph().links.length === 0) {
             <span>{{ i18n.t('workspace.graph.hintBefore') }} <kbd>note://ID</kbd> {{ i18n.t('workspace.graph.hintMiddle') }} <em>{{ i18n.t('workspace.palette.cmd.copyNoteLink') }}</em> {{ i18n.t('workspace.graph.hintAfter') }}</span>
@@ -138,13 +131,11 @@ export class GraphViewComponent implements OnDestroy {
   protected readonly graph = this.backlinks.graph;
   protected readonly hideOrphans = this.backlinks.hideOrphans;
 
-  /** Colour of each folder group, in name order (the legend and the nodes share it). */
+  /** Colour of each folder group, in name order. */
   private readonly groupColors = computed(() => {
     const names = [...new Set(this.graph().nodes.map(node => node.group).filter(group => group != null))].sort();
     return new Map(names.map((name, index) => [name, GRAPH_GROUP_COLORS[index % GRAPH_GROUP_COLORS.length]]));
   });
-
-  protected readonly groupLegend = computed(() => [...this.groupColors()].map(([name, color]) => ({ name, color })));
 
   /** Widths of the titles at the label font size (screen px), measured once each. */
   private readonly labelWidths = new Map<string, number>();
