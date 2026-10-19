@@ -24,3 +24,15 @@ describe('formatNoteTimestamp', () => {
     expect(formatNoteTimestamp('')).toBe('');
   });
 });
+
+describe('formatNoteTimestamp by language', () => {
+  const iso = new Date(2026, 9, 2, 9, 7, 5).toISOString();
+
+  it('puts the day first in French', () => {
+    expect(formatNoteTimestamp(iso, 'fr')).toBe('02/10/2026 09:07:05');
+  });
+
+  it('puts the month first in English', () => {
+    expect(formatNoteTimestamp(iso, 'en')).toBe('10/02/2026 09:07:05');
+  });
+});

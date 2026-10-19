@@ -7,9 +7,12 @@ import { TabsService } from '../../core/services/tabs.service';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { noteDisplayTitle } from '../../core/utils/note-title.util';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
+import { QUICK_NOTES_TAB_ID, Tab } from '../../core/models/note.model';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
-import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
+import { NoteExportService, noteExportMenu } from '../../core/services/note-export.service';
 
 @Component({
   selector: 'app-tabs-bar',
@@ -24,7 +27,7 @@ import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-ex
         [class.active]="sidebarVisible()"
         (click)="toggleSidebar()"
         (dblclick)="$event.stopPropagation()"
-        [title]="'Toggle sidebar (' + shortcutLabel('sidebar.toggle') + ')'"
+        [title]="i18n.t('workspace.tabs.toggleSidebar', { shortcut: shortcutLabel('sidebar.toggle') })"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
@@ -37,7 +40,7 @@ import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-ex
         [class.active]="activeIndex() === -1"
         (click)="goHome()"
         (dblclick)="$event.stopPropagation()"
-        title="Home"
+        [title]="i18n.t('workspace.tabs.home')"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -64,7 +67,7 @@ import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-ex
             (mousedown)="onTabMouseDown($event)"
             (auxclick)="onAuxClick($event, i)"
             (contextmenu)="onTabContextMenu($event, i)"
-            [title]="tab.title || 'Untitled'"
+            [title]="tabTitle(tab)"
             draggable="true"
             (dragstart)="onDragStart($event, i)"
             (dragover)="onDragOver($event, i)"
@@ -77,16 +80,16 @@ import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-ex
                 <path d="M16 2L7.5 10.5 2 12l3 3-5 7 7-5 3 3 1.5-5.5L20 6l-2-2z"/>
               </svg>
             }
-            <span class="tab-title">{{ tab.title || 'Untitled' }}</span>
+            <span class="tab-title">{{ tabTitle(tab) }}</span>
             @if (tab.isDirty) {
-              <span class="dirty-dot" title="Unsaved changes"></span>
+              <span class="dirty-dot" [title]="i18n.t('workspace.tabs.unsaved')"></span>
             }
             @if (!tab.isPinned) {
               <button
                 class="tab-close"
                 (click)="closeTab($event, i)"
                 tabindex="-1"
-                [title]="'Close (' + shortcutLabel('tab.close') + ')'"
+                [title]="i18n.t('workspace.tabs.closeWithShortcut', { shortcut: shortcutLabel('tab.close') })"
               >×</button>
             }
           </div>
@@ -98,7 +101,7 @@ import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-ex
         class="titlebar-icon-btn"
         (click)="toggleWideMode()"
         (dblclick)="$event.stopPropagation()"
-        [title]="(wideMode() ? 'Centered layout (' : 'Full width layout (') + shortcutLabel('layout.toggle') + ')'"
+        [title]="i18n.t(wideMode() ? 'workspace.tabs.layoutCentered' : 'workspace.tabs.layoutFullWidth', { shortcut: shortcutLabel('layout.toggle') })"
       >
         @if (wideMode()) {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -119,13 +122,13 @@ import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-ex
 
       <!-- Window controls -->
       <div class="window-controls">
-        <button class="wc-btn minimize" (click)="minimize()" title="Minimize">
+        <button class="wc-btn minimize" (click)="minimize()" [title]="i18n.t('workspace.tabs.minimize')">
           <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
         </button>
-        <button class="wc-btn maximize" (click)="toggleMaximize()" title="Maximize">
+        <button class="wc-btn maximize" (click)="toggleMaximize()" [title]="i18n.t('workspace.tabs.maximize')">
           <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor"/></svg>
         </button>
-        <button class="wc-btn close" (click)="closeWindow()" title="Close">
+        <button class="wc-btn close" (click)="closeWindow()" [title]="i18n.t('common.close')">
           <svg width="10" height="10" viewBox="0 0 10 10">
             <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/>
             <line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/>
@@ -147,6 +150,7 @@ import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-ex
   styleUrls: ['./tabs-bar.component.scss'],
 })
 export class TabsBarComponent {
+  protected readonly i18n = inject(I18nService);
   private tabs$ = inject(TabsService);
   private electron = inject(ElectronBridgeService);
   private layout = inject(LayoutService);
@@ -179,6 +183,11 @@ export class TabsBarComponent {
   toggleSidebar(): void { this.sidebarState.toggleVisible(); }
 
   protected shortcutLabel(id: string): string { return this.settings.shortcutLabel(id); }
+
+  /** The quick notes tab is stored with a fixed title: shown in the current language, like the untitled notes. */
+  protected tabTitle(tab: Tab): string {
+    return tab.noteId === QUICK_NOTES_TAB_ID ? this.i18n.t('common.quickNotes') : noteDisplayTitle(tab.title, this.i18n.t);
+  }
 
   closeTab(event: MouseEvent, index: number): void {
     event.stopPropagation();
@@ -272,7 +281,7 @@ export class TabsBarComponent {
     event.stopPropagation();
 
     const tab = this.tabs()[index];
-    const pinLabel = tab.isPinned ? 'Unpin Tab' : 'Pin Tab';
+    const pinLabel = this.i18n.t(tab.isPinned ? 'workspace.tabs.unpin' : 'workspace.tabs.pin');
     // SVG paths (24x24 viewBox)
     const pinIcon = 'M16 2L7.5 10.5 2 12l3 3-5 7 7-5 3 3 1.5-5.5L20 6l-2-2z';
     const closeIcon = 'M18 6L6 18M6 6l12 12';
@@ -285,13 +294,13 @@ export class TabsBarComponent {
     const items: ContextMenuEntry[] = [
       { id: 'pin', label: pinLabel, icon: pinIcon, shortcut: this.shortcutLabel('tab.pin') },
       { divider: true },
-      { id: 'close', label: 'Close Tab', icon: closeIcon, shortcut: this.shortcutLabel('tab.close'), disabled: tab.isPinned },
-      { id: 'closeOthers', label: 'Close Others', icon: closeIcon, disabled: !hasClosableOthers },
-      { id: 'closeAll', label: 'Close All Tabs', icon: closeIcon, disabled: !hasClosableTab },
+      { id: 'close', label: this.i18n.t('workspace.tabs.closeTab'), icon: closeIcon, shortcut: this.shortcutLabel('tab.close'), disabled: tab.isPinned },
+      { id: 'closeOthers', label: this.i18n.t('workspace.tabs.closeOthers'), icon: closeIcon, disabled: !hasClosableOthers },
+      { id: 'closeAll', label: this.i18n.t('workspace.tabs.closeAll'), icon: closeIcon, disabled: !hasClosableTab },
     ];
 
     if (this.noteExport.canExport(tab.noteId)) {
-      items.push({ divider: true }, NOTE_EXPORT_MENU);
+      items.push({ divider: true }, noteExportMenu(this.i18n.t));
     }
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, tabIndex: index });

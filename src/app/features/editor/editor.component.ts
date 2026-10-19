@@ -30,7 +30,8 @@ import { ElectronBridgeService } from '../../core/services/electron-bridge.servi
 import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
 import { EditorViewMode, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
-import { NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
+import { TranslationKey } from '../../core/i18n/translations';
+import { noteExportMenu, NoteExportService } from '../../core/services/note-export.service';
 import { FoldersService } from '../../core/services/folders.service';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
@@ -51,6 +52,8 @@ import { FileDocsService } from '../../core/services/file-docs.service';
 import { baseName, resolveRelativeLink } from '../../core/utils/collection.util';
 import { FindService } from '../../core/services/find.service';
 import { FindPanelComponent } from '../find/find-panel.component';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { translatorFacet } from '../../shared/codemirror/translator';
 
 /** CodeMirror's search needs a panel to keep its matches highlighted: an empty, hidden one (the find panel is the UI). */
 function hiddenSearchPanel(): HTMLElement {
@@ -69,27 +72,27 @@ const PREVIEW_REFRESH_MS = 150;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (fileBanner(); as banner) {
-      <div class="file-banner" role="alert" [class.error]="banner.kind === 'missing'">
+      <div class="file-banner" role="alert" [class.error]="banner.kind !== 'conflict'">
         @if (banner.kind === 'conflict') {
-          <span>This file was changed on the disk while you were editing it.</span>
-          <button type="button" (click)="reloadFromDisk()">Reload from disk</button>
-          <button type="button" (click)="fileBanner.set(null)">Keep my version</button>
+          <span>{{ i18n.t('editor.fileBanner.conflict') }}</span>
+          <button type="button" (click)="reloadFromDisk()">{{ i18n.t('editor.fileBanner.reload') }}</button>
+          <button type="button" (click)="fileBanner.set(null)">{{ i18n.t('editor.fileBanner.keepMine') }}</button>
         } @else {
-          <span>{{ banner.message }}</span>
-          <button type="button" (click)="fileBanner.set(null)">Dismiss</button>
+          <span>{{ i18n.t(banner.kind === 'unreadable' ? 'editor.fileBanner.unreadable' : 'editor.fileBanner.unsaved', { path: banner.path, error: banner.error }) }}</span>
+          <button type="button" (click)="fileBanner.set(null)">{{ i18n.t('editor.fileBanner.dismiss') }}</button>
         }
       </div>
     }
     <div class="editor-wrapper" [attr.data-view-mode]="viewMode()">
       @if (activeNote()) {
-        <div class="view-modes" role="group" aria-label="View mode">
+        <div class="view-modes" role="group" [attr.aria-label]="i18n.t('editor.viewMode.label')">
           @for (mode of viewModes; track mode.id) {
             <button
               type="button"
               class="view-mode"
               [class.active]="viewMode() === mode.id"
               [attr.aria-pressed]="viewMode() === mode.id"
-              [title]="mode.label + (mode.shortcut ? ' (' + shortcutLabel(mode.shortcut) + ')' : '')"
+              [title]="i18n.t(mode.labelKey) + (mode.shortcut ? ' (' + shortcutLabel(mode.shortcut) + ')' : '')"
               (mousedown)="$event.preventDefault()"
               (click)="setViewMode(mode.id)"
             >
@@ -121,7 +124,7 @@ const PREVIEW_REFRESH_MS = 150;
         @if (find.isOpen()) {
           <app-find-panel />
         } @else if (outlineShown()) {
-          <nav class="toc" aria-label="Table of contents">
+          <nav class="toc" [attr.aria-label]="i18n.t('editor.toc.label')">
             @for (heading of headings(); track heading.from; let i = $index) {
               <button
                 type="button"
@@ -147,10 +150,10 @@ const PREVIEW_REFRESH_MS = 150;
                 <polyline points="10 9 9 9 8 9"/>
               </svg>
             </div>
-            <p class="empty-title">No note open</p>
+            <p class="empty-title">{{ i18n.t('editor.empty.title') }}</p>
             <p class="empty-hint">
-              Press <kbd>{{ shortcutLabel('note.new') }}</kbd> to create a new note<br>
-              or <kbd>{{ shortcutLabel('palette.commands') }}</kbd> to search existing notes
+              {{ i18n.t('editor.empty.press') }} <kbd>{{ shortcutLabel('note.new') }}</kbd> {{ i18n.t('editor.empty.toCreate') }}<br>
+              {{ i18n.t('editor.empty.or') }} <kbd>{{ shortcutLabel('palette.commands') }}</kbd> {{ i18n.t('editor.empty.toSearch') }}
             </p>
           </div>
         </div>
@@ -178,6 +181,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private bridge = inject(ElectronBridgeService);
   private tabs = inject(TabsService);
   protected settingsService = inject(SettingsService);
+  protected readonly i18n = inject(I18nService);
   private themeService = inject(ThemeService);
   private formattingBar = inject(FormattingBarService);
   private noteExport = inject(NoteExportService);
@@ -189,7 +193,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   readonly headings = signal<OutlineHeading[]>([]);
   readonly activeHeading = signal(-1);
   /** Problem with the collection file being edited: changed on disk meanwhile, or unreadable. */
-  protected readonly fileBanner = signal<{ kind: 'conflict' | 'missing'; message: string } | null>(null);
+  protected readonly fileBanner = signal<{ kind: 'conflict' | 'unreadable' | 'unsaved'; path: string; error: string } | null>(null);
   /** Last text written to (or read from) the disk for the open file: its own change events are not reloads. */
   private fileContentOnDisk: string | null = null;
 
@@ -208,10 +212,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Set while the editor scrolls because of the preview: that scroll must not be echoed back. */
   private syncingFromPreview = false;
 
-  protected readonly viewModes: { id: EditorViewMode; label: string; shortcut: string | null }[] = [
-    { id: 'source', label: 'Source', shortcut: null },
-    { id: 'split', label: 'Preview to the side', shortcut: 'editor.previewSide' },
-    { id: 'preview', label: 'Preview', shortcut: 'editor.preview' },
+  protected readonly viewModes: { id: EditorViewMode; labelKey: TranslationKey; shortcut: string | null }[] = [
+    { id: 'source', labelKey: 'editor.viewMode.source', shortcut: null },
+    { id: 'split', labelKey: 'editor.viewMode.split', shortcut: 'editor.previewSide' },
+    { id: 'preview', labelKey: 'editor.viewMode.preview', shortcut: 'editor.preview' },
   ];
 
   /** Whether a link target exists, shared by the editor decorations and the preview. */
@@ -460,7 +464,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         // A note is titled by its first line; a file keeps its file name
         if (!this.fileDocs.isFileDoc(note.id)) {
           const title = this.notes.extractTitle(content);
-          this.tabs.updateTitle(note.id, title || 'Untitled');
+          this.tabs.updateTitle(note.id, title);
         }
         this.tabs.markDirty(note.id, true);
 
@@ -590,6 +594,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
         },
       ]),
       this.shortcutsCompartment.of(this.buildShortcutsKeymap()),
+      // Reads the language at each call: what is drawn on demand (menus, tooltips, widgets) follows it
+      translatorFacet.of(this.i18n.t),
       updateListener,
       this.wrapCompartment.of(this.buildWrapping()),
       this.scrollbarCompartment.of(this.buildScrollbar()),
@@ -691,27 +697,28 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return EditorView.domEventHandlers({
       contextmenu: (event) => {
         event.preventDefault();
+        const t = this.i18n.t;
         const items: ContextMenuEntry[] = [
-          { id: 'draft', label: 'Toggle draft', shortcut: this.shortcutLabel('editor.draft') },
+          { id: 'draft', label: t('editor.menu.toggleDraft'), shortcut: this.shortcutLabel('editor.draft') },
         ];
         const table = this.editorView ? describeTableAtCursor(this.editorView.state) : null;
 
         if (table) {
           items.push(
             { divider: true },
-            { id: 'table:addRow', label: 'Insert row below' },
-            { id: 'table:deleteRow', label: 'Delete row', disabled: table.row === 0 },
-            { id: 'table:addColumn', label: 'Insert column right' },
-            { id: 'table:deleteColumn', label: 'Delete column', disabled: table.columnCount <= 1 },
+            { id: 'table:addRow', label: t('editor.menu.table.insertRowBelow') },
+            { id: 'table:deleteRow', label: t('editor.menu.table.deleteRow'), disabled: table.row === 0 },
+            { id: 'table:addColumn', label: t('editor.menu.table.insertColumnRight') },
+            { id: 'table:deleteColumn', label: t('editor.menu.table.deleteColumn'), disabled: table.columnCount <= 1 },
             { divider: true },
-            { id: 'table:alignLeft', label: 'Align column left' },
-            { id: 'table:alignCenter', label: 'Align column center' },
-            { id: 'table:alignRight', label: 'Align column right' },
+            { id: 'table:alignLeft', label: t('editor.menu.table.alignLeft') },
+            { id: 'table:alignCenter', label: t('editor.menu.table.alignCenter') },
+            { id: 'table:alignRight', label: t('editor.menu.table.alignRight') },
           );
         }
 
         if (this.noteExport.canExport(this.activeNote()?.id ?? null)) {
-          items.push({ divider: true }, NOTE_EXPORT_MENU);
+          items.push({ divider: true }, noteExportMenu(t));
         }
 
         this.ctxMenu.set({ items, x: event.clientX, y: event.clientY });
@@ -786,7 +793,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const note = notes.find(n => n.id === noteId);
 
     if (note) {
-      this.tabs.openNote(note.id, note.title || 'Untitled');
+      this.tabs.openNote(note.id, note.title);
     }
   }
 
@@ -861,7 +868,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       }
 
       this.tabs.markDirty(id, false);
-      this.tabs.updateTitle(id, title || 'Untitled');
+      this.tabs.updateTitle(id, title);
       this.activeNote.update(n => n ? { ...n, title, content } : n);
     } catch (err) {
       console.error('[Editor] Failed to save note:', err);
@@ -877,7 +884,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.fileContentOnDisk = content;
     } catch {
       this.fileContentOnDisk = null;
-      this.fileBanner.set({ kind: 'missing', message: `${file.path} could not be read: it was probably moved or deleted.` });
+      this.fileBanner.set({ kind: 'unreadable', path: file.path, error: '' });
     }
 
     return { id, title: baseName(file.path), content, tags: [], folderId: null, sortOrder: null, color: null, createdAt: '', updatedAt: '' };
@@ -891,7 +898,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.activeNote.update(n => (n ? { ...n, content } : n));
     } catch (err) {
       this.fileContentOnDisk = null;
-      this.fileBanner.set({ kind: 'missing', message: `${file.path} could not be saved: ${err instanceof Error ? err.message : String(err)}` });
+      this.fileBanner.set({ kind: 'unsaved', path: file.path, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -914,7 +921,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const dirty = this.tabs.tabs().find(tab => tab.noteId === note.id)?.isDirty ?? false;
 
     if (dirty) {
-      this.fileBanner.set({ kind: 'conflict', message: '' });
+      this.fileBanner.set({ kind: 'conflict', path: file.path, error: '' });
     } else {
       this.replaceContent(content);
     }

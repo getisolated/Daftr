@@ -5,6 +5,8 @@ import { shell } from 'electron/common';
 import { CollectionRow, collectionOps } from './database';
 import { isMarkdownFile, resolveInside } from './collections-scan';
 import { CollectionKind, WorkerRequest, WorkerResponse } from './collections-protocol';
+import { message } from './i18n';
+import { getSettings } from './settings';
 
 /** A file to show in an editor tab: its collection and its path relative to it (the file name for a file collection). */
 export interface CollectionFileRef {
@@ -158,9 +160,14 @@ export async function addCollection(candidate: string): Promise<CollectionRow | 
 
 /** Asks for folders (or markdown files) to open as collections. */
 export async function pickCollections(window: BrowserWindow | null, kind: CollectionKind): Promise<CollectionRow[]> {
+  const { language } = getSettings();
   const options: Electron.OpenDialogOptions = kind === 'folder'
-    ? { title: 'Open Folder as Collection', properties: ['openDirectory', 'multiSelections'] }
-    : { title: 'Open Markdown File', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Markdown', extensions: ['md'] }] };
+    ? { title: message(language, 'dialog.openFolder'), properties: ['openDirectory', 'multiSelections'] }
+    : {
+      title: message(language, 'dialog.openFile'),
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: message(language, 'filter.markdown'), extensions: ['md'] }],
+    };
   const { canceled, filePaths } = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
 
   if (canceled) {
@@ -199,9 +206,10 @@ export async function relocateCollection(window: BrowserWindow | null, root: unk
 }
 
 async function pickPaths(window: BrowserWindow | null, kind: CollectionKind): Promise<string[]> {
+  const markdownName = message(getSettings().language, 'filter.markdown');
   const options: Electron.OpenDialogOptions = kind === 'folder'
     ? { properties: ['openDirectory'] }
-    : { properties: ['openFile'], filters: [{ name: 'Markdown', extensions: ['md'] }] };
+    : { properties: ['openFile'], filters: [{ name: markdownName, extensions: ['md'] }] };
   const { canceled, filePaths } = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
   return canceled ? [] : filePaths;
 }

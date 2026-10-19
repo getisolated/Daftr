@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { TranslationKey } from '../src/app/core/i18n/translations';
+import { TranslationParams, translate } from '../src/app/core/i18n/translate';
 import {
   buildNoteGraph,
   extractLinkExcerpt,
@@ -7,6 +9,9 @@ import {
   GRAPH_LARGE_THRESHOLD,
   LinkableNote,
 } from '../src/app/core/utils/note-links.util';
+
+const t = (key: TranslationKey, params?: TranslationParams): string => translate('en', key, params);
+const tFr = (key: TranslationKey, params?: TranslationParams): string => translate('fr', key, params);
 
 function note(id: number, content = '', folderId: number | null = null): LinkableNote {
   return { id, title: `Note ${id}`, content, folderId };
@@ -46,7 +51,7 @@ describe('findBacklinks', () => {
   it('lists the notes linking to the target, sorted by title, with an excerpt', () => {
     const notes = [note(1), note(3, 'to note://1 here'), note(2, 'also note://1')];
 
-    expect(findBacklinks(notes, 1)).toEqual([
+    expect(findBacklinks(notes, 1, t)).toEqual([
       { noteId: 2, title: 'Note 2', excerpt: 'also note://1' },
       { noteId: 3, title: 'Note 3', excerpt: 'to note://1 here' },
     ]);
@@ -55,26 +60,34 @@ describe('findBacklinks', () => {
   it('never lists the note itself, nor a note linking to an id that only starts like the target', () => {
     const notes = [note(1, 'self note://1'), note(2, 'note://10')];
 
-    expect(findBacklinks(notes, 1)).toEqual([]);
+    expect(findBacklinks(notes, 1, t)).toEqual([]);
+  });
+});
+
+describe('titles without a name', () => {
+  it('are shown with the placeholder of the language', () => {
+    const untitled: LinkableNote[] = [{ id: 1, title: '', content: '', folderId: null }, { id: 2, title: '', content: 'note://1', folderId: null }];
+    expect(findBacklinks(untitled, 1, tFr).map(b => b.title)).toEqual(['Sans titre']);
+    expect(buildNoteGraph(untitled, t).nodes.map(n => n.title)).toEqual(['Untitled', 'Untitled']);
   });
 });
 
 describe('buildNoteGraph', () => {
   it('links the notes and counts degrees', () => {
-    const graph = buildNoteGraph([note(1, 'note://2'), note(2), note(3)]);
+    const graph = buildNoteGraph([note(1, 'note://2'), note(2), note(3)], t);
 
     expect(graph.links).toEqual([{ source: 1, target: 2 }]);
     expect(graph.nodes.map(n => [n.id, n.degree])).toEqual([[1, 1], [2, 1], [3, 0]]);
   });
 
   it('keeps both directions of a cycle and ignores self links', () => {
-    const graph = buildNoteGraph([note(1, 'note://2 note://1'), note(2, 'note://1')]);
+    const graph = buildNoteGraph([note(1, 'note://2 note://1'), note(2, 'note://1')], t);
 
     expect(graph.links).toEqual([{ source: 1, target: 2 }, { source: 2, target: 1 }]);
   });
 
   it('draws a missing node for a link to a deleted note', () => {
-    const graph = buildNoteGraph([note(1, 'note://99')]);
+    const graph = buildNoteGraph([note(1, 'note://99')], t);
 
     expect(graph.nodes.find(n => n.id === 99)).toMatchObject({ missing: true, degree: 1 });
     expect(graph.links).toEqual([{ source: 1, target: 99 }]);
@@ -82,14 +95,14 @@ describe('buildNoteGraph', () => {
 
   it('filters by folder without turning outside notes into missing ones', () => {
     const notes = [note(1, 'note://2 note://3', 10), note(2, '', 20), note(3, '', 10)];
-    const graph = buildNoteGraph(notes, { folderId: 10 });
+    const graph = buildNoteGraph(notes, t, { folderId: 10 });
 
     expect(graph.nodes.map(n => n.id)).toEqual([1, 3]);
     expect(graph.links).toEqual([{ source: 1, target: 3 }]);
   });
 
   it('can hide the orphans', () => {
-    const graph = buildNoteGraph([note(1, 'note://2'), note(2), note(3)], { hideOrphans: true });
+    const graph = buildNoteGraph([note(1, 'note://2'), note(2), note(3)], t, { hideOrphans: true });
 
     expect(graph.nodes.map(n => n.id)).toEqual([1, 2]);
   });
@@ -100,13 +113,13 @@ describe('buildNoteGraph', () => {
     const orphans = [note(9001), note(9002)];
 
     it('keeps the notes within two links of the focus', () => {
-      const graph = buildNoteGraph([...chain, ...orphans], { focusId: 100 });
+      const graph = buildNoteGraph([...chain, ...orphans], t, { focusId: 100 });
 
       expect(graph.nodes.map(n => n.id).sort((a, b) => a - b)).toEqual([98, 99, 100, 101, 102]);
     });
 
     it('keeps only the connected notes without focus', () => {
-      const graph = buildNoteGraph([...chain, ...orphans]);
+      const graph = buildNoteGraph([...chain, ...orphans], t);
 
       expect(graph.nodes.some(n => n.id === 9001)).toBe(false);
       expect(graph.nodes.some(n => n.id === 1)).toBe(true);

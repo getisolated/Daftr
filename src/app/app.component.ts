@@ -27,8 +27,8 @@ import { CollectionsBridgeService } from './core/services/collections-bridge.ser
 import { ThemeService } from './core/services/theme.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
 import { QUICK_NOTES_TAB_ID } from './core/models/note.model';
-import { GETTING_STARTED_FOLDER_NAME } from './core/models/folder.model';
-import { SAMPLE_NOTES } from './core/data/sample-notes';
+import { I18nService } from './core/i18n/i18n.service';
+import { SAMPLE_NOTES, SAMPLE_NOTES_FR, getSampleNotes } from './core/data/sample-notes';
 import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 
 @Component({
@@ -75,7 +75,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
           [title]="dialog.title"
           [message]="dialog.message"
           [actions]="dialog.actions"
-          cancelLabel="Later"
+          [cancelLabel]="i18n.t('workspace.update.later')"
           (chosen)="onUpdateChoice($event)"
         />
       }
@@ -133,6 +133,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 export class AppComponent implements OnInit, OnDestroy {
   @ViewChild('editor') editorRef!: EditorComponent;
 
+  protected readonly i18n = inject(I18nService);
   private notesService = inject(NotesService);
   private tabsService = inject(TabsService);
   private paletteService = inject(PaletteService);
@@ -169,11 +170,12 @@ export class AppComponent implements OnInit, OnDestroy {
     const info = this.updateService.info();
     if (!info || !this.updateService.dialogOpen()) return null;
     return {
-      title: `Version ${info.version} is available`,
-      message: info.downloaded
-        ? `Version ${info.version} is ready (you have ${info.currentVersion}). The app restarts to apply it.`
-        : `You have version ${info.currentVersion}. Download and install version ${info.version}? The app restarts to apply it.`,
-      actions: [{ id: 'install', label: info.downloaded ? 'Restart now' : 'Update now' }],
+      title: this.i18n.t('workspace.update.title', { version: info.version }),
+      message: this.i18n.t(
+        info.downloaded ? 'workspace.update.messageDownloaded' : 'workspace.update.messageAvailable',
+        { version: info.version, current: info.currentVersion },
+      ),
+      actions: [{ id: 'install', label: this.i18n.t(info.downloaded ? 'workspace.update.restartNow' : 'workspace.update.updateNow') }],
     };
   });
 
@@ -241,9 +243,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   /** The sample notes get their own folder so the user can delete them all at once. */
   private async seedSampleNotes(): Promise<void> {
-    const folder = await this.foldersService.create(GETTING_STARTED_FOLDER_NAME, null);
+    const language = this.i18n.language();
+    const folder = await this.foldersService.create(this.i18n.t('workspace.sample.folderName'), null);
 
-    for (const sample of SAMPLE_NOTES) {
+    for (const sample of getSampleNotes(language)) {
       await this.bridge.createNote(sample.title, sample.content, [], folder?.id ?? null);
     }
 
@@ -259,13 +262,13 @@ export class AppComponent implements OnInit, OnDestroy {
     const treeNotes = this.notesService.notes().map(n => ({
       id: n.id, title: n.title, folderId: n.folderId, sortOrder: n.sortOrder,
     }));
-    const toMove = findSampleNotesToGather(this.foldersService.folders(), treeNotes, SAMPLE_NOTES.map(n => n.title));
+    const toMove = findSampleNotesToGather(this.foldersService.folders(), treeNotes, [...SAMPLE_NOTES, ...SAMPLE_NOTES_FR].map(n => n.title));
 
     if (toMove.length === 0) {
       return;
     }
 
-    const folder = await this.foldersService.create(GETTING_STARTED_FOLDER_NAME, null);
+    const folder = await this.foldersService.create(this.i18n.t('workspace.sample.folderName'), null);
 
     if (!folder) {
       return;
@@ -332,6 +335,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private async createNote(): Promise<void> {
     const note = await this.notesService.create();
-    this.tabsService.openNote(note.id, 'Untitled');
+    this.tabsService.openNote(note.id, note.title);
   }
 }

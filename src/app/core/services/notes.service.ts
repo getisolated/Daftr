@@ -4,6 +4,7 @@ import { QUICK_NOTE_TAG } from '../models/settings.model';
 import { joinBlocks, TimestampedBlock } from '../../shared/codemirror/note-timestamps';
 import { extractNoteTitle } from '../utils/note-title.util';
 import { formatNoteTimestamp } from '../utils/note-timestamp.util';
+import { I18nService } from '../i18n/i18n.service';
 import { ElectronBridgeService } from './electron-bridge.service';
 import { FoldersService } from './folders.service';
 
@@ -12,7 +13,7 @@ const PREVIEW_MAX_LENGTH = 120;
 function toPreview(n: Note): NotePreview {
   return {
     id: n.id,
-    title: n.title || 'Untitled',
+    title: n.title,
     tags: n.tags,
     folderId: n.folderId,
     updatedAt: n.updatedAt,
@@ -24,6 +25,7 @@ function toPreview(n: Note): NotePreview {
 export class NotesService {
   private bridge = inject(ElectronBridgeService);
   private folders = inject(FoldersService);
+  private readonly i18n = inject(I18nService);
   private readonly _notes = signal<Note[]>([]);
 
   readonly notes = this._notes.asReadonly();
@@ -41,7 +43,7 @@ export class NotesService {
 
   /** Quick notes as the blocks of one document (trimmed text + timestamp label), oldest first. */
   readonly quickNoteBlocks = computed<TimestampedBlock[]>(() =>
-    this.quickNotes().map(n => ({ id: n.id, text: n.content.trim(), label: formatNoteTimestamp(n.createdAt) }))
+    this.quickNotes().map(n => ({ id: n.id, text: n.content.trim(), label: formatNoteTimestamp(n.createdAt, this.i18n.language()) }))
   );
 
   /** All quick notes as one document: one blank line between two notes. */

@@ -73,4 +73,8 @@ export const FOLDER_RECOMMENDED_MAX_DEPTH = 4;
 
 export const DEFAULT_FOLDER_NAME = 'Inbox';
 
+/** Name of the sample notes folder in English; the folder is recognised by its name, whichever language created it. */
 export const GETTING_STARTED_FOLDER_NAME = 'Getting started';
+
+/** Every name the sample notes folder may have been created with (one per language). */
+export const GETTING_STARTED_FOLDER_NAMES: readonly string[] = [GETTING_STARTED_FOLDER_NAME, 'Premiers pas'];

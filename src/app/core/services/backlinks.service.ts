@@ -3,6 +3,7 @@ import { QUICK_NOTES_TAB_ID } from '../models/note.model';
 import { QUICK_NOTE_TAG } from '../models/settings.model';
 import { Backlink, buildNoteGraph, findBacklinks, NoteGraph } from '../utils/note-links.util';
 import { createLinkResolver } from '../utils/note-paths.util';
+import { I18nService } from '../i18n/i18n.service';
 import { FoldersService } from './folders.service';
 import { NotesService } from './notes.service';
 import { SidebarStateService } from './sidebar-state.service';
@@ -18,6 +19,7 @@ export class BacklinksService {
   private folders = inject(FoldersService);
   private tabs = inject(TabsService);
   private sidebarState = inject(SidebarStateService);
+  private i18n = inject(I18nService);
 
   private readonly _hideOrphans = signal(false);
   private readonly lastActiveId = signal<number | null>(null);
@@ -53,7 +55,7 @@ export class BacklinksService {
   /** Notes linking to the active one; follows the active tab and the edits. */
   readonly backlinks = computed<Backlink[]>(() => {
     const activeId = this.tabs.activeNoteId();
-    return activeId === null || activeId === QUICK_NOTES_TAB_ID ? [] : findBacklinks(this.linkableNotes(), activeId, this.resolver());
+    return activeId === null || activeId === QUICK_NOTES_TAB_ID ? [] : findBacklinks(this.linkableNotes(), activeId, this.i18n.t, this.resolver());
   });
 
   /** Graph of the folder selected in the sidebar (everything when none is), or of the selected collection. */
@@ -64,7 +66,7 @@ export class BacklinksService {
       return this.collectionGraph(root);
     }
 
-    return buildNoteGraph(this.linkableNotes(), {
+    return buildNoteGraph(this.linkableNotes(), this.i18n.t, {
       folderId: this.sidebarState.selectedFolderId(),
       focusId: this.referenceNoteId(),
       hideOrphans: this._hideOrphans(),

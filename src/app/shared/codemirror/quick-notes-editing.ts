@@ -1,5 +1,7 @@
 import { EditorState, Extension, Facet, Prec, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType, keymap } from '@codemirror/view';
+import { TranslationKey } from '../../core/i18n/translations';
+import { translatorOf } from './translator';
 import { BlockRange, noteTimestamps, timestampBlocks } from './note-timestamps';
 
 /** What the quick notes document asks the app to do with one of its notes. */
@@ -124,15 +126,15 @@ const ICONS = {
 
 interface ToolbarButton {
   icon: keyof typeof ICONS;
-  title: string;
+  titleKey: TranslationKey;
   run: (view: EditorView, range: BlockRange) => void;
   danger?: boolean;
 }
 
 const READ_BUTTONS: ToolbarButton[] = [
-  { icon: 'copy', title: 'Copy', run: (view, range) => view.state.facet(handlersFacet)?.copy(blockText(view.state, range)) },
-  { icon: 'edit', title: 'Edit', run: edit },
-  { icon: 'remove', title: 'Delete', danger: true, run: (view, range) => view.state.facet(handlersFacet)?.remove(range.id) },
+  { icon: 'copy', titleKey: 'common.copy', run: (view, range) => view.state.facet(handlersFacet)?.copy(blockText(view.state, range)) },
+  { icon: 'edit', titleKey: 'editor.quickNote.edit', run: edit },
+  { icon: 'remove', titleKey: 'common.delete', danger: true, run: (view, range) => view.state.facet(handlersFacet)?.remove(range.id) },
 ];
 
 /** Discord-like actions over the hovered note (copy / edit / delete); the edited note has its own buttons below it. */
@@ -187,7 +189,8 @@ const actionsToolbar = ViewPlugin.fromClass(class {
       return;
     }
 
-    const key = String(range.id);
+    // The language is part of the key: the titles are redrawn when it changes
+    const key = `${range.id}:${translatorOf(this.view.state)('common.copy')}`;
     if (key !== this.drawn) {
       this.draw(range, READ_BUTTONS);
       this.drawn = key;
@@ -198,9 +201,10 @@ const actionsToolbar = ViewPlugin.fromClass(class {
   private draw(range: BlockRange, buttons: ToolbarButton[]): void {
     this.dom.replaceChildren(...buttons.map(button => {
       const element = document.createElement('button');
+      const title = translatorOf(this.view.state)(button.titleKey);
       element.type = 'button';
-      element.title = button.title;
-      element.setAttribute('aria-label', button.title);
+      element.title = title;
+      element.setAttribute('aria-label', title);
       element.className = button.danger ? 'cm-quick-note-action danger' : 'cm-quick-note-action';
       element.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[button.icon]}</svg>`;
       element.addEventListener('click', () => {
@@ -248,9 +252,10 @@ class EditBarWidget extends WidgetType {
     bar.className = 'cm-quick-note-edit-bar';
     // The buttons must not take the focus from the editor: leaving it would save the note
     bar.addEventListener('mousedown', event => event.preventDefault());
+    const t = translatorOf(view.state);
     bar.append(
-      this.button('Cancel', 'Escape', 'cm-quick-note-edit-button', () => cancel(view)),
-      this.button('Save', 'Ctrl+Enter', 'cm-quick-note-edit-button primary', () => commit(view)),
+      this.button(t('common.cancel'), 'Escape', 'cm-quick-note-edit-button', () => cancel(view)),
+      this.button(t('common.save'), 'Ctrl+Enter', 'cm-quick-note-edit-button primary', () => commit(view)),
     );
     return bar;
   }

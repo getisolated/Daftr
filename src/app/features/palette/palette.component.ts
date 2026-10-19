@@ -13,6 +13,8 @@ import { CollectionsService } from '../../core/services/collections.service';
 import { NoteExportService } from '../../core/services/note-export.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { PaletteResult } from '../../core/models/note.model';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { noteDisplayTitle } from '../../core/utils/note-title.util';
 import { buildThemePickerItems } from '../../core/utils/theme.util';
 
 @Component({
@@ -75,7 +77,7 @@ import { buildThemePickerItems } from '../../core/utils/theme.util';
                       </svg>
                     </div>
                     <div class="item-content">
-                      <span class="item-label">{{ result.note!.title }}</span>
+                      <span class="item-label">{{ noteTitle(result.note!.title) }}</span>
                       @if (result.note!.preview) {
                         <span class="item-desc">{{ result.note!.preview }}</span>
                       }
@@ -111,7 +113,7 @@ import { buildThemePickerItems } from '../../core/utils/theme.util';
                     </div>
                     <div class="item-content">
                       <span class="item-label">#{{ result.tag }}</span>
-                      <span class="item-desc">Filter by tag</span>
+                      <span class="item-desc">{{ i18n.t('workspace.palette.filterByTag') }}</span>
                     </div>
                   }
 
@@ -131,7 +133,7 @@ import { buildThemePickerItems } from '../../core/utils/theme.util';
               }
             </div>
           } @else if (query && !loading()) {
-            <div class="palette-empty">No results for "{{ query }}"</div>
+            <div class="palette-empty">{{ i18n.t('workspace.palette.noResults', { query }) }}</div>
           }
         </div>
       </div>
@@ -140,6 +142,7 @@ import { buildThemePickerItems } from '../../core/utils/theme.util';
   styleUrls: ['./palette.component.scss'],
 })
 export class PaletteComponent implements OnDestroy {
+  protected readonly i18n = inject(I18nService);
   private palette = inject(PaletteService);
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
@@ -166,10 +169,10 @@ export class PaletteComponent implements OnDestroy {
 
   readonly placeholder = computed(() => {
     switch (this.mode()) {
-      case 'search': return 'Search all notes... (or #tag to filter)';
-      case 'tag': return 'Filter by tag...';
-      case 'theme': return 'Select Color Theme (Up/Down Keys to Preview)';
-      default: return 'Type a command or note name...';
+      case 'search': return this.i18n.t('workspace.palette.placeholderSearch');
+      case 'tag': return this.i18n.t('workspace.palette.placeholderTag');
+      case 'theme': return this.i18n.t('workspace.palette.placeholderTheme');
+      default: return this.i18n.t('workspace.palette.placeholderCommand');
     }
   });
 
@@ -179,40 +182,40 @@ export class PaletteComponent implements OnDestroy {
       {
         type: 'command',
         command: {
-          id: 'new-note', label: 'New Note', shortcut: this.settings.shortcutLabel('note.new'),
-          description: 'Create a new empty note', category: 'note',
+          id: 'new-note', label: this.i18n.t('workspace.palette.cmd.newNote'), shortcut: this.settings.shortcutLabel('note.new'),
+          description: this.i18n.t('workspace.palette.cmd.newNoteDesc'), category: 'note',
           action: () => this.createNote(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'global-search', label: 'Search Notes', shortcut: this.settings.shortcutLabel('search.global'),
-          description: 'Search across all notes', category: 'note',
+          id: 'global-search', label: this.i18n.t('workspace.palette.cmd.searchNotes'), shortcut: this.settings.shortcutLabel('search.global'),
+          description: this.i18n.t('workspace.palette.cmd.searchNotesDesc'), category: 'note',
           action: () => { this.palette.open('search'); }
         }
       },
       {
         type: 'command',
         command: {
-          id: 'quick-notes', label: 'Quick Notes',
-          description: 'Open every quick note in a single document', category: 'note',
+          id: 'quick-notes', label: this.i18n.t('workspace.palette.cmd.quickNotes'),
+          description: this.i18n.t('workspace.palette.cmd.quickNotesDesc'), category: 'note',
           action: () => this.tabs.openQuickNotes(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'graph-view', label: 'Graph View',
-          description: 'Show the links between notes on the home page', category: 'note',
+          id: 'graph-view', label: this.i18n.t('workspace.palette.cmd.graphView'),
+          description: this.i18n.t('workspace.palette.cmd.graphViewDesc'), category: 'note',
           action: () => this.openGraphView(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'copy-note-link', label: 'Copy Note Link',
-          description: 'Copy the note:// link to the current note', category: 'note',
+          id: 'copy-note-link', label: this.i18n.t('workspace.palette.cmd.copyNoteLink'),
+          description: this.i18n.t('workspace.palette.cmd.copyNoteLinkDesc'), category: 'note',
           action: () => { void this.copyNoteLink(); },
         }
       },
@@ -220,40 +223,40 @@ export class PaletteComponent implements OnDestroy {
       {
         type: 'command',
         command: {
-          id: 'close-tab', label: 'Close Tab', shortcut: this.settings.shortcutLabel('tab.close'),
-          description: 'Close the current tab', category: 'action',
+          id: 'close-tab', label: this.i18n.t('workspace.palette.cmd.closeTab'), shortcut: this.settings.shortcutLabel('tab.close'),
+          description: this.i18n.t('workspace.palette.cmd.closeTabDesc'), category: 'action',
           action: () => this.tabs.closeActiveTab(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'next-tab', label: 'Next Tab', shortcut: this.settings.shortcutLabel('tab.next'),
-          description: 'Switch to next tab', category: 'action',
+          id: 'next-tab', label: this.i18n.t('workspace.palette.cmd.nextTab'), shortcut: this.settings.shortcutLabel('tab.next'),
+          description: this.i18n.t('workspace.palette.cmd.nextTabDesc'), category: 'action',
           action: () => this.tabs.nextTab(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'prev-tab', label: 'Previous Tab', shortcut: this.settings.shortcutLabel('tab.prev'),
-          description: 'Switch to previous tab', category: 'action',
+          id: 'prev-tab', label: this.i18n.t('workspace.palette.cmd.prevTab'), shortcut: this.settings.shortcutLabel('tab.prev'),
+          description: this.i18n.t('workspace.palette.cmd.prevTabDesc'), category: 'action',
           action: () => this.tabs.prevTab(),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'color-theme', label: 'Color Theme', shortcut: this.settings.shortcutLabel('theme.select'),
-          description: 'Pick the color theme, previewed as you move', category: 'settings',
+          id: 'color-theme', label: this.i18n.t('workspace.palette.cmd.colorTheme'), shortcut: this.settings.shortcutLabel('theme.select'),
+          description: this.i18n.t('workspace.palette.cmd.colorThemeDesc'), category: 'settings',
           action: () => this.palette.open('theme'),
         }
       },
       {
         type: 'command',
         command: {
-          id: 'settings', label: 'Settings', shortcut: this.settings.shortcutLabel('settings.open'),
-          description: 'Global shortcut and quick-note overlay', category: 'settings',
+          id: 'settings', label: this.i18n.t('workspace.palette.cmd.settings'), shortcut: this.settings.shortcutLabel('settings.open'),
+          description: this.i18n.t('workspace.palette.cmd.settingsDesc'), category: 'settings',
           action: () => this.settings.open(),
         }
       },
@@ -289,6 +292,8 @@ export class PaletteComponent implements OnDestroy {
     if (this.searchDebounce) clearTimeout(this.searchDebounce);
     this.cancelFileSearch?.();
   }
+
+  protected noteTitle(title: string): string { return noteDisplayTitle(title, this.i18n.t); }
 
   close(): void { this.palette.close(); }
   clearQuery(): void { this.query = ''; this.onQueryChange(''); }
@@ -388,7 +393,7 @@ export class PaletteComponent implements OnDestroy {
     const settings = this.settings.settings();
     const systemThemes = { dark: settings.preferredDarkTheme, light: settings.preferredLightTheme };
     const needle = query.trim().toLowerCase();
-    const items = buildThemePickerItems(systemThemes, settings.theme).filter(item => item.label.toLowerCase().includes(needle));
+    const items = buildThemePickerItems(systemThemes, settings.theme, this.i18n.t).filter(item => item.label.toLowerCase().includes(needle));
 
     this._results.set(items.map(item => ({ type: 'theme', theme: item })));
 
@@ -460,15 +465,21 @@ export class PaletteComponent implements OnDestroy {
       return [];
     }
 
-    const command = (id: string, label: string, description: string, actionId: string): PaletteResult => ({
+    const command = (id: string, key: 'copyNoteContent' | 'exportNoteMd' | 'exportNoteHtml', actionId: string): PaletteResult => ({
       type: 'command',
-      command: { id, label, description, category: 'note', action: () => { void this.noteExport.runNoteAction(actionId, noteId); } },
+      command: {
+        id,
+        label: this.i18n.t(`workspace.palette.cmd.${key}`),
+        description: this.i18n.t(`workspace.palette.cmd.${key}Desc`),
+        category: 'note',
+        action: () => { void this.noteExport.runNoteAction(actionId, noteId); },
+      },
     });
 
     return [
-      command('copy-note-content', 'Copy Note Content', 'Copy the markdown of the current note', 'export:copy'),
-      command('export-note-md', 'Export Note as Markdown…', 'Save the current note as a .md file', 'export:md'),
-      command('export-note-html', 'Export Note as HTML…', 'Save the current note as a standalone web page', 'export:html'),
+      command('copy-note-content', 'copyNoteContent', 'export:copy'),
+      command('export-note-md', 'exportNoteMd', 'export:md'),
+      command('export-note-html', 'exportNoteHtml', 'export:html'),
     ];
   }
 
@@ -488,6 +499,6 @@ export class PaletteComponent implements OnDestroy {
 
   private async createNote(): Promise<void> {
     const note = await this.notes.create();
-    this.tabs.openNote(note.id, note.title || 'Untitled');
+    this.tabs.openNote(note.id, note.title);
   }
 }

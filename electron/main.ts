@@ -8,7 +8,7 @@ import { loadRenderer } from './renderer-loader';
 import { getSettings, loadSettings, updateSettings } from './settings';
 import { sanitizeSettings, SettingsPatch, ThemeId } from './settings-schema';
 import { applyLaunchAtStartup, launchedHidden } from './startup';
-import { createTray, destroyTray } from './tray';
+import { createTray, destroyTray, setTrayLanguage } from './tray';
 import { applyUpdate, getUpdateInfo, onAutoUpdateChanged, startUpdater, stopUpdater } from './updater';
 import {
   CollectionFileRef, addCollection, cancelCollectionSearch, createCollectionFile, initCollections, listCollections,
@@ -150,7 +150,7 @@ app.whenReady().then(() => {
   const settings = loadSettings();
   createWindow(!launchedHidden());
   void prepareOverlay();
-  createTray({ openApp: showMainWindow, quickNote: showOverlay, openSettings, quit: quitApp });
+  createTray({ openApp: showMainWindow, quickNote: showOverlay, openSettings, quit: quitApp }, settings.language);
   applyLaunchAtStartup(settings.launchAtStartup);
   if (!registerGlobalShortcut(settings.globalShortcut, onGlobalShortcut)) {
     console.error(`[Shortcut] Unable to register ${settings.globalShortcut}`);
@@ -314,6 +314,9 @@ safeHandle('settings:set', (e, patch: SettingsPatch) => {
   applyOverlaySize(before, next);
   if (next.launchAtStartup !== before.launchAtStartup) {
     applyLaunchAtStartup(next.launchAtStartup);
+  }
+  if (next.language !== before.language) {
+    setTrayLanguage(next.language);
   }
   if (next.autoUpdate !== before.autoUpdate) {
     onAutoUpdateChanged();

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { translate } from '../src/app/core/i18n/translate';
 import { Folder } from '../src/app/core/models/folder.model';
 import {
   buildFolderTree,
@@ -7,6 +8,8 @@ import {
   clampSidebarWidth,
   collectSubtreeIds,
   flattenVisibleTree,
+  folderDisplayName,
+  isGettingStartedFolderName,
   DROP_EDGE_RATIO,
   folderDepth,
   insertSibling,
@@ -286,5 +289,30 @@ describe('clampSectionHeight', () => {
 
   it('prefers the minimum when the maximum is smaller (tiny window)', () => {
     expect(clampSectionHeight(100, 20)).toBe(SECTION_MIN_HEIGHT);
+  });
+});
+
+describe('folderDisplayName', () => {
+  const en = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>): string => translate('en', key, params);
+  const fr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>): string => translate('fr', key, params);
+
+  it('translates the default folder whatever its stored name', () => {
+    expect(folderDisplayName(folder(1, 'Inbox', null, true), en)).toBe('Inbox');
+    expect(folderDisplayName(folder(1, 'Inbox', null, true), fr)).toBe('Boîte de réception');
+  });
+
+  it('translates the sample notes folder created in either language', () => {
+    expect(folderDisplayName(folder(2, 'Getting started'), fr)).toBe('Premiers pas');
+    expect(folderDisplayName(folder(2, 'Premiers pas'), en)).toBe('Getting started');
+  });
+
+  it('keeps the name of any other folder', () => {
+    expect(folderDisplayName(folder(3, 'Work'), fr)).toBe('Work');
+  });
+
+  it('recognises the sample notes folder name in both languages only', () => {
+    expect(isGettingStartedFolderName('Getting started')).toBe(true);
+    expect(isGettingStartedFolderName('Premiers pas')).toBe(true);
+    expect(isGettingStartedFolderName('Inbox')).toBe(false);
   });
 });

@@ -1,6 +1,8 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { BrowserWindow, app, dialog } from 'electron/main';
+import { message } from './i18n';
+import { getSettings } from './settings';
 import { createZip } from './zip';
 
 export type ExportKind = 'md' | 'html' | 'zip';
@@ -11,11 +13,18 @@ export interface ExportedNote {
   content: string;
 }
 
-const FILTERS: Record<ExportKind, Electron.FileFilter> = {
-  md: { name: 'Markdown', extensions: ['md'] },
-  html: { name: 'HTML page', extensions: ['html'] },
-  zip: { name: 'ZIP archive', extensions: ['zip'] },
-};
+function fileFilter(kind: ExportKind): Electron.FileFilter {
+  const { language } = getSettings();
+
+  switch (kind) {
+    case 'md':
+      return { name: message(language, 'filter.markdown'), extensions: ['md'] };
+    case 'html':
+      return { name: message(language, 'filter.html'), extensions: ['html'] };
+    case 'zip':
+      return { name: message(language, 'filter.zip'), extensions: ['zip'] };
+  }
+}
 
 const FORBIDDEN_IN_NAME = /[<>:"/\\|?*\u0000-\u001f]/g;
 /** Device names Windows refuses as file names, whatever the extension. */
@@ -62,7 +71,7 @@ function isExportedNotes(value: unknown): value is ExportedNote[] {
  */
 export async function saveExport(window: BrowserWindow | null, kind: ExportKind, suggestedName: string, payload: unknown): Promise<string | null> {
   const name = `${safeFileName(suggestedName)}.${kind}`;
-  const options: Electron.SaveDialogOptions = { defaultPath: path.join(app.getPath('documents'), name), filters: [FILTERS[kind]] };
+  const options: Electron.SaveDialogOptions = { defaultPath: path.join(app.getPath('documents'), name), filters: [fileFilter(kind)] };
   const { canceled, filePath } = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options);
 
   if (canceled || !filePath) {

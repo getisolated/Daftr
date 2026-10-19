@@ -4,6 +4,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LinkStatus } from '../../core/utils/note-paths.util';
 import { createMarkdownRenderer, renderMarkdown } from '../../shared/markdown/markdown-renderer';
 import { highlightCodeBlocks, renderMermaidBlocks } from '../../shared/markdown/preview-enhancers';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { ThemeService } from '../../core/services/theme.service';
 
 /** Space kept above the block a scroll sync brings to the top. */
@@ -25,6 +26,7 @@ export class MarkdownPreviewComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly theme = inject(ThemeService);
+  private readonly i18n = inject(I18nService);
 
   readonly content = input('');
   /** Whether a link target exists (same rule as the editor): broken local links are drawn in red. */
@@ -40,7 +42,7 @@ export class MarkdownPreviewComponent {
   /** Set while the preview scrolls because of the editor: that scroll must not be echoed back. */
   private syncing = false;
 
-  private readonly renderer = computed(() => createMarkdownRenderer({ linkStatus: this.linkStatus() }));
+  private readonly renderer = computed(() => createMarkdownRenderer({ linkStatus: this.linkStatus(), t: this.i18n.t }));
 
   /** Sanitized by DOMPurify in renderMarkdown, so Angular's own (stricter) sanitizer must not strip the classes and inputs. */
   protected readonly html = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.renderer(), this.content())));

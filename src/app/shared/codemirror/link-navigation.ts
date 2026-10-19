@@ -2,6 +2,7 @@ import { syntaxTree } from '@codemirror/language';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView, hoverTooltip } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
+import { translatorOf } from './translator';
 
 const NOTE_URL = /note:\/\/\d+/g;
 const CTRL_HELD_CLASS = 'cm-ctrl-held';
@@ -48,7 +49,6 @@ export function linkTargetAt(state: EditorState, pos: number): string | null {
 /** Hover hint telling how to follow a link; a plain DOM tooltip so it matches the app theme, unlike the native `title`. */
 function linkHoverTooltip(): Extension {
   const isMac = /mac/i.test(navigator.platform);
-  const label = `${isMac ? 'Cmd' : 'Ctrl'} + Clic pour ouvrir le lien`;
 
   return [
     hoverTooltip((view, pos) => {
@@ -62,11 +62,11 @@ function linkHoverTooltip(): Extension {
         pos: hit.from,
         end: hit.to,
         above: true,
-        create: () => {
+        create: view => {
           const dom = document.createElement('div');
 
           dom.className = 'cm-link-hint';
-          dom.textContent = label;
+          dom.textContent = translatorOf(view.state)('editor.link.hint', { key: isMac ? 'Cmd' : 'Ctrl' });
           return { dom };
         },
       };

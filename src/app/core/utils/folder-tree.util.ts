@@ -1,10 +1,28 @@
-import { DropPlacement, Folder, FolderTreeNode, FolderTreeRow, TreeNote } from '../models/folder.model';
+import { Translator } from '../i18n/translate';
+import { DropPlacement, Folder, FolderTreeNode, FolderTreeRow, GETTING_STARTED_FOLDER_NAMES, TreeNote } from '../models/folder.model';
 
 export const SIDEBAR_MIN_WIDTH = 180;
 export const SIDEBAR_MAX_WIDTH = 600;
 export const SIDEBAR_DEFAULT_WIDTH = 260;
 /** A resized sidebar section keeps at least its header and a row. */
 export const SECTION_MIN_HEIGHT = 48;
+
+/** Whether a folder name is the one of the sample notes folder, in any language. */
+export function isGettingStartedFolderName(name: string): boolean {
+  return GETTING_STARTED_FOLDER_NAMES.includes(name);
+}
+
+/**
+ * Name to show for a folder: the system folders (the default one, the sample notes one) are stored under a fixed
+ * name and shown in the current language; any other folder, or a renamed one, shows its own name.
+ */
+export function folderDisplayName(folder: Pick<Folder, 'name' | 'isDefault'>, t: Translator): string {
+  if (folder.isDefault) {
+    return t('sidebar.folder.inbox');
+  }
+
+  return isGettingStartedFolderName(folder.name) ? t('sidebar.folder.gettingStarted') : folder.name;
+}
 
 /** Items the user positioned come first in that order; the others follow (`null`), alphabetically. */
 function compareSortOrder(a: number | null, b: number | null): number {

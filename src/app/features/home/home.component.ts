@@ -9,8 +9,10 @@ import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { HomeView, LayoutService } from '../../core/services/layout.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { NotePreview } from '../../core/models/note.model';
 import { parseNoteDate } from '../../core/utils/note-timestamp.util';
+import { noteDisplayTitle } from '../../core/utils/note-title.util';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { GraphViewComponent } from '../graph/graph-view.component';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
@@ -34,9 +36,9 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
           </svg>
           <h1 class="home-title">{{ title() }}</h1>
         </div>
-        <div class="view-switch" role="group" aria-label="Home view">
-          <button type="button" class="view-btn" [class.active]="view() === 'graph'" (click)="setView('graph')">Graph</button>
-          <button type="button" class="view-btn" [class.active]="view() === 'list'" (click)="setView('list')">List</button>
+        <div class="view-switch" role="group" [attr.aria-label]="i18n.t('workspace.home.viewSwitch')">
+          <button type="button" class="view-btn" [class.active]="view() === 'graph'" (click)="setView('graph')">{{ i18n.t('workspace.home.viewGraph') }}</button>
+          <button type="button" class="view-btn" [class.active]="view() === 'list'" (click)="setView('list')">{{ i18n.t('workspace.home.viewList') }}</button>
         </div>
       </div>
 
@@ -50,7 +52,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
             </svg>
-            <p>No notes here. Press <kbd>{{ shortcutLabel('note.new') }}</kbd> to create one.</p>
+            <p>{{ i18n.t('workspace.home.emptyBefore') }} <kbd>{{ shortcutLabel('note.new') }}</kbd> {{ i18n.t('workspace.home.emptyAfter') }}</p>
           </div>
         }
         @for (note of filteredNotes(); track note.id) {
@@ -62,7 +64,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
             (keydown.enter)="openNote(note)"
           >
             <div class="note-main">
-              <span class="note-title">{{ note.title || 'Untitled' }}</span>
+              <span class="note-title">{{ displayTitle(note) }}</span>
               @if (note.tags.length > 0) {
                 <div class="note-tags">
                   @for (tag of note.tags.slice(0, 3); track tag) {
@@ -95,6 +97,7 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
   styleUrls: ['./home.component.scss'],
 })
 export class HomeComponent {
+  protected readonly i18n = inject(I18nService);
   private notesService = inject(NotesService);
   private settingsService = inject(SettingsService);
   private tabsService = inject(TabsService);
@@ -115,7 +118,8 @@ export class HomeComponent {
 
     const folderId = this.sidebarState.selectedFolderId();
     const tag = this.sidebarState.activeTag();
-    const base = folderId === null ? 'All notes' : (this.foldersService.getById(folderId)?.name ?? 'All notes');
+    const allNotes = this.i18n.t('workspace.home.allNotes');
+    const base = folderId === null ? allNotes : (this.foldersService.getById(folderId)?.name ?? allNotes);
 
     return tag ? `${base} · #${tag}` : base;
   });
@@ -140,7 +144,11 @@ export class HomeComponent {
   }
 
   openNote(note: NotePreview): void {
-    this.tabsService.openNote(note.id, note.title || 'Untitled');
+    this.tabsService.openNote(note.id, note.title);
+  }
+
+  protected displayTitle(note: NotePreview): string {
+    return noteDisplayTitle(note.title, this.i18n.t);
   }
 
   protected shortcutLabel(id: string): string {
@@ -154,7 +162,7 @@ export class HomeComponent {
     const deleteIcon = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2';
 
     const items: ContextMenuEntry[] = [
-      { id: 'delete', label: 'Delete Note', icon: deleteIcon, danger: true },
+      { id: 'delete', label: this.i18n.t('workspace.home.deleteNote'), icon: deleteIcon, danger: true },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, noteId: note.id });
@@ -181,8 +189,8 @@ export class HomeComponent {
       d.getMonth() === now.getMonth() &&
       d.getFullYear() === now.getFullYear();
     if (isToday) {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString(this.i18n.language(), { hour: '2-digit', minute: '2-digit' });
     }
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(this.i18n.language(), { month: 'short', day: 'numeric' });
   }
 }

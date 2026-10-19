@@ -2,8 +2,12 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { THEMES } from '../src/app/core/models/theme.model';
 import { THEME_KINDS } from '../electron/settings-schema';
-import { buildThemePickerItems, findTheme, resolveTheme, themeKind } from '../src/app/core/utils/theme.util';
+import { translate } from '../src/app/core/i18n/translate';
+import { Translator } from '../src/app/core/i18n/translate';
+import { buildThemePickerItems, findTheme, resolveTheme, themeKind, themeLabel } from '../src/app/core/utils/theme.util';
 
+const en: Translator = (key, params) => translate('en', key, params);
+const fr: Translator = (key, params) => translate('fr', key, params);
 const systemThemes = { dark: 'github-dark-dimmed', light: 'solarized-light' } as const;
 
 describe('resolveTheme', () => {
@@ -32,15 +36,30 @@ describe('themeKind', () => {
 
 describe('buildThemePickerItems', () => {
   it('lists system first, then every theme', () => {
-    const items = buildThemePickerItems(systemThemes, 'dark');
+    const items = buildThemePickerItems(systemThemes, 'dark', en);
     expect(items.map(item => item.id)).toEqual(['system', ...THEMES.map(theme => theme.id)]);
     expect(items[0]?.detail).toBe('Follows Windows: GitHub Dark Dimmed / Solarized Light');
   });
 
   it('flags the current choice only', () => {
-    const items = buildThemePickerItems(systemThemes, 'violet-light');
+    const items = buildThemePickerItems(systemThemes, 'violet-light', en);
     expect(items.filter(item => item.detail.endsWith('· Current')).map(item => item.id)).toEqual(['violet-light']);
     expect(items.find(item => item.id === 'dark')?.detail).toBe('Dark theme');
+  });
+});
+
+describe('themeLabel', () => {
+  it('translates theme names, keeping proper names', () => {
+    expect(themeLabel('dark', en)).toBe('Dark');
+    expect(themeLabel('dark', fr)).toBe('Sombre');
+    expect(themeLabel('github-light', fr)).toBe('GitHub Clair');
+    expect(themeLabel('system', fr)).toBe('Système');
+  });
+
+  it('translates the picker details', () => {
+    const items = buildThemePickerItems(systemThemes, 'dark', fr);
+    expect(items[0]?.detail).toBe('Suit Windows : GitHub Sombre atténué / Solarized Clair');
+    expect(items.find(item => item.id === 'dark')?.detail).toBe('Thème sombre · Actuel');
   });
 });
 

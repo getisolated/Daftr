@@ -30,6 +30,7 @@ A fast, keyboard-driven note-taking desktop app built with Angular, Electron, an
 - **Preview** — GitHub-like rendering of a note (markdown-it, sanitized by DOMPurify): tables, task lists, footnotes, GitHub alerts (`> [!NOTE]`…), code colored with the editor's Lezer parsers, **Mermaid** diagrams (` ```mermaid `, loaded on demand, following the theme). The buttons at the top right of a note switch between *Source*, *side by side* (scrolls synchronized both ways) and *Preview*; `Ctrl+Shift+V` toggles the preview, `Ctrl+K V` the side-by-side view. **Settings → Editor → Open Notes In Preview** opens notes rendered. Local links pointing to nothing are shown in red, in the editor and in the preview
 - **Copy & export** — right-click a note (tab, editor or sidebar) or use the palette: *Copy Content* (markdown), *Export as Markdown…*, *Export as HTML…* (standalone page rendered like the preview, GitHub light style, code colored and Mermaid diagrams drawn). Right-click a folder: *Export as ZIP…* (its notes as `.md` files, sub-folders kept). Links are exported as written
 - **Collections** — open folders (e.g. the documentation of a repository) or markdown files of your disk from the *Collections* section of the sidebar, apart from your notes: only the `.md` files and the folders holding some are listed (build / dependency folders and hidden ones are skipped: **Settings → Collections → Excluded Folders**). Files open in tabs and are saved to the disk; a file changed by another program reloads, or shows a banner when you have unsaved edits. Create, rename, move (drag & drop inside a collection) and delete (to the Recycle Bin) files; relative links (`[x](./other.md)`) open with `Ctrl+click`. The palette search (`Ctrl+Shift+F`) also finds collection files by name and content. Two folders with the same name show their parent; hovering shows the disk path. Folders and `.md` files can be dropped on the window, and `.md` files open with the app from the Explorer. A folder is only read once expanded (`N` next to its name until then, a spinner while it loads), so that the app starts without touching the disk; the palette searches the loaded ones. Scanning, watching and searching run in a separate process (Electron utilityProcess): nothing blocks the app, and the notes never wait for the disk. The Collections and Tags sections are resized by dragging the line above them (double-click to reset)
+- **Languages** — English and French. **Settings → General → Language**; on the first launch the language follows the OS locale (`fr*` → French, anything else → English). The change applies instantly, to the windows, the quick-note overlay, the tray menu and the native dialogs; the sample notes are created in the language chosen at that time. Texts live in typed dictionaries (`src/app/core/i18n/translations/{en,fr}/<area>.ts`, English is the reference, a test checks both define the same keys and placeholders); the main process has its own small one (`electron/i18n.ts`). A new language = a value in `Language` (`language.model.ts`, mirrored in `electron/settings-schema.ts`), a dictionary per area, and the main process messages
 - **Keyboard-first** — every action has a shortcut (see below)
 - **Local storage** — all data stays on your machine in a SQLite database
 
@@ -54,7 +55,8 @@ electron/
   settings.ts        # settings.json persistence (userData)
   settings-schema.ts # Settings type, defaults, validation
   renderer-loader.ts # Loads the Angular bundle (#overlay selects the overlay root)
-  tray.ts            # System tray icon & menu
+  tray.ts            # System tray icon & menu (rebuilt when the language changes)
+  i18n.ts            # Texts of the main process (tray, native dialogs) in each language
   updater.ts         # Update check (hourly), verified download, silent install on exit/restart
   update-manifest.ts # Pure helpers: version comparison, manifest validation
   startup.ts         # Launch at startup (login item, started hidden with --hidden)
@@ -63,6 +65,7 @@ electron/
 
 src/app/
   core/
+    i18n/            # I18nService (`t()`, `plural()`, current language), pure `translate()`, typed en/fr dictionaries per area
     services/        # NotesService, FoldersService, SidebarStateService (persisted in localStorage), TabsService, BacklinksService (backlinks + graph data), PaletteService, ShortcutsService, ThemeService (applies `data-theme`)
     models/          # TypeScript interfaces (Note, Folder, Tab, PaletteItem)
     utils/           # Pure helpers (folder-tree.util: tree building, move validation, sidebar width; note-links.util: `note://` parsing, backlinks, graph)

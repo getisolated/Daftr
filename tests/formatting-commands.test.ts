@@ -1,17 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { EditorState, TransactionSpec } from '@codemirror/state';
+import { EditorState, Extension, TransactionSpec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { ensureSyntaxTree } from '@codemirror/language';
 import {
-  clearInlineFormatting, detectActiveFormats, findTagAround, insertLink, insertRuleBelow, insertTableBelow,
+  FORMAT_ACTIONS, clearInlineFormatting, detectActiveFormats, findTagAround, insertLink, insertRuleBelow, insertTableBelow,
   stripInlineFormatting, toggleCodeBlock, toggleHtmlTag, toggleInlineMark, toggleLineKind,
 } from '../src/app/shared/codemirror/formatting-commands';
+import { slashCommands } from '../src/app/shared/codemirror/slash-commands';
+import { translatorFacet } from '../src/app/shared/codemirror/translator';
+import { translate } from '../src/app/core/i18n/translate';
+import { LANGUAGES } from '../src/app/core/i18n/language.model';
 
 /** Minimal stand-in for EditorView (no DOM in the test environment): only state, dispatch and focus are used. */
-function createView(doc: string, anchor: number, head = anchor): EditorView {
+function createView(doc: string, anchor: number, head = anchor, extensions: Extension[] = []): EditorView {
   const view = {
-    state: EditorState.create({ doc, selection: { anchor, head }, extensions: [markdown({ base: markdownLanguage })] }),
+    state: EditorState.create({ doc, selection: { anchor, head }, extensions: [markdown({ base: markdownLanguage }), ...extensions] }),
     dispatch(spec: TransactionSpec) { view.state = view.state.update(spec).state; },
     focus() { /* no DOM */ },
   };
@@ -297,5 +301,33 @@ describe('insertLink', () => {
     insertLink(view, true);
     expect(text(view)).toBe('![image](url)');
     expect(selected(view)).toBe('url');
+  });
+
+  it('writes the placeholder label in the language of the editor', () => {
+    const view = createView('', 0, 0, [translatorFacet.of((key, params) => translate('fr', key, params))]);
+    insertLink(view, true);
+    expect(text(view)).toBe('![image](url)');
+    const link = createView('', 0, 0, [translatorFacet.of((key, params) => translate('fr', key, params))]);
+    insertLink(link);
+    expect(text(link)).toBe('[texte](url)');
+  });
+});
+
+describe('translated labels of the actions', () => {
+  it('give each formatting action and slash command a label and a description in every language', () => {
+    for (const { id: language } of LANGUAGES) {
+      for (const action of Object.values(FORMAT_ACTIONS)) {
+        expect(translate(language, action.labelKey), `${language}:${action.labelKey}`).not.toBe('');
+        expect(translate(language, action.descriptionKey), `${language}:${action.descriptionKey}`).not.toBe('');
+      }
+      for (const command of slashCommands) {
+        expect(translate(language, command.groupKey)).not.toBe('');
+      }
+    }
+  });
+
+  it('are in French in the French dictionary', () => {
+    expect(translate('fr', FORMAT_ACTIONS.bold.labelKey)).toBe('Gras');
+    expect(translate('en', FORMAT_ACTIONS.bold.labelKey)).toBe('Bold');
   });
 });

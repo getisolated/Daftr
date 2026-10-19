@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 
 import {
   DropPlacement,
+  Folder,
   FolderOption,
   FolderTreeNode,
   FolderTreeRow,
@@ -10,6 +11,7 @@ import {
   SidebarDragItem,
   TreeNote,
 } from '../../core/models/folder.model';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { FoldersService } from '../../core/services/folders.service';
 import { NotesService } from '../../core/services/notes.service';
@@ -19,7 +21,7 @@ import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { UpdateService } from '../../core/services/update.service';
 import { CollectionsService } from '../../core/services/collections.service';
-import { FOLDER_EXPORT_MENU, NOTE_EXPORT_MENU, NoteExportService } from '../../core/services/note-export.service';
+import { NoteExportService, folderExportMenu, noteExportMenu } from '../../core/services/note-export.service';
 import {
   buildFolderTree,
   canMoveFolder,
@@ -27,10 +29,12 @@ import {
   compareNotes,
   flattenVisibleTree,
   folderDepth,
+  folderDisplayName,
   insertSibling,
   resolveFolderRowDrop,
   resolveNoteRowDrop,
 } from '../../core/utils/folder-tree.util';
+import { noteDisplayTitle } from '../../core/utils/note-title.util';
 import { itemKey, parseItemKey, rangeBetween, topLevelItems } from '../../core/utils/sidebar-selection.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { ColorPickerComponent } from '../../shared/ui/color-picker.component';
@@ -39,8 +43,6 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { SectionSplitterComponent } from '../../shared/ui/section-splitter.component';
 import { CollectionsSectionComponent } from './collections-section.component';
 import { MoveToDialogComponent } from './move-to-dialog.component';
-
-const NEW_FOLDER_NAME = 'New folder';
 
 const ICON_NEW_NOTE = 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6';
 const ICON_NEW_FOLDER = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14h6';
@@ -74,6 +76,7 @@ export class SidebarComponent {
   private readonly updates = inject(UpdateService);
   private readonly collections = inject(CollectionsService);
   private readonly noteExport = inject(NoteExportService);
+  protected readonly i18n = inject(I18nService);
 
   protected readonly updateInfo = this.updates.info;
   protected readonly updateLabel = this.updates.label;
@@ -89,7 +92,7 @@ export class SidebarComponent {
   private readonly treeNotes = computed<TreeNote[]>(() =>
     this.notesService.notes()
       .filter(n => !n.tags.includes(QUICK_NOTE_TAG))
-      .map(n => ({ id: n.id, title: n.title || 'Untitled', folderId: n.folderId, sortOrder: n.sortOrder, color: n.color }))
+      .map(n => ({ id: n.id, title: noteDisplayTitle(n.title, this.i18n.t), folderId: n.folderId, sortOrder: n.sortOrder, color: n.color }))
   );
 
   private readonly tree = computed<FolderTreeNode[]>(() =>
@@ -152,8 +155,8 @@ export class SidebarComponent {
     const folderRows = flattenVisibleTree(this.tree(), allExpanded).filter(row => row.kind === 'folder');
 
     return [
-      { id: null, label: 'Root (no folder)', depth: 0, disabled: false },
-      ...folderRows.map(row => ({ id: row.node.folder.id, label: row.node.folder.name, depth: row.depth, disabled: blocked.has(row.node.folder.id) })),
+      { id: null, label: this.i18n.t('sidebar.moveTo.root'), depth: 0, disabled: false },
+      ...folderRows.map(row => ({ id: row.node.folder.id, label: folderDisplayName(row.node.folder, this.i18n.t), depth: row.depth, disabled: blocked.has(row.node.folder.id) })),
     ];
   });
 
@@ -183,6 +186,7 @@ export class SidebarComponent {
 
   protected readonly dialogView = computed<{ title: string; message: string; actions: ConfirmDialogAction[] } | null>(() => {
     const dialog = this.dialog();
+    const t = this.i18n.t;
 
     if (!dialog) {
       return null;
@@ -198,36 +202,40 @@ export class SidebarComponent {
 
     if (dialog.kind === 'deepFolder') {
       return {
-        title: 'Deeply nested folder',
-        message: `This folder would be more than ${FOLDER_RECOMMENDED_MAX_DEPTH} levels deep. Deep trees get hard to navigate: 3 to ${FOLDER_RECOMMENDED_MAX_DEPTH} levels are recommended.`,
-        actions: [{ id: 'confirm', label: 'Create anyway' }],
+        title: t('sidebar.dialog.deepFolder.title'),
+        message: t('sidebar.dialog.deepFolder.message', { max: FOLDER_RECOMMENDED_MAX_DEPTH }),
+        actions: [{ id: 'confirm', label: t('sidebar.dialog.deepFolder.confirm') }],
       };
     }
 
     const folder = this.foldersService.getById(dialog.folderId);
     const node = this.findNode(dialog.folderId);
-    const name = folder?.name ?? '';
+    const name = folder ? folderDisplayName(folder, t) : '';
     const isEmpty = (node?.noteCount ?? 0) === 0 && (node?.children.length ?? 0) === 0;
 
     if (isEmpty) {
       return {
-        title: `Delete "${name}"?`,
-        message: 'This folder is empty.',
-        actions: [{ id: 'deleteAll', label: 'Delete', danger: true }],
+        title: t('sidebar.dialog.deleteFolder.title', { name }),
+        message: t('sidebar.dialog.deleteFolder.empty'),
+        actions: [{ id: 'deleteAll', label: t('common.delete'), danger: true }],
       };
     }
 
     return {
-      title: `Delete "${name}"?`,
-      message: `It contains ${node?.noteCount ?? 0} note(s) (sub-folders included). Its sub-folders are deleted in both cases.`,
+      title: t('sidebar.dialog.deleteFolder.title', { name }),
+      message: t('sidebar.dialog.deleteFolder.message', { notes: this.i18n.plural('sidebar.count.notes', node?.noteCount ?? 0) }),
       actions: [
-        { id: 'moveToRoot', label: 'Move notes to root' },
-        { id: 'deleteAll', label: 'Delete everything', danger: true },
+        { id: 'moveToRoot', label: t('sidebar.dialog.moveNotesToRoot') },
+        { id: 'deleteAll', label: t('sidebar.dialog.deleteEverything'), danger: true },
       ],
     };
   });
 
   // ── Toolbar ────────────────────────────────────────────────────────────────
+
+  protected folderLabel(folder: Folder): string {
+    return folderDisplayName(folder, this.i18n.t);
+  }
 
   protected shortcutLabel(id: string): string {
     return this.settings.shortcutLabel(id);
@@ -258,7 +266,7 @@ export class SidebarComponent {
       this.state.expand(note.folderId);
     }
 
-    this.tabs.openNote(note.id, 'Untitled');
+    this.tabs.openNote(note.id, note.title);
   }
 
   protected async newFolder(parentId: number | null = null): Promise<void> {
@@ -273,7 +281,7 @@ export class SidebarComponent {
   }
 
   private async createFolder(parentId: number | null): Promise<void> {
-    const folder = await this.foldersService.create(NEW_FOLDER_NAME, parentId);
+    const folder = await this.foldersService.create(this.i18n.t('sidebar.folder.newName'), parentId);
 
     if (!folder) {
       return;
@@ -455,13 +463,14 @@ export class SidebarComponent {
       return;
     }
 
+    const t = this.i18n.t;
     const items: ContextMenuEntry[] = [
-      { id: 'newNote', label: 'New Note', icon: ICON_NEW_NOTE },
-      { id: 'newFolder', label: 'New Subfolder', icon: ICON_NEW_FOLDER },
+      { id: 'newNote', label: t('common.newNote'), icon: ICON_NEW_NOTE },
+      { id: 'newFolder', label: t('sidebar.menu.newSubfolder'), icon: ICON_NEW_FOLDER },
     ];
 
     if (node.noteCount > 0) {
-      items.push({ divider: true }, FOLDER_EXPORT_MENU);
+      items.push({ divider: true }, folderExportMenu(t));
     }
 
     items.push({ divider: true });
@@ -469,19 +478,19 @@ export class SidebarComponent {
     // The default folder is always there: no rename, no move, no delete
     if (!node.folder.isDefault) {
       items.push(
-        { id: 'rename', label: 'Rename', icon: ICON_RENAME, shortcut: 'F2' },
-        { id: 'moveTo', label: 'Move To…', icon: ICON_MOVE },
+        { id: 'rename', label: t('common.rename'), icon: ICON_RENAME, shortcut: 'F2' },
+        { id: 'moveTo', label: t('sidebar.menu.moveTo'), icon: ICON_MOVE },
       );
     }
 
-    items.push({ id: 'color', label: 'Color…', icon: ICON_COLOR });
+    items.push({ id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR });
 
     if (node.noteCount > 0 || node.children.length > 0) {
-      items.push({ divider: true }, { id: 'empty', label: 'Empty Folder…', icon: ICON_EMPTY, danger: true });
+      items.push({ divider: true }, { id: 'empty', label: t('sidebar.menu.emptyFolder'), icon: ICON_EMPTY, danger: true });
     }
 
     if (!node.folder.isDefault) {
-      items.push({ divider: true }, { id: 'delete', label: 'Delete Folder', icon: ICON_DELETE, danger: true });
+      items.push({ divider: true }, { id: 'delete', label: t('sidebar.menu.deleteFolder'), icon: ICON_DELETE, danger: true });
     }
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, target, targets });
@@ -499,24 +508,26 @@ export class SidebarComponent {
       return;
     }
 
+    const t = this.i18n.t;
     const items: ContextMenuEntry[] = [
-      NOTE_EXPORT_MENU,
+      noteExportMenu(t),
       { divider: true },
-      { id: 'moveTo', label: 'Move To…', icon: ICON_MOVE },
-      { id: 'color', label: 'Color…', icon: ICON_COLOR },
+      { id: 'moveTo', label: t('sidebar.menu.moveTo'), icon: ICON_MOVE },
+      { id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR },
       { divider: true },
-      { id: 'delete', label: 'Delete Note', icon: ICON_DELETE, danger: true },
+      { id: 'delete', label: t('sidebar.menu.deleteNote'), icon: ICON_DELETE, danger: true },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, target, targets });
   }
 
   private openSelectionMenu(event: MouseEvent, target: SidebarDragItem, targets: SidebarDragItem[]): void {
+    const t = this.i18n.t;
     const items: ContextMenuEntry[] = [
-      { id: 'moveTo', label: `Move ${targets.length} Items To…`, icon: ICON_MOVE },
-      { id: 'color', label: 'Color…', icon: ICON_COLOR },
+      { id: 'moveTo', label: t('sidebar.menu.moveItems', { count: targets.length }), icon: ICON_MOVE },
+      { id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR },
       { divider: true },
-      { id: 'delete', label: `Delete ${targets.length} Items`, icon: ICON_DELETE, danger: true, shortcut: 'Del' },
+      { id: 'delete', label: t('sidebar.menu.deleteItems', { count: targets.length }), icon: ICON_DELETE, danger: true, shortcut: 'Del' },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, target, targets });
@@ -526,8 +537,8 @@ export class SidebarComponent {
     event.preventDefault();
 
     const items: ContextMenuEntry[] = [
-      { id: 'newNote', label: 'New Note', icon: ICON_NEW_NOTE },
-      { id: 'newFolder', label: 'New Folder', icon: ICON_NEW_FOLDER },
+      { id: 'newNote', label: this.i18n.t('common.newNote'), icon: ICON_NEW_NOTE },
+      { id: 'newFolder', label: this.i18n.t('common.newFolder'), icon: ICON_NEW_FOLDER },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, target: null, targets: [] });
@@ -627,10 +638,16 @@ export class SidebarComponent {
     const node = this.findNode(folderId);
     const subfolders = collectSubtreeIds(this.foldersService.folders(), folderId).length - 1;
 
+    const t = this.i18n.t;
+    const plural = this.i18n.plural;
+
     return {
-      title: `Empty "${node?.folder.name ?? ''}"?`,
-      message: `${node?.noteCount ?? 0} note(s) and ${subfolders} sub-folder(s) will be deleted. The folder itself is kept.`,
-      actions: [{ id: 'empty', label: 'Empty', danger: true }],
+      title: t('sidebar.dialog.emptyFolder.title', { name: node ? folderDisplayName(node.folder, t) : '' }),
+      message: t('sidebar.dialog.emptyFolder.message', {
+        notes: plural('sidebar.count.notes', node?.noteCount ?? 0),
+        subfolders: plural('sidebar.count.subfolders', subfolders),
+      }),
+      actions: [{ id: 'empty', label: t('sidebar.dialog.emptyFolder.confirm'), danger: true }],
     };
   }
 
@@ -638,18 +655,29 @@ export class SidebarComponent {
     const folderNodes = items.filter(item => item.kind === 'folder').map(item => this.findNode(item.id));
     const notesInFolders = folderNodes.reduce((total, node) => total + (node?.noteCount ?? 0), 0);
     const selectedNotes = items.filter(item => item.kind === 'note').length;
-    const title = `Delete ${items.length} items?`;
+    const t = this.i18n.t;
+    const plural = this.i18n.plural;
+    const title = t('sidebar.dialog.bulkDelete.title', { count: items.length });
 
     if (notesInFolders === 0) {
-      return { title, message: `${selectedNotes} note(s) and ${folderNodes.length} empty folder(s).`, actions: [{ id: 'deleteAll', label: 'Delete', danger: true }] };
+      const message = t('sidebar.dialog.bulkDelete.messageEmpty', {
+        notes: plural('sidebar.count.notes', selectedNotes),
+        folders: plural('sidebar.count.emptyFolders', folderNodes.length),
+      });
+
+      return { title, message, actions: [{ id: 'deleteAll', label: t('common.delete'), danger: true }] };
     }
 
     return {
       title,
-      message: `${selectedNotes} selected note(s) and ${folderNodes.length} folder(s) holding ${notesInFolders} note(s). The selected notes and the folders are deleted in both cases.`,
+      message: t('sidebar.dialog.bulkDelete.message', {
+        selected: plural('sidebar.count.selectedNotes', selectedNotes),
+        folders: plural('sidebar.count.folders', folderNodes.length),
+        inFolders: plural('sidebar.count.notes', notesInFolders),
+      }),
       actions: [
-        { id: 'moveToRoot', label: 'Move folder notes to root' },
-        { id: 'deleteAll', label: 'Delete everything', danger: true },
+        { id: 'moveToRoot', label: t('sidebar.dialog.bulkDelete.moveToRoot') },
+        { id: 'deleteAll', label: t('sidebar.dialog.deleteEverything'), danger: true },
       ],
     };
   }
