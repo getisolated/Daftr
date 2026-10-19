@@ -204,11 +204,19 @@ export class TabsBarComponent {
     if (event.button === 1) this.tabs$.closeTab(index);
   }
 
+  /** The wheel (vertical) and a touchpad swipe (horizontal) both scroll the tabs sideways. */
   @HostListener('wheel', ['$event'])
   onWheel(event: WheelEvent): void {
     const el = this.tabsContainer?.nativeElement;
-    if (el) {
-      el.scrollLeft += event.deltaY;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (!el || delta === 0) {
+      return;
+    }
+
+    const before = el.scrollLeft;
+    el.scrollLeft += delta;
+    // Only a scroll that moved the tabs is kept from the page
+    if (el.scrollLeft !== before) {
       event.preventDefault();
     }
   }
