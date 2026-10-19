@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "ng:serve": "npm run start -w frontend",
+    "tauri": "tauri",
     "electron:compile": "tsc -p electron/tsconfig.json",
     "electron:dev": "npm run electron:compile && wait-on http://localhost:4200 && node scripts/electron-dev.js",
     "dev": "concurrently \"npm run ng:serve\" \"npm run electron:dev\"",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.1",
+    "@tauri-apps/cli": "^2.12.3",
     "@types/better-sqlite3": "^7.6.13",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",

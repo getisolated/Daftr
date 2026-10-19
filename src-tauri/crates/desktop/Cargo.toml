@@ -1,0 +1,19 @@
+[package]
+name = "desktop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Coquille Tauri : fenêtres, tray, commandes IPC"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tauri.workspace = true
+tracing.workspace = true
