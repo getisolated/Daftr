@@ -479,7 +479,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const now = new Date().toISOString();
     return {
       id: QUICK_NOTES_TAB_ID, title: QUICK_NOTES_TITLE, content: this.notes.quickNotesDocument(),
-      tags: [], folderId: null, sortOrder: null, createdAt: now, updatedAt: now,
+      tags: [], folderId: null, sortOrder: null, color: null, createdAt: now, updatedAt: now,
     };
   }
 
