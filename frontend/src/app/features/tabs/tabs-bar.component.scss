@@ -78,8 +78,8 @@
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  // As wide as its name (the close button floats over it), up to a limit
-  max-width: 200px;
+  // As wide as its name (the close button floats over it), up to a limit: beyond, the title ends with an ellipsis
+  max-width: 250px;
   height: 24px;
   background: transparent;
   color: var(--evn-text-faint);
