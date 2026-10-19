@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { LANGUAGES, isLanguage, resolveLanguage } from '../src/app/core/i18n/language.model';
 import { translate, translatePlural } from '../src/app/core/i18n/translate';
 import { EN, TRANSLATIONS, TranslationKey } from '../src/app/core/i18n/translations';
-import { DEFAULT_SETTINGS, isLanguage as isSchemaLanguage, resolveLanguage as resolveSchemaLanguage, sanitizeSettings } from '../../electron/settings-schema';
-import { message } from '../../electron/i18n';
 
 const PLACEHOLDER = /\{(\w+)\}/g;
 
@@ -86,26 +84,5 @@ describe('resolveLanguage', () => {
     expect(isLanguage('fr')).toBe(true);
     expect(isLanguage('de')).toBe(false);
     expect(isLanguage(null)).toBe(false);
-  });
-});
-
-describe('main process language', () => {
-  it('resolves locales like the renderer', () => {
-    for (const locale of ['fr', 'fr-FR', 'en-GB', 'es', '', 'pt_BR']) {
-      expect(resolveSchemaLanguage(locale)).toBe(resolveLanguage(locale));
-    }
-    expect(isSchemaLanguage('fr')).toBe(true);
-    expect(isSchemaLanguage('de')).toBe(false);
-  });
-
-  it('keeps a valid language setting and falls back to the current one otherwise', () => {
-    expect(sanitizeSettings({ language: 'fr' }).language).toBe('fr');
-    expect(sanitizeSettings({ language: 'de' }).language).toBe(DEFAULT_SETTINGS.language);
-    expect(sanitizeSettings({ language: 'de' }, { ...DEFAULT_SETTINGS, language: 'fr' }).language).toBe('fr');
-  });
-
-  it('translates its own messages', () => {
-    expect(message('en', 'tray.quit')).toBe('Quit');
-    expect(message('fr', 'tray.quit')).toBe('Quitter');
   });
 });

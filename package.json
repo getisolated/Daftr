@@ -3,80 +3,23 @@
   "version": "0.0.8",
   "description": "Fast, keyboard-driven note-taking app",
   "author": "Yassine Debbih",
-  "main": "dist-electron/main.js",
   "private": true,
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "ng:serve": "npm run start -w frontend",
     "tauri": "tauri",
-    "electron:compile": "tsc -p electron/tsconfig.json",
-    "electron:dev": "npm run electron:compile && wait-on http://localhost:4200 && node scripts/electron-dev.js",
-    "dev": "concurrently \"npm run ng:serve\" \"npm run electron:dev\"",
-    "build": "npm run build -w frontend && npm run electron:compile",
-    "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "dist": "npm run build && electron-builder",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:frontend": "npm run build -w frontend",
     "lint": "npm run lint -w frontend",
-    "test": "npm test -w frontend"
-  },
-  "dependencies": {
-    "better-sqlite3": "^13.0.3"
+    "test": "npm test -w frontend",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.2.1",
-    "@tauri-apps/cli": "^2.12.3",
-    "@types/better-sqlite3": "^7.6.13",
-    "concurrently": "^9.1.2",
-    "cross-env": "^7.0.3",
-    "electron": "^44.7.2",
-    "electron-builder": "^26.15.3",
-    "typescript": "~6.0.3",
-    "wait-on": "^8.0.3"
+    "@tauri-apps/cli": "^2.12.3"
   },
   "overrides": {
     "lodash-es": "4.18.1"
-  },
-  "build": {
-    "appId": "com.everything.note",
-    "productName": "Everything Note",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "frontend/dist/**/*",
-      "dist-electron/**/*",
-      "assets/logo.ico"
-    ],
-    "fileAssociations": [
-      {
-        "ext": "md",
-        "name": "Markdown",
-        "description": "Markdown document",
-        "role": "Editor"
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/logo.ico",
-      "signtoolOptions": {
-        "signingHashAlgorithms": [
-          "sha256"
-        ]
-      }
-    },
-    "nsis": {
-      "artifactName": "${productName} Setup.${ext}",
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false,
-      "installerIcon": "assets/logo.ico",
-      "uninstallerIcon": "assets/logo.ico",
-      "installerSidebar": "assets/installer-sidebar.bmp",
-      "uninstallerSidebar": "assets/uninstaller-sidebar.bmp",
-      "installerHeader": "assets/installer-header.bmp"
-    }
-  },
-  "workspaces": [
-    "frontend"
-  ]
+  }
 }

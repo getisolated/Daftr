@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { THEMES } from '../src/app/core/models/theme.model';
-import { THEME_KINDS } from '../../electron/settings-schema';
 import { translate } from '../src/app/core/i18n/translate';
 import { Translator } from '../src/app/core/i18n/translate';
 import { buildThemePickerItems, findTheme, resolveTheme, themeKind, themeLabel } from '../src/app/core/utils/theme.util';
@@ -81,7 +80,9 @@ describe('theme registry', () => {
     blocks.forEach(body => expect(variablesOf(body)).toEqual(reference));
   });
 
-  it('matches the families known by the main process', () => {
-    expect(Object.fromEntries(THEMES.map(theme => [theme.id, theme.kind]))).toEqual(THEME_KINDS);
+  it('declares every theme in the main process (src-tauri/crates/domain/src/settings/theme.rs)', () => {
+    const rust = readFileSync(new URL('../../src-tauri/crates/domain/src/settings/theme.rs', import.meta.url), 'utf-8');
+    const declared = [...rust.matchAll(/=> "([a-z-]+)",/g)].map(match => match[1]);
+    expect(declared.sort()).toEqual(THEMES.map(theme => theme.id).sort());
   });
 });
