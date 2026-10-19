@@ -20,10 +20,10 @@ import { editorHighlight } from '../../shared/codemirror/editor-highlight';
 import { linkStatusFacet, markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
-import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
+import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
 import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
@@ -65,7 +65,7 @@ const PREVIEW_REFRESH_MS = 150;
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FindPanelComponent, MarkdownPreviewComponent],
+  imports: [ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (fileBanner(); as banner) {
@@ -93,7 +93,13 @@ const PREVIEW_REFRESH_MS = 150;
               (mousedown)="$event.preventDefault()"
               (click)="setViewMode(mode.id)"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="mode.icon"></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                @switch (mode.id) {
+                  @case ('source') { <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" /> }
+                  @case ('split') { <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 3v18" /> }
+                  @case ('preview') { <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /> }
+                }
+              </svg>
             </button>
           }
         </div>
@@ -150,14 +156,6 @@ const PREVIEW_REFRESH_MS = 150;
         </div>
       }
     </div>
-    @if (quickNoteToDelete() !== null) {
-      <app-confirm-dialog
-        title="Delete this quick note?"
-        message="It is deleted for good."
-        [actions]="deleteQuickNoteActions"
-        (chosen)="onDeleteQuickNoteChoice($event)"
-      />
-    }
     @if (ctxMenu(); as menu) {
       <app-context-menu
         [items]="menu.items"
@@ -210,10 +208,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Set while the editor scrolls because of the preview: that scroll must not be echoed back. */
   private syncingFromPreview = false;
 
-  protected readonly viewModes: { id: EditorViewMode; label: string; shortcut: string | null; icon: string }[] = [
-    { id: 'source', label: 'Source', shortcut: null, icon: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>' },
-    { id: 'split', label: 'Preview to the side', shortcut: 'editor.previewSide', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/>' },
-    { id: 'preview', label: 'Preview', shortcut: 'editor.preview', icon: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>' },
+  protected readonly viewModes: { id: EditorViewMode; label: string; shortcut: string | null }[] = [
+    { id: 'source', label: 'Source', shortcut: null },
+    { id: 'split', label: 'Preview to the side', shortcut: 'editor.previewSide' },
+    { id: 'preview', label: 'Preview', shortcut: 'editor.preview' },
   ];
 
   /** Whether a link target exists, shared by the editor decorations and the preview. */
@@ -224,9 +222,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return target => linkStatus(target, resolve, id => ids.has(id));
   });
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
-  /** Quick note whose deletion waits for a confirmation. */
-  protected readonly quickNoteToDelete = signal<number | null>(null);
-  protected readonly deleteQuickNoteActions: ConfirmDialogAction[] = [{ id: 'delete', label: 'Delete', danger: true }];
 
   private editorView: EditorView | null = null;
   private readonly shortcutsCompartment = new Compartment();
@@ -506,13 +501,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
         color: 'var(--evn-text-faint)',
         userSelect: 'none',
       },
-      // Numbers hug the text, left-aligned like in VS Code: the gutter and the content are centered together
+      // Numbers hug the text, right-aligned like in VS Code: the gutter and the content are centered together
       '.cm-lineNumbers .cm-gutterElement': {
         padding: '0 0 0 8px',
-        textAlign: 'left',
         // Centered on the line: the headings are taller than the text
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'flex-end',
         fontSize: '12px',
       },
       '&.cm-with-numbers .cm-content': {
@@ -601,6 +596,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.lineNumbersCompartment.of(this.buildLineNumbers()),
       this.trailingLineCompartment.of(this.buildTrailingLine()),
       linkNavigation(target => this.followLink(target)),
+      cursorResync,
       EditorView.domEventHandlers({
         scroll: (_event, view) => {
           this.refreshActiveHeading(view);
@@ -685,19 +681,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private quickNoteHandlers(): QuickNoteHandlers {
     return {
       save: (id, text) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text) }); },
-      remove: id => this.quickNoteToDelete.set(id),
+      remove: id => { void this.notes.delete(id); },
       copy: text => { void navigator.clipboard.writeText(text); },
       editEnded: () => this.refreshQuickNotesView(this.notes.quickNotesDocument()),
     };
-  }
-
-  protected async onDeleteQuickNoteChoice(choice: string | null): Promise<void> {
-    const id = this.quickNoteToDelete();
-    this.quickNoteToDelete.set(null);
-
-    if (choice === 'delete' && id !== null) {
-      await this.notes.delete(id);
-    }
   }
 
   private contextMenuHandler(): Extension {
