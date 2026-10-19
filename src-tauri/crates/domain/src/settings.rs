@@ -69,6 +69,8 @@ pub struct AppSettings {
     pub trailing_line: bool,
     /// Plan h1/h2/h3 à droite de la note.
     pub show_outline: bool,
+    /// Fil d'Ariane (collection ou notes, dossiers, fichier) en haut de la note.
+    pub show_breadcrumbs: bool,
     /// Barre de défilement de l'éditeur visible seulement au survol.
     pub hide_scrollbar: bool,
     /// Les notes s'ouvrent rendues (lecture seule) plutôt qu'en source.
@@ -112,6 +114,7 @@ impl Default for AppSettings {
             word_wrap: true,
             trailing_line: false,
             show_outline: false,
+            show_breadcrumbs: true,
             hide_scrollbar: false,
             open_in_preview: false,
             collections_exclude: DEFAULT_COLLECTION_EXCLUDES.map(str::to_owned).to_vec(),

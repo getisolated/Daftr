@@ -99,6 +99,7 @@ fn apply_editor(raw: &RawSettings, settings: &mut AppSettings) {
     settings.word_wrap = raw.word_wrap.unwrap_or(settings.word_wrap);
     settings.trailing_line = raw.trailing_line.unwrap_or(settings.trailing_line);
     settings.show_outline = raw.show_outline.unwrap_or(settings.show_outline);
+    settings.show_breadcrumbs = raw.show_breadcrumbs.unwrap_or(settings.show_breadcrumbs);
     settings.hide_scrollbar = raw.hide_scrollbar.unwrap_or(settings.hide_scrollbar);
     settings.open_in_preview = raw.open_in_preview.unwrap_or(settings.open_in_preview);
 }

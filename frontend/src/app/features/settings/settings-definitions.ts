@@ -144,6 +144,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'showBreadcrumbs',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.showBreadcrumbs.title',
+    descriptionKey: 'settings.showBreadcrumbs.description',
+    control: 'checkbox',
+  },
+  {
     key: 'hideScrollbar',
     categoryKey: 'settings.category.editor',
     titleKey: 'settings.hideScrollbar.title',

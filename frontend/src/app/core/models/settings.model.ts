@@ -40,6 +40,8 @@ export interface AppSettings {
   trailingLine: boolean;
   /** true: the h1/h2/h3 outline is shown on the right of the open note. */
   showOutline: boolean;
+  /** true: the path of the note (notes or collection, folders, file) is shown above it. */
+  showBreadcrumbs: boolean;
   /** true: the editor scrollbar only shows while the mouse is over it. */
   hideScrollbar: boolean;
   /** true: a note opens in preview (rendered, read-only) instead of its markdown source. */
@@ -77,6 +79,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   wordWrap: true,
   trailingLine: false,
   showOutline: false,
+  showBreadcrumbs: true,
   hideScrollbar: false,
   openInPreview: false,
   collectionsExclude: [

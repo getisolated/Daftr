@@ -53,6 +53,8 @@ import { baseName, collectionLinkStatus, knownFiles, resolveRelativeLink, resolv
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { inDesktop } from '../../core/services/desktop-api';
 import { ImageResolver } from '../../shared/markdown/markdown-renderer';
+import { fileBreadcrumbs, noteBreadcrumbs } from '../../core/utils/breadcrumbs.util';
+import { noteDisplayTitle } from '../../core/utils/note-title.util';
 
 /** Protocol of the main process serving the images of the collections (crate `desktop`, file_protocol.rs). */
 const COLLECTION_FILE_SCHEME = 'collection-file';
@@ -88,6 +90,18 @@ const PREVIEW_REFRESH_MS = 150;
           <button type="button" (click)="fileBanner.set(null)">{{ i18n.t('editor.fileBanner.dismiss') }}</button>
         }
       </div>
+    }
+    @if (breadcrumbs().length > 0) {
+      <nav class="breadcrumbs" [attr.aria-label]="i18n.t('editor.breadcrumbs.label')">
+        @for (segment of breadcrumbs(); track $index; let last = $last) {
+          <span class="crumb" [class.current]="last" [title]="segment">{{ segment }}</span>
+          @if (!last) {
+            <svg class="crumb-separator" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          }
+        }
+      </nav>
     }
     <div class="editor-wrapper" [attr.data-view-mode]="viewMode()">
       @if (activeNote()) {
@@ -224,6 +238,21 @@ export class EditorComponent implements OnDestroy, OnChanges {
     { id: 'split', labelKey: 'editor.viewMode.split', shortcut: 'editor.previewSide' },
     { id: 'preview', labelKey: 'editor.viewMode.preview', shortcut: 'editor.preview' },
   ];
+
+  /** Where the open note sits: the notes or its collection, the folders, then the note (setting `showBreadcrumbs`). */
+  protected readonly breadcrumbs = computed<string[]>(() => {
+    const note = this.activeNote();
+    if (!this.settingsService.settings().showBreadcrumbs || !note || note.id === QUICK_NOTES_TAB_ID) {
+      return [];
+    }
+
+    const file = this.fileDocs.refFor(note.id);
+    if (file) {
+      const state = this.collections.states().find(candidate => candidate.collection.path === file.root);
+      return fileBreadcrumbs(state?.label ?? baseName(file.root), file.path);
+    }
+    return noteBreadcrumbs(this.i18n.t('common.notes'), note.folderId, this.folders.folders(), noteDisplayTitle(note.title, this.i18n.t));
+  });
 
   /** In a collection file, relative images are read from the disk, next to the file (see the `collection-file` protocol). */
   protected readonly imageResolver = computed<ImageResolver | null>(() => {

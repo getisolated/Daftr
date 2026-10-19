@@ -116,6 +116,39 @@
   }
 }
 
+// ── Breadcrumbs: notes or collection > folders > note ─────────────────────────
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 6px 16px 2px;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--evn-text-faint);
+  white-space: nowrap;
+}
+
+.crumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  // The note itself keeps its whole name as long as possible: the folders shrink first
+  &.current {
+    flex-shrink: 0;
+    max-width: 60%;
+    color: var(--evn-text-soft);
+  }
+}
+
+.crumb-separator {
+  flex: none;
+  opacity: 0.7;
+}
+
 // ── Collection file problems (changed on disk, unreadable) ───────────────────
 :host {
   flex-direction: column;

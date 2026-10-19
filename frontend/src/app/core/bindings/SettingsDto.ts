@@ -86,6 +86,10 @@ trailingLine: boolean,
  */
 showOutline: boolean, 
 /**
+ * Fil d'Ariane en haut de la note.
+ */
+showBreadcrumbs: boolean, 
+/**
  * Barre de défilement au survol.
  */
 hideScrollbar: boolean, 

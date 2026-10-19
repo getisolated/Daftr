@@ -55,6 +55,9 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   'editor.find.results.other': '{count} résultats',
   'editor.find.currentOf': '{current} sur {total}',
 
+  // Fil d'Ariane
+  'editor.breadcrumbs.label': 'Chemin de la note',
+
   // Barre de mise en forme
   'editor.formatBar.label': 'Mise en forme',
   'editor.formatBar.style': 'Style',

@@ -38,6 +38,8 @@ export const EN_SETTINGS = {
   'settings.trailingLine.description': 'Always keep an empty line at the end of a note, added automatically.',
   'settings.showOutline.title': 'Outline',
   'settings.showOutline.description': 'Show the h1, h2 and h3 headings of the note on the right of the editor, to jump to a chapter.',
+  'settings.showBreadcrumbs.title': 'Breadcrumbs',
+  'settings.showBreadcrumbs.description': 'Show the path of the note above it: the notes or the collection, its folders, then the note.',
   'settings.hideScrollbar.title': 'Hide Scrollbar',
   'settings.hideScrollbar.description': 'Hide the scrollbar of the editor; it shows again while the mouse is over its edge. Scrolling keeps working.',
   'settings.openInPreview.title': 'Open Notes In Preview',

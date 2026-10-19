@@ -53,6 +53,9 @@ export const EN_EDITOR = {
   'editor.find.results.other': '{count} results',
   'editor.find.currentOf': '{current} of {total}',
 
+  // Breadcrumbs
+  'editor.breadcrumbs.label': 'Path of the note',
+
   // Formatting bar
   'editor.formatBar.label': 'Formatting',
   'editor.formatBar.style': 'Style',

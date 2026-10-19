@@ -64,6 +64,8 @@ pub struct RawSettings {
     pub trailing_line: Option<bool>,
     /// Voir [`AppSettings::show_outline`].
     pub show_outline: Option<bool>,
+    /// Voir [`AppSettings::show_breadcrumbs`].
+    pub show_breadcrumbs: Option<bool>,
     /// Voir [`AppSettings::hide_scrollbar`].
     pub hide_scrollbar: Option<bool>,
     /// Voir [`AppSettings::open_in_preview`].
@@ -99,6 +101,7 @@ impl RawSettings {
             word_wrap: Some(settings.word_wrap),
             trailing_line: Some(settings.trailing_line),
             show_outline: Some(settings.show_outline),
+            show_breadcrumbs: Some(settings.show_breadcrumbs),
             hide_scrollbar: Some(settings.hide_scrollbar),
             open_in_preview: Some(settings.open_in_preview),
             collections_exclude: Some(
@@ -138,6 +141,7 @@ impl RawSettings {
             word_wrap: patch.word_wrap.or(self.word_wrap),
             trailing_line: patch.trailing_line.or(self.trailing_line),
             show_outline: patch.show_outline.or(self.show_outline),
+            show_breadcrumbs: patch.show_breadcrumbs.or(self.show_breadcrumbs),
             hide_scrollbar: patch.hide_scrollbar.or(self.hide_scrollbar),
             open_in_preview: patch.open_in_preview.or(self.open_in_preview),
             collections_exclude: patch.collections_exclude.or(self.collections_exclude),

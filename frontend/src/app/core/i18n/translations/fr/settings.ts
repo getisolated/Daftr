@@ -40,6 +40,8 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.trailingLine.description': 'Toujours conserver une ligne vide à la fin d\'une note, ajoutée automatiquement.',
   'settings.showOutline.title': 'Plan',
   'settings.showOutline.description': 'Afficher les titres h1, h2 et h3 de la note à droite de l\'éditeur, pour accéder à un chapitre.',
+  'settings.showBreadcrumbs.title': 'Fil d\'Ariane',
+  'settings.showBreadcrumbs.description': 'Afficher le chemin de la note au-dessus d\'elle : les notes ou la collection, ses dossiers, puis la note.',
   'settings.hideScrollbar.title': 'Masquer la barre de défilement',
   'settings.hideScrollbar.description': 'Masquer la barre de défilement de l\'éditeur ; elle réapparaît lorsque la souris survole son bord. Le défilement continue de fonctionner.',
   'settings.openInPreview.title': 'Ouvrir les notes en aperçu',

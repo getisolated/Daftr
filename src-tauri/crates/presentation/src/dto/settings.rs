@@ -69,6 +69,8 @@ pub struct SettingsDto {
     pub trailing_line: bool,
     /// Plan de la note.
     pub show_outline: bool,
+    /// Fil d'Ariane en haut de la note.
+    pub show_breadcrumbs: bool,
     /// Barre de défilement au survol.
     pub hide_scrollbar: bool,
     /// Ouverture en aperçu.
@@ -102,6 +104,7 @@ impl From<&AppSettings> for SettingsDto {
             word_wrap: settings.word_wrap,
             trailing_line: settings.trailing_line,
             show_outline: settings.show_outline,
+            show_breadcrumbs: settings.show_breadcrumbs,
             hide_scrollbar: settings.hide_scrollbar,
             open_in_preview: settings.open_in_preview,
             collections_exclude: settings.collections_exclude.clone(),
