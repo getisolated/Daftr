@@ -80,6 +80,5 @@ export const FR_WORKSPACE: Record<keyof typeof EN_WORKSPACE, string> = {
   'workspace.graph.hintAfter': '',
 
   'workspace.overlay.dragToMove': 'Glisser pour déplacer',
-  'workspace.overlay.placeholderEnter': 'Écrire une note… (Enter pour envoyer)',
-  'workspace.overlay.placeholderCtrlEnter': 'Écrire une note… (Ctrl+Enter pour envoyer)',
+  'workspace.overlay.placeholder': 'Écrire une note…',
 };

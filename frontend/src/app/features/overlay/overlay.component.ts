@@ -63,10 +63,7 @@ export class OverlayComponent implements OnInit, OnDestroy {
   readonly reversedMessages = computed(() => [...this.messages()].reverse());
   // Lives in the component: the window is only hidden (never destroyed), so the draft survives hide/show
   readonly draft = signal('');
-  readonly placeholder = computed(() =>
-    this.settingsService.settings().enterToSend
-      ? this.i18n.t('workspace.overlay.placeholderEnter')
-      : this.i18n.t('workspace.overlay.placeholderCtrlEnter'));
+  readonly placeholder = computed(() => this.i18n.t('workspace.overlay.placeholder'));
 
   private unsubscribers: (() => void)[] = [];
 

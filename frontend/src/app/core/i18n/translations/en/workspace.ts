@@ -78,6 +78,5 @@ export const EN_WORKSPACE = {
   'workspace.graph.hintAfter': 'command',
 
   'workspace.overlay.dragToMove': 'Drag to move',
-  'workspace.overlay.placeholderEnter': 'Write a note… (Enter to send)',
-  'workspace.overlay.placeholderCtrlEnter': 'Write a note… (Ctrl+Enter to send)',
+  'workspace.overlay.placeholder': 'Write a note…',
 } as const;
