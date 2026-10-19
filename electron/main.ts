@@ -6,7 +6,7 @@ import { registerGlobalShortcut, unregisterGlobalShortcuts } from './global-shor
 import { applyOverlaySize, broadcastToWindows, hideOverlay, prepareOverlay, showOverlay, toggleOverlay } from './overlay';
 import { loadRenderer } from './renderer-loader';
 import { getSettings, loadSettings, updateSettings } from './settings';
-import { sanitizeSettings, SettingsPatch } from './settings-schema';
+import { sanitizeSettings, SettingsPatch, ThemeId } from './settings-schema';
 import { applyLaunchAtStartup, launchedHidden } from './startup';
 import { createTray, destroyTray } from './tray';
 import { applyUpdate, getUpdateInfo, onAutoUpdateChanged, startUpdater, stopUpdater } from './updater';
@@ -16,11 +16,23 @@ let mainWindow: BrowserWindow | null = null;
 // Closing the window only hides it to the tray; a real quit comes from the tray menu (or the OS)
 let isQuitting = false;
 
+/** `--evn-bg` of every theme (styles.scss). */
+const THEME_BACKGROUNDS: Readonly<Record<ThemeId, string>> = {
+  'dark': '#1c1e22',
+  'light': '#ffffff',
+  'solarized-light': '#fdf6e3',
+  'violet-light': '#fdfcff',
+  'github-light': '#ffffff',
+  'github-dark-dimmed': '#22272e',
+};
+
 /** Window color shown before the renderer paints: matches the theme so a light theme does not flash dark. */
 function windowBackgroundColor(): string {
-  const { theme } = getSettings();
-  const isDark = theme === 'system' ? nativeTheme.shouldUseDarkColors : theme === 'dark';
-  return isDark ? '#1e1e1e' : '#ffffff';
+  const { theme, preferredDarkTheme, preferredLightTheme } = getSettings();
+  const systemTheme = nativeTheme.shouldUseDarkColors ? preferredDarkTheme : preferredLightTheme;
+  const resolved = theme === 'system' ? systemTheme : theme;
+
+  return THEME_BACKGROUNDS[resolved];
 }
 
 function createWindow(showOnReady = true): void {

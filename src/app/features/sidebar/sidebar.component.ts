@@ -10,7 +10,7 @@ import {
   SidebarDragItem,
   TreeNote,
 } from '../../core/models/folder.model';
-import { OVERLAY_NOTE_TAG } from '../../core/models/settings.model';
+import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { FoldersService } from '../../core/services/folders.service';
 import { NotesService } from '../../core/services/notes.service';
 import { PaletteService } from '../../core/services/palette.service';
@@ -75,10 +75,10 @@ export class SidebarComponent {
   protected readonly activeTag = this.state.activeTag;
   protected readonly activeNoteId = this.tabs.activeNoteId;
 
-  // The overlay notes have their own entry, they never appear inside the tree
+  // The quick notes have their own entry, they never appear inside the tree
   private readonly treeNotes = computed<TreeNote[]>(() =>
     this.notesService.notes()
-      .filter(n => !n.tags.includes(OVERLAY_NOTE_TAG))
+      .filter(n => !n.tags.includes(QUICK_NOTE_TAG))
       .map(n => ({ id: n.id, title: n.title || 'Untitled', folderId: n.folderId, sortOrder: n.sortOrder, color: n.color }))
   );
 
@@ -100,13 +100,13 @@ export class SidebarComponent {
   });
 
   protected readonly totalNotes = computed(() => this.treeNotes().length);
-  protected readonly overlayNotesCount = computed(() => this.notesService.overlayNotes().length);
+  protected readonly quickNotesCount = computed(() => this.notesService.quickNotes().length);
 
   protected readonly tags = computed<string[]>(() => {
     const all = new Set<string>();
 
     for (const note of this.notesService.notes()) {
-      note.tags.filter(tag => tag !== OVERLAY_NOTE_TAG).forEach(tag => all.add(tag));
+      note.tags.filter(tag => tag !== QUICK_NOTE_TAG).forEach(tag => all.add(tag));
     }
 
     return [...all].sort((a, b) => a.localeCompare(b));
@@ -386,8 +386,8 @@ export class SidebarComponent {
     this.requestDeletion(this.isMultiSelected(itemKey({ kind: 'note', id: note.id })) ? this.selectedItems() : [{ kind: 'note', id: note.id }]);
   }
 
-  protected openOverlayNotes(): void {
-    this.tabs.openOverlayNotes();
+  protected openQuickNotes(): void {
+    this.tabs.openQuickNotes();
   }
 
   protected selectTag(tag: string | null): void {
