@@ -93,7 +93,13 @@ const PREVIEW_REFRESH_MS = 150;
               (mousedown)="$event.preventDefault()"
               (click)="setViewMode(mode.id)"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="mode.icon"></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                @switch (mode.id) {
+                  @case ('source') { <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" /> }
+                  @case ('split') { <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 3v18" /> }
+                  @case ('preview') { <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /> }
+                }
+              </svg>
             </button>
           }
         </div>
@@ -202,10 +208,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Set while the editor scrolls because of the preview: that scroll must not be echoed back. */
   private syncingFromPreview = false;
 
-  protected readonly viewModes: { id: EditorViewMode; label: string; shortcut: string | null; icon: string }[] = [
-    { id: 'source', label: 'Source', shortcut: null, icon: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>' },
-    { id: 'split', label: 'Preview to the side', shortcut: 'editor.previewSide', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/>' },
-    { id: 'preview', label: 'Preview', shortcut: 'editor.preview', icon: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>' },
+  protected readonly viewModes: { id: EditorViewMode; label: string; shortcut: string | null }[] = [
+    { id: 'source', label: 'Source', shortcut: null },
+    { id: 'split', label: 'Preview to the side', shortcut: 'editor.previewSide' },
+    { id: 'preview', label: 'Preview', shortcut: 'editor.preview' },
   ];
 
   /** Whether a link target exists, shared by the editor decorations and the preview. */
