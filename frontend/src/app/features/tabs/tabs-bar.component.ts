@@ -1,12 +1,14 @@
 import {
   Component, inject, ElementRef, ViewChild,
-  ChangeDetectionStrategy, HostListener, signal
+  ChangeDetectionStrategy, HostListener, signal, DestroyRef, computed
 } from '@angular/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { TabsService } from '../../core/services/tabs.service';
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { PlatformService } from '../../core/services/platform.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { noteDisplayTitle } from '../../core/utils/note-title.util';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
@@ -22,6 +24,11 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
   template: `
     <!-- Title bar: drags the window, double-click maximizes (Tauri drag region; tabs and buttons excluded) -->
     <div class="tabs-bar" data-tauri-drag-region="deep">
+      <!-- macOS: the native traffic lights float over the top left corner; this empty zone keeps the tabs clear of them but still drags the window -->
+      @if (trafficLightsInset()) {
+        <div class="traffic-lights-inset" data-tauri-drag-region></div>
+      }
+
       <!-- Sidebar toggle -->
       <button
         class="home-btn"
@@ -122,7 +129,8 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
         }
       </button>
 
-      <!-- Window controls -->
+      <!-- Window controls (macOS has the native traffic lights instead) -->
+      @if (!platform.isMac) {
       <div class="window-controls">
         <button class="wc-btn minimize" (click)="minimize()" [title]="i18n.t('workspace.tabs.minimize')">
           <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
@@ -137,6 +145,7 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
           </svg>
         </button>
       </div>
+      }
     </div>
 
     @if (ctxMenu()) {
@@ -153,13 +162,37 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
 })
 export class TabsBarComponent {
   protected readonly i18n = inject(I18nService);
+  protected readonly platform = inject(PlatformService);
   private tabs$ = inject(TabsService);
   private desktop = inject(DesktopBridgeService);
   private layout = inject(LayoutService);
   private settings = inject(SettingsService);
   private sidebarState = inject(SidebarStateService);
+  private destroyRef = inject(DestroyRef);
 
   @ViewChild('tabsContainer') tabsContainer!: ElementRef<HTMLElement>;
+
+  /** True while the macOS window is fullscreen: the traffic lights are hidden, so no room is kept for them. */
+  private readonly fullscreen = signal(false);
+  readonly trafficLightsInset = computed(() => this.platform.isMac && !this.fullscreen());
+
+  constructor() {
+    if (this.platform.isMac && this.desktop.inDesktop) {
+      void this.trackFullscreen();
+    }
+  }
+
+  private async trackFullscreen(): Promise<void> {
+    const win = getCurrentWindow();
+    const refresh = async () => this.fullscreen.set(await win.isFullscreen());
+    try {
+      await refresh();
+      const unlisten = await win.onResized(() => void refresh());
+      this.destroyRef.onDestroy(unlisten);
+    } catch {
+      // Window API unavailable: keep the fixed inset
+    }
+  }
 
   readonly wideMode = this.layout.wideMode;
   readonly sidebarVisible = this.sidebarState.visible;

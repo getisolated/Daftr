@@ -37,7 +37,7 @@ describe('buildThemePickerItems', () => {
   it('lists system first, then every theme', () => {
     const items = buildThemePickerItems(systemThemes, 'dark', en);
     expect(items.map(item => item.id)).toEqual(['system', ...THEMES.map(theme => theme.id)]);
-    expect(items[0]?.detail).toBe('Follows Windows: GitHub Dark Dimmed / Solarized Light');
+    expect(items[0]?.detail).toBe('Follows the system: GitHub Dark Dimmed / Solarized Light');
   });
 
   it('flags the current choice only', () => {
@@ -57,7 +57,7 @@ describe('themeLabel', () => {
 
   it('translates the picker details', () => {
     const items = buildThemePickerItems(systemThemes, 'dark', fr);
-    expect(items[0]?.detail).toBe('Suit Windows : GitHub Sombre atténué / Solarized Clair');
+    expect(items[0]?.detail).toBe('Suit le système : GitHub Sombre atténué / Solarized Clair');
     expect(items.find(item => item.id === 'dark')?.detail).toBe('Thème sombre · Actuel');
   });
 });

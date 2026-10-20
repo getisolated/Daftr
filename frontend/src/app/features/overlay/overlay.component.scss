@@ -20,7 +20,14 @@
 
 // The OS paints the (rather light grey) acrylic behind the window: a flat anthracite tint darkens it
 :host-context(html.overlay-acrylic) .overlay {
+  // Transparent tint only (no opaque layer) so the native acrylic / macOS vibrancy shows through
   background: rgba(22, 22, 24, 0.2);
+}
+
+// macOS only: 12px matches the native corner radius of the vibrancy view; subtle semi-transparent 1px edge
+:host-context(html.overlay-acrylic) .overlay.platform-mac {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .drag-handle {
