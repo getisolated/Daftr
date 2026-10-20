@@ -96,7 +96,7 @@
   border-radius: 4px;
   color: var(--daftr-text);
   font: inherit;
-  font-family: Consolas, 'Cascadia Mono', monospace;
+  font-family: var(--daftr-font-mono);
   outline: none;
 
   &:focus { border-color: var(--daftr-accent); }

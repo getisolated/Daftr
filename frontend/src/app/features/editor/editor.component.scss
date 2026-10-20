@@ -281,7 +281,7 @@ app-find-panel {
     border: 1px solid var(--daftr-border);
     border-radius: 3px;
     padding: 1px 6px;
-    font-family: 'Consolas', monospace;
+    font-family: var(--daftr-font-mono);
     font-size: 12px;
     color: var(--daftr-text-dimmed);
   }

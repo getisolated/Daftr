@@ -15,7 +15,7 @@ hr { height: 4px; margin: 24px 0; padding: 0; background: #d1d9e0; border: 0; }
 blockquote { padding: 0 1em; color: #59636e; border-left: .25em solid #d1d9e0; }
 ul, ol { padding-left: 2em; }
 .task-list-item { list-style-type: none; } .task-list-item-checkbox { margin: 0 .35em .2em -1.4em; vertical-align: middle; }
-code { padding: .2em .4em; font-family: Consolas, 'SF Mono', monospace; font-size: 85%; background: rgba(129, 139, 152, .12); border-radius: 6px; }
+code { padding: .2em .4em; font-family: Consolas, ui-monospace, 'SF Mono', Menlo, monospace; font-size: 85%; background: rgba(129, 139, 152, .12); border-radius: 6px; }
 pre { padding: 16px; overflow: auto; font-size: 85%; line-height: 1.45; background: #f6f8fa; border-radius: 6px; }
 pre code { padding: 0; font-size: 100%; background: transparent; white-space: pre; }
 table { display: block; width: max-content; max-width: 100%; overflow: auto; border-collapse: collapse; }
@@ -28,7 +28,7 @@ img { max-width: 100%; }
 .new-block { position: relative; margin-top: 28px; padding: 26px 12px 10px; background: #7344f511; border: 1px solid #7344f555; border-radius: 8px; } .new-block .badge-new { position: absolute; top: 0; left: 10px; margin: 0; transform: translateY(-50%); } .new-block > :last-child { margin-bottom: 0; }
 .footnotes { font-size: 12px; color: #59636e; border-top: 1px solid #d1d9e0; }
 .mermaid-diagram { display: flex; justify-content: center; } .mermaid-diagram svg { max-width: 100%; height: auto; }
-.mermaid-error { color: #d1242f; font-family: Consolas, monospace; white-space: pre-wrap; }
+.mermaid-error { color: #d1242f; font-family: Consolas, ui-monospace, 'SF Mono', Menlo, monospace; white-space: pre-wrap; }
 .tok-keyword, .tok-controlKeyword, .tok-modifier { color: #cf222e; } .tok-string, .tok-string2 { color: #0a3069; }
 .tok-number, .tok-bool, .tok-atom, .tok-constant { color: #0550ae; } .tok-comment, .tok-meta { color: #59636e; font-style: italic; }
 .tok-variableName, .tok-propertyName { color: #953800; } .tok-definition, .tok-function { color: #8250df; }

@@ -293,7 +293,7 @@ export const markdownDecorationTheme = EditorView.baseTheme({
     color: 'var(--daftr-syntax-strike)',
   },
   '.cm-md-inline-code': {
-    fontFamily: 'Consolas, "Courier New", monospace',
+    fontFamily: 'var(--daftr-font-mono)',
     fontSize: '0.88em',
     background: 'var(--daftr-bg-chip)',
     borderRadius: '3px',
@@ -301,7 +301,7 @@ export const markdownDecorationTheme = EditorView.baseTheme({
     color: 'var(--daftr-syntax-code)',
   },
   '.cm-md-code-block': {
-    fontFamily: 'Consolas, "Courier New", monospace',
+    fontFamily: 'var(--daftr-font-mono)',
     fontSize: '0.88em',
   },
   '.cm-md-hr': {
@@ -347,13 +347,13 @@ export const markdownDecorationTheme = EditorView.baseTheme({
   '.cm-bullet-todo': {
     color: 'var(--daftr-text-dimmed)',
     cursor: 'pointer',
-    fontFamily: 'monospace',
+    fontFamily: 'var(--daftr-font-mono)',
     '&:hover': { color: 'var(--daftr-text)' },
   },
   '.cm-bullet-done': {
     color: 'var(--daftr-syntax-comment)',
     cursor: 'pointer',
-    fontFamily: 'monospace',
+    fontFamily: 'var(--daftr-font-mono)',
     '&:hover': { color: 'var(--daftr-text)' },
   },
   '.cm-hidden-mark': {
