@@ -12,7 +12,7 @@
 // Usage: node scripts/update-manifest.mjs <artifacts dir> <tag> <owner/repo> <output file>
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 const [artifactsDir, tag, repository, output] = process.argv.slice(2);
 
@@ -20,8 +20,8 @@ if (!artifactsDir || !tag || !repository || !output) {
   throw new Error('Usage: update-manifest.mjs <artifacts dir> <tag> <owner/repo> <output>');
 }
 
-// `download-artifact` with `merge-multiple` flattens everything, but stay tolerant of one
-// sub-folder per artifact.
+// `download-artifact` with `merge-multiple` merges the artifacts into one folder, but each keeps
+// its own layout (the macOS one has `dmg/` and `macos/` sub-folders): search recursively.
 function listFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
     entry.isDirectory() ? listFiles(join(dir, entry.name)) : [join(dir, entry.name)],
@@ -35,7 +35,8 @@ const targets = {
   'darwin-aarch64': '.app.tar.gz',
 };
 
-const baseName = path => path.slice(path.lastIndexOf('/') + 1);
+// `basename` and not a split on `/`: the CI also runs the tests on Windows (`\` separators)
+const baseName = path => basename(path);
 
 // GitHub turns spaces into dots in asset names: the manifest must use the published name
 const urlOf = name =>

@@ -377,6 +377,9 @@ jobs:
 
       # `gh` est préinstallé sur les runners : pas d'action tierce à maintenir. Les `.sig` ne
       # sont pas publiés : leur contenu est dans le manifeste.
+      # L'artefact macOS garde les sous-dossiers `dmg/` et `macos/` (`upload-artifact` prend
+      # pour racine l'ancêtre commun de ses chemins) : d'où `**/`. `failglob` fait échouer la
+      # publication si un des fichiers attendus manque, au lieu de passer le motif tel quel.
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -385,8 +388,9 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
           TARGET: ${{ needs.stamp.outputs.sha }}
         run: |
+          shopt -s globstar failglob
           gh release create "$TAG" \
-            artifacts/*-setup.exe artifacts/*.dmg artifacts/*.app.tar.gz artifacts/latest.json \
+            artifacts/**/*-setup.exe artifacts/**/*.dmg artifacts/**/*.app.tar.gz artifacts/latest.json \
             --target "$TARGET" \
             --title "$VERSION" \
             --generate-notes \

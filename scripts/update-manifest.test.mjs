@@ -4,9 +4,11 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
-const script = new URL('./update-manifest.mjs', import.meta.url).pathname;
+// `fileURLToPath`, not `.pathname`: on Windows the latter gives `/D:/…`, which Node cannot open
+const script = fileURLToPath(new URL('./update-manifest.mjs', import.meta.url));
 const repo = 'owner/repo';
 
 function run(dir) {
