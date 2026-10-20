@@ -305,10 +305,28 @@ jobs:
       # La config macOS (`tauri.macos.conf.json`) est fusionnée automatiquement ; la
       # signature minisign de l'archive de mise à jour utilise les mêmes secrets que Windows.
       - name: Build & package
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build
+        run: |
+          set -euo pipefail
+          # `tauri.macos.conf.json` signe ad hoc (`signingIdentity: "-"`) pour sceller le bundle.
+          # `APPLE_SIGNING_IDENTITY` prime sur cette valeur quand elle est exportée ; mais avec
+          # un certificat seul, le bundler exigerait que son nom contienne « - ». La clé est
+          # donc retirée dès qu'un certificat est fourni : le bundler reprend son identité.
+          args=()
+          if [ -n "${APPLE_CERTIFICATE:-}" ]; then
+            args+=(--config '{"bundle":{"macOS":{"signingIdentity":null}}}')
+          fi
+          # Avec `CI=true`, le bundler saute la mise en page du DMG (fond, positions des
+          # icônes) ; `TAURI_BUNDLER_DMG_IGNORE_CI` la force, mais l'AppleScript qui pilote le
+          # Finder peut expirer sur un runner. Repli : un DMG sans mise en page. Le `.app` est
+          # déjà compilé, le second passage est rapide.
+          if ! TAURI_BUNDLER_DMG_IGNORE_CI=true npx tauri build ${args[@]+"${args[@]}"}; then
+            echo "::warning::DMG layout (Finder AppleScript) failed: retrying without background and icon positions."
+            env -u TAURI_BUNDLER_DMG_IGNORE_CI npx tauri build ${args[@]+"${args[@]}"}
+          fi
 
       - name: Check artifacts
         shell: bash

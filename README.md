@@ -35,7 +35,7 @@
 
 1. Download `Daftr_<version>_aarch64.dmg` from the [latest release](https://github.com/getisolated/Daftr/releases/latest) (Apple Silicon, macOS 13 Ventura or later).
 2. Open it and drag **Daftr** into **Applications**.
-3. The macOS build is not notarized yet, so the first launch is refused (« Apple could not verify… »). Open **System Settings → Privacy & Security** and click **Open Anyway**, or run `xattr -cr /Applications/Daftr.app` once in a terminal.
+3. The macOS build is not notarized yet, so the first launch is refused (« Apple could not verify… »). Open **System Settings → Privacy & Security** and click **Open Anyway** (the button appears after that first attempt), or run `xattr -cr /Applications/Daftr.app` once in a terminal.
 
 ### Updates and data
 
@@ -89,6 +89,8 @@ Every shortcut below is a default and can be rebound in **Settings → Keyboard 
 | `Ctrl+Alt+Q` (global, configurable)  | `⌥⌘Q` (global, configurable) | Toggle the quick-note overlay |
 
 On macOS, `⌘` replaces `Ctrl` and `⌥` replaces `Alt`, with two exceptions: tabs cycle with `⌃⇥` (`⌘Tab` is the system app switcher) and find & replace is `⌥⌘F` (`⌘H` hides the app). In the search panel, *replace all* is `⌥⌘↩`.
+
+On macOS the global shortcut is bound to the physical key position. Until it has been recorded once, Daftr assumes an AZERTY keyboard: the default `⌥⌘Q` is the key labelled Q on an AZERTY layout, which is `⌥⌘A` on a QWERTY one. Recording the shortcut again in **Settings** binds the right key for any layout.
 
 In the overlay: `Enter` sends (`Shift+Enter` = new line) — or, if configured, `Enter` = new line and `Ctrl+Enter` (`⌘↩` on macOS) sends. `Esc` or a click outside hides it; the draft is kept.
 
