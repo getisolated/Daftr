@@ -158,7 +158,7 @@ fn french(key: MessageKey) -> &'static str {
         MessageKey::MenuPaste => "Coller",
         MessageKey::MenuSelectAll => "Tout sélectionner",
         MessageKey::MenuWindow => "Fenêtre",
-        MessageKey::MenuMinimize => "Minimiser",
+        MessageKey::MenuMinimize => "Placer dans le Dock",
         MessageKey::MenuZoom => "Réduire/agrandir",
         MessageKey::MenuCloseWindow => "Fermer la fenêtre",
     }
@@ -203,5 +203,9 @@ mod tests {
         assert_eq!(message(Language::Fr, MessageKey::MenuEdit), "Édition");
         assert_eq!(message(Language::Fr, MessageKey::MenuCopy), "Copier");
         assert_eq!(message(Language::Fr, MessageKey::MenuWindow), "Fenêtre");
+        assert_eq!(
+            message(Language::Fr, MessageKey::MenuMinimize),
+            "Placer dans le Dock"
+        );
     }
 }

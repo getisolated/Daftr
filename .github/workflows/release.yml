@@ -292,14 +292,15 @@ jobs:
             echo "No Apple certificate: building unsigned."
             exit 0
           fi
-          {
-            echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
-            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
-            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
-            echo "APPLE_ID=$APPLE_ID"
-            echo "APPLE_PASSWORD=$APPLE_PASSWORD"
-            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
-          } >> "$GITHUB_ENV"
+          # Une variable vide n'est jamais exportée (notarisation sans `APPLE_ID`, par exemple) ;
+          # la syntaxe à délimiteur tolère un certificat base64 coupé sur plusieurs lignes.
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+                      APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            value="${!name}"
+            [ -n "$value" ] || { echo "$name not set: skipped."; continue; }
+            delimiter="EOF_$(openssl rand -hex 16)"
+            printf '%s<<%s\n%s\n%s\n' "$name" "$delimiter" "$value" "$delimiter" >> "$GITHUB_ENV"
+          done
 
       # La config macOS (`tauri.macos.conf.json`) est fusionnée automatiquement ; la
       # signature minisign de l'archive de mise à jour utilise les mêmes secrets que Windows.

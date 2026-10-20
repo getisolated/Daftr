@@ -176,7 +176,11 @@ export class TabsBarComponent {
   private readonly fullscreen = signal(false);
   readonly trafficLightsInset = computed(() => this.platform.isMac && !this.fullscreen());
 
+  /** Set on destroy: a listener resolved afterwards is removed at once (`onDestroy` would throw then). */
+  private destroyed = false;
+
   constructor() {
+    this.destroyRef.onDestroy(() => { this.destroyed = true; });
     if (this.platform.isMac && this.desktop.inDesktop) {
       void this.trackFullscreen();
     }
@@ -188,6 +192,10 @@ export class TabsBarComponent {
     try {
       await refresh();
       const unlisten = await win.onResized(() => void refresh());
+      if (this.destroyed) {
+        unlisten();
+        return;
+      }
       this.destroyRef.onDestroy(unlisten);
     } catch {
       // Window API unavailable: keep the fixed inset

@@ -16,7 +16,7 @@
   position: relative;
 }
 
-// macOS: room for the native traffic lights (3 x 12px, 8px apart, from x = 12px, so they end near 64px)
+// macOS: room for the native traffic lights (from x = 12px, they end near 72px on macOS 26: see TRAFFIC_LIGHTS in main_window.rs)
 .traffic-lights-inset {
   flex-shrink: 0;
   width: 78px;

@@ -37,6 +37,10 @@ const BLUR_CHECK_INTERVAL: Duration = Duration::from_millis(250);
 /// Un déplacement plus récent : la fenêtre est en train d'être glissée par sa poignée.
 const DRAG_GRACE: Duration = Duration::from_millis(400);
 
+/// Attente maximale de la destruction de l'ancien overlay avant d'en recréer un.
+const DESTROY_TIMEOUT: Duration = Duration::from_secs(2);
+const DESTROY_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
 /// Rayon des coins de la vibrancy macOS, en points (celui des coins de `overlay.component.scss`).
 const VIBRANCY_CORNER_RADIUS: f64 = 12.0;
 
@@ -240,10 +244,21 @@ fn ensure_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
             return Ok(window);
         }
         window.destroy()?;
+        wait_until_destroyed(app);
     }
     let window = create(app, wanted)?;
     *material = Some(wanted);
     Ok(window)
+}
+
+/// `destroy` passe par la boucle d'événements : l'étiquette reste prise jusqu'au traitement
+/// de `Destroyed` sur le fil principal, et recréer l'overlay avant échouerait
+/// (`WindowLabelAlreadyExists`). Appelé hors du fil principal, qui n'attend jamais ce verrou.
+fn wait_until_destroyed(app: &AppHandle) {
+    let started = Instant::now();
+    while app.get_webview_window(OVERLAY).is_some() && started.elapsed() < DESTROY_TIMEOUT {
+        std::thread::sleep(DESTROY_POLL_INTERVAL);
+    }
 }
 
 fn create(app: &AppHandle, material: Material) -> tauri::Result<WebviewWindow> {

@@ -56,6 +56,11 @@ jobs:
       - name: Test (Angular)
         run: npm test
 
+      # Générateur de `latest.json` de la release. Le glob est développé par Node lui-même
+      # (`node --test`, Node 21+) : il marche aussi sous cmd.exe, qui ne le développe pas.
+      - name: Test (scripts)
+        run: npm run test:scripts
+
       - name: Format (Rust)
         working-directory: src-tauri
         run: cargo fmt --all --check

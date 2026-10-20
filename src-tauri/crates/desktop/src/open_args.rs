@@ -4,8 +4,12 @@
 #[cfg(target_os = "macos")]
 use std::path::Path;
 use std::path::PathBuf;
+#[cfg(target_os = "macos")]
+use std::sync::Mutex;
 
 use domain::collection::is_markdown_file;
+#[cfg(target_os = "macos")]
+use platform::sync::lock;
 use presentation::dto::CollectionFileRefDto;
 use presentation::events::COLLECTIONS_OPEN;
 use tauri::AppHandle;
@@ -27,23 +31,17 @@ pub fn open_from_arguments(app: &AppHandle, args: impl Iterator<Item = String>) 
     open_files(app, &markdown_files(args));
 }
 
-/// Fichiers envoyés par le Finder (macOS). Au lancement par double-clic, ils arrivent avant
-/// que la fenêtre ait chargé : ils attendent alors `open_pending_files`.
+/// Fichiers envoyés par le Finder (macOS). Au lancement par double-clic, AppKit les livre
+/// avant `applicationDidFinishLaunching`, donc avant `setup` (et `DesktopState`) : ils
+/// attendent alors `open_pending_files`, dans une file gérée à part.
 #[cfg(target_os = "macos")]
 pub fn open_from_urls(app: &AppHandle, urls: &[Url]) {
     let files = markdown_files_from_urls(urls);
     if files.is_empty() {
         return;
     }
-    let Some(state) = app.try_state::<crate::state::DesktopState>() else {
-        tracing::warn!(
-            count = files.len(),
-            "fichiers reçus avant le démarrage, ignorés"
-        );
-        return;
-    };
     let count = files.len();
-    let ready = state.receive_opened_files(files);
+    let ready = lock(&opened_files(app).0).receive(files);
     tracing::info!(
         count,
         waiting = ready.is_empty(),
@@ -58,11 +56,26 @@ pub fn open_from_urls(app: &AppHandle, urls: &[Url]) {
 /// Ouvre les fichiers reçus du Finder pendant le chargement de la fenêtre.
 #[cfg(target_os = "macos")]
 pub fn open_pending_files(app: &AppHandle) {
-    let files = desktop(app).take_pending_opened_files();
-    if !files.is_empty() {
-        tracing::info!(count = files.len(), "fichiers en attente ouverts");
+    let files = lock(&opened_files(app).0).mark_ready();
+    if files.is_empty() {
+        return;
     }
+    tracing::info!(count = files.len(), "fichiers en attente ouverts");
+    // Même lancée cachée (ouverture de session), l'app montre les fichiers demandés
+    main_window::show(app);
     open_files(app, &files);
+}
+
+/// File des fichiers reçus du Finder, gérée par Tauri hors de `DesktopState`.
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+struct OpenedFilesState(Mutex<OpenedFiles>);
+
+/// La file, créée au premier besoin (`manage` ne remplace pas un état déjà géré).
+#[cfg(target_os = "macos")]
+fn opened_files(app: &AppHandle) -> tauri::State<'_, OpenedFilesState> {
+    app.manage(OpenedFilesState::default());
+    app.state::<OpenedFilesState>()
 }
 
 fn open_files(app: &AppHandle, files: &[PathBuf]) {
@@ -119,7 +132,7 @@ fn is_markdown_path(path: &Path) -> bool {
 /// Fichiers reçus du Finder avant que la fenêtre ait fini de charger (macOS).
 #[cfg(target_os = "macos")]
 #[derive(Debug, Default)]
-pub struct OpenedFiles {
+struct OpenedFiles {
     /// La fenêtre a chargé : les fichiers s'ouvrent directement.
     ready: bool,
     /// Fichiers en attente du chargement.
@@ -129,7 +142,7 @@ pub struct OpenedFiles {
 #[cfg(target_os = "macos")]
 impl OpenedFiles {
     /// Les fichiers à ouvrir tout de suite ; tant que la fenêtre charge, aucun (ils attendent).
-    pub fn receive(&mut self, files: Vec<PathBuf>) -> Vec<PathBuf> {
+    fn receive(&mut self, files: Vec<PathBuf>) -> Vec<PathBuf> {
         if self.ready {
             return files;
         }
@@ -138,7 +151,7 @@ impl OpenedFiles {
     }
 
     /// La fenêtre a chargé : vide la file d'attente.
-    pub fn mark_ready(&mut self) -> Vec<PathBuf> {
+    fn mark_ready(&mut self) -> Vec<PathBuf> {
         self.ready = true;
         std::mem::take(&mut self.pending)
     }

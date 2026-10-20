@@ -11,6 +11,7 @@ import { TabsService } from '../../core/services/tabs.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { baseName, parentPath } from '../../core/utils/collection.util';
 import { PlatformService } from '../../core/services/platform.service';
+import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
@@ -149,6 +150,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
               (keydown.enter)="onNodeClick(row.root, row.node)"
               (keydown.f2)="startEditing({ kind: 'renamePath', root: row.root, path: row.node.path })"
               (keydown.delete)="confirmTrash.set({ root: row.root, path: row.node.path })"
+              (keydown.meta.backspace)="isMacDeleteKey($event) && confirmTrash.set({ root: row.root, path: row.node.path })"
               (contextmenu)="onNodeMenu($event, row.root, row.node)"
               (dragstart)="onDragStart($event, row.root, row.node.path)"
               (dragend)="dragged = null; dropKey.set(null)"
@@ -215,6 +217,17 @@ export class CollectionsSectionComponent {
   protected readonly tabs = inject(TabsService);
   private readonly sidebarState = inject(SidebarStateService);
   private readonly platform = inject(PlatformService);
+
+  /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
+  protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
+
+  /**
+   * ⌘⌫ deletes like Delete on macOS (MacBooks have no forward Delete key). Only on the row itself: in a rename
+   * field ⌘⌫ keeps erasing the text. Always false elsewhere.
+   */
+  protected isMacDeleteKey(event: Event): boolean {
+    return this.platform.isMac && event.target === event.currentTarget;
+  }
 
   protected readonly iconFile = ICON_FILE;
   protected readonly trashActions = computed<ConfirmDialogAction[]>(() => [
@@ -501,7 +514,7 @@ export class CollectionsSectionComponent {
       { id: 'renamePath', label: t('common.rename'), icon: ICON_RENAME, shortcut: 'F2' },
       { id: 'reveal', label: t(this.platformKey('sidebar.collections.menu.reveal')), icon: ICON_REVEAL },
       { divider: true },
-      { id: 'trash', label: t('common.delete'), icon: ICON_DELETE, danger: true, shortcut: 'Del' },
+      { id: 'trash', label: t('common.delete'), icon: ICON_DELETE, danger: true, shortcut: this.deleteShortcut },
     );
 
     this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root, node } });

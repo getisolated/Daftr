@@ -21,6 +21,7 @@ import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { UpdateService } from '../../core/services/update.service';
 import { CollectionsService } from '../../core/services/collections.service';
+import { PlatformService } from '../../core/services/platform.service';
 import { NoteExportService, folderExportMenu, noteExportMenu } from '../../core/services/note-export.service';
 import {
   buildFolderTree,
@@ -35,6 +36,7 @@ import {
   resolveNoteRowDrop,
 } from '../../core/utils/folder-tree.util';
 import { noteDisplayTitle } from '../../core/utils/note-title.util';
+import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { itemKey, parseItemKey, rangeBetween, topLevelItems } from '../../core/utils/sidebar-selection.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { ColorPickerComponent } from '../../shared/ui/color-picker.component';
@@ -77,6 +79,18 @@ export class SidebarComponent {
   private readonly collections = inject(CollectionsService);
   private readonly noteExport = inject(NoteExportService);
   protected readonly i18n = inject(I18nService);
+  private readonly platform = inject(PlatformService);
+
+  /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
+  protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
+
+  /**
+   * ⌘⌫ deletes like Delete on macOS (MacBooks have no forward Delete key). Only on the row itself: in a rename
+   * field ⌘⌫ keeps erasing the text. Always false elsewhere.
+   */
+  protected isMacDeleteKey(event: Event): boolean {
+    return this.platform.isMac && event.target === event.currentTarget;
+  }
 
   protected readonly updateInfo = this.updates.info;
   protected readonly updateLabel = this.updates.label;
@@ -527,7 +541,7 @@ export class SidebarComponent {
       { id: 'moveTo', label: t('sidebar.menu.moveItems', { count: targets.length }), icon: ICON_MOVE },
       { id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR },
       { divider: true },
-      { id: 'delete', label: t('sidebar.menu.deleteItems', { count: targets.length }), icon: ICON_DELETE, danger: true, shortcut: 'Del' },
+      { id: 'delete', label: t('sidebar.menu.deleteItems', { count: targets.length }), icon: ICON_DELETE, danger: true, shortcut: this.deleteShortcut },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, target, targets });

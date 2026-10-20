@@ -43,13 +43,13 @@ import { FindOptions } from '../../core/models/find.model';
             (input)="setText('search', $event)"
           />
           <div class="toggles">
-            <button type="button" class="icon-btn toggle" [title]="i18n.t('editor.find.matchCase', { shortcut: 'Alt+C' })" [class.on]="find.options().caseSensitive" [attr.aria-pressed]="find.options().caseSensitive" (click)="toggle('caseSensitive')">
+            <button type="button" class="icon-btn toggle" [title]="i18n.t('editor.find.matchCase', { shortcut: toggleShortcut('C') })" [class.on]="find.options().caseSensitive" [attr.aria-pressed]="find.options().caseSensitive" (click)="toggle('caseSensitive')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17 6.5 6 11 17M3.6 13.5h5.8"/><path d="M19 17v-5.5a2.5 2.5 0 0 0-5 0M19 14.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/></svg>
             </button>
-            <button type="button" class="icon-btn toggle" [title]="i18n.t('editor.find.wholeWord', { shortcut: 'Alt+W' })" [class.on]="find.options().wholeWord" [attr.aria-pressed]="find.options().wholeWord" (click)="toggle('wholeWord')">
+            <button type="button" class="icon-btn toggle" [title]="i18n.t('editor.find.wholeWord', { shortcut: toggleShortcut('W') })" [class.on]="find.options().wholeWord" [attr.aria-pressed]="find.options().wholeWord" (click)="toggle('wholeWord')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19h18M3 15v2M21 15v2"/><path d="M10 13v-3a2 2 0 0 0-4 0M10 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0M13 6v7M13 11a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/></svg>
             </button>
-            <button type="button" class="icon-btn toggle" [title]="i18n.t('editor.find.regexp', { shortcut: 'Alt+R' })" [class.on]="find.options().regexp" [attr.aria-pressed]="find.options().regexp" (click)="toggle('regexp')">
+            <button type="button" class="icon-btn toggle" [title]="i18n.t('editor.find.regexp', { shortcut: toggleShortcut('R') })" [class.on]="find.options().regexp" [attr.aria-pressed]="find.options().regexp" (click)="toggle('regexp')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3v10M12.67 5.5l8.66 5M12.67 10.5l8.66-5"/><circle cx="6" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
             </button>
           </div>
@@ -126,6 +126,8 @@ export class FindPanelComponent {
   private readonly platform = inject(PlatformService);
   // ⌥⌘↩ on macOS, Ctrl+Alt+Enter on Windows
   protected readonly replaceAllShortcut = formatAccelerator('CommandOrControl+Alt+Return', this.platform.platform);
+  // ⌥C on macOS, Alt+C on Windows
+  protected readonly toggleShortcut = (letter: string): string => formatAccelerator(`Alt+${letter}`, this.platform.platform);
 
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly results = viewChild<ElementRef<HTMLElement>>('results');
@@ -194,12 +196,24 @@ export class FindPanelComponent {
 
     // VS Code's option toggles
     const toggles: Record<string, keyof Pick<FindOptions, 'caseSensitive' | 'wholeWord' | 'regexp'>> = { c: 'caseSensitive', w: 'wholeWord', r: 'regexp' };
-    const toggleKey = toggles[event.key.toLowerCase()];
+    const toggleKey = toggles[this.toggleLetter(event)];
 
     if (event.altKey && !this.primaryMod(event) && toggleKey) {
       event.preventDefault();
       this.toggle(toggleKey);
     }
+  }
+
+  /**
+   * Letter of an option toggle. On macOS ⌥ turns the letter into a symbol (⌥C gives `ç`): the physical key
+   * (`code`) is read instead, as `keyEventToAccelerator` does.
+   */
+  private toggleLetter(event: KeyboardEvent): string {
+    const key = event.key.toLowerCase();
+    if (!this.platform.isMac || /^[a-z]$/.test(key)) {
+      return key;
+    }
+    return /^Key(?<letter>[A-Z])$/.exec(event.code)?.groups?.['letter']?.toLowerCase() ?? key;
   }
 
   /** The primary modifier: ⌘ on macOS, Ctrl elsewhere. */
