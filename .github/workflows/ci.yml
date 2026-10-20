@@ -1,6 +1,7 @@
 name: CI
 
-# Vérifications d'une pull request : tests Angular, format, lint et tests Rust.
+# Vérifications d'une pull request : tests Angular, format, lint et tests Rust, sur les
+# deux plateformes ciblées (Windows et macOS), car le code natif y diffère (`cfg(target_os)`).
 #
 # Le même workflow est appelé par `release.yml` avant toute publication : une release
 # ne part jamais d'un état que la PR n'aurait pas validé.
@@ -20,9 +21,14 @@ concurrency:
 
 jobs:
   check:
-    name: Tests Angular et Rust
-    # Windows : l'app cible Windows (corbeille, sonde de l'acrylique, WebView2)
-    runs-on: windows-latest
+    name: Tests Angular et Rust (${{ matrix.os }})
+    # Windows (corbeille, sonde de l'acrylique, WebView2) et macOS (arm64) ; l'échec d'une
+    # plateforme ne masque pas le résultat de l'autre.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout

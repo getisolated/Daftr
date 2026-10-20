@@ -20,8 +20,14 @@ name: Release
 # d'un compte autorisé à contourner la protection) ; sans lui, le jeton du workflow est tenté.
 # Un commit dont le message contient `[skip release]` ne publie rien.
 #
-# L'application interroge `releases/latest/download/latest.json` pour proposer les mises
-# à jour : ce manifeste est publié à côté de l'installeur.
+# Deux plateformes sont publiées : Windows (installeur NSIS) et macOS Apple Silicon (DMG,
+# plus l'archive `.app.tar.gz` de l'updater). Chaque job de build ne produit que ses
+# artefacts et leurs signatures minisign ; le job `release` fusionne le tout dans un seul
+# `latest.json`, que l'application interroge à `releases/latest/download/latest.json` pour
+# proposer les mises à jour. Une plateforme dont le build échoue bloque la release entière.
+#
+# Le build macOS n'est signé/notarisé par Apple que si les secrets `APPLE_*` existent ;
+# sans eux il reste non signé (voir l'étape « Apple signing »).
 on:
   push:
     branches: [main]
@@ -146,7 +152,7 @@ jobs:
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  build:
+  build-windows:
     name: Build (Windows)
     needs: [version, stamp, check]
     runs-on: windows-latest
@@ -215,14 +221,6 @@ jobs:
           ls src-tauri/target/release/bundle/nsis/*-setup.exe > /dev/null || { echo "::error::Installer missing."; exit 1; }
           ls src-tauri/target/release/bundle/nsis/*-setup.exe.sig > /dev/null || { echo "::error::Update signature missing."; exit 1; }
 
-      # Le manifeste est produit ici, où l'installeur, son empreinte et sa signature sont connus
-      - name: Generate update manifest
-        shell: bash
-        run: |
-          node scripts/update-manifest.mjs src-tauri/target/release/bundle/nsis \
-            "${{ needs.version.outputs.tag }}" "${{ github.repository }}" \
-            src-tauri/target/release/bundle/nsis/latest.json
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -230,14 +228,135 @@ jobs:
           if-no-files-found: error
           path: |
             src-tauri/target/release/bundle/nsis/*-setup.exe
-            src-tauri/target/release/bundle/nsis/latest.json
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+
+  build-macos:
+    name: Build (macOS)
+    needs: [version, stamp, check]
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout stamped commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stamp.outputs.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Le manifeste de mise à jour déclare `darwin-aarch64` : un runner Intel produirait
+      # un binaire x86_64 publié sous la mauvaise clé.
+      - name: Check architecture
+        run: |
+          set -euo pipefail
+          [ "$(uname -m)" = "arm64" ] || { echo "::error::Runner is $(uname -m), arm64 expected."; exit 1; }
+
+      - name: Check version
+        shell: bash
+        env:
+          APP_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          actual=$(node -p "require('./package.json').version")
+          [ "$actual" = "$APP_VERSION" ] || { echo "::error::package.json carries $actual, expected $APP_VERSION."; exit 1; }
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Le bundler Tauri signe et notarise dès que les variables `APPLE_*` sont définies, et
+      # échoue si l'une est définie mais vide : or `${{ secrets.X }}` vaut une chaîne vide
+      # quand le secret n'existe pas. Elles ne sont donc exportées que si un certificat est
+      # fourni ; sinon le build reste non signé.
+      - name: Apple signing (optional)
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No Apple certificate: building unsigned."
+            exit 0
+          fi
+          {
+            echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
+            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            echo "APPLE_ID=$APPLE_ID"
+            echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+          } >> "$GITHUB_ENV"
+
+      # La config macOS (`tauri.macos.conf.json`) est fusionnée automatiquement ; la
+      # signature minisign de l'archive de mise à jour utilise les mêmes secrets que Windows.
+      - name: Build & package
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build
+
+      - name: Check artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle=src-tauri/target/release/bundle
+          ls "$bundle"/dmg/*.dmg > /dev/null || { echo "::error::Disk image missing."; exit 1; }
+          ls "$bundle"/macos/*.app.tar.gz > /dev/null || { echo "::error::Update archive missing."; exit 1; }
+          ls "$bundle"/macos/*.app.tar.gz.sig > /dev/null || { echo "::error::Update signature missing."; exit 1; }
+
+      # L'archive s'appelle toujours `Daftr.app.tar.gz` : sans version ni architecture dans
+      # le nom, l'asset serait ambigu dans la release.
+      - name: Rename update archive
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          dir=src-tauri/target/release/bundle/macos
+          mv "$dir"/Daftr.app.tar.gz "$dir/Daftr_${VERSION}_aarch64.app.tar.gz"
+          mv "$dir"/Daftr.app.tar.gz.sig "$dir/Daftr_${VERSION}_aarch64.app.tar.gz.sig"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
 
   release:
     name: Publish release
-    needs: [version, stamp, build]
+    needs: [version, stamp, build-windows, build-macos]
     runs-on: ubuntu-latest
 
     steps:
+      # Seul `scripts/` est utile ici (générateur du manifeste) : le commit estampillé suffit.
+      - name: Checkout stamped commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stamp.outputs.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -247,7 +366,16 @@ jobs:
       - name: List artifacts
         run: ls -R artifacts
 
-      # `gh` est préinstallé sur les runners : pas d'action tierce à maintenir.
+      # Le manifeste fusionne les deux plateformes : il est produit ici, où les installeurs,
+      # leurs empreintes et leurs signatures sont tous connus.
+      - name: Generate update manifest
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: node scripts/update-manifest.mjs artifacts "$TAG" "$REPO" artifacts/latest.json
+
+      # `gh` est préinstallé sur les runners : pas d'action tierce à maintenir. Les `.sig` ne
+      # sont pas publiés : leur contenu est dans le manifeste.
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -256,7 +384,8 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
           TARGET: ${{ needs.stamp.outputs.sha }}
         run: |
-          gh release create "$TAG" artifacts/* \
+          gh release create "$TAG" \
+            artifacts/*-setup.exe artifacts/*.dmg artifacts/*.app.tar.gz artifacts/latest.json \
             --target "$TARGET" \
             --title "$VERSION" \
             --generate-notes \
