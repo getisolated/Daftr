@@ -16,19 +16,19 @@ import { noteDisplayTitle } from '../../core/utils/note-title.util';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { GraphViewComponent } from '../graph/graph-view.component';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
-import { DaftrIconComponent } from '../../shared/ui/brand.component';
+import { DaftrMarkComponent } from '../../shared/ui/brand.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [ContextMenuComponent, GraphViewComponent, DaftrIconComponent],
+  imports: [ContextMenuComponent, GraphViewComponent, DaftrMarkComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="home" [class.graph-mode]="view() === 'graph'">
       <div class="home-inner">
       <div class="home-header">
         <div class="home-brand">
-          <app-daftr-icon class="brand-logo" [size]="28" />
+          <app-daftr-mark class="brand-logo" [size]="32" />
           <h1 class="home-title">{{ title() }}</h1>
         </div>
         <div class="view-switch" role="group" [attr.aria-label]="i18n.t('workspace.home.viewSwitch')">

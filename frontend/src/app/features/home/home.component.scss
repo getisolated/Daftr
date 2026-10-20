@@ -70,7 +70,13 @@
 // ── Home Brand ──────────────────────────────────────────────────────────────
 .home-brand {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
+}
+
+// White on dark themes, brand purple on light ones (the mark has no background of its own)
+.brand-logo {
+  color: var(--daftr-brand);
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────

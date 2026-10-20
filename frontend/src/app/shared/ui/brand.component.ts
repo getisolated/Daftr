@@ -1,22 +1,24 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
-/** Daftr app icon: the glyph on its purple rounded square (same drawing as the bundled icons). */
+/**
+ * Daftr mark alone (glyph and its shadow) on a transparent background, drawn in `currentColor`: the host
+ * sets the colour (see `--daftr-brand`). The shadow keeps its 28 % opacity relative to that colour.
+ */
 @Component({
-  selector: 'app-daftr-icon',
+  selector: 'app-daftr-mark',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <svg [attr.width]="size()" [attr.height]="size()" viewBox="0 0 512 512" aria-hidden="true">
-      <rect width="512" height="512" rx="112" fill="#5b3fa3" />
-      <g transform="translate(76 76) scale(3.6)" fill="none" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M 64 24 C 69 40 75 56 81 72 Q 84 83 72 83 L 38 83 C 31 83 26 78 26 70" stroke="#ffffff" stroke-opacity="0.28" />
-        <path d="M 58 18 C 63 34 69 50 75 66 Q 78 77 66 77 L 32 77 C 25 77 20 72 20 64" stroke="#ffffff" />
+    <svg [attr.width]="size()" [attr.height]="size()" viewBox="0 0 100 100" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 64 24 C 69 40 75 56 81 72 Q 84 83 72 83 L 38 83 C 31 83 26 78 26 70" stroke-opacity="0.28" />
+        <path d="M 58 18 C 63 34 69 50 75 66 Q 78 77 66 77 L 32 77 C 25 77 20 72 20 64" />
       </g>
     </svg>
   `,
   styles: [':host { display: inline-flex; line-height: 0; }'],
 })
-export class DaftrIconComponent {
+export class DaftrMarkComponent {
   /** Side of the square, in pixels. */
   readonly size = input(28);
 }
