@@ -18,6 +18,7 @@ pub fn raw_from_json(value: &Value) -> RawSettings {
     RawSettings {
         language: text("language"),
         global_shortcut: text("globalShortcut"),
+        global_shortcut_physical_key: text("globalShortcutPhysicalKey"),
         shortcut_mode: text("shortcutMode"),
         overlay_width: number("overlayWidth"),
         overlay_height: number("overlayHeight"),
@@ -80,6 +81,7 @@ pub fn settings_to_json(settings: &AppSettings) -> Value {
     json!({
         "language": settings.language.as_str(),
         "globalShortcut": settings.global_shortcut,
+        "globalShortcutPhysicalKey": settings.global_shortcut_physical_key,
         "shortcutMode": settings.shortcut_mode.as_str(),
         "overlayWidth": settings.overlay_width,
         "overlayHeight": settings.overlay_height,
@@ -123,6 +125,7 @@ mod tests {
         let settings = AppSettings {
             app_shortcuts: vec![("tab.close".to_owned(), "Ctrl+W".to_owned())],
             overlay_position: Some(domain::overlay::Position { x: -10, y: 20 }),
+            global_shortcut_physical_key: Some("Digit1".to_owned()),
             word_wrap: false,
             ..AppSettings::default()
         };

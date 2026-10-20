@@ -78,7 +78,8 @@ fn start_background(app: &AppHandle) {
 
     overlay::prepare_in_background(app);
     startup::apply(app, settings.launch_at_startup);
-    if !shortcut::register(app, &settings.global_shortcut) {
+    let physical_key = settings.global_shortcut_physical_key.as_deref();
+    if !shortcut::register(app, &settings.global_shortcut, physical_key) {
         tracing::error!(shortcut = %settings.global_shortcut, "raccourci global indisponible");
     }
     updater::start(app);

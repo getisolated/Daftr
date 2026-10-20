@@ -27,6 +27,8 @@ pub struct RawSettings {
     pub language: Option<String>,
     /// Voir [`AppSettings::global_shortcut`].
     pub global_shortcut: Option<String>,
+    /// Voir [`AppSettings::global_shortcut_physical_key`].
+    pub global_shortcut_physical_key: Option<String>,
     /// Voir [`AppSettings::shortcut_mode`].
     pub shortcut_mode: Option<String>,
     /// Voir [`AppSettings::overlay_width`].
@@ -83,6 +85,7 @@ impl RawSettings {
         Self {
             language: Some(settings.language.as_str().to_owned()),
             global_shortcut: Some(settings.global_shortcut.clone()),
+            global_shortcut_physical_key: settings.global_shortcut_physical_key.clone(),
             shortcut_mode: Some(settings.shortcut_mode.as_str().to_owned()),
             overlay_width: Some(f64::from(settings.overlay_width)),
             overlay_height: Some(f64::from(settings.overlay_height)),
@@ -117,10 +120,21 @@ impl RawSettings {
     }
 
     /// `self` dont chaque champ présent dans `patch` est remplacé (fusion `{...self, ...patch}`).
+    /// Exception : un patch qui change le raccourci global sans donner sa touche physique
+    /// l'efface (l'ancienne ne correspond plus au nouveau raccourci).
     pub fn overridden_by(self, patch: Self) -> Self {
+        let physical_key = if patch.global_shortcut.is_some() {
+            patch.global_shortcut_physical_key
+        } else {
+            patch
+                .global_shortcut_physical_key
+                .or(self.global_shortcut_physical_key)
+        };
+
         Self {
             language: patch.language.or(self.language),
             global_shortcut: patch.global_shortcut.or(self.global_shortcut),
+            global_shortcut_physical_key: physical_key,
             shortcut_mode: patch.shortcut_mode.or(self.shortcut_mode),
             overlay_width: patch.overlay_width.or(self.overlay_width),
             overlay_height: patch.overlay_height.or(self.overlay_height),

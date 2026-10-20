@@ -14,6 +14,11 @@ language: 'en' | 'fr',
  */
 globalShortcut: string, 
 /**
+ * Touche physique de la touche finale du raccourci global (`KeyA`…`KeyZ`,
+ * `Digit0`…`Digit9`), `null` si inconnue.
+ */
+globalShortcutPhysicalKey: string | null, 
+/**
  * Ce qu'ouvre le raccourci global.
  */
 shortcutMode: 'overlay' | 'app', 

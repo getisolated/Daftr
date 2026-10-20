@@ -12,9 +12,10 @@ pub struct SettingsChange {
 }
 
 impl SettingsChange {
-    /// Le raccourci global a changé.
+    /// Le raccourci global a changé, ou seulement sa touche physique (même libellé, autre
+    /// touche : sur macOS il faut le réenregistrer).
     pub fn shortcut_changed(&self) -> bool {
-        self.before.global_shortcut != self.after.global_shortcut
+        !self.before.same_global_shortcut(&self.after)
     }
 
     /// La taille de l'overlay a changé.

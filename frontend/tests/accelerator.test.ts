@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { acceleratorToCodeMirrorKey, formatAccelerator, isModifierKey, isReservedAccelerator, keyEventToAccelerator } from '../src/app/core/utils/accelerator.util';
+import { acceleratorToCodeMirrorKey, formatAccelerator, isModifierKey, isReservedAccelerator, keyEventToAccelerator, physicalKeyOf } from '../src/app/core/utils/accelerator.util';
 
-const ev = (code: string, mods: Partial<{ key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }> = {}) =>
+const ev = (code: string, mods: Partial<{ key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean; keyCode: number }> = {}) =>
   ({ key: '', code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
 
 describe('keyEventToAccelerator', () => {
@@ -15,6 +15,25 @@ describe('keyEventToAccelerator', () => {
 
   it('falls back to the physical key when the layout key is not a letter (AltGr symbol)', () => {
     expect(keyEventToAccelerator(ev('KeyE', { key: '€', ctrlKey: true, altKey: true }))).toBe('CommandOrControl+Alt+E');
+  });
+
+  it('names the layout letter from keyCode when Option produces a symbol (macOS AZERTY)', () => {
+    // ⌥⌘ + the key marked "Q" on AZERTY (physical KeyA) types '‡', keyCode 81 = Q
+    expect(keyEventToAccelerator(ev('KeyA', { key: '‡', keyCode: 81, metaKey: true, altKey: true }), { platform: 'mac' })).toBe('CommandOrControl+Alt+Q');
+    // ⌥⌘ + the key marked "A" on AZERTY (physical KeyQ) types 'æ', keyCode 65 = A
+    expect(keyEventToAccelerator(ev('KeyQ', { key: 'æ', keyCode: 65, metaKey: true, altKey: true }), { platform: 'mac' })).toBe('CommandOrControl+Alt+A');
+    // Option dead keys (⌥E, ⌥N…) report 'Dead'
+    expect(keyEventToAccelerator(ev('KeyE', { key: 'Dead', keyCode: 69, altKey: true }), { platform: 'mac' })).toBe('Alt+E');
+  });
+
+  it('names the layout letter from keyCode on QWERTY too', () => {
+    expect(keyEventToAccelerator(ev('KeyQ', { key: 'œ', keyCode: 81, metaKey: true, altKey: true }), { platform: 'mac' })).toBe('CommandOrControl+Alt+Q');
+    expect(keyEventToAccelerator(ev('KeyE', { key: '€', keyCode: 69, ctrlKey: true, altKey: true }))).toBe('CommandOrControl+Alt+E');
+  });
+
+  it('ignores a keyCode that is not a letter', () => {
+    expect(keyEventToAccelerator(ev('Digit2', { key: '~', keyCode: 50, ctrlKey: true, altKey: true }))).toBe('CommandOrControl+Alt+2');
+    expect(keyEventToAccelerator(ev('F5', { key: 'F5', keyCode: 116, ctrlKey: true }))).toBe('CommandOrControl+F5');
   });
 
   it('follows the layout for punctuation (AZERTY: the "," key is the physical M key)', () => {
@@ -48,6 +67,17 @@ describe('keyEventToAccelerator', () => {
   it('still returns null for an unsupported key, even bare keys allowed', () => {
     expect(keyEventToAccelerator(ev('Escape', { key: 'Escape' }), { allowBareKey: true })).toBeNull();
     expect(keyEventToAccelerator(ev('ShiftLeft', { key: 'Shift', shiftKey: true }), { allowBareKey: true })).toBeNull();
+  });
+});
+
+describe('physicalKeyOf', () => {
+  it('keeps the code of a letter or digit key', () => {
+    expect(physicalKeyOf({ code: 'KeyA' })).toBe('KeyA');
+    expect(physicalKeyOf({ code: 'Digit0' })).toBe('Digit0');
+  });
+
+  it('returns null for any other key', () => {
+    ['F5', 'Space', 'Semicolon', 'Numpad1', 'ArrowUp', ''].forEach(code => expect(physicalKeyOf({ code })).toBeNull());
   });
 });
 

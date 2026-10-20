@@ -7,6 +7,8 @@ interface KeyEventLike {
   metaKey: boolean;
   altKey: boolean;
   shiftKey: boolean;
+  /** Legacy key code; for letters, browsers derive it from the unmodified character of the key in the current layout. */
+  keyCode?: number;
 }
 
 const NAMED_KEYS: Record<string, string> = {
@@ -23,15 +25,20 @@ const PUNCTUATION_KEYS = new Set(['-', '=', ',', '.', '/', '\\', ';', "'", '[', 
  * Electron accelerator key name, or null for modifiers/unsupported keys.
  * Letters follow the keyboard layout (`key`), because Electron resolves an accelerator letter through the
  * active layout: on AZERTY the physical "Q" key (`code` KeyA) must be recorded as Q, not A. `key` is not a
- * plain letter when AltGr produces a symbol; the physical key is the best remaining guess then.
+ * plain letter when Option (macOS) or AltGr (Windows) produces a symbol: `keyCode` still names the letter of
+ * the key in the current layout (WebKit and Chromium derive it from the unmodified character); the physical
+ * key is the last resort.
  */
-function keyName(key: string, code: string): string | null {
+function keyName(key: string, code: string, keyCode?: number): string | null {
   if (/^[a-zA-Z]$/.test(key)) {
     return key.toUpperCase();
   }
   // Punctuation also follows the layout: on AZERTY the "," key is the physical M key (code KeyM)
   if (PUNCTUATION_KEYS.has(key)) {
     return key;
+  }
+  if (keyCode !== undefined && keyCode >= 65 && keyCode <= 90) {
+    return String.fromCharCode(keyCode);
   }
   const letter = /^Key(?<letter>[A-Z])$/.exec(code)?.groups?.['letter'];
   if (letter) {
@@ -71,7 +78,7 @@ export interface AcceleratorOptions {
  * shortcut (a bare key without modifier would hijack normal typing system-wide; F-keys are the exception).
  */
 export function keyEventToAccelerator(event: KeyEventLike, options: AcceleratorOptions = {}): string | null {
-  const key = keyName(event.key, event.code);
+  const key = keyName(event.key, event.code, event.keyCode);
   if (!key) {
     return null;
   }
@@ -104,6 +111,14 @@ export function keyEventToAccelerator(event: KeyEventLike, options: AcceleratorO
     return null;
   }
   return [...parts, key].join('+');
+}
+
+/**
+ * Physical key (`KeyboardEvent.code`) of a letter or digit key, null for any other key. Stored with the global
+ * shortcut: macOS registers global shortcuts by physical key, and the recorded letter follows the layout.
+ */
+export function physicalKeyOf(event: Pick<KeyEventLike, 'code'>): string | null {
+  return /^Key[A-Z]$|^Digit[0-9]$/.test(event.code) ? event.code : null;
 }
 
 /** Modifier symbols of macOS, in the order Apple displays them (⌃ ⌥ ⇧ ⌘). */

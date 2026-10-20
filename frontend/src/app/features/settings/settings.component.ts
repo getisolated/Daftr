@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, SettingsPatch } from '../../core/models/settings.mode
 import { appVersion } from '../../core/services/desktop-api';
 import { Translator } from '../../core/i18n/translate';
 import { PlatformService } from '../../core/services/platform.service';
-import { formatAccelerator, isReservedAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
+import { formatAccelerator, isReservedAccelerator, keyEventToAccelerator, physicalKeyOf } from '../../core/utils/accelerator.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
 import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
@@ -111,7 +111,7 @@ import {
                             class="control shortcut"
                             data-shortcut-recorder
                             [class.recording]="recording() === def.key"
-                            (click)="startRecording(def)"
+                            (click)="startRecording(def, $event)"
                             (keydown)="onShortcutKeydown(def, $event)"
                             (blur)="recording.set(null)"
                           >{{ recording() === def.key ? i18n.t('settings.modal.recording') : shortcutLabel(def) }}</button>
@@ -266,9 +266,12 @@ export class SettingsComponent {
     await this.save(def, value);
   }
 
-  startRecording(def: SettingDefinition): void {
+  startRecording(def: SettingDefinition, event: Event): void {
     this.shortcutError.set(null);
     this.recording.set(def.key);
+    // WebKit (macOS) does not focus a clicked button: without focus, keydown never reaches the recorder
+    // and Escape closes the settings. Focusing after the mousedown cannot trigger the (blur) that cancels.
+    if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus();
   }
 
   async onShortcutKeydown(def: SettingDefinition, event: KeyboardEvent): Promise<void> {
@@ -303,7 +306,8 @@ export class SettingsComponent {
       return;
     }
 
-    const result = await this.settingsService.update({ globalShortcut: accelerator });
+    // The physical key lets macOS register the key that carries this letter in the current layout
+    const result = await this.settingsService.update({ globalShortcut: accelerator, globalShortcutPhysicalKey: physicalKeyOf(event) });
     if (result && !result.ok) {
       this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut }) });
     }

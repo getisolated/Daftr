@@ -102,3 +102,16 @@ fn reports_what_changed() {
     assert!(change.shortcut_changed() && change.overlay_size_changed());
     assert!(!change.language_changed() && !change.collections_exclude_changed());
 }
+
+#[test]
+fn a_new_physical_key_is_a_shortcut_change() {
+    let (_, service) = service(None);
+    let next = AppSettings {
+        global_shortcut_physical_key: Some("KeyA".into()),
+        ..AppSettings::default()
+    };
+
+    let change = service.commit(next);
+
+    assert!(change.shortcut_changed());
+}

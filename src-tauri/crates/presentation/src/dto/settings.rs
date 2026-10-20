@@ -26,6 +26,9 @@ pub struct SettingsDto {
     pub language: &'static str,
     /// Raccourci global.
     pub global_shortcut: String,
+    /// Touche physique de la touche finale du raccourci global (`KeyA`…`KeyZ`,
+    /// `Digit0`…`Digit9`), `null` si inconnue.
+    pub global_shortcut_physical_key: Option<String>,
     /// Ce qu'ouvre le raccourci global.
     #[ts(type = "'overlay' | 'app'")]
     pub shortcut_mode: &'static str,
@@ -86,6 +89,7 @@ impl From<&AppSettings> for SettingsDto {
         Self {
             language: settings.language.as_str(),
             global_shortcut: settings.global_shortcut.clone(),
+            global_shortcut_physical_key: settings.global_shortcut_physical_key.clone(),
             shortcut_mode: settings.shortcut_mode.as_str(),
             overlay_width: settings.overlay_width,
             overlay_height: settings.overlay_height,

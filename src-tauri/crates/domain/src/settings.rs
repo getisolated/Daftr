@@ -33,6 +33,11 @@ pub struct AppSettings {
     pub language: Language,
     /// Raccourci global (format accélérateur, ex. `CommandOrControl+Alt+Q`).
     pub global_shortcut: String,
+    /// Touche physique de la touche finale du raccourci global (`KeyboardEvent.code` :
+    /// `KeyA`…`KeyZ`, `Digit0`…`Digit9`), `None` si inconnue. Sur macOS le raccourci global
+    /// s'enregistre par code de touche physique : la lettre de `global_shortcut` suit la
+    /// disposition (sur AZERTY la touche « Q » est la touche physique `KeyA`).
+    pub global_shortcut_physical_key: Option<String>,
     /// Ce qu'ouvre le raccourci global.
     pub shortcut_mode: ShortcutMode,
     /// Largeur de l'overlay.
@@ -89,6 +94,12 @@ impl AppSettings {
             height: self.overlay_height,
         }
     }
+
+    /// Même raccourci global : même accélérateur et même touche physique.
+    pub fn same_global_shortcut(&self, other: &Self) -> bool {
+        self.global_shortcut == other.global_shortcut
+            && self.global_shortcut_physical_key == other.global_shortcut_physical_key
+    }
 }
 
 impl Default for AppSettings {
@@ -96,6 +107,7 @@ impl Default for AppSettings {
         Self {
             language: DEFAULT_LANGUAGE,
             global_shortcut: "CommandOrControl+Alt+Q".to_owned(),
+            global_shortcut_physical_key: None,
             shortcut_mode: ShortcutMode::Overlay,
             overlay_width: 250,
             overlay_height: 350,
