@@ -1,5 +1,5 @@
 //! Point d'entrée de l'application de bureau : assemble les adaptateurs, les fenêtres, le
-//! tray et les commandes IPC.
+//! tray (et le menu d'application sur macOS) et les commandes IPC.
 
 // Pas de console derrière la fenêtre en release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -9,6 +9,8 @@ mod data_dir;
 mod events;
 mod file_protocol;
 mod lifecycle;
+#[cfg(target_os = "macos")]
+mod menu;
 mod open_args;
 mod settings_effects;
 mod setup;

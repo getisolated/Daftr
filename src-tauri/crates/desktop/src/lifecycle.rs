@@ -4,8 +4,10 @@ use tauri::{AppHandle, RunEvent};
 
 use crate::state::desktop;
 use crate::updater;
+#[cfg(target_os = "macos")]
+use crate::{open_args, windows::main_window};
 
-/// Quitte pour de bon (menu du tray).
+/// Quitte pour de bon (menu du tray, menu d'application de macOS).
 pub fn quit(app: &AppHandle) {
     desktop(app).set_quitting();
     app.exit(0);
@@ -20,6 +22,12 @@ pub fn on_run_event(app: &AppHandle, event: RunEvent) {
             api, code: None, ..
         } => api.prevent_exit(),
         RunEvent::Exit => updater::install_on_exit(app),
+        // Clic sur l'icône du Dock : la fenêtre cachée revient
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen { .. } => main_window::show(app),
+        // Fichiers ouverts depuis le Finder (double-clic, « Ouvrir avec », glisser sur le Dock)
+        #[cfg(target_os = "macos")]
+        RunEvent::Opened { urls } => open_args::open_from_urls(app, &urls),
         _ => {}
     }
 }

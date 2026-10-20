@@ -18,6 +18,8 @@ pub fn apply(app: &AppHandle, change: &SettingsChange) {
     }
     if change.language_changed() {
         tray::set_language(app, change.after.language);
+        #[cfg(target_os = "macos")]
+        crate::menu::set_language(app, change.after.language);
     }
     if change.auto_update_changed() {
         updater::on_auto_update_changed(app);

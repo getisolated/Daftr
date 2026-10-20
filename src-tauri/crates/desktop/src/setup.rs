@@ -67,6 +67,8 @@ fn start_windows(app: &AppHandle) -> anyhow::Result<()> {
 
     main_window::create(app, !startup::launched_hidden()).context("fenêtre principale")?;
     tray::create(app, settings.language).context("icône du tray")?;
+    #[cfg(target_os = "macos")]
+    crate::menu::install(app, settings.language).context("menu d'application")?;
     Ok(())
 }
 
