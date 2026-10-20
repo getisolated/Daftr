@@ -1,0 +1,219 @@
+name: Release
+
+# Publie une release à chaque poussée sur `main` (fusion d'une pull request).
+#
+# La version est déduite des commits (Conventional Commits) depuis la dernière version
+# publiée, c'est-à-dire le dernier tag `vX.Y.Z` :
+#   - `BREAKING CHANGE` ou `type!:`  -> majeure
+#   - `feat:`                        -> mineure
+#   - tout le reste                  -> correctif
+# Sans tag existant, la version déclarée dans `package.json` est publiée telle quelle.
+#
+# Une PR fusionnée par « squash » donne un seul commit dont le titre est celui de la PR :
+# c'est lui qui décide du niveau d'incrément. Une fusion classique garde les commits de la
+# PR, et le plus fort d'entre eux l'emporte.
+#
+# La version n'est jamais réécrite dans le dépôt : elle est injectée dans `package.json`
+# (lu par `tauri.conf.json`) le temps du build, et portée par le tag.
+# Un commit dont le message contient `[skip release]` ne publie rien.
+#
+# L'application interroge `releases/latest/download/latest.json` pour proposer les mises
+# à jour : ce manifeste est publié à côté de l'installeur.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Deux poussées rapprochées ne doivent pas calculer la même version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.version.outputs.skip }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout with tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git log -1 --format=%B | grep -qF '[skip release]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Seuls les tags strictement `vX.Y.Z` sont des versions publiées
+          last=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+
+          if [ -z "$last" ]; then
+            next=$(node -p "require('./package.json').version.replace(/[+-].*$/, '')")
+          else
+            if [ "$(git rev-list --count "$last..HEAD")" = "0" ]; then
+              echo "No commit since $last."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            IFS=. read -r major minor patch <<< "${last#v}"
+            log=$(git log --format='%s%n%b' "$last..HEAD")
+
+            if grep -qE '^[a-z]+(\([^)]*\))?!:|^BREAKING[ -]CHANGE' <<< "$log"; then
+              major=$((major + 1)); minor=0; patch=0
+            elif grep -qE '^feat(\([^)]*\))?:' <<< "$log"; then
+              minor=$((minor + 1)); patch=0
+            else
+              patch=$((patch + 1))
+            fi
+
+            next="$major.$minor.$patch"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$next" > /dev/null; then
+            echo "::error::Tag v$next already exists."
+            exit 1
+          fi
+
+          echo "Publishing $next (previous: ${last:-none})"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+  check:
+    name: Checks
+    needs: version
+    if: needs.version.outputs.skip == 'false'
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build (Windows)
+    needs: [version, check]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Tauri lit la version dans `package.json` : on l'aligne avant tout build.
+      # Le fichier n'est pas commité.
+      - name: Stamp version
+        shell: bash
+        env:
+          APP_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.env.APP_VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          node -p "'Stamped version: ' + require('./package.json').version"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate self-signed certificate
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject "CN=Everything Note, O=EvNote" `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -NotAfter (Get-Date).AddYears(3)
+          echo "SIGN_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+
+      # Signature Authenticode des binaires et de l'installeur (certificat du runner), et
+      # signature minisign de l'installeur pour l'updater (clé privée dans les secrets)
+      - name: Build & package
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $config = @{ bundle = @{ windows = @{ certificateThumbprint = $env:SIGN_THUMBPRINT; digestAlgorithm = 'sha256' } } }
+          $config | ConvertTo-Json -Depth 5 -Compress | Set-Content -Encoding utf8 sign.json
+          npx tauri build --config sign.json
+
+      # Une release sans installeur ni signature de mise à jour doit échouer plutôt que
+      # paraître complète.
+      - name: Check artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls src-tauri/target/release/bundle/nsis/*-setup.exe > /dev/null || { echo "::error::Installer missing."; exit 1; }
+          ls src-tauri/target/release/bundle/nsis/*-setup.exe.sig > /dev/null || { echo "::error::Update signature missing."; exit 1; }
+
+      # Le manifeste est produit ici, où l'installeur, son empreinte et sa signature sont connus
+      - name: Generate update manifest
+        shell: bash
+        run: |
+          node scripts/update-manifest.mjs src-tauri/target/release/bundle/nsis \
+            "${{ needs.version.outputs.tag }}" "${{ github.repository }}" \
+            src-tauri/target/release/bundle/nsis/latest.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/latest.json
+
+  release:
+    name: Publish release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -R artifacts
+
+      # `gh` est préinstallé sur les runners : pas d'action tierce à maintenir.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release create "$TAG" artifacts/* \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --generate-notes \
+            --latest

@@ -141,6 +141,16 @@ npm run test:rust
 npm run build
 ```
 
+### Releases
+
+Every merge on `main` publishes a release, with no manual step (`.github/workflows/release.yml`):
+
+1. The version comes from the commits since the last `vX.Y.Z` tag ([Conventional Commits](https://www.conventionalcommits.org/)): `type!:` or `BREAKING CHANGE` bumps the major, `feat:` the minor, anything else the patch. A PR merged by *squash* counts as one commit whose title is the PR title, so **the title of the PR decides the bump** (`feat(scope): …`, `fix: …`).
+2. The checks of `ci.yml` (Angular tests, `cargo fmt`, `clippy`, Rust tests) must pass first; the same workflow also runs on every pull request.
+3. The version is stamped into `package.json` for the build only (it is never committed: the tag carries it), then the installer, its update signature and `latest.json` are published with the tag.
+
+A commit message containing `[skip release]` publishes nothing, and so does a push with no commit since the last tag. Required secrets: `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (empty if the key has none). The `version` in `package.json` is only used until a first tag exists: local builds keep it.
+
 ## License
 
 MIT
