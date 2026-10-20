@@ -6,7 +6,7 @@ name: CI
 # ne part jamais d'un état que la PR n'aurait pas validé.
 on:
   pull_request:
-    branches: [main, NF/dev]
+    branches: [main,dev,recipe]
   workflow_call:
 
 permissions:
