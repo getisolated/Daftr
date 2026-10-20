@@ -302,7 +302,7 @@
       background: transparent;
       border-radius: 0;
       // Inset shadow rather than a border: the tab keeps its height, ::before / ::after stay for the drop marks
-      box-shadow: inset 0 -2px 0 $underline;
+      box-shadow: inset 0 -1px 0 $underline;
     }
   }
 }
