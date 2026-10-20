@@ -7,7 +7,8 @@ use std::path::Path;
 use app::ports::{CollectionFiles, EntryKind};
 use app::{AppError, AppResult, Refusal};
 
-/// Accès direct au système de fichiers ; la corbeille est celle de Windows.
+/// Accès direct au système de fichiers ; la corbeille est celle de l'OS (Corbeille de Windows
+/// ou de macOS).
 #[derive(Debug, Default)]
 pub struct DiskFiles;
 
@@ -48,8 +49,28 @@ impl CollectionFiles for DiskFiles {
     }
 
     fn trash(&self, path: &Path) -> AppResult<()> {
-        trash::delete(path).map_err(AppError::file_system)
+        move_to_trash(path).map_err(AppError::file_system)
     }
+}
+
+/// Corbeille de Windows (et de Linux) : appel par défaut du crate `trash`.
+#[cfg(not(target_os = "macos"))]
+fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
+    trash::delete(path)
+}
+
+/// Corbeille de macOS par `NSFileManager.trashItemAtURL` : la méthode par défaut pilote le
+/// Finder par AppleScript, qui demande l'autorisation « contrôler le Finder » et joue un son.
+/// En contrepartie, « Remettre » n'est pas proposé (le fichier se sort de la Corbeille à la
+/// main).
+#[cfg(target_os = "macos")]
+fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
+    use trash::TrashContext;
+    use trash::macos::{DeleteMethod, TrashContextExtMacos};
+
+    let mut context = TrashContext::new();
+    context.set_delete_method(DeleteMethod::NsFileManager);
+    context.delete(path)
 }
 
 #[cfg(test)]

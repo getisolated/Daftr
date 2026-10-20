@@ -1,104 +1,32 @@
-//! Le matériau acrylique de Windows (flou de ce qui est derrière la fenêtre) est-il rendu ?
+//! L'effet de flou de l'overlay (ce qui est derrière la fenêtre) est-il rendu ?
 //!
-//! Windows le remplace par un gris uni sous l'économiseur de batterie ou quand les effets de
-//! transparence sont désactivés ; aucune API de Tauri ne l'expose, d'où une sonde PowerShell
-//! (`GetSystemPowerStatus` et la clé `Personalize`), sans code `unsafe`.
+//! - Windows : le matériau acrylique est remplacé par un gris uni sous l'économiseur de batterie
+//!   ou quand les effets de transparence sont désactivés ; aucune API de Tauri ne l'expose, d'où
+//!   une sonde PowerShell (`GetSystemPowerStatus` et la clé `Personalize`), sans code `unsafe`.
+//! - macOS : la vibrancy (`NSVisualEffectView`) existe depuis 10.14 et l'application demande
+//!   macOS 13 : l'effet est toujours disponible, aucun processus n'est lancé.
+//! - Ailleurs : pas d'effet, l'overlay garde son panneau translucide.
 
-use std::process::{Command, Stdio};
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+#[cfg(windows)]
+pub use probe::{is_active, refresh_in_background};
 
-use platform::sync::lock;
+/// L'effet est-il rendu ? Toujours sur macOS, jamais hors Windows et macOS.
+#[cfg(not(windows))]
+pub const fn is_active() -> bool {
+    cfg!(target_os = "macos")
+}
+
+/// Rien à sonder hors Windows : la disponibilité de l'effet ne change pas.
+#[cfg(not(windows))]
+pub const fn refresh_in_background() {}
 
 /// L'acrylique de fenêtre demande Windows 11 22H2.
+#[cfg(any(windows, test))]
 const ACRYLIC_MIN_WINDOWS_BUILD: u32 = 22621;
-const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
-const POLL_INTERVAL: Duration = Duration::from_millis(50);
-
-const PROBE_SCRIPT: &str = concat!(
-    "Add-Type 'using System.Runtime.InteropServices; public class PowerProbe { ",
-    "[StructLayout(LayoutKind.Sequential)] public struct Status { public byte Line; ",
-    "public byte Flag; public byte Life; public byte Saver; public int A; public int B; } ",
-    "[DllImport(\"kernel32.dll\")] ",
-    "public static extern bool GetSystemPowerStatus(out Status s); }';",
-    "$status = New-Object PowerProbe+Status;",
-    "[void][PowerProbe]::GetSystemPowerStatus([ref]$status);",
-    "$key = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize';",
-    "$transparency = (Get-ItemProperty $key -ErrorAction SilentlyContinue).EnableTransparency;",
-    "\"$($status.Saver),$transparency,$([Environment]::OSVersion.Version.Build)\"",
-);
-
-/// Dernier état connu (`None` : jamais sondé).
-static ACTIVE: Mutex<Option<bool>> = Mutex::new(None);
-
-/// L'acrylique est-il rendu ? Le premier appel paie la sonde (jusqu'à 5 s), les suivants
-/// sont immédiats.
-pub fn is_active() -> bool {
-    if let Some(active) = *lock(&ACTIVE) {
-        return active;
-    }
-    let active = probe();
-    *lock(&ACTIVE) = Some(active);
-    active
-}
-
-/// Sonde à nouveau en arrière-plan : le prochain appel voit un changement d'économiseur de
-/// batterie ou de transparence.
-pub fn refresh_in_background() {
-    let spawned = std::thread::Builder::new()
-        .name("acrylic-probe".into())
-        .spawn(|| {
-            let active = probe();
-            *lock(&ACTIVE) = Some(active);
-        });
-    if let Err(error) = spawned {
-        tracing::warn!(%error, "sonde de l'acrylique non lancée");
-    }
-}
-
-fn probe() -> bool {
-    match run_probe() {
-        Some(output) => parse_probe(&output),
-        // État inconnu : on suppose l'effet rendu, le comportement normal d'un Windows 11
-        None => true,
-    }
-}
-
-fn run_probe() -> Option<String> {
-    let mut child = probe_command()
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let started = Instant::now();
-
-    while child.try_wait().ok()?.is_none() {
-        if started.elapsed() > PROBE_TIMEOUT {
-            // Sonde bloquée : elle est abandonnée, son échec éventuel n'importe plus
-            let _ = child.kill();
-            return None;
-        }
-        std::thread::sleep(POLL_INTERVAL);
-    }
-    let output = child.wait_with_output().ok()?;
-    String::from_utf8(output.stdout).ok()
-}
-
-fn probe_command() -> Command {
-    let mut command = Command::new("powershell.exe");
-    command.args(["-NoProfile", "-NonInteractive", "-Command", PROBE_SCRIPT]);
-
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    command
-}
 
 /// `économiseur,transparence,build` → acrylique rendu : Windows 11 22H2+, économiseur coupé
 /// (`1` = actif) et transparence non désactivée (`0`).
+#[cfg(any(windows, test))]
 fn parse_probe(output: &str) -> bool {
     let fields: Vec<&str> = output.trim().split(',').collect();
     let [saver, transparency, build] = fields.as_slice() else {
@@ -110,6 +38,100 @@ fn parse_probe(output: &str) -> bool {
         .is_ok_and(|b| b >= ACRYLIC_MIN_WINDOWS_BUILD);
 
     recent_windows && *saver != "1" && *transparency != "0"
+}
+
+/// Sonde PowerShell de Windows.
+#[cfg(windows)]
+mod probe {
+    use std::os::windows::process::CommandExt;
+    use std::process::{Command, Stdio};
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+
+    use platform::sync::lock;
+
+    use super::parse_probe;
+
+    const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+    const POLL_INTERVAL: Duration = Duration::from_millis(50);
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    const PROBE_SCRIPT: &str = concat!(
+        "Add-Type 'using System.Runtime.InteropServices; public class PowerProbe { ",
+        "[StructLayout(LayoutKind.Sequential)] public struct Status { public byte Line; ",
+        "public byte Flag; public byte Life; public byte Saver; public int A; public int B; } ",
+        "[DllImport(\"kernel32.dll\")] ",
+        "public static extern bool GetSystemPowerStatus(out Status s); }';",
+        "$status = New-Object PowerProbe+Status;",
+        "[void][PowerProbe]::GetSystemPowerStatus([ref]$status);",
+        "$key = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize';",
+        "$transparency = (Get-ItemProperty $key -ErrorAction SilentlyContinue).EnableTransparency;",
+        "\"$($status.Saver),$transparency,$([Environment]::OSVersion.Version.Build)\"",
+    );
+
+    /// Dernier état connu (`None` : jamais sondé).
+    static ACTIVE: Mutex<Option<bool>> = Mutex::new(None);
+
+    /// L'acrylique est-il rendu ? Le premier appel paie la sonde (jusqu'à 5 s), les suivants
+    /// sont immédiats.
+    pub fn is_active() -> bool {
+        if let Some(active) = *lock(&ACTIVE) {
+            return active;
+        }
+        let active = probe();
+        *lock(&ACTIVE) = Some(active);
+        active
+    }
+
+    /// Sonde à nouveau en arrière-plan : le prochain appel voit un changement d'économiseur de
+    /// batterie ou de transparence.
+    pub fn refresh_in_background() {
+        let spawned = std::thread::Builder::new()
+            .name("acrylic-probe".into())
+            .spawn(|| {
+                let active = probe();
+                *lock(&ACTIVE) = Some(active);
+            });
+        if let Err(error) = spawned {
+            tracing::warn!(%error, "sonde de l'acrylique non lancée");
+        }
+    }
+
+    fn probe() -> bool {
+        match run_probe() {
+            Some(output) => parse_probe(&output),
+            // État inconnu : on suppose l'effet rendu, le comportement normal d'un Windows 11
+            None => true,
+        }
+    }
+
+    fn run_probe() -> Option<String> {
+        let mut child = probe_command()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()?;
+        let started = Instant::now();
+
+        while child.try_wait().ok()?.is_none() {
+            if started.elapsed() > PROBE_TIMEOUT {
+                // Sonde bloquée : elle est abandonnée, son échec éventuel n'importe plus
+                let _ = child.kill();
+                return None;
+            }
+            std::thread::sleep(POLL_INTERVAL);
+        }
+        let output = child.wait_with_output().ok()?;
+        String::from_utf8(output.stdout).ok()
+    }
+
+    fn probe_command() -> Command {
+        let mut command = Command::new("powershell.exe");
+        command
+            .args(["-NoProfile", "-NonInteractive", "-Command", PROBE_SCRIPT])
+            .creation_flags(CREATE_NO_WINDOW);
+        command
+    }
 }
 
 #[cfg(test)]
@@ -128,5 +150,11 @@ mod tests {
     #[test]
     fn an_unreadable_probe_assumes_acrylic() {
         assert!(parse_probe("garbage"));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn the_effect_is_available_on_macos_only_outside_windows() {
+        assert_eq!(is_active(), cfg!(target_os = "macos"));
     }
 }
