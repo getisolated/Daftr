@@ -2,14 +2,14 @@
 
 # Compiled output
 /dist
-/dist-electron
+/frontend/dist
 /tmp
 /out-tsc
 /bazel-out
-/release
 
 # Node
 /node_modules
+/frontend/node_modules
 npm-debug.log
 yarn-error.log
 
@@ -32,6 +32,7 @@ yarn-error.log
 
 # Miscellaneous
 /.angular/cache
+/frontend/.angular/cache
 .sass-cache/
 /connect.lock
 /coverage

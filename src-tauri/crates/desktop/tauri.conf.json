@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Everything Note",
+  "version": "../../../package.json",
+  "identifier": "com.everything.note",
+  "build": {
+    "beforeDevCommand": "npm run start -w frontend",
+    "beforeBuildCommand": "npm run build -w frontend",
+    "devUrl": "http://localhost:4200",
+    "frontendDist": "../../../frontend/dist/browser"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "md"
+        ],
+        "name": "Markdown",
+        "description": "Markdown document",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "sidebarImage": "../../../assets/installer-sidebar.bmp",
+        "headerImage": "../../../assets/installer-header.bmp",
+        "installerHooks": "windows/hooks.nsh"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNGM0VCMDIwNzFCMDJCNjYKUldSbUs3QnhJTEErUCtRMnJSRWZxVVc2eFdUN1hMT3IwUFBtOXZ0UkVnSnp2M2sydS9RYWdmSzAK",
+      "endpoints": [
+        "https://github.com/getisolated/Everything-Note/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
+  "mainBinaryName": "EverythingNote"
+}

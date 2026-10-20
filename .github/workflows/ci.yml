@@ -1,0 +1,63 @@
+name: CI
+
+# Vérifications d'une pull request : tests Angular, format, lint et tests Rust.
+#
+# Le même workflow est appelé par `release.yml` avant toute publication : une release
+# ne part jamais d'un état que la PR n'aurait pas validé.
+on:
+  pull_request:
+    branches: [main,dev,recipe]
+  workflow_call:
+
+permissions:
+  contents: read
+
+# Un nouveau commit sur une PR annule la vérification précédente, devenue obsolète ;
+# un appel depuis la release n'est jamais annulé.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Tests Angular et Rust
+    # Windows : l'app cible Windows (corbeille, sonde de l'acrylique, WebView2)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test (Angular)
+        run: npm test
+
+      - name: Format (Rust)
+        working-directory: src-tauri
+        run: cargo fmt --all --check
+
+      - name: Lint (Rust)
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test (Rust)
+        working-directory: src-tauri
+        run: cargo test --workspace

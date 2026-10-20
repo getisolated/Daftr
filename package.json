@@ -3,111 +3,23 @@
   "version": "0.0.8",
   "description": "Fast, keyboard-driven note-taking app",
   "author": "Yassine Debbih",
-  "main": "dist-electron/main.js",
   "private": true,
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "ng": "ng",
-    "ng:serve": "ng serve",
-    "electron:compile": "tsc -p electron/tsconfig.json",
-    "electron:dev": "npm run electron:compile && wait-on http://localhost:4200 && node scripts/electron-dev.js",
-    "dev": "concurrently \"npm run ng:serve\" \"npm run electron:dev\"",
-    "build": "ng build && npm run electron:compile",
-    "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "dist": "npm run build && electron-builder",
-    "lint": "ng lint",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@angular/common": "^22.2.2",
-    "@angular/compiler": "^22.2.2",
-    "@angular/core": "^22.2.2",
-    "@angular/forms": "^22.2.2",
-    "@angular/platform-browser": "^22.2.2",
-    "@angular/platform-browser-dynamic": "^22.2.2",
-    "@angular/router": "^22.2.2",
-    "@codemirror/commands": "^6.7.1",
-    "@codemirror/lang-markdown": "^6.3.1",
-    "@codemirror/language": "^6.10.6",
-    "@codemirror/language-data": "^6.5.1",
-    "@codemirror/search": "^6.5.8",
-    "@codemirror/state": "^6.4.1",
-    "@codemirror/theme-one-dark": "^6.1.3",
-    "@codemirror/view": "^6.35.3",
-    "@lezer/highlight": "^1.2.1",
-    "@types/d3-force": "^3.0.10",
-    "better-sqlite3": "^13.0.3",
-    "d3-force": "^3.0.0",
-    "dompurify": "3.4.16",
-    "markdown-it": "15.0.2",
-    "markdown-it-footnote": "4.0.0",
-    "mermaid": "12.2.0",
-    "rxjs": "~7.8.0",
-    "tslib": "^2.3.0"
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:frontend": "npm run build -w frontend",
+    "lint": "npm run lint -w frontend",
+    "test": "npm test -w frontend",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "devDependencies": {
-    "@angular/build": "^22.2.2",
-    "@angular/cli": "^22.2.2",
-    "@angular/compiler-cli": "^22.2.2",
-    "@electron/rebuild": "^4.2.1",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/jasmine": "~5.1.0",
-    "@types/markdown-it-footnote": "3.0.4",
-    "angular-eslint": "^22.6.0",
-    "concurrently": "^9.1.2",
-    "cross-env": "^7.0.3",
-    "electron": "^44.7.2",
-    "electron-builder": "^26.15.3",
-    "esbuild": "^0.27.3",
-    "eslint": "^9.39.1",
-    "typescript": "~6.0.3",
-    "typescript-eslint": "^8.71.2",
-    "vitest": "^4.0.18",
-    "wait-on": "^8.0.3"
+    "@tauri-apps/cli": "^2.12.3"
   },
   "overrides": {
     "lodash-es": "4.18.1"
-  },
-  "build": {
-    "appId": "com.everything.note",
-    "productName": "Everything Note",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
-      "assets/logo.ico"
-    ],
-    "fileAssociations": [
-      {
-        "ext": "md",
-        "name": "Markdown",
-        "description": "Markdown document",
-        "role": "Editor"
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/logo.ico",
-      "signtoolOptions": {
-        "signingHashAlgorithms": [
-          "sha256"
-        ]
-      }
-    },
-    "nsis": {
-      "artifactName": "${productName} Setup.${ext}",
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false,
-      "installerIcon": "assets/logo.ico",
-      "uninstallerIcon": "assets/logo.ico",
-      "installerSidebar": "assets/installer-sidebar.bmp",
-      "uninstallerSidebar": "assets/uninstaller-sidebar.bmp",
-      "installerHeader": "assets/installer-header.bmp"
-    }
   }
 }

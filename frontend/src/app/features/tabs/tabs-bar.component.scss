@@ -1,0 +1,312 @@
+:host {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.tabs-bar {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 38px;
+  background: var(--evn-bg-panel);
+  // Same light line as the right edge of the sidebar
+  border-bottom: 1px solid var(--evn-border-subtle);
+  user-select: none;
+  position: relative;
+}
+
+// ── Home button ───────────────────────────────────────────────────────────────
+
+.home-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--evn-text-disabled);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 6px;
+  margin-left: 8px;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: rgba(var(--evn-hover-rgb), 0.07);
+    color: var(--evn-text);
+  }
+
+  &.active {
+    color: var(--evn-text);
+    background: var(--evn-bg);
+    border-radius: 8px;
+  }
+}
+
+// ── Drag region ───────────────────────────────────────────────────────────────
+
+.drag-region {
+  flex-shrink: 0;
+  width: 4px;
+  height: 100%;
+}
+
+// ── Tabs container ────────────────────────────────────────────────────────────
+
+.tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  // Shrinks below its content so that the tabs overflow (and scroll) inside it
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 100%;
+
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+// ── Tab ───────────────────────────────────────────────────────────────────────
+
+.tab {
+  // Solid color under the tab, painted behind the floating close button so that it hides the end of the title
+  --tab-bg: var(--evn-bg-panel);
+
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  // As wide as its name (the close button floats over it), up to a limit: beyond, the title ends with an ellipsis
+  max-width: 250px;
+  height: 24px;
+  background: transparent;
+  color: var(--evn-text-faint);
+  font-size: 12px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s, color 0.15s, transform 0.2s ease, opacity 0.2s ease;
+
+  &:hover {
+    --tab-bg: color-mix(in srgb, var(--evn-bg-panel), rgb(var(--evn-hover-rgb)) 7%);
+
+    color: var(--evn-text-soft);
+    background: rgba(var(--evn-hover-rgb), 0.07);
+  }
+
+  &.active {
+    --tab-bg: var(--evn-bg);
+
+    color: var(--evn-text);
+    background: var(--evn-bg);
+    border-radius: 8px;
+  }
+
+  // ── Pinned tab ──────────────────────────────────────────────────────────
+  &.pinned {
+    min-width: auto;
+    max-width: 150px;
+    padding: 0 10px;
+
+    .tab-title {
+      max-width: 90px;
+    }
+  }
+
+  // ── Drag states ─────────────────────────────────────────────────────────
+  &.dragging {
+    opacity: 0.4;
+  }
+
+  &.drag-over-left {
+    &::before {
+      content: '';
+      position: absolute;
+      left: -2px;
+      top: 4px;
+      bottom: 4px;
+      width: 2px;
+      background: var(--evn-accent);
+      border-radius: 1px;
+      animation: dropIndicator 0.15s ease;
+    }
+  }
+
+  &.drag-over-right {
+    &::after {
+      content: '';
+      position: absolute;
+      right: -2px;
+      top: 4px;
+      bottom: 4px;
+      width: 2px;
+      background: var(--evn-accent);
+      border-radius: 1px;
+      animation: dropIndicator 0.15s ease;
+    }
+  }
+}
+
+@keyframes dropIndicator {
+  from {
+    opacity: 0;
+    transform: scaleY(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.pin-icon {
+  flex-shrink: 0;
+  color: var(--evn-text-dimmed);
+  opacity: 0.7;
+  transform: rotate(-45deg);
+
+  .tab.active & {
+    color: var(--evn-text);
+    opacity: 1;
+  }
+}
+
+.tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dirty-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--evn-text);
+  flex-shrink: 0;
+}
+
+// Floats over the end of the title: the width of a tab only depends on its name
+.tab-close {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: none;
+  background: var(--tab-bg);
+  // Fades the title out on the left of the button instead of cutting it
+  box-shadow: -10px 0 8px var(--tab-bg);
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  // Hidden (and not clickable) until the tab is hovered: a click on the end of the title must not close it
+  visibility: hidden;
+  opacity: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  transition: background 0.1s, opacity 0.1s, visibility 0.1s;
+
+  .tab:hover & {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--tab-bg), rgb(var(--evn-hover-rgb)) 10%);
+    color: var(--evn-text);
+  }
+}
+
+// ── Search icon button ────────────────────────────────────────────────────────
+
+.titlebar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--evn-text-disabled);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 6px;
+  margin-right: 4px;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: rgba(var(--evn-hover-rgb), 0.07);
+    color: var(--evn-text);
+  }
+}
+
+// ── Window controls ───────────────────────────────────────────────────────────
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.wc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--evn-text-dimmed);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+
+  &:hover {
+    background: rgba(var(--evn-hover-rgb), 0.06);
+    color: var(--evn-text);
+  }
+
+  &.close:hover {
+    background: #e81123;
+    color: #fff;
+  }
+}
+
+// ── GitHub themes: flat tabs underlined like GitHub's navigation, instead of pills ──
+
+@mixin github-tabs($underline) {
+  .tabs-container {
+    gap: 0;
+    align-items: stretch;
+  }
+
+  .tab {
+    height: auto;
+    border-radius: 0;
+
+    &.active {
+      --tab-bg: var(--evn-bg-panel);
+
+      background: transparent;
+      border-radius: 0;
+      // Inset shadow rather than a border: the tab keeps its height, ::before / ::after stay for the drop marks
+      box-shadow: inset 0 -1px 0 $underline;
+    }
+  }
+}
+
+// Active underline colors of GitHub (light / dark dimmed)
+:host-context([data-theme='github-light']) { @include github-tabs(#fd8c73); }
+:host-context([data-theme='github-dark-dimmed']) { @include github-tabs(#ec775c); }
