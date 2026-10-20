@@ -4,7 +4,7 @@ import { QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE, Tab } from '../models/note.model
 import { FileDocsService } from './file-docs.service';
 import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
 
-const SESSION_KEY = 'evnote-session';
+const SESSION_KEY = 'daftr-session';
 
 @Injectable({ providedIn: 'root' })
 export class TabsService {

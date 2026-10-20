@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, ou
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Hsv, hexToHsv, hsvToHex, normalizeHex } from '../../core/utils/color.util';
 
-const RECENT_COLORS_KEY = 'evn-recent-colors';
+const RECENT_COLORS_KEY = 'daftr-recent-colors';
 const MAX_RECENT_COLORS = 8;
 const PANEL_WIDTH_PX = 236;
 const PANEL_HEIGHT_PX = 330;

@@ -8,7 +8,7 @@ Renderer Angular conservé ; le main process (`electron/` (supprimé), ~3000 lig
 | Sujet                 | Choix                                                                                                          |
 | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Arborescence          | Angular déplacé dans `frontend/` (`git mv`), Rust dans `src-tauri/`                                            |
-| Données               | Même dossier qu'Electron : `%APPDATA%/everything-note/` (champ `name` du `package.json`) (`evnote.db`, `settings.json`), schéma SQLite inchangé |
+| Données               | `%APPDATA%/daftr/` (champ `name` du `package.json`) : `daftr.db`, `settings.json`, schéma SQLite inchangé. Au premier lancement, `%APPDATA%/everything-note/` (Electron puis Tauri « Everything Note ») est déplacé et `evnote.db` renommé (`data_dir.rs`) |
 | Mise à jour           | `tauri-plugin-updater` (signature minisign, `latest.json` au format Tauri)                                     |
 | Bindings TS           | `ts-rs` (stable, simple) plutôt que `specta` (tauri-specta encore en RC)                                       |
 | `domain`              | std seul ; DTO miroirs (serde + ts-rs) dans `presentation`, conversions `From`                                 |
@@ -95,12 +95,12 @@ Tests : 219 tests Rust (spécification portée depuis les tests TS du main proce
 - **Fond flouté de l'overlay** : la capture `desktopCapturer` disparaît ; sans acrylique, panneau translucide uni.
 - **Sonde acrylique** (économiseur de batterie, transparence) : portée telle quelle via `powershell.exe` (`std::process::Command`), sans `unsafe`.
 - **Dossier manquant** : une collection dont le dossier a disparu émet désormais l'événement `error` (état « déplacé » du renderer) ; Electron rendait un arbre vide.
-- **localStorage** (onglets ouverts, état de la sidebar, vue d'accueil) : l'origine change, il sera vide au premier lancement Tauri. La base SQLite et `settings.json` (`%APPDATA%/everything-note`) sont repris.
+- **localStorage** (onglets ouverts, état de la sidebar, vue d'accueil) : l'origine change, il sera vide au premier lancement Tauri. La base SQLite et `settings.json` (`%APPDATA%/everything-note`, déplacé vers `%APPDATA%/daftr` depuis le renommage en Daftr) sont repris.
 - **Utilisateurs Electron existants** :
   - hook NSIS ([hooks.nsh](../../src-tauri/crates/desktop/windows/hooks.nsh)) : désinstalle en silence la version Electron (clé `34a98de4-…`, UUID v5 de l'appId), données conservées ;
   - `latest.json` hybride ([update-manifest.mjs](../../scripts/update-manifest.mjs)) : champs Tauri (`platforms`) + champs Electron (`path`, `url`, `sha512`) pointant sur le même installeur. Le plugin Tauri tolère les champs inconnus (vérifié dans ses sources).
   - Electron lance l'installeur avec `/S --updated --force-run` : l'option de relance de Tauri est `/R`, l'app ne redémarre donc pas seule après cette unique mise à jour.
-- **Exécutable** : `EverythingNote.exe` (`mainBinaryName`), distinct de l'exécutable Electron que son désinstalleur ferme.
-- **Clé de signature des mises à jour** : générée sans mot de passe dans `%USERPROFILE%/.tauri/everything-note.key` (publique dans `tauri.conf.json`). À stocker dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY` (contenu du fichier) ; `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` vide. La perdre empêche toute mise à jour future.
+- **Exécutable** : `Daftr.exe` (`mainBinaryName`, `EverythingNote.exe` avant le renommage), distinct de l'exécutable Electron que son désinstalleur ferme. L'installeur désinstalle aussi en silence la version Tauri « Everything Note » (`hooks.nsh`), dont la clé de désinstallation NSIS porte l'ancien nom de produit.
+- **Clé de signature des mises à jour** : générée sans mot de passe dans `%USERPROFILE%/.tauri/everything-note.key` (nom historique, la clé n'a pas changé avec le renommage en Daftr) (publique dans `tauri.conf.json`). À stocker dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY` (contenu du fichier) ; `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` vide. La perdre empêche toute mise à jour future.
 - **Version et release** : `tauri.conf.json` lit `package.json`, tamponné par la CI le temps du build (jamais commité). Chaque fusion sur `main` publie une release dont la version est déduite des commits depuis le dernier tag (voir « Releases » du README), sur le modèle de `quark`. Le premier passage donnera `0.1.0` (la branche contient des `feat:`) : c'est ce qui fait proposer la version Tauri aux utilisateurs d'Electron (0.0.11).
 - **Lint du renderer** : 5 erreurs préexistantes sur `main` (`editor.component.ts`, `markdown-decorations.ts`), non corrigées ici.

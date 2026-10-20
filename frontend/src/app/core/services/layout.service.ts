@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 
-const STORAGE_KEY = 'evnote-wide-mode';
-const HOME_VIEW_KEY = 'evnote-home-view';
+const STORAGE_KEY = 'daftr-wide-mode';
+const HOME_VIEW_KEY = 'daftr-home-view';
 
 export type HomeView = 'graph' | 'list';
 

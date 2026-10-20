@@ -19,7 +19,7 @@ pub const MAIN: &str = "main";
 /// lancement au démarrage de Windows reste dans le tray).
 pub fn create(app: &AppHandle, show: bool) -> tauri::Result<WebviewWindow> {
     let window = WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html".into()))
-        .title("Everything Note")
+        .title("Daftr")
         .inner_size(1280.0, 800.0)
         .min_inner_size(600.0, 400.0)
         .decorations(false)

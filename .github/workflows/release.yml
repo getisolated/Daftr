@@ -146,7 +146,7 @@ jobs:
         run: |
           $cert = New-SelfSignedCertificate `
             -Type CodeSigningCert `
-            -Subject "CN=Everything Note, O=EvNote" `
+            -Subject "CN=Daftr, O=Daftr" `
             -CertStoreLocation Cert:\CurrentUser\My `
             -NotAfter (Get-Date).AddYears(3)
           echo "SIGN_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV

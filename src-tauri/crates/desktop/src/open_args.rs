@@ -68,7 +68,7 @@ mod tests {
     }
 
     fn tempfile_dir() -> PathBuf {
-        let directory = std::env::temp_dir().join(format!("evn-open-args-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("daftr-open-args-{}", std::process::id()));
         std::fs::create_dir_all(&directory).expect("dossier temporaire");
         directory
     }

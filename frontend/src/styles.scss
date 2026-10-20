@@ -5,398 +5,405 @@
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
+  // Brand colour of the Daftr logotype (settings): white on dark themes, the brand purple on light ones
+  --daftr-brand: #ffffff;
 
   // Surfaces: neutral greys drawn very slightly towards blue (hue ~220°, a few % of saturation)
-  --evn-bg: #1c1e22;
-  --evn-bg-panel: #232529;
-  --evn-bg-modal: #1d1f23;
-  --evn-bg-menu: #2b2d31;
-  --evn-bg-input: #2f3135;
-  --evn-bg-chip: #2b2d31;
-  --evn-bg-hover: #282c30;
-  --evn-bg-active: #35373e;
-  --evn-bg-selected: #094771;
-  --evn-selection: #264f78;
-  --evn-caret: #aeafad;
+  --daftr-bg: #1c1e22;
+  --daftr-bg-panel: #232529;
+  --daftr-bg-modal: #1d1f23;
+  --daftr-bg-menu: #2b2d31;
+  --daftr-bg-input: #2f3135;
+  --daftr-bg-chip: #2b2d31;
+  --daftr-bg-hover: #282c30;
+  --daftr-bg-active: #35373e;
+  --daftr-bg-selected: #094771;
+  --daftr-selection: #264f78;
+  --daftr-caret: #aeafad;
   // Translucent "ink" layered over a surface (hover backgrounds): white on dark, black on light
-  --evn-hover-rgb: 255, 255, 255;
+  --daftr-hover-rgb: 255, 255, 255;
 
   // Borders & scrollbars
-  --evn-border: #42454b;
-  --evn-border-soft: #3a3c41;
-  --evn-border-subtle: #292b2f;
-  --evn-border-hover: #52555b;
-  --evn-scrollbar: #42454b;
-  --evn-scrollbar-hover: #52555b;
+  --daftr-border: #42454b;
+  --daftr-border-soft: #3a3c41;
+  --daftr-border-subtle: #292b2f;
+  --daftr-border-hover: #52555b;
+  --daftr-scrollbar: #42454b;
+  --daftr-scrollbar-hover: #52555b;
 
   // Text
-  --evn-text: #cccccc;
-  --evn-text-strong: #e7e7e7;
-  --evn-text-bright: #ffffff;
-  --evn-text-soft: #9a9da3;
-  --evn-text-dimmed: #83868c;
-  --evn-text-disabled: #686b71;
-  --evn-text-faint: #53565c;
+  --daftr-text: #cccccc;
+  --daftr-text-strong: #e7e7e7;
+  --daftr-text-bright: #ffffff;
+  --daftr-text-soft: #9a9da3;
+  --daftr-text-dimmed: #83868c;
+  --daftr-text-disabled: #686b71;
+  --daftr-text-faint: #53565c;
 
   // Accent & status
-  --evn-accent: #0078d4;
-  --evn-accent-strong: #0e639c;
-  --evn-accent-strong-rgb: 14, 99, 156;
-  --evn-accent-hover: #1177bb;
-  --evn-accent-text: #75beff;
-  --evn-danger: #f14c4c;
+  --daftr-accent: #0078d4;
+  --daftr-accent-strong: #0e639c;
+  --daftr-accent-strong-rgb: 14, 99, 156;
+  --daftr-accent-hover: #1177bb;
+  --daftr-accent-text: #75beff;
+  --daftr-danger: #f14c4c;
 
   // Editor syntax (VS Code "Default Dark Modern")
-  --evn-syntax-plain: #d4d4d4;
-  --evn-syntax-punctuation: #808080;
-  --evn-syntax-comment: #6a9955;
-  --evn-syntax-keyword: #569cd6;
-  --evn-syntax-control: #c586c0;
-  --evn-syntax-variable: #9cdcfe;
-  --evn-syntax-function: #dcdcaa;
-  --evn-syntax-type: #4ec9b0;
-  --evn-syntax-string: #ce9178;
-  --evn-syntax-escape: #d7ba7d;
-  --evn-syntax-number: #b5cea8;
-  --evn-syntax-constant: #4fc1ff;
-  --evn-syntax-regexp: #d16969;
-  --evn-syntax-invalid: #f44747;
-  --evn-syntax-link: #3794ff;
-  --evn-syntax-strike: #6a6a6a;
+  --daftr-syntax-plain: #d4d4d4;
+  --daftr-syntax-punctuation: #808080;
+  --daftr-syntax-comment: #6a9955;
+  --daftr-syntax-keyword: #569cd6;
+  --daftr-syntax-control: #c586c0;
+  --daftr-syntax-variable: #9cdcfe;
+  --daftr-syntax-function: #dcdcaa;
+  --daftr-syntax-type: #4ec9b0;
+  --daftr-syntax-string: #ce9178;
+  --daftr-syntax-escape: #d7ba7d;
+  --daftr-syntax-number: #b5cea8;
+  --daftr-syntax-constant: #4fc1ff;
+  --daftr-syntax-regexp: #d16969;
+  --daftr-syntax-invalid: #f44747;
+  --daftr-syntax-link: #3794ff;
+  --daftr-syntax-strike: #6a6a6a;
   // Markdown
-  --evn-syntax-heading: #569cd6;
-  --evn-syntax-bold: #569cd6;
-  --evn-syntax-italic: #569cd6;
-  --evn-syntax-quote: #6a9955;
-  --evn-syntax-code: #ce9178;
-  --evn-syntax-mark-hidden: #3e4a57;
-  --evn-syntax-mark-dim: #4a5568;
-  --evn-syntax-timestamp: #6e7681;
+  --daftr-syntax-heading: #569cd6;
+  --daftr-syntax-bold: #569cd6;
+  --daftr-syntax-italic: #569cd6;
+  --daftr-syntax-quote: #6a9955;
+  --daftr-syntax-code: #ce9178;
+  --daftr-syntax-mark-hidden: #3e4a57;
+  --daftr-syntax-mark-dim: #4a5568;
+  --daftr-syntax-timestamp: #6e7681;
 }
 
 // "Default Light Modern"
 :root[data-theme='light'] {
   color-scheme: light;
+  --daftr-brand: #5b3fa3;
 
-  --evn-bg: #ffffff;
-  --evn-bg-panel: #f3f3f3;
-  --evn-bg-modal: #ffffff;
-  --evn-bg-menu: #ffffff;
-  --evn-bg-input: #ffffff;
-  --evn-bg-chip: #ececec;
-  --evn-bg-hover: #e8e8e8;
-  --evn-bg-active: #e4e6f1;
-  --evn-bg-selected: #cce4f7;
-  --evn-selection: #add6ff;
-  --evn-caret: #000000;
-  --evn-hover-rgb: 0, 0, 0;
+  --daftr-bg: #ffffff;
+  --daftr-bg-panel: #f3f3f3;
+  --daftr-bg-modal: #ffffff;
+  --daftr-bg-menu: #ffffff;
+  --daftr-bg-input: #ffffff;
+  --daftr-bg-chip: #ececec;
+  --daftr-bg-hover: #e8e8e8;
+  --daftr-bg-active: #e4e6f1;
+  --daftr-bg-selected: #cce4f7;
+  --daftr-selection: #add6ff;
+  --daftr-caret: #000000;
+  --daftr-hover-rgb: 0, 0, 0;
 
-  --evn-border: #c8c8c8;
-  --evn-border-soft: #d4d4d4;
-  --evn-border-subtle: #e5e5e5;
-  --evn-border-hover: #a0a0a0;
-  --evn-scrollbar: #c4c4c4;
-  --evn-scrollbar-hover: #a0a0a0;
+  --daftr-border: #c8c8c8;
+  --daftr-border-soft: #d4d4d4;
+  --daftr-border-subtle: #e5e5e5;
+  --daftr-border-hover: #a0a0a0;
+  --daftr-scrollbar: #c4c4c4;
+  --daftr-scrollbar-hover: #a0a0a0;
 
-  --evn-text: #3b3b3b;
-  --evn-text-strong: #1f1f1f;
-  --evn-text-bright: #000000;
-  --evn-text-soft: #616161;
-  --evn-text-dimmed: #6e6e6e;
-  --evn-text-disabled: #8a8a8a;
-  --evn-text-faint: #b0b0b0;
+  --daftr-text: #3b3b3b;
+  --daftr-text-strong: #1f1f1f;
+  --daftr-text-bright: #000000;
+  --daftr-text-soft: #616161;
+  --daftr-text-dimmed: #6e6e6e;
+  --daftr-text-disabled: #8a8a8a;
+  --daftr-text-faint: #b0b0b0;
 
-  --evn-accent: #005fb8;
-  --evn-accent-strong: #0066b8;
-  --evn-accent-strong-rgb: 0, 102, 184;
-  --evn-accent-hover: #0258a8;
-  --evn-accent-text: #0451a5;
-  --evn-danger: #c72e2e;
+  --daftr-accent: #005fb8;
+  --daftr-accent-strong: #0066b8;
+  --daftr-accent-strong-rgb: 0, 102, 184;
+  --daftr-accent-hover: #0258a8;
+  --daftr-accent-text: #0451a5;
+  --daftr-danger: #c72e2e;
 
-  --evn-syntax-plain: #3b3b3b;
-  --evn-syntax-punctuation: #6e6e6e;
-  --evn-syntax-comment: #008000;
-  --evn-syntax-keyword: #0000ff;
-  --evn-syntax-control: #af00db;
-  --evn-syntax-variable: #001080;
-  --evn-syntax-function: #795e26;
-  --evn-syntax-type: #267f99;
-  --evn-syntax-string: #a31515;
-  --evn-syntax-escape: #ee0000;
-  --evn-syntax-number: #098658;
-  --evn-syntax-constant: #0070c1;
-  --evn-syntax-regexp: #811f3f;
-  --evn-syntax-invalid: #cd3131;
-  --evn-syntax-link: #006ab1;
-  --evn-syntax-strike: #8a8a8a;
-  --evn-syntax-heading: #0451a5;
-  --evn-syntax-bold: #0451a5;
-  --evn-syntax-italic: #0451a5;
-  --evn-syntax-quote: #008000;
-  --evn-syntax-code: #a31515;
-  --evn-syntax-mark-hidden: #c8d1da;
-  --evn-syntax-mark-dim: #8a94a3;
-  --evn-syntax-timestamp: #6e7681;
+  --daftr-syntax-plain: #3b3b3b;
+  --daftr-syntax-punctuation: #6e6e6e;
+  --daftr-syntax-comment: #008000;
+  --daftr-syntax-keyword: #0000ff;
+  --daftr-syntax-control: #af00db;
+  --daftr-syntax-variable: #001080;
+  --daftr-syntax-function: #795e26;
+  --daftr-syntax-type: #267f99;
+  --daftr-syntax-string: #a31515;
+  --daftr-syntax-escape: #ee0000;
+  --daftr-syntax-number: #098658;
+  --daftr-syntax-constant: #0070c1;
+  --daftr-syntax-regexp: #811f3f;
+  --daftr-syntax-invalid: #cd3131;
+  --daftr-syntax-link: #006ab1;
+  --daftr-syntax-strike: #8a8a8a;
+  --daftr-syntax-heading: #0451a5;
+  --daftr-syntax-bold: #0451a5;
+  --daftr-syntax-italic: #0451a5;
+  --daftr-syntax-quote: #008000;
+  --daftr-syntax-code: #a31515;
+  --daftr-syntax-mark-hidden: #c8d1da;
+  --daftr-syntax-mark-dim: #8a94a3;
+  --daftr-syntax-timestamp: #6e7681;
 }
 
 // Solarized Light (Ethan Schoonover's palette)
 :root[data-theme='solarized-light'] {
   color-scheme: light;
+  --daftr-brand: #5b3fa3;
 
-  --evn-bg: #fdf6e3;
-  --evn-bg-panel: #eee8d5;
-  --evn-bg-modal: #fdf6e3;
-  --evn-bg-menu: #fdf6e3;
-  --evn-bg-input: #fffbf0;
-  --evn-bg-chip: #eee8d5;
-  --evn-bg-hover: #e9e2cb;
-  --evn-bg-active: #e4ddc6;
-  --evn-bg-selected: #e6d9a8;
-  --evn-selection: #e3dbbf;
-  --evn-caret: #657b83;
-  --evn-hover-rgb: 88, 110, 117;
+  --daftr-bg: #fdf6e3;
+  --daftr-bg-panel: #eee8d5;
+  --daftr-bg-modal: #fdf6e3;
+  --daftr-bg-menu: #fdf6e3;
+  --daftr-bg-input: #fffbf0;
+  --daftr-bg-chip: #eee8d5;
+  --daftr-bg-hover: #e9e2cb;
+  --daftr-bg-active: #e4ddc6;
+  --daftr-bg-selected: #e6d9a8;
+  --daftr-selection: #e3dbbf;
+  --daftr-caret: #657b83;
+  --daftr-hover-rgb: 88, 110, 117;
 
-  --evn-border: #d3cbb7;
-  --evn-border-soft: #ddd6c1;
-  --evn-border-subtle: #e8e1cc;
-  --evn-border-hover: #b9b29d;
-  --evn-scrollbar: #d3cbb7;
-  --evn-scrollbar-hover: #b9b29d;
+  --daftr-border: #d3cbb7;
+  --daftr-border-soft: #ddd6c1;
+  --daftr-border-subtle: #e8e1cc;
+  --daftr-border-hover: #b9b29d;
+  --daftr-scrollbar: #d3cbb7;
+  --daftr-scrollbar-hover: #b9b29d;
 
-  --evn-text: #586e75;
-  --evn-text-strong: #073642;
-  --evn-text-bright: #002b36;
-  --evn-text-soft: #657b83;
-  --evn-text-dimmed: #708189;
-  --evn-text-disabled: #93a1a1;
-  --evn-text-faint: #c5c0ad;
+  --daftr-text: #586e75;
+  --daftr-text-strong: #073642;
+  --daftr-text-bright: #002b36;
+  --daftr-text-soft: #657b83;
+  --daftr-text-dimmed: #708189;
+  --daftr-text-disabled: #93a1a1;
+  --daftr-text-faint: #c5c0ad;
 
-  --evn-accent: #268bd2;
-  --evn-accent-strong: #2176b3;
-  --evn-accent-strong-rgb: 33, 118, 179;
-  --evn-accent-hover: #1d679c;
-  --evn-accent-text: #1f72ad;
-  --evn-danger: #dc322f;
+  --daftr-accent: #268bd2;
+  --daftr-accent-strong: #2176b3;
+  --daftr-accent-strong-rgb: 33, 118, 179;
+  --daftr-accent-hover: #1d679c;
+  --daftr-accent-text: #1f72ad;
+  --daftr-danger: #dc322f;
 
-  --evn-syntax-plain: #586e75;
-  --evn-syntax-punctuation: #93a1a1;
-  --evn-syntax-comment: #93a1a1;
-  --evn-syntax-keyword: #859900;
-  --evn-syntax-control: #859900;
-  --evn-syntax-variable: #268bd2;
-  --evn-syntax-function: #268bd2;
-  --evn-syntax-type: #b58900;
-  --evn-syntax-string: #2aa198;
-  --evn-syntax-escape: #cb4b16;
-  --evn-syntax-number: #d33682;
-  --evn-syntax-constant: #cb4b16;
-  --evn-syntax-regexp: #dc322f;
-  --evn-syntax-invalid: #dc322f;
-  --evn-syntax-link: #268bd2;
-  --evn-syntax-strike: #93a1a1;
-  --evn-syntax-heading: #268bd2;
-  --evn-syntax-bold: #b58900;
-  --evn-syntax-italic: #6c71c4;
-  --evn-syntax-quote: #859900;
-  --evn-syntax-code: #2aa198;
-  --evn-syntax-mark-hidden: #d8d0b8;
-  --evn-syntax-mark-dim: #93a1a1;
-  --evn-syntax-timestamp: #93a1a1;
+  --daftr-syntax-plain: #586e75;
+  --daftr-syntax-punctuation: #93a1a1;
+  --daftr-syntax-comment: #93a1a1;
+  --daftr-syntax-keyword: #859900;
+  --daftr-syntax-control: #859900;
+  --daftr-syntax-variable: #268bd2;
+  --daftr-syntax-function: #268bd2;
+  --daftr-syntax-type: #b58900;
+  --daftr-syntax-string: #2aa198;
+  --daftr-syntax-escape: #cb4b16;
+  --daftr-syntax-number: #d33682;
+  --daftr-syntax-constant: #cb4b16;
+  --daftr-syntax-regexp: #dc322f;
+  --daftr-syntax-invalid: #dc322f;
+  --daftr-syntax-link: #268bd2;
+  --daftr-syntax-strike: #93a1a1;
+  --daftr-syntax-heading: #268bd2;
+  --daftr-syntax-bold: #b58900;
+  --daftr-syntax-italic: #6c71c4;
+  --daftr-syntax-quote: #859900;
+  --daftr-syntax-code: #2aa198;
+  --daftr-syntax-mark-hidden: #d8d0b8;
+  --daftr-syntax-mark-dim: #93a1a1;
+  --daftr-syntax-timestamp: #93a1a1;
 }
 
 // Composed for the app: lavender-tinted whites, violet accents
 :root[data-theme='violet-light'] {
   color-scheme: light;
+  --daftr-brand: #5b3fa3;
 
-  --evn-bg: #fdfcff;
-  --evn-bg-panel: #f4f1fb;
-  --evn-bg-modal: #ffffff;
-  --evn-bg-menu: #ffffff;
-  --evn-bg-input: #ffffff;
-  --evn-bg-chip: #ece7f7;
-  --evn-bg-hover: #eee9f8;
-  --evn-bg-active: #e5ddf6;
-  --evn-bg-selected: #ddd0fa;
-  --evn-selection: #d9cbfb;
-  --evn-caret: #6d28d9;
-  --evn-hover-rgb: 46, 16, 101;
+  --daftr-bg: #fdfcff;
+  --daftr-bg-panel: #f4f1fb;
+  --daftr-bg-modal: #ffffff;
+  --daftr-bg-menu: #ffffff;
+  --daftr-bg-input: #ffffff;
+  --daftr-bg-chip: #ece7f7;
+  --daftr-bg-hover: #eee9f8;
+  --daftr-bg-active: #e5ddf6;
+  --daftr-bg-selected: #ddd0fa;
+  --daftr-selection: #d9cbfb;
+  --daftr-caret: #6d28d9;
+  --daftr-hover-rgb: 46, 16, 101;
 
-  --evn-border: #d6cdea;
-  --evn-border-soft: #ded7ee;
-  --evn-border-subtle: #ebe6f5;
-  --evn-border-hover: #b3a6d4;
-  --evn-scrollbar: #d6cdea;
-  --evn-scrollbar-hover: #b3a6d4;
+  --daftr-border: #d6cdea;
+  --daftr-border-soft: #ded7ee;
+  --daftr-border-subtle: #ebe6f5;
+  --daftr-border-hover: #b3a6d4;
+  --daftr-scrollbar: #d6cdea;
+  --daftr-scrollbar-hover: #b3a6d4;
 
-  --evn-text: #3a3350;
-  --evn-text-strong: #241d38;
-  --evn-text-bright: #0f0a1f;
-  --evn-text-soft: #625a7a;
-  --evn-text-dimmed: #706889;
-  --evn-text-disabled: #9890ad;
-  --evn-text-faint: #bcb4d1;
+  --daftr-text: #3a3350;
+  --daftr-text-strong: #241d38;
+  --daftr-text-bright: #0f0a1f;
+  --daftr-text-soft: #625a7a;
+  --daftr-text-dimmed: #706889;
+  --daftr-text-disabled: #9890ad;
+  --daftr-text-faint: #bcb4d1;
 
-  --evn-accent: #7c3aed;
-  --evn-accent-strong: #6d28d9;
-  --evn-accent-strong-rgb: 109, 40, 217;
-  --evn-accent-hover: #5b21b6;
-  --evn-accent-text: #6d28d9;
-  --evn-danger: #d13a4c;
+  --daftr-accent: #7c3aed;
+  --daftr-accent-strong: #6d28d9;
+  --daftr-accent-strong-rgb: 109, 40, 217;
+  --daftr-accent-hover: #5b21b6;
+  --daftr-accent-text: #6d28d9;
+  --daftr-danger: #d13a4c;
 
-  --evn-syntax-plain: #3a3350;
-  --evn-syntax-punctuation: #8a82a3;
-  --evn-syntax-comment: #8b83a3;
-  --evn-syntax-keyword: #7c3aed;
-  --evn-syntax-control: #c026d3;
-  --evn-syntax-variable: #3b4fc4;
-  --evn-syntax-function: #a3478c;
-  --evn-syntax-type: #0f7c8c;
-  --evn-syntax-string: #b8451f;
-  --evn-syntax-escape: #c2410c;
-  --evn-syntax-number: #0b7a5a;
-  --evn-syntax-constant: #4c4fbf;
-  --evn-syntax-regexp: #a1365a;
-  --evn-syntax-invalid: #d13a4c;
-  --evn-syntax-link: #6d28d9;
-  --evn-syntax-strike: #9890ad;
-  --evn-syntax-heading: #6d28d9;
-  --evn-syntax-bold: #5b21b6;
-  --evn-syntax-italic: #5b21b6;
-  --evn-syntax-quote: #0b7a5a;
-  --evn-syntax-code: #b8451f;
-  --evn-syntax-mark-hidden: #d9d1ea;
-  --evn-syntax-mark-dim: #9890ad;
-  --evn-syntax-timestamp: #8a82a3;
+  --daftr-syntax-plain: #3a3350;
+  --daftr-syntax-punctuation: #8a82a3;
+  --daftr-syntax-comment: #8b83a3;
+  --daftr-syntax-keyword: #7c3aed;
+  --daftr-syntax-control: #c026d3;
+  --daftr-syntax-variable: #3b4fc4;
+  --daftr-syntax-function: #a3478c;
+  --daftr-syntax-type: #0f7c8c;
+  --daftr-syntax-string: #b8451f;
+  --daftr-syntax-escape: #c2410c;
+  --daftr-syntax-number: #0b7a5a;
+  --daftr-syntax-constant: #4c4fbf;
+  --daftr-syntax-regexp: #a1365a;
+  --daftr-syntax-invalid: #d13a4c;
+  --daftr-syntax-link: #6d28d9;
+  --daftr-syntax-strike: #9890ad;
+  --daftr-syntax-heading: #6d28d9;
+  --daftr-syntax-bold: #5b21b6;
+  --daftr-syntax-italic: #5b21b6;
+  --daftr-syntax-quote: #0b7a5a;
+  --daftr-syntax-code: #b8451f;
+  --daftr-syntax-mark-hidden: #d9d1ea;
+  --daftr-syntax-mark-dim: #9890ad;
+  --daftr-syntax-timestamp: #8a82a3;
 }
 
 // GitHub Light (Primer)
 :root[data-theme='github-light'] {
   color-scheme: light;
+  --daftr-brand: #5b3fa3;
 
-  --evn-bg: #ffffff;
-  --evn-bg-panel: #f6f8fa;
-  --evn-bg-modal: #ffffff;
-  --evn-bg-menu: #ffffff;
-  --evn-bg-input: #ffffff;
-  --evn-bg-chip: #eff1f3;
-  --evn-bg-hover: #eef1f4;
-  --evn-bg-active: #e6eaef;
-  --evn-bg-selected: #ddf4ff;
-  --evn-selection: #bbdfff;
-  --evn-caret: #1f2328;
-  --evn-hover-rgb: 31, 35, 40;
+  --daftr-bg: #ffffff;
+  --daftr-bg-panel: #f6f8fa;
+  --daftr-bg-modal: #ffffff;
+  --daftr-bg-menu: #ffffff;
+  --daftr-bg-input: #ffffff;
+  --daftr-bg-chip: #eff1f3;
+  --daftr-bg-hover: #eef1f4;
+  --daftr-bg-active: #e6eaef;
+  --daftr-bg-selected: #ddf4ff;
+  --daftr-selection: #bbdfff;
+  --daftr-caret: #1f2328;
+  --daftr-hover-rgb: 31, 35, 40;
 
-  --evn-border: #d0d7de;
-  --evn-border-soft: #d8dee4;
-  --evn-border-subtle: #eaeef2;
-  --evn-border-hover: #afb8c1;
-  --evn-scrollbar: #d0d7de;
-  --evn-scrollbar-hover: #afb8c1;
+  --daftr-border: #d0d7de;
+  --daftr-border-soft: #d8dee4;
+  --daftr-border-subtle: #eaeef2;
+  --daftr-border-hover: #afb8c1;
+  --daftr-scrollbar: #d0d7de;
+  --daftr-scrollbar-hover: #afb8c1;
 
-  --evn-text: #24292f;
-  --evn-text-strong: #1f2328;
-  --evn-text-bright: #000000;
-  --evn-text-soft: #59636e;
-  --evn-text-dimmed: #656d76;
-  --evn-text-disabled: #8c959f;
-  --evn-text-faint: #afb8c1;
+  --daftr-text: #24292f;
+  --daftr-text-strong: #1f2328;
+  --daftr-text-bright: #000000;
+  --daftr-text-soft: #59636e;
+  --daftr-text-dimmed: #656d76;
+  --daftr-text-disabled: #8c959f;
+  --daftr-text-faint: #afb8c1;
 
-  --evn-accent: #0969da;
-  --evn-accent-strong: #0969da;
-  --evn-accent-strong-rgb: 9, 105, 218;
-  --evn-accent-hover: #0860ca;
-  --evn-accent-text: #0969da;
-  --evn-danger: #d1242f;
+  --daftr-accent: #0969da;
+  --daftr-accent-strong: #0969da;
+  --daftr-accent-strong-rgb: 9, 105, 218;
+  --daftr-accent-hover: #0860ca;
+  --daftr-accent-text: #0969da;
+  --daftr-danger: #d1242f;
 
-  --evn-syntax-plain: #1f2328;
-  --evn-syntax-punctuation: #6e7781;
-  --evn-syntax-comment: #6e7781;
-  --evn-syntax-keyword: #cf222e;
-  --evn-syntax-control: #cf222e;
-  --evn-syntax-variable: #953800;
-  --evn-syntax-function: #8250df;
-  --evn-syntax-type: #953800;
-  --evn-syntax-string: #0a3069;
-  --evn-syntax-escape: #116329;
-  --evn-syntax-number: #0550ae;
-  --evn-syntax-constant: #0550ae;
-  --evn-syntax-regexp: #116329;
-  --evn-syntax-invalid: #82071e;
-  --evn-syntax-link: #0969da;
-  --evn-syntax-strike: #6e7781;
-  --evn-syntax-heading: #0550ae;
-  --evn-syntax-bold: #1f2328;
-  --evn-syntax-italic: #1f2328;
-  --evn-syntax-quote: #116329;
-  --evn-syntax-code: #0550ae;
-  --evn-syntax-mark-hidden: #d0d7de;
-  --evn-syntax-mark-dim: #8c959f;
-  --evn-syntax-timestamp: #6e7781;
+  --daftr-syntax-plain: #1f2328;
+  --daftr-syntax-punctuation: #6e7781;
+  --daftr-syntax-comment: #6e7781;
+  --daftr-syntax-keyword: #cf222e;
+  --daftr-syntax-control: #cf222e;
+  --daftr-syntax-variable: #953800;
+  --daftr-syntax-function: #8250df;
+  --daftr-syntax-type: #953800;
+  --daftr-syntax-string: #0a3069;
+  --daftr-syntax-escape: #116329;
+  --daftr-syntax-number: #0550ae;
+  --daftr-syntax-constant: #0550ae;
+  --daftr-syntax-regexp: #116329;
+  --daftr-syntax-invalid: #82071e;
+  --daftr-syntax-link: #0969da;
+  --daftr-syntax-strike: #6e7781;
+  --daftr-syntax-heading: #0550ae;
+  --daftr-syntax-bold: #1f2328;
+  --daftr-syntax-italic: #1f2328;
+  --daftr-syntax-quote: #116329;
+  --daftr-syntax-code: #0550ae;
+  --daftr-syntax-mark-hidden: #d0d7de;
+  --daftr-syntax-mark-dim: #8c959f;
+  --daftr-syntax-timestamp: #6e7781;
 }
 
 // GitHub Dark Dimmed (Primer)
 :root[data-theme='github-dark-dimmed'] {
   color-scheme: dark;
+  --daftr-brand: #ffffff;
 
-  --evn-bg: #22272e;
-  --evn-bg-panel: #1c2128;
-  --evn-bg-modal: #2d333b;
-  --evn-bg-menu: #2d333b;
-  --evn-bg-input: #22272e;
-  --evn-bg-chip: #373e47;
-  --evn-bg-hover: #272d35;
-  --evn-bg-active: #3b424b;
-  --evn-bg-selected: #253a54;
-  --evn-selection: #34507a;
-  --evn-caret: #539bf5;
-  --evn-hover-rgb: 205, 217, 229;
+  --daftr-bg: #22272e;
+  --daftr-bg-panel: #1c2128;
+  --daftr-bg-modal: #2d333b;
+  --daftr-bg-menu: #2d333b;
+  --daftr-bg-input: #22272e;
+  --daftr-bg-chip: #373e47;
+  --daftr-bg-hover: #272d35;
+  --daftr-bg-active: #3b424b;
+  --daftr-bg-selected: #253a54;
+  --daftr-selection: #34507a;
+  --daftr-caret: #539bf5;
+  --daftr-hover-rgb: 205, 217, 229;
 
-  --evn-border: #444c56;
-  --evn-border-soft: #373e47;
-  --evn-border-subtle: #2d333b;
-  --evn-border-hover: #545d68;
-  --evn-scrollbar: #444c56;
-  --evn-scrollbar-hover: #545d68;
+  --daftr-border: #444c56;
+  --daftr-border-soft: #373e47;
+  --daftr-border-subtle: #2d333b;
+  --daftr-border-hover: #545d68;
+  --daftr-scrollbar: #444c56;
+  --daftr-scrollbar-hover: #545d68;
 
-  --evn-text: #adbac7;
-  --evn-text-strong: #cdd9e5;
-  --evn-text-bright: #e6edf3;
-  --evn-text-soft: #909dab;
-  --evn-text-dimmed: #768390;
-  --evn-text-disabled: #636e7b;
-  --evn-text-faint: #545d68;
+  --daftr-text: #adbac7;
+  --daftr-text-strong: #cdd9e5;
+  --daftr-text-bright: #e6edf3;
+  --daftr-text-soft: #909dab;
+  --daftr-text-dimmed: #768390;
+  --daftr-text-disabled: #636e7b;
+  --daftr-text-faint: #545d68;
 
-  --evn-accent: #316dca;
-  --evn-accent-strong: #316dca;
-  --evn-accent-strong-rgb: 49, 109, 202;
-  --evn-accent-hover: #4184e4;
-  --evn-accent-text: #539bf5;
-  --evn-danger: #e5534b;
+  --daftr-accent: #316dca;
+  --daftr-accent-strong: #316dca;
+  --daftr-accent-strong-rgb: 49, 109, 202;
+  --daftr-accent-hover: #4184e4;
+  --daftr-accent-text: #539bf5;
+  --daftr-danger: #e5534b;
 
-  --evn-syntax-plain: #adbac7;
-  --evn-syntax-punctuation: #768390;
-  --evn-syntax-comment: #768390;
-  --evn-syntax-keyword: #f47067;
-  --evn-syntax-control: #f47067;
-  --evn-syntax-variable: #f69d50;
-  --evn-syntax-function: #dcbdfb;
-  --evn-syntax-type: #f69d50;
-  --evn-syntax-string: #96d0ff;
-  --evn-syntax-escape: #8ddb8c;
-  --evn-syntax-number: #6cb6ff;
-  --evn-syntax-constant: #6cb6ff;
-  --evn-syntax-regexp: #8ddb8c;
-  --evn-syntax-invalid: #ff938a;
-  --evn-syntax-link: #539bf5;
-  --evn-syntax-strike: #636e7b;
-  --evn-syntax-heading: #6cb6ff;
-  --evn-syntax-bold: #adbac7;
-  --evn-syntax-italic: #adbac7;
-  --evn-syntax-quote: #8ddb8c;
-  --evn-syntax-code: #6cb6ff;
-  --evn-syntax-mark-hidden: #444c56;
-  --evn-syntax-mark-dim: #636e7b;
-  --evn-syntax-timestamp: #768390;
+  --daftr-syntax-plain: #adbac7;
+  --daftr-syntax-punctuation: #768390;
+  --daftr-syntax-comment: #768390;
+  --daftr-syntax-keyword: #f47067;
+  --daftr-syntax-control: #f47067;
+  --daftr-syntax-variable: #f69d50;
+  --daftr-syntax-function: #dcbdfb;
+  --daftr-syntax-type: #f69d50;
+  --daftr-syntax-string: #96d0ff;
+  --daftr-syntax-escape: #8ddb8c;
+  --daftr-syntax-number: #6cb6ff;
+  --daftr-syntax-constant: #6cb6ff;
+  --daftr-syntax-regexp: #8ddb8c;
+  --daftr-syntax-invalid: #ff938a;
+  --daftr-syntax-link: #539bf5;
+  --daftr-syntax-strike: #636e7b;
+  --daftr-syntax-heading: #6cb6ff;
+  --daftr-syntax-bold: #adbac7;
+  --daftr-syntax-italic: #adbac7;
+  --daftr-syntax-quote: #8ddb8c;
+  --daftr-syntax-code: #6cb6ff;
+  --daftr-syntax-mark-hidden: #444c56;
+  --daftr-syntax-mark-dim: #636e7b;
+  --daftr-syntax-timestamp: #768390;
 }
 
 *, *::before, *::after {
@@ -409,8 +416,8 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--evn-bg);
-  color: var(--evn-text);
+  background: var(--daftr-bg);
+  color: var(--daftr-text);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -433,18 +440,18 @@ html.overlay-mode body {
 // No arrow buttons at the ends of the track
 ::-webkit-scrollbar-button { display: none; }
 ::-webkit-scrollbar-thumb {
-  background: var(--evn-scrollbar);
+  background: var(--daftr-scrollbar);
   border-radius: 3px;
-  &:hover { background: var(--evn-scrollbar-hover); }
+  &:hover { background: var(--daftr-scrollbar-hover); }
 }
 
 // Remove focus outline for mouse users
 :focus:not(:focus-visible) { outline: none; }
-:focus-visible { outline: 2px solid var(--evn-accent); outline-offset: 1px; }
+:focus-visible { outline: 2px solid var(--daftr-accent); outline-offset: 1px; }
 
 // Selection
 ::selection {
-  background: var(--evn-selection);
+  background: var(--daftr-selection);
   color: inherit;
 }
 
@@ -452,8 +459,8 @@ html.overlay-mode body {
 .cm-slash-menu {
   position: fixed;
   z-index: 1000;
-  background: var(--evn-bg-panel);
-  border: 1px solid var(--evn-border-soft);
+  background: var(--daftr-bg-panel);
+  border: 1px solid var(--daftr-border-soft);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   min-width: 220px;
@@ -468,7 +475,7 @@ html.overlay-mode body {
     width: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: var(--evn-scrollbar);
+    background: var(--daftr-scrollbar);
     border-radius: 2px;
   }
 }
@@ -482,7 +489,7 @@ html.overlay-mode body {
   padding: 6px 10px 4px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   user-select: none;
@@ -500,11 +507,11 @@ html.overlay-mode body {
 
   &:hover,
   &.cm-slash-item-selected {
-    background: var(--evn-bg-hover);
+    background: var(--daftr-bg-hover);
   }
 
   &.cm-slash-item-selected {
-    background: var(--evn-bg-selected);
+    background: var(--daftr-bg-selected);
   }
 }
 
@@ -515,9 +522,9 @@ html.overlay-mode body {
   width: 28px;
   height: 28px;
   border-radius: 5px;
-  background: var(--evn-bg-chip);
-  border: 1px solid var(--evn-border-soft);
-  color: var(--evn-text);
+  background: var(--daftr-bg-chip);
+  border: 1px solid var(--daftr-border-soft);
+  color: var(--daftr-text);
   flex-shrink: 0;
 
   svg {
@@ -534,7 +541,7 @@ html.overlay-mode body {
 
 .cm-slash-item-label {
   font-size: 13px;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -543,7 +550,7 @@ html.overlay-mode body {
 
 .cm-slash-item-desc {
   font-size: 11px;
-  color: var(--evn-text-disabled);
+  color: var(--daftr-text-disabled);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -552,13 +559,13 @@ html.overlay-mode body {
 .cm-slash-empty {
   padding: 16px;
   text-align: center;
-  color: var(--evn-text-disabled);
+  color: var(--daftr-text-disabled);
   font-size: 13px;
 }
 
 // ── Slash placeholder on empty lines ──────────────────────────────────────────
 .cm-slash-placeholder {
-  color: var(--evn-text-faint);
+  color: var(--daftr-text-faint);
   font-style: italic;
   font-size: 14px;
   pointer-events: none;

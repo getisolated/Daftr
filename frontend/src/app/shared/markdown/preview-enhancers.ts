@@ -110,7 +110,7 @@ async function drawDiagram(mermaid: Mermaid, source: string, dark: boolean): Pro
   await document.fonts.ready;
   // Validated first: a failed render leaves error markup behind in the page
   await mermaid.parse(source);
-  const { svg } = await mermaid.render(`evn-mermaid-${++diagramCounter}`, source);
+  const { svg } = await mermaid.render(`daftr-mermaid-${++diagramCounter}`, source);
 
   if (diagramCache.size >= MAX_CACHED_DIAGRAMS) {
     const oldest = diagramCache.keys().next().value;

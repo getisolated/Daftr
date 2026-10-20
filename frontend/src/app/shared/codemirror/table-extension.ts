@@ -467,16 +467,16 @@ const tableTheme = EditorView.baseTheme({
     fontSize: '0.95em',
   },
   '.cm-md-table th, .cm-md-table td': {
-    border: '1px solid var(--evn-border)',
+    border: '1px solid var(--daftr-border)',
     padding: '4px 12px',
     verticalAlign: 'top',
     minWidth: '3ch',
     height: '1.4em',
   },
   '.cm-md-table th': {
-    background: 'var(--evn-bg-chip)',
+    background: 'var(--daftr-bg-chip)',
     fontWeight: '600',
-    color: 'var(--evn-text-strong)',
+    color: 'var(--daftr-text-strong)',
   },
   '.cm-md-table-line': {
     fontFamily: 'Consolas, "Courier New", monospace',

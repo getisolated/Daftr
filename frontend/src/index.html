@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>EvNote</title>
+  <title>Daftr</title>
   <base href="./">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -12,10 +12,20 @@
       var themes = ['dark', 'light', 'solarized-light', 'violet-light', 'github-light', 'github-dark-dimmed'];
       var theme = 'dark';
       try {
-        var saved = localStorage.getItem('evn-theme');
+        // Keys written before the app became Daftr (`evn-*`): renamed here, before they are read. Keep in sync with storage-migration.ts.
+        ['theme', 'theme-dark', 'theme-light'].forEach(function (key) {
+          var legacy = localStorage.getItem('evn-' + key);
+          if (legacy !== null) {
+            if (localStorage.getItem('daftr-' + key) === null) {
+              localStorage.setItem('daftr-' + key, legacy);
+            }
+            localStorage.removeItem('evn-' + key);
+          }
+        });
+        var saved = localStorage.getItem('daftr-theme');
         if (saved === 'system') {
           var prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
-          saved = localStorage.getItem(prefersDark ? 'evn-theme-dark' : 'evn-theme-light') || (prefersDark ? 'dark' : 'light');
+          saved = localStorage.getItem(prefersDark ? 'daftr-theme-dark' : 'daftr-theme-light') || (prefersDark ? 'dark' : 'light');
         }
         if (themes.indexOf(saved) !== -1) {
           theme = saved;

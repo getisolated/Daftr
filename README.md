@@ -1,9 +1,9 @@
-# Everything Note
+# Daftr
 
 A fast, keyboard-driven note-taking desktop app built with Angular, Rust (Tauri 2), and SQLite.
 
 <p align="center">
-  <img src="assets/logo.png" alt="Everything Note" width="128" />
+  <img src="assets/logo.png" alt="Daftr" width="128" />
 </p>
 
 <p align="center">

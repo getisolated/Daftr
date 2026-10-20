@@ -9,9 +9,9 @@
   align-items: center;
   box-sizing: border-box;
   height: 38px;
-  background: var(--evn-bg-panel);
+  background: var(--daftr-bg-panel);
   // Same light line as the right edge of the sidebar
-  border-bottom: 1px solid var(--evn-border-subtle);
+  border-bottom: 1px solid var(--daftr-border-subtle);
   user-select: none;
   position: relative;
 }
@@ -26,7 +26,7 @@
   height: 24px;
   border: none;
   background: transparent;
-  color: var(--evn-text-disabled);
+  color: var(--daftr-text-disabled);
   cursor: pointer;
   flex-shrink: 0;
   border-radius: 6px;
@@ -34,13 +34,13 @@
   transition: background 0.15s, color 0.15s;
 
   &:hover {
-    background: rgba(var(--evn-hover-rgb), 0.07);
-    color: var(--evn-text);
+    background: rgba(var(--daftr-hover-rgb), 0.07);
+    color: var(--daftr-text);
   }
 
   &.active {
-    color: var(--evn-text);
-    background: var(--evn-bg);
+    color: var(--daftr-text);
+    background: var(--daftr-bg);
     border-radius: 8px;
   }
 }
@@ -74,7 +74,7 @@
 
 .tab {
   // Solid color under the tab, painted behind the floating close button so that it hides the end of the title
-  --tab-bg: var(--evn-bg-panel);
+  --tab-bg: var(--daftr-bg-panel);
 
   display: flex;
   align-items: center;
@@ -84,7 +84,7 @@
   max-width: 250px;
   height: 24px;
   background: transparent;
-  color: var(--evn-text-faint);
+  color: var(--daftr-text-faint);
   font-size: 12px;
   font-family: 'Segoe UI', system-ui, sans-serif;
   border-radius: 6px;
@@ -94,17 +94,17 @@
   transition: background 0.15s, color 0.15s, transform 0.2s ease, opacity 0.2s ease;
 
   &:hover {
-    --tab-bg: color-mix(in srgb, var(--evn-bg-panel), rgb(var(--evn-hover-rgb)) 7%);
+    --tab-bg: color-mix(in srgb, var(--daftr-bg-panel), rgb(var(--daftr-hover-rgb)) 7%);
 
-    color: var(--evn-text-soft);
-    background: rgba(var(--evn-hover-rgb), 0.07);
+    color: var(--daftr-text-soft);
+    background: rgba(var(--daftr-hover-rgb), 0.07);
   }
 
   &.active {
-    --tab-bg: var(--evn-bg);
+    --tab-bg: var(--daftr-bg);
 
-    color: var(--evn-text);
-    background: var(--evn-bg);
+    color: var(--daftr-text);
+    background: var(--daftr-bg);
     border-radius: 8px;
   }
 
@@ -132,7 +132,7 @@
       top: 4px;
       bottom: 4px;
       width: 2px;
-      background: var(--evn-accent);
+      background: var(--daftr-accent);
       border-radius: 1px;
       animation: dropIndicator 0.15s ease;
     }
@@ -146,7 +146,7 @@
       top: 4px;
       bottom: 4px;
       width: 2px;
-      background: var(--evn-accent);
+      background: var(--daftr-accent);
       border-radius: 1px;
       animation: dropIndicator 0.15s ease;
     }
@@ -166,12 +166,12 @@
 
 .pin-icon {
   flex-shrink: 0;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   opacity: 0.7;
   transform: rotate(-45deg);
 
   .tab.active & {
-    color: var(--evn-text);
+    color: var(--daftr-text);
     opacity: 1;
   }
 }
@@ -187,7 +187,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--evn-text);
+  background: var(--daftr-text);
   flex-shrink: 0;
 }
 
@@ -223,8 +223,8 @@
   }
 
   &:hover {
-    background: color-mix(in srgb, var(--tab-bg), rgb(var(--evn-hover-rgb)) 10%);
-    color: var(--evn-text);
+    background: color-mix(in srgb, var(--tab-bg), rgb(var(--daftr-hover-rgb)) 10%);
+    color: var(--daftr-text);
   }
 }
 
@@ -238,7 +238,7 @@
   height: 24px;
   border: none;
   background: transparent;
-  color: var(--evn-text-disabled);
+  color: var(--daftr-text-disabled);
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
@@ -247,8 +247,8 @@
   transition: background 0.15s, color 0.15s;
 
   &:hover {
-    background: rgba(var(--evn-hover-rgb), 0.07);
-    color: var(--evn-text);
+    background: rgba(var(--daftr-hover-rgb), 0.07);
+    color: var(--daftr-text);
   }
 }
 
@@ -269,13 +269,13 @@
   height: 100%;
   border: none;
   background: transparent;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
 
   &:hover {
-    background: rgba(var(--evn-hover-rgb), 0.06);
-    color: var(--evn-text);
+    background: rgba(var(--daftr-hover-rgb), 0.06);
+    color: var(--daftr-text);
   }
 
   &.close:hover {
@@ -297,7 +297,7 @@
     border-radius: 0;
 
     &.active {
-      --tab-bg: var(--evn-bg-panel);
+      --tab-bg: var(--daftr-bg-panel);
 
       background: transparent;
       border-radius: 0;

@@ -10,11 +10,11 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--evn-border-subtle);
+  border: 1px solid var(--daftr-border-subtle);
   border-radius: 8px;
   background:
-    radial-gradient(circle at 50% 45%, rgba(var(--evn-hover-rgb), 0.04), transparent 70%),
-    var(--evn-bg);
+    radial-gradient(circle at 50% 45%, rgba(var(--daftr-hover-rgb), 0.04), transparent 70%),
+    var(--daftr-bg);
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
@@ -41,23 +41,23 @@ canvas {
 .graph-btn {
   padding: 4px 10px;
   border-radius: 6px;
-  border: 1px solid var(--evn-border-soft);
-  background: var(--evn-bg-panel);
-  color: var(--evn-text-dimmed);
+  border: 1px solid var(--daftr-border-soft);
+  background: var(--daftr-bg-panel);
+  color: var(--daftr-text-dimmed);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
 
   &:hover {
-    color: var(--evn-text);
-    border-color: var(--evn-border-hover);
+    color: var(--daftr-text);
+    border-color: var(--daftr-border-hover);
   }
 
   &.active {
-    background: var(--evn-bg-selected);
-    border-color: var(--evn-accent-strong);
-    color: var(--evn-text);
+    background: var(--daftr-bg-selected);
+    border-color: var(--daftr-accent-strong);
+    color: var(--daftr-text);
   }
 }
 
@@ -69,12 +69,12 @@ canvas {
   flex-direction: column;
   gap: 2px;
   font-size: 11px;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   pointer-events: none;
 
   kbd {
     font-family: inherit;
-    color: var(--evn-text-soft);
+    color: var(--daftr-text-soft);
   }
 }
 
@@ -84,7 +84,7 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   font-size: 13px;
   pointer-events: none;
 }

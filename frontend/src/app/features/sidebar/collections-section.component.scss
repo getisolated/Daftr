@@ -26,7 +26,7 @@
   padding: 0 8px;
   border: none;
   background: transparent;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   font: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -44,12 +44,12 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--evn-text-soft);
+  color: var(--daftr-text-soft);
   cursor: pointer;
 
   &:hover {
-    color: var(--evn-text-bright);
-    background: rgba(var(--evn-hover-rgb), 0.08);
+    color: var(--daftr-text-bright);
+    background: rgba(var(--daftr-hover-rgb), 0.08);
   }
 }
 
@@ -57,7 +57,7 @@
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--evn-scrollbar) transparent;
+  scrollbar-color: var(--daftr-scrollbar) transparent;
 }
 
 .row {
@@ -71,26 +71,26 @@
   cursor: pointer;
   outline: none;
 
-  &:hover { background: rgba(var(--evn-hover-rgb), 0.05); }
+  &:hover { background: rgba(var(--daftr-hover-rgb), 0.05); }
 
   &:focus-visible {
-    outline: 1px solid var(--evn-accent-strong);
+    outline: 1px solid var(--daftr-accent-strong);
     outline-offset: -1px;
   }
 
   &.selected {
-    background: var(--evn-bg-active);
-    color: var(--evn-text-bright);
+    background: var(--daftr-bg-active);
+    color: var(--daftr-text-bright);
   }
 
   &.drop-target {
-    background: rgba(var(--evn-accent-strong-rgb), 0.35);
-    outline: 1px solid var(--evn-accent-strong);
+    background: rgba(var(--daftr-accent-strong-rgb), 0.35);
+    outline: 1px solid var(--daftr-accent-strong);
     outline-offset: -1px;
   }
 
   &.collection { font-weight: 600; }
-  &.error .row-label { color: var(--evn-text-dimmed); text-decoration: line-through; }
+  &.error .row-label { color: var(--daftr-text-dimmed); text-decoration: line-through; }
 }
 
 .chevron,
@@ -100,7 +100,7 @@
 }
 
 .chevron {
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   transition: transform 0.1s;
 
   &.open { transform: rotate(90deg); }
@@ -108,7 +108,7 @@
 
 .row-icon {
   flex-shrink: 0;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
 }
 
 .row-label {
@@ -126,7 +126,7 @@
   text-overflow: ellipsis;
   font-size: 11px;
   font-weight: 400;
-  color: var(--evn-text-faint);
+  color: var(--daftr-text-faint);
 }
 
 .status {
@@ -134,15 +134,15 @@
   margin-left: auto;
   padding: 0 5px;
   border-radius: 8px;
-  background: var(--evn-danger);
+  background: var(--daftr-danger);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
 
   &.unloaded {
     background: transparent;
-    border: 1px solid var(--evn-border-hover);
-    color: var(--evn-text-dimmed);
+    border: 1px solid var(--daftr-border-hover);
+    color: var(--daftr-text-dimmed);
   }
 }
 
@@ -151,8 +151,8 @@
   width: 11px;
   height: 11px;
   margin-left: auto;
-  border: 1.5px solid var(--evn-border-hover);
-  border-top-color: var(--evn-accent-strong);
+  border: 1.5px solid var(--daftr-border-hover);
+  border-top-color: var(--daftr-accent-strong);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -166,10 +166,10 @@
   min-width: 0;
   height: 20px;
   padding: 0 4px;
-  background: var(--evn-bg-input);
-  border: 1px solid var(--evn-accent);
+  background: var(--daftr-bg-input);
+  border: 1px solid var(--daftr-accent);
   border-radius: 2px;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   font: inherit;
   font-weight: 400;
   outline: none;
@@ -179,7 +179,7 @@
   padding: 6px 14px 8px;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
 }
 
 .failure {
@@ -187,7 +187,7 @@
   padding: 6px 8px;
   border-radius: 4px;
   font-size: 12px;
-  color: var(--evn-text);
-  background: color-mix(in srgb, var(--evn-danger) 18%, transparent);
+  color: var(--daftr-text);
+  background: color-mix(in srgb, var(--daftr-danger) 18%, transparent);
   cursor: pointer;
 }

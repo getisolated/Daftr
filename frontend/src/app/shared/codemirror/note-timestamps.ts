@@ -126,7 +126,7 @@ export const noteTimestampsTheme = EditorView.baseTheme({
     display: 'inline-block',
     width: '150px',
     textIndent: '0',
-    color: 'var(--evn-syntax-timestamp)',
+    color: 'var(--daftr-syntax-timestamp)',
     // Not the text I-beam: the timestamp is not part of the text
     cursor: 'default',
     userSelect: 'none',
