@@ -25,6 +25,8 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.language.description': 'Langue de l\'application. La valeur initiale suit la langue de votre PC ; le changement s\'applique immédiatement.',
   'settings.launchAtStartup.title': 'Lancer au démarrage',
   'settings.launchAtStartup.description': 'Démarrer Daftr silencieusement dans la zone de notification ou la barre de menus à l\'ouverture de session.',
+  'settings.showMenuBarIcon.title': 'Icône dans la barre de menus',
+  'settings.showMenuBarIcon.description': 'Afficher l\'icône de Daftr dans la barre de menus. Sans elle, Daftr reste actif en arrière-plan : le raccourci de note rapide fonctionne toujours et l\'icône du Dock rouvre la fenêtre.',
   'settings.autoUpdate.title': 'Mises à jour automatiques',
   'settings.autoUpdate.description': 'Télécharger les nouvelles versions en arrière-plan et les installer à la fermeture de l\'application. Si la case est décochée, une confirmation est demandée avant tout téléchargement.',
   'settings.theme.title': 'Thème',

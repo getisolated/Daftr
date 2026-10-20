@@ -39,6 +39,8 @@ pub struct RawSettings {
     pub enter_to_send: Option<bool>,
     /// Voir [`AppSettings::launch_at_startup`].
     pub launch_at_startup: Option<bool>,
+    /// Voir [`AppSettings::show_menu_bar_icon`].
+    pub show_menu_bar_icon: Option<bool>,
     /// Voir [`AppSettings::theme`].
     pub theme: Option<String>,
     /// Voir [`AppSettings::preferred_dark_theme`].
@@ -91,6 +93,7 @@ impl RawSettings {
             overlay_height: Some(f64::from(settings.overlay_height)),
             enter_to_send: Some(settings.enter_to_send),
             launch_at_startup: Some(settings.launch_at_startup),
+            show_menu_bar_icon: Some(settings.show_menu_bar_icon),
             theme: Some(settings.theme.as_str().to_owned()),
             preferred_dark_theme: Some(settings.preferred_dark_theme.as_str().to_owned()),
             preferred_light_theme: Some(settings.preferred_light_theme.as_str().to_owned()),
@@ -140,6 +143,7 @@ impl RawSettings {
             overlay_height: patch.overlay_height.or(self.overlay_height),
             enter_to_send: patch.enter_to_send.or(self.enter_to_send),
             launch_at_startup: patch.launch_at_startup.or(self.launch_at_startup),
+            show_menu_bar_icon: patch.show_menu_bar_icon.or(self.show_menu_bar_icon),
             theme: patch.theme.or(self.theme),
             preferred_dark_theme: patch.preferred_dark_theme.or(self.preferred_dark_theme),
             preferred_light_theme: patch.preferred_light_theme.or(self.preferred_light_theme),

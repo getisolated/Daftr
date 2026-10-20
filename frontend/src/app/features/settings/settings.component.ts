@@ -11,7 +11,7 @@ import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
 import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
 import {
-  SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
+  SETTING_DEFINITIONS, SettingDefinition, definitionsForPlatform, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
 } from './settings-definitions';
 
 @Component({
@@ -138,6 +138,8 @@ export class SettingsComponent {
   private settingsService = inject(SettingsService);
   protected readonly i18n = inject(I18nService);
   private readonly platform = inject(PlatformService).platform;
+  /** Settings that apply to this platform: the only ones shown, searched and counted. */
+  private readonly definitions = definitionsForPlatform(SETTING_DEFINITIONS, this.platform);
 
   @ViewChild('search') searchRef?: ElementRef<HTMLInputElement>;
   @ViewChild('list') listRef?: ElementRef<HTMLElement>;
@@ -152,7 +154,7 @@ export class SettingsComponent {
   readonly version = signal<string | null>(null);
   /** Translator that also fills `{shortcut}` with the platform's send shortcut (descriptions such as enterToSend). */
   private readonly tx: Translator = (key, params) => this.i18n.t(key, { shortcut: formatAccelerator('CommandOrControl+Return', this.platform), ...params });
-  readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query(), this.tx), this.i18n.t));
+  readonly sections = computed(() => groupByCategory(filterSettings(this.definitions, this.query(), this.tx), this.i18n.t));
   private readonly scrolledCategory = signal<string | null>(null);
   // Falls back to the first visible section when the scrolled one has been filtered out
   readonly activeCategory = computed(() => {

@@ -28,6 +28,11 @@ impl SettingsChange {
         self.before.launch_at_startup != self.after.launch_at_startup
     }
 
+    /// L'affichage de l'icône dans la barre de menus a changé.
+    pub fn menu_bar_icon_changed(&self) -> bool {
+        self.before.show_menu_bar_icon != self.after.show_menu_bar_icon
+    }
+
     /// La langue a changé.
     pub fn language_changed(&self) -> bool {
         self.before.language != self.after.language

@@ -48,6 +48,9 @@ pub struct AppSettings {
     pub enter_to_send: bool,
     /// Lancement au démarrage de Windows (dans le tray).
     pub launch_at_startup: bool,
+    /// Icône dans la barre de menus (macOS seulement) ; masquée, l'app reste active en
+    /// arrière-plan et le Dock rouvre la fenêtre. Ignoré sous Windows : l'app vit dans le tray.
+    pub show_menu_bar_icon: bool,
     /// Thème, ou `system` pour suivre l'OS.
     pub theme: ThemePreference,
     /// Thème de `system` quand l'OS est en mode sombre.
@@ -113,6 +116,7 @@ impl Default for AppSettings {
             overlay_height: 350,
             enter_to_send: true,
             launch_at_startup: false,
+            show_menu_bar_icon: true,
             theme: ThemePreference::Theme(ThemeId::Dark),
             preferred_dark_theme: ThemeId::Dark,
             preferred_light_theme: ThemeId::Light,

@@ -3,6 +3,7 @@ import { TranslationParams, Translator } from '../../core/i18n/translate';
 import { TranslationKey } from '../../core/i18n/translations';
 import { APP_SHORTCUTS } from '../../core/models/app-shortcuts.model';
 import { THEMES, ThemeKind } from '../../core/models/theme.model';
+import type { Platform } from '../../core/services/platform.service';
 
 export type SettingControl = 'checkbox' | 'number' | 'select' | 'shortcut' | 'list';
 
@@ -27,6 +28,8 @@ export interface SettingDefinition {
   max?: number;
   step?: number;
   options?: SettingOption[];
+  /** Platforms where the setting applies; absent = every platform. */
+  platforms?: Platform[];
 }
 
 export interface SettingsSection {
@@ -80,6 +83,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     titleKey: 'settings.launchAtStartup.title',
     descriptionKey: 'settings.launchAtStartup.description',
     control: 'checkbox',
+  },
+  {
+    key: 'showMenuBarIcon',
+    categoryKey: 'settings.category.general',
+    titleKey: 'settings.showMenuBarIcon.title',
+    descriptionKey: 'settings.showMenuBarIcon.description',
+    control: 'checkbox',
+    platforms: ['mac'],
   },
   {
     key: 'autoUpdate',
@@ -260,6 +271,11 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   },
   ...APP_SHORTCUT_DEFINITIONS,
 ];
+
+/** Definitions that apply to `platform` (those without `platforms` apply everywhere). */
+export function definitionsForPlatform(definitions: SettingDefinition[], platform: Platform): SettingDefinition[] {
+  return definitions.filter(def => !def.platforms || def.platforms.includes(platform));
+}
 
 /** Case-insensitive match on the translated category, title, description or key; every word of the query must match. */
 export function filterSettings(definitions: SettingDefinition[], query: string, t: Translator): SettingDefinition[] {

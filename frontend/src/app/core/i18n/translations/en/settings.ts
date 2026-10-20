@@ -23,6 +23,8 @@ export const EN_SETTINGS = {
   'settings.language.description': 'Language of the app. The initial value follows the language of your PC; the change applies immediately.',
   'settings.launchAtStartup.title': 'Launch At Startup',
   'settings.launchAtStartup.description': 'Start Daftr silently in the tray or menu bar when you log in.',
+  'settings.showMenuBarIcon.title': 'Menu Bar Icon',
+  'settings.showMenuBarIcon.description': 'Show Daftr\'s icon in the menu bar. Without it, Daftr still runs in the background: the quick-note shortcut keeps working and the Dock icon reopens the window.',
   'settings.autoUpdate.title': 'Automatic Updates',
   'settings.autoUpdate.description': 'Download new versions in the background and install them when the app closes. When unchecked, you are asked before anything is downloaded.',
   'settings.theme.title': 'Theme',

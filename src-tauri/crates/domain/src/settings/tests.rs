@@ -303,6 +303,22 @@ fn a_new_shortcut_without_physical_key_drops_the_old_one() {
 }
 
 #[test]
+fn shows_the_menu_bar_icon_unless_turned_off() {
+    let base = AppSettings {
+        show_menu_bar_icon: false,
+        ..AppSettings::default()
+    };
+    let turned_on = RawSettings {
+        show_menu_bar_icon: Some(true),
+        ..RawSettings::default()
+    };
+
+    assert!(AppSettings::default().show_menu_bar_icon);
+    assert!(!sanitize_settings(&RawSettings::default(), &base).show_menu_bar_icon);
+    assert!(sanitize_settings(&turned_on, &base).show_menu_bar_icon);
+}
+
+#[test]
 fn falls_back_to_the_current_values_rather_than_the_defaults() {
     let base = AppSettings {
         overlay_width: 400,

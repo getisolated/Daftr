@@ -44,6 +44,9 @@ fn apply_general(raw: &RawSettings, settings: &mut AppSettings) {
         settings.shortcut_mode,
     );
     settings.launch_at_startup = raw.launch_at_startup.unwrap_or(settings.launch_at_startup);
+    settings.show_menu_bar_icon = raw
+        .show_menu_bar_icon
+        .unwrap_or(settings.show_menu_bar_icon);
     settings.auto_update = raw.auto_update.unwrap_or(settings.auto_update);
     settings.app_shortcuts = app_shortcuts(raw.app_shortcuts.as_deref(), &settings.app_shortcuts);
     settings.collections_exclude = excludes(

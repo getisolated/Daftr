@@ -39,6 +39,10 @@ enterToSend: boolean,
  */
 launchAtStartup: boolean, 
 /**
+ * Icône dans la barre de menus (macOS).
+ */
+showMenuBarIcon: boolean, 
+/**
  * Thème ou `system`.
  */
 theme: string, 

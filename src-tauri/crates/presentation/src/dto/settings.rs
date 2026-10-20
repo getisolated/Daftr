@@ -40,6 +40,8 @@ pub struct SettingsDto {
     pub enter_to_send: bool,
     /// Lancement au démarrage.
     pub launch_at_startup: bool,
+    /// Icône dans la barre de menus (macOS).
+    pub show_menu_bar_icon: bool,
     /// Thème ou `system`.
     #[ts(type = "string")]
     pub theme: &'static str,
@@ -95,6 +97,7 @@ impl From<&AppSettings> for SettingsDto {
             overlay_height: settings.overlay_height,
             enter_to_send: settings.enter_to_send,
             launch_at_startup: settings.launch_at_startup,
+            show_menu_bar_icon: settings.show_menu_bar_icon,
             theme: settings.theme.as_str(),
             preferred_dark_theme: settings.preferred_dark_theme.as_str(),
             preferred_light_theme: settings.preferred_light_theme.as_str(),

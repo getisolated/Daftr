@@ -58,6 +58,18 @@ fn with_icon(
         .show_menu_on_left_click(true))
 }
 
+/// Affiche ou masque l'icône de la barre de menus ; masquée, l'app reste active en
+/// arrière-plan (raccourci global, Dock).
+#[cfg(target_os = "macos")]
+pub fn set_visible(app: &AppHandle, visible: bool) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    if let Err(error) = tray.set_visible(visible) {
+        tracing::warn!(%error, visible, "visibilité de l'icône de la barre de menus non appliquée");
+    }
+}
+
 /// Reconstruit le menu dans une autre langue.
 pub fn set_language(app: &AppHandle, language: Language) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {

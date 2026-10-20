@@ -22,6 +22,8 @@ export interface AppSettings {
   /** true: Enter sends (Shift+Enter = new line). false: Enter = new line (Ctrl+Enter sends). */
   enterToSend: boolean;
   launchAtStartup: boolean;
+  /** macOS only: false hides the menu bar icon; Daftr keeps running (global shortcut, Dock). Ignored on Windows. */
+  showMenuBarIcon: boolean;
   /** 'system' follows the OS color scheme. */
   theme: ThemePreference;
   /** Theme used by 'system' while the OS is in dark mode. */
@@ -72,6 +74,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   overlayHeight: 350,
   enterToSend: true,
   launchAtStartup: false,
+  showMenuBarIcon: true,
   theme: 'dark',
   preferredDarkTheme: 'dark',
   preferredLightTheme: 'light',

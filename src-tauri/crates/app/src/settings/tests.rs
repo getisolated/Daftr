@@ -104,6 +104,20 @@ fn reports_what_changed() {
 }
 
 #[test]
+fn reports_a_hidden_menu_bar_icon() {
+    let (_, service) = service(None);
+    let next = AppSettings {
+        show_menu_bar_icon: false,
+        ..AppSettings::default()
+    };
+
+    let change = service.commit(next);
+
+    assert!(change.menu_bar_icon_changed());
+    assert!(!change.launch_at_startup_changed() && !change.shortcut_changed());
+}
+
+#[test]
 fn a_new_physical_key_is_a_shortcut_change() {
     let (_, service) = service(None);
     let next = AppSettings {

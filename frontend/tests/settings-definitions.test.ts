@@ -3,7 +3,7 @@ import { APP_SHORTCUTS } from '../src/app/core/models/app-shortcuts.model';
 import { DEFAULT_SETTINGS } from '../src/app/core/models/settings.model';
 import { translate } from '../src/app/core/i18n/translate';
 import { Translator } from '../src/app/core/i18n/translate';
-import { SETTING_DEFINITIONS, filterSettings, groupByCategory, settingOptions, settingTitle } from '../src/app/features/settings/settings-definitions';
+import { SETTING_DEFINITIONS, definitionsForPlatform, filterSettings, groupByCategory, settingOptions, settingTitle } from '../src/app/features/settings/settings-definitions';
 
 const en: Translator = (key, params) => translate('en', key, params);
 const fr: Translator = (key, params) => translate('fr', key, params);
@@ -64,6 +64,13 @@ describe('SETTING_DEFINITIONS', () => {
     const keys = SETTING_DEFINITIONS.map(d => d.key);
     expect(new Set(keys).size).toBe(keys.length);
     SETTING_DEFINITIONS.filter(d => !d.shortcutId).forEach(d => expect(d.key in DEFAULT_SETTINGS).toBe(true));
+  });
+
+  it('shows the menu bar icon setting on macOS only', () => {
+    const keysOn = (platform: 'mac' | 'windows') => definitionsForPlatform(SETTING_DEFINITIONS, platform).map(d => d.key);
+    expect(keysOn('mac')).toContain('showMenuBarIcon');
+    expect(keysOn('windows')).not.toContain('showMenuBarIcon');
+    expect(keysOn('windows')).toEqual(SETTING_DEFINITIONS.filter(d => d.key !== 'showMenuBarIcon').map(d => d.key));
   });
 
   it('lists every rebindable shortcut', () => {

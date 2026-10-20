@@ -24,6 +24,7 @@ pub fn raw_from_json(value: &Value) -> RawSettings {
         overlay_height: number("overlayHeight"),
         enter_to_send: flag("enterToSend"),
         launch_at_startup: flag("launchAtStartup"),
+        show_menu_bar_icon: flag("showMenuBarIcon"),
         theme: text("theme"),
         preferred_dark_theme: text("preferredDarkTheme"),
         preferred_light_theme: text("preferredLightTheme"),
@@ -87,6 +88,7 @@ pub fn settings_to_json(settings: &AppSettings) -> Value {
         "overlayHeight": settings.overlay_height,
         "enterToSend": settings.enter_to_send,
         "launchAtStartup": settings.launch_at_startup,
+        "showMenuBarIcon": settings.show_menu_bar_icon,
         "theme": settings.theme.as_str(),
         "preferredDarkTheme": settings.preferred_dark_theme.as_str(),
         "preferredLightTheme": settings.preferred_light_theme.as_str(),
@@ -127,6 +129,7 @@ mod tests {
             overlay_position: Some(domain::overlay::Position { x: -10, y: 20 }),
             global_shortcut_physical_key: Some("Digit1".to_owned()),
             word_wrap: false,
+            show_menu_bar_icon: false,
             ..AppSettings::default()
         };
 
