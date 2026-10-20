@@ -78,10 +78,8 @@ mod tests {
 
     /// Dossier de travail jetable, propre à chaque test.
     fn sandbox(name: &str) -> PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "daftr-data-dir-{name}-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("daftr-data-dir-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).expect("dossier temporaire");
         root
@@ -92,7 +90,12 @@ mod tests {
         let root = sandbox("moves");
         let legacy = root.join(LEGACY_DATA_FOLDER);
         std::fs::create_dir_all(&legacy).unwrap();
-        for file in ["evnote.db", "evnote.db-wal", "evnote.db-shm", "settings.json"] {
+        for file in [
+            "evnote.db",
+            "evnote.db-wal",
+            "evnote.db-shm",
+            "settings.json",
+        ] {
             std::fs::write(legacy.join(file), file).unwrap();
         }
         let directory = root.join(DATA_FOLDER);
@@ -136,7 +139,10 @@ mod tests {
 
         migrate_legacy(&root.join(LEGACY_DATA_FOLDER), &directory).unwrap();
 
-        assert!(!directory.exists(), "le dossier est créé par `resolve`, pas ici");
+        assert!(
+            !directory.exists(),
+            "le dossier est créé par `resolve`, pas ici"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 }
