@@ -4,6 +4,7 @@ import { SettingsService } from '../../core/services/settings.service';
 import { APP_SHORTCUTS, defaultAcceleratorFor, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
 import { DEFAULT_SETTINGS, SettingsPatch } from '../../core/models/settings.model';
 import { appVersion } from '../../core/services/desktop-api';
+import { Translator } from '../../core/i18n/translate';
 import { PlatformService } from '../../core/services/platform.service';
 import { formatAccelerator, isReservedAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
@@ -149,7 +150,9 @@ export class SettingsComponent {
   readonly shortcutError = signal<{ key: string; message: string } | null>(null);
   /** Version shown under the logotype; null until known, or outside the desktop app. */
   readonly version = signal<string | null>(null);
-  readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query(), this.i18n.t), this.i18n.t));
+  /** Translator that also fills `{shortcut}` with the platform's send shortcut (descriptions such as enterToSend). */
+  private readonly tx: Translator = (key, params) => this.i18n.t(key, { shortcut: formatAccelerator('CommandOrControl+Return', this.platform), ...params });
+  readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query(), this.tx), this.i18n.t));
   private readonly scrolledCategory = signal<string | null>(null);
   // Falls back to the first visible section when the scrolled one has been filtered out
   readonly activeCategory = computed(() => {
@@ -193,7 +196,7 @@ export class SettingsComponent {
 
   titleOf(def: SettingDefinition): string { return settingTitle(def, this.i18n.t); }
 
-  descriptionOf(def: SettingDefinition): string { return settingDescription(def, this.i18n.t); }
+  descriptionOf(def: SettingDefinition): string { return settingDescription(def, this.tx); }
 
   optionsOf(def: SettingDefinition): { value: string; label: string }[] { return settingOptions(def, this.i18n.t); }
 
@@ -286,7 +289,7 @@ export class SettingsComponent {
 
     // Kept by the system (⌘Q, ⌘H, ⌘M, ⌘Tab, ⌘Space… on macOS): the app would never receive it
     if (isReservedAccelerator(accelerator, this.platform)) {
-      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut }) });
+      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutReserved', { shortcut }) });
       return;
     }
 

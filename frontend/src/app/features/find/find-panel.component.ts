@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, viewChild } from '@angular/core';
+import { PlatformService } from '../../core/services/platform.service';
+import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { FindService } from '../../core/services/find.service';
 import { MAX_FIND_MATCHES } from '../../shared/codemirror/find-matches';
@@ -87,7 +89,7 @@ import { FindOptions } from '../../core/models/find.model';
           <button type="button" class="icon-btn" [title]="i18n.t('editor.find.replace')" [disabled]="!hasMatches()" (click)="find.replace()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4a2 2 0 0 1 2-2M16 10a2 2 0 0 1-2-2M20 2a2 2 0 0 1 2 2M22 8a2 2 0 0 1-2 2M3 7l3 3 3-3M6 10V5a3 3 0 0 1 3-3h1"/><rect x="2" y="14" width="8" height="8" rx="2"/></svg>
           </button>
-          <button type="button" class="icon-btn" [title]="i18n.t('editor.find.replaceAll', { shortcut: 'Ctrl+Alt+Enter' })" [disabled]="!hasMatches()" (click)="find.replaceAll()">
+          <button type="button" class="icon-btn" [title]="i18n.t('editor.find.replaceAll', { shortcut: replaceAllShortcut })" [disabled]="!hasMatches()" (click)="find.replaceAll()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2M14 4a2 2 0 0 1 2-2M16 10a2 2 0 0 1-2-2M20 14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2M20 2a2 2 0 0 1 2 2M22 8a2 2 0 0 1-2 2M3 7l3 3 3-3M6 10V5a3 3 0 0 1 3-3h1"/><rect x="2" y="14" width="8" height="8" rx="2"/></svg>
           </button>
         }
@@ -121,6 +123,9 @@ import { FindOptions } from '../../core/models/find.model';
 export class FindPanelComponent {
   protected readonly find = inject(FindService);
   protected readonly i18n = inject(I18nService);
+  private readonly platform = inject(PlatformService);
+  // ⌥⌘↩ on macOS, Ctrl+Alt+Enter on Windows
+  protected readonly replaceAllShortcut = formatAccelerator('CommandOrControl+Alt+Return', this.platform.platform);
 
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly results = viewChild<ElementRef<HTMLElement>>('results');
@@ -191,14 +196,19 @@ export class FindPanelComponent {
     const toggles: Record<string, keyof Pick<FindOptions, 'caseSensitive' | 'wholeWord' | 'regexp'>> = { c: 'caseSensitive', w: 'wholeWord', r: 'regexp' };
     const toggleKey = toggles[event.key.toLowerCase()];
 
-    if (event.altKey && !event.ctrlKey && toggleKey) {
+    if (event.altKey && !this.primaryMod(event) && toggleKey) {
       event.preventDefault();
       this.toggle(toggleKey);
     }
   }
 
+  /** The primary modifier: ⌘ on macOS, Ctrl elsewhere. */
+  private primaryMod(event: KeyboardEvent): boolean {
+    return this.platform.isMac ? event.metaKey : event.ctrlKey;
+  }
+
   private runEnter(event: KeyboardEvent, inReplace: boolean): void {
-    if (inReplace && event.ctrlKey && event.altKey) {
+    if (inReplace && this.primaryMod(event) && event.altKey) {
       this.find.replaceAll();
     } else if (inReplace) {
       this.find.replace();

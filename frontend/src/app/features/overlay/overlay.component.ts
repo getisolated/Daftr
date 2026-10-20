@@ -98,8 +98,8 @@ export class OverlayComponent implements OnInit, OnDestroy {
     }
     if (event.key !== 'Enter' || event.isComposing) return;
 
-    // Ctrl+Enter always sends; plain Enter sends only when configured so (Shift+Enter keeps the new line)
-    const shouldSend = event.ctrlKey || (this.settingsService.settings().enterToSend && !event.shiftKey);
+    // Ctrl+Enter (⌘↩ on macOS) always sends; plain Enter sends only when configured so (Shift+Enter keeps the new line)
+    const shouldSend = (this.platform.isMac ? event.metaKey : event.ctrlKey) || (this.settingsService.settings().enterToSend && !event.shiftKey);
     if (shouldSend) {
       event.preventDefault();
       this.send();
