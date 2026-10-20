@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "adapter-fs"
-version = "0.0.12"
+version = "1.0.0"
 dependencies = [
  "app",
  "domain",
@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "adapter-sqlite"
-version = "0.0.12"
+version = "1.0.0"
 dependencies = [
  "app",
  "domain",
@@ -76,7 +76,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app"
-version = "0.0.12"
+version = "1.0.0"
 dependencies = [
  "domain",
  "platform",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "desktop"
-version = "0.0.12"
+version = "1.0.0"
 dependencies = [
  "adapter-fs",
  "adapter-sqlite",
@@ -942,7 +942,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.0.12"
+version = "1.0.0"
 
 [[package]]
 name = "dpi"
@@ -3001,7 +3001,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "platform"
-version = "0.0.12"
+version = "1.0.0"
 dependencies = [
  "tracing",
  "tracing-subscriber",
@@ -3098,7 +3098,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "presentation"
-version = "0.0.12"
+version = "1.0.0"
 dependencies = [
  "app",
  "domain",
