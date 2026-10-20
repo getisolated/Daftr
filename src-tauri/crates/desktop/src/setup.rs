@@ -67,6 +67,10 @@ fn start_windows(app: &AppHandle) -> anyhow::Result<()> {
 
     main_window::create(app, !startup::launched_hidden()).context("fenêtre principale")?;
     tray::create(app, settings.language).context("icône du tray")?;
+    #[cfg(target_os = "macos")]
+    tray::set_visible(app, settings.show_menu_bar_icon);
+    #[cfg(target_os = "macos")]
+    crate::menu::install(app, settings.language).context("menu d'application")?;
     Ok(())
 }
 
@@ -76,7 +80,8 @@ fn start_background(app: &AppHandle) {
 
     overlay::prepare_in_background(app);
     startup::apply(app, settings.launch_at_startup);
-    if !shortcut::register(app, &settings.global_shortcut) {
+    let physical_key = settings.global_shortcut_physical_key.as_deref();
+    if !shortcut::register(app, &settings.global_shortcut, physical_key) {
         tracing::error!(shortcut = %settings.global_shortcut, "raccourci global indisponible");
     }
     updater::start(app);

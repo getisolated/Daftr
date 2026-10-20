@@ -1,15 +1,17 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { SettingsService } from '../../core/services/settings.service';
-import { APP_SHORTCUTS, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
+import { APP_SHORTCUTS, defaultAcceleratorFor, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
 import { DEFAULT_SETTINGS, SettingsPatch } from '../../core/models/settings.model';
 import { appVersion } from '../../core/services/desktop-api';
-import { formatAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
+import { Translator } from '../../core/i18n/translate';
+import { PlatformService } from '../../core/services/platform.service';
+import { formatAccelerator, isReservedAccelerator, keyEventToAccelerator, physicalKeyOf } from '../../core/utils/accelerator.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
 import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
 import {
-  SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
+  SETTING_DEFINITIONS, SettingDefinition, definitionsForPlatform, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
 } from './settings-definitions';
 
 @Component({
@@ -109,7 +111,7 @@ import {
                             class="control shortcut"
                             data-shortcut-recorder
                             [class.recording]="recording() === def.key"
-                            (click)="startRecording(def)"
+                            (click)="startRecording(def, $event)"
                             (keydown)="onShortcutKeydown(def, $event)"
                             (blur)="recording.set(null)"
                           >{{ recording() === def.key ? i18n.t('settings.modal.recording') : shortcutLabel(def) }}</button>
@@ -135,6 +137,9 @@ import {
 export class SettingsComponent {
   private settingsService = inject(SettingsService);
   protected readonly i18n = inject(I18nService);
+  private readonly platform = inject(PlatformService).platform;
+  /** Settings that apply to this platform: the only ones shown, searched and counted. */
+  private readonly definitions = definitionsForPlatform(SETTING_DEFINITIONS, this.platform);
 
   @ViewChild('search') searchRef?: ElementRef<HTMLInputElement>;
   @ViewChild('list') listRef?: ElementRef<HTMLElement>;
@@ -147,7 +152,9 @@ export class SettingsComponent {
   readonly shortcutError = signal<{ key: string; message: string } | null>(null);
   /** Version shown under the logotype; null until known, or outside the desktop app. */
   readonly version = signal<string | null>(null);
-  readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query(), this.i18n.t), this.i18n.t));
+  /** Translator that also fills `{shortcut}` with the platform's send shortcut (descriptions such as enterToSend). */
+  private readonly tx: Translator = (key, params) => this.i18n.t(key, { shortcut: formatAccelerator('CommandOrControl+Return', this.platform), ...params });
+  readonly sections = computed(() => groupByCategory(filterSettings(this.definitions, this.query(), this.tx), this.i18n.t));
   private readonly scrolledCategory = signal<string | null>(null);
   // Falls back to the first visible section when the scrolled one has been filtered out
   readonly activeCategory = computed(() => {
@@ -191,13 +198,13 @@ export class SettingsComponent {
 
   titleOf(def: SettingDefinition): string { return settingTitle(def, this.i18n.t); }
 
-  descriptionOf(def: SettingDefinition): string { return settingDescription(def, this.i18n.t); }
+  descriptionOf(def: SettingDefinition): string { return settingDescription(def, this.tx); }
 
   optionsOf(def: SettingDefinition): { value: string; label: string }[] { return settingOptions(def, this.i18n.t); }
 
   shortcutLabel(def: SettingDefinition): string {
     const accelerator = def.shortcutId ? this.settingsService.appShortcuts()[def.shortcutId] : this.settings().globalShortcut;
-    return formatAccelerator(accelerator ?? '');
+    return formatAccelerator(accelerator ?? '', this.platform);
   }
 
   isModified(def: SettingDefinition): boolean {
@@ -261,9 +268,12 @@ export class SettingsComponent {
     await this.save(def, value);
   }
 
-  startRecording(def: SettingDefinition): void {
+  startRecording(def: SettingDefinition, event: Event): void {
     this.shortcutError.set(null);
     this.recording.set(def.key);
+    // WebKit (macOS) does not focus a clicked button: without focus, keydown never reaches the recorder
+    // and Escape closes the settings. Focusing after the mousedown cannot trigger the (blur) that cancels.
+    if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus();
   }
 
   async onShortcutKeydown(def: SettingDefinition, event: KeyboardEvent): Promise<void> {
@@ -276,30 +286,40 @@ export class SettingsComponent {
       return;
     }
 
-    const accelerator = keyEventToAccelerator(event);
+    // On macOS ⌘ is recorded as CommandOrControl (⌘ in the global shortcut too) and ⌃ as Control
+    const accelerator = keyEventToAccelerator(event, { platform: this.platform });
     if (!accelerator) return;
     this.recording.set(null);
+    const shortcut = formatAccelerator(accelerator, this.platform);
+
+    // Kept by the system (⌘Q, ⌘H, ⌘M, ⌘Tab, ⌘Space… on macOS): the app would never receive it
+    if (isReservedAccelerator(accelerator, this.platform)) {
+      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutReserved', { shortcut }) });
+      return;
+    }
 
     if (def.shortcutId) {
       const conflict = findShortcutConflict(def.shortcutId, accelerator, this.settingsService.appShortcuts());
       if (conflict) {
-        this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutConflict', { shortcut: formatAccelerator(accelerator), label: shortcutLabel(conflict, this.i18n.t) }) });
+        this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutConflict', { shortcut, label: shortcutLabel(conflict, this.i18n.t) }) });
         return;
       }
       await this.setAppShortcut(def.shortcutId, accelerator);
       return;
     }
 
-    const result = await this.settingsService.update({ globalShortcut: accelerator });
+    // The physical key lets macOS register the key that carries this letter in the current layout
+    const result = await this.settingsService.update({ globalShortcut: accelerator, globalShortcutPhysicalKey: physicalKeyOf(event) });
     if (result && !result.ok) {
-      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut: formatAccelerator(accelerator) }) });
+      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut }) });
     }
   }
 
   /** Stores an override, or drops it (null / same as the default) so the default keeps applying. */
   private async setAppShortcut(id: string, accelerator: string | null): Promise<void> {
     const overrides = { ...this.settings().appShortcuts };
-    const defaultAccelerator = APP_SHORTCUTS.find(shortcut => shortcut.id === id)?.defaultAccelerator;
+    const definition = APP_SHORTCUTS.find(shortcut => shortcut.id === id);
+    const defaultAccelerator = definition ? defaultAcceleratorFor(definition, this.platform) : undefined;
     if (accelerator === null || accelerator === defaultAccelerator) {
       delete overrides[id];
     } else {

@@ -2,6 +2,7 @@ import { syntaxTree } from '@codemirror/language';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView, hoverTooltip } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
+import { detectPlatform } from '../../core/services/platform.service';
 import { translatorOf } from './translator';
 
 const NOTE_URL = /note:\/\/\d+/g;
@@ -48,7 +49,7 @@ export function linkTargetAt(state: EditorState, pos: number): string | null {
 
 /** Hover hint telling how to follow a link; a plain DOM tooltip so it matches the app theme, unlike the native `title`. */
 function linkHoverTooltip(): Extension {
-  const isMac = /mac/i.test(navigator.platform);
+  const isMac = detectPlatform(navigator) === 'mac';
 
   return [
     hoverTooltip((view, pos) => {
@@ -66,7 +67,7 @@ function linkHoverTooltip(): Extension {
           const dom = document.createElement('div');
 
           dom.className = 'cm-link-hint';
-          dom.textContent = translatorOf(view.state)('editor.link.hint', { key: isMac ? 'Cmd' : 'Ctrl' });
+          dom.textContent = translatorOf(view.state)('editor.link.hint', { key: isMac ? '⌘' : 'Ctrl' });
           return { dom };
         },
       };

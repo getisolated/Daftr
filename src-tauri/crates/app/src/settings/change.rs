@@ -12,9 +12,10 @@ pub struct SettingsChange {
 }
 
 impl SettingsChange {
-    /// Le raccourci global a changé.
+    /// Le raccourci global a changé, ou seulement sa touche physique (même libellé, autre
+    /// touche : sur macOS il faut le réenregistrer).
     pub fn shortcut_changed(&self) -> bool {
-        self.before.global_shortcut != self.after.global_shortcut
+        !self.before.same_global_shortcut(&self.after)
     }
 
     /// La taille de l'overlay a changé.
@@ -25,6 +26,11 @@ impl SettingsChange {
     /// Le lancement au démarrage a changé.
     pub fn launch_at_startup_changed(&self) -> bool {
         self.before.launch_at_startup != self.after.launch_at_startup
+    }
+
+    /// L'affichage de l'icône dans la barre de menus a changé.
+    pub fn menu_bar_icon_changed(&self) -> bool {
+        self.before.show_menu_bar_icon != self.after.show_menu_bar_icon
     }
 
     /// La langue a changé.

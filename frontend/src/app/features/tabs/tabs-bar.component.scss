@@ -16,6 +16,13 @@
   position: relative;
 }
 
+// macOS: room for the native traffic lights (from x = 12px, they end near 72px on macOS 26: see TRAFFIC_LIGHTS in main_window.rs)
+.traffic-lights-inset {
+  flex-shrink: 0;
+  width: 78px;
+  height: 100%;
+}
+
 // ── Home button ───────────────────────────────────────────────────────────────
 
 .home-btn {

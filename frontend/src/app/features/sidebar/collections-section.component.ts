@@ -10,6 +10,8 @@ import { FileDocsService } from '../../core/services/file-docs.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { baseName, parentPath } from '../../core/utils/collection.util';
+import { PlatformService } from '../../core/services/platform.service';
+import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
@@ -148,6 +150,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
               (keydown.enter)="onNodeClick(row.root, row.node)"
               (keydown.f2)="startEditing({ kind: 'renamePath', root: row.root, path: row.node.path })"
               (keydown.delete)="confirmTrash.set({ root: row.root, path: row.node.path })"
+              (keydown.meta.backspace)="isMacDeleteKey($event) && confirmTrash.set({ root: row.root, path: row.node.path })"
               (contextmenu)="onNodeMenu($event, row.root, row.node)"
               (dragstart)="onDragStart($event, row.root, row.node.path)"
               (dragend)="dragged = null; dropKey.set(null)"
@@ -193,8 +196,8 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
 
     @if (confirmTrash(); as target) {
       <app-confirm-dialog
-        [title]="i18n.t('sidebar.collections.trash.title', { name: baseName(target.path) })"
-        [message]="i18n.t('sidebar.collections.trash.message')"
+        [title]="i18n.t(platformKey('sidebar.collections.trash.title'), { name: baseName(target.path) })"
+        [message]="i18n.t(platformKey('sidebar.collections.trash.message'))"
         [actions]="trashActions()"
         (chosen)="onTrashChoice($event)"
       />
@@ -213,12 +216,29 @@ export class CollectionsSectionComponent {
   private readonly fileDocs = inject(FileDocsService);
   protected readonly tabs = inject(TabsService);
   private readonly sidebarState = inject(SidebarStateService);
+  private readonly platform = inject(PlatformService);
+
+  /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
+  protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
+
+  /**
+   * ⌘⌫ deletes like Delete on macOS (MacBooks have no forward Delete key). Only on the row itself: in a rename
+   * field ⌘⌫ keeps erasing the text. Always false elsewhere.
+   */
+  protected isMacDeleteKey(event: Event): boolean {
+    return this.platform.isMac && event.target === event.currentTarget;
+  }
 
   protected readonly iconFile = ICON_FILE;
   protected readonly trashActions = computed<ConfirmDialogAction[]>(() => [
-    { id: 'trash', label: this.i18n.t('sidebar.collections.trash.confirm'), danger: true },
+    { id: 'trash', label: this.i18n.t(this.platformKey('sidebar.collections.trash.confirm')), danger: true },
   ]);
   protected readonly baseName = baseName;
+
+  /** Picks the macOS wording (Trash, Finder) over the Windows one. */
+  protected platformKey<K extends string>(key: K): K | `${K}.mac` {
+    return this.platform.isMac ? `${key}.mac` as `${K}.mac` : key;
+  }
 
   protected readonly open = signal(!readSet(SECTION_KEY).has('closed'));
   private readonly expanded = signal<ReadonlySet<string>>(readSet(EXPANDED_KEY));
@@ -471,7 +491,7 @@ export class CollectionsSectionComponent {
 
     items.push(
       { id: 'renameCollection', label: t('sidebar.collections.menu.renameCollection'), icon: ICON_RENAME, shortcut: 'F2' },
-      { id: 'reveal', label: t('sidebar.collections.menu.reveal'), icon: ICON_REVEAL, disabled: state.status === 'error' },
+      { id: 'reveal', label: t(this.platformKey('sidebar.collections.menu.reveal')), icon: ICON_REVEAL, disabled: state.status === 'error' },
       { id: 'refresh', label: t('sidebar.collections.menu.refresh'), icon: ICON_REFRESH, disabled: !isFolder },
       { divider: true },
       { id: 'remove', label: t('sidebar.collections.menu.remove'), icon: ICON_REMOVE },
@@ -492,9 +512,9 @@ export class CollectionsSectionComponent {
 
     items.push(
       { id: 'renamePath', label: t('common.rename'), icon: ICON_RENAME, shortcut: 'F2' },
-      { id: 'reveal', label: t('sidebar.collections.menu.reveal'), icon: ICON_REVEAL },
+      { id: 'reveal', label: t(this.platformKey('sidebar.collections.menu.reveal')), icon: ICON_REVEAL },
       { divider: true },
-      { id: 'trash', label: t('common.delete'), icon: ICON_DELETE, danger: true, shortcut: 'Del' },
+      { id: 'trash', label: t('common.delete'), icon: ICON_DELETE, danger: true, shortcut: this.deleteShortcut },
     );
 
     this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root, node } });

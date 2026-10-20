@@ -479,7 +479,7 @@ const tableTheme = EditorView.baseTheme({
     color: 'var(--daftr-text-strong)',
   },
   '.cm-md-table-line': {
-    fontFamily: 'Consolas, "Courier New", monospace',
+    fontFamily: 'var(--daftr-font-mono)',
     fontSize: '0.92em',
   },
 });

@@ -27,6 +27,8 @@ pub struct RawSettings {
     pub language: Option<String>,
     /// Voir [`AppSettings::global_shortcut`].
     pub global_shortcut: Option<String>,
+    /// Voir [`AppSettings::global_shortcut_physical_key`].
+    pub global_shortcut_physical_key: Option<String>,
     /// Voir [`AppSettings::shortcut_mode`].
     pub shortcut_mode: Option<String>,
     /// Voir [`AppSettings::overlay_width`].
@@ -37,6 +39,8 @@ pub struct RawSettings {
     pub enter_to_send: Option<bool>,
     /// Voir [`AppSettings::launch_at_startup`].
     pub launch_at_startup: Option<bool>,
+    /// Voir [`AppSettings::show_menu_bar_icon`].
+    pub show_menu_bar_icon: Option<bool>,
     /// Voir [`AppSettings::theme`].
     pub theme: Option<String>,
     /// Voir [`AppSettings::preferred_dark_theme`].
@@ -83,11 +87,13 @@ impl RawSettings {
         Self {
             language: Some(settings.language.as_str().to_owned()),
             global_shortcut: Some(settings.global_shortcut.clone()),
+            global_shortcut_physical_key: settings.global_shortcut_physical_key.clone(),
             shortcut_mode: Some(settings.shortcut_mode.as_str().to_owned()),
             overlay_width: Some(f64::from(settings.overlay_width)),
             overlay_height: Some(f64::from(settings.overlay_height)),
             enter_to_send: Some(settings.enter_to_send),
             launch_at_startup: Some(settings.launch_at_startup),
+            show_menu_bar_icon: Some(settings.show_menu_bar_icon),
             theme: Some(settings.theme.as_str().to_owned()),
             preferred_dark_theme: Some(settings.preferred_dark_theme.as_str().to_owned()),
             preferred_light_theme: Some(settings.preferred_light_theme.as_str().to_owned()),
@@ -117,15 +123,27 @@ impl RawSettings {
     }
 
     /// `self` dont chaque champ présent dans `patch` est remplacé (fusion `{...self, ...patch}`).
+    /// Exception : un patch qui change le raccourci global sans donner sa touche physique
+    /// l'efface (l'ancienne ne correspond plus au nouveau raccourci).
     pub fn overridden_by(self, patch: Self) -> Self {
+        let physical_key = if patch.global_shortcut.is_some() {
+            patch.global_shortcut_physical_key
+        } else {
+            patch
+                .global_shortcut_physical_key
+                .or(self.global_shortcut_physical_key)
+        };
+
         Self {
             language: patch.language.or(self.language),
             global_shortcut: patch.global_shortcut.or(self.global_shortcut),
+            global_shortcut_physical_key: physical_key,
             shortcut_mode: patch.shortcut_mode.or(self.shortcut_mode),
             overlay_width: patch.overlay_width.or(self.overlay_width),
             overlay_height: patch.overlay_height.or(self.overlay_height),
             enter_to_send: patch.enter_to_send.or(self.enter_to_send),
             launch_at_startup: patch.launch_at_startup.or(self.launch_at_startup),
+            show_menu_bar_icon: patch.show_menu_bar_icon.or(self.show_menu_bar_icon),
             theme: patch.theme.or(self.theme),
             preferred_dark_theme: patch.preferred_dark_theme.or(self.preferred_dark_theme),
             preferred_light_theme: patch.preferred_light_theme.or(self.preferred_light_theme),

@@ -83,7 +83,7 @@
 
     code, tt {
       padding: 0.2em 0.4em;
-      font-family: Consolas, 'Cascadia Mono', 'SF Mono', monospace;
+      font-family: var(--daftr-font-mono);
       font-size: 85%;
       background: rgba(var(--daftr-hover-rgb), 0.08);
       border-radius: 6px;
@@ -258,7 +258,7 @@
     .mermaid-error {
       display: block;
       padding: 8px 12px;
-      font-family: Consolas, 'Cascadia Mono', monospace;
+      font-family: var(--daftr-font-mono);
       font-size: 12px;
       white-space: pre-wrap;
       color: var(--daftr-danger);

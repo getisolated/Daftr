@@ -1,8 +1,11 @@
-//! Icône de la zone de notification : l'app y reste quand sa fenêtre est fermée.
+//! Icône de la zone de notification (barre de menus sur macOS) : l'app y reste quand sa
+//! fenêtre est fermée.
 
 use domain::i18n::{Language, MessageKey, message};
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::TrayIconBuilder;
+#[cfg(not(target_os = "macos"))]
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconEvent};
 use tauri::{AppHandle, Wry};
 
 use crate::lifecycle;
@@ -14,19 +17,57 @@ const QUICK_NOTE: &str = "quick-note";
 const SETTINGS: &str = "settings";
 const QUIT: &str = "quit";
 
+/// Icône monochrome de la barre de menus : macOS la teinte selon l'apparence (clair, sombre).
+#[cfg(target_os = "macos")]
+const TEMPLATE_ICON: &[u8] = include_bytes!("../icons/tray-template@2x.png");
+
 /// Crée l'icône et son menu.
 pub fn create(app: &AppHandle, language: Language) -> tauri::Result<()> {
-    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
+    let builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("Daftr")
         .menu(&build_menu(app, language)?)
+        .on_menu_event(on_menu_event);
+    with_icon(app, builder)?.build(app)?;
+    Ok(())
+}
+
+/// Icône de l'application ; un clic gauche montre la fenêtre, le menu est au clic droit.
+#[cfg(not(target_os = "macos"))]
+fn with_icon(
+    app: &AppHandle,
+    builder: TrayIconBuilder<Wry>,
+) -> tauri::Result<TrayIconBuilder<Wry>> {
+    let mut builder = builder
         .show_menu_on_left_click(false)
-        .on_menu_event(on_menu_event)
         .on_tray_icon_event(on_tray_icon_event);
     if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
-    builder.build(app)?;
-    Ok(())
+    Ok(builder)
+}
+
+/// Icône template ; comme dans toute la barre de menus, un clic (gauche ou droit) ouvre le menu.
+#[cfg(target_os = "macos")]
+fn with_icon(
+    _app: &AppHandle,
+    builder: TrayIconBuilder<Wry>,
+) -> tauri::Result<TrayIconBuilder<Wry>> {
+    Ok(builder
+        .icon(tauri::image::Image::from_bytes(TEMPLATE_ICON)?)
+        .icon_as_template(true)
+        .show_menu_on_left_click(true))
+}
+
+/// Affiche ou masque l'icône de la barre de menus ; masquée, l'app reste active en
+/// arrière-plan (raccourci global, Dock).
+#[cfg(target_os = "macos")]
+pub fn set_visible(app: &AppHandle, visible: bool) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    if let Err(error) = tray.set_visible(visible) {
+        tracing::warn!(%error, visible, "visibilité de l'icône de la barre de menus non appliquée");
+    }
 }
 
 /// Reconstruit le menu dans une autre langue.
@@ -67,6 +108,7 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn on_tray_icon_event(tray: &TrayIcon, event: TrayIconEvent) {
     if let TrayIconEvent::Click {
         button: MouseButton::Left,

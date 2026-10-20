@@ -3,10 +3,12 @@ import { formatAccelerator } from '../utils/accelerator.util';
 import { resolveAppShortcuts } from '../models/app-shortcuts.model';
 import { AppSettings, DEFAULT_SETTINGS, SettingsPatch, SettingsUpdateResult } from '../models/settings.model';
 import { DesktopBridgeService } from './desktop-bridge.service';
+import { PlatformService } from './platform.service';
 
 @Injectable({ providedIn: 'root' })
 export class SettingsService implements OnDestroy {
   private bridge = inject(DesktopBridgeService);
+  private readonly platform = inject(PlatformService).platform;
   private readonly _settings = signal<AppSettings>(DEFAULT_SETTINGS);
   private readonly _isOpen = signal(false);
   private readonly _loaded = signal(false);
@@ -16,8 +18,8 @@ export class SettingsService implements OnDestroy {
   readonly isOpen = this._isOpen.asReadonly();
   /** False until the main process answered: before that, `settings` only holds the defaults. */
   readonly loaded = this._loaded.asReadonly();
-  /** Accelerator in effect for every rebindable in-app shortcut, by shortcut id. */
-  readonly appShortcuts = computed(() => resolveAppShortcuts(this._settings().appShortcuts));
+  /** Accelerator in effect for every rebindable in-app shortcut, by shortcut id (defaults depend on the platform). */
+  readonly appShortcuts = computed(() => resolveAppShortcuts(this._settings().appShortcuts, this.platform));
 
   constructor() {
     this.load();
@@ -29,9 +31,9 @@ export class SettingsService implements OnDestroy {
     ];
   }
 
-  /** Human-readable shortcut currently bound to an in-app action, for hints and tooltips. */
+  /** Human-readable shortcut currently bound to an in-app action, for hints and tooltips (⌘ symbols on macOS). */
   shortcutLabel(id: string): string {
-    return formatAccelerator(this.appShortcuts()[id] ?? '');
+    return formatAccelerator(this.appShortcuts()[id] ?? '', this.platform);
   }
 
   async load(): Promise<void> {

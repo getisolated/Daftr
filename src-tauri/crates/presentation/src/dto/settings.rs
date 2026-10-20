@@ -26,6 +26,9 @@ pub struct SettingsDto {
     pub language: &'static str,
     /// Raccourci global.
     pub global_shortcut: String,
+    /// Touche physique de la touche finale du raccourci global (`KeyA`…`KeyZ`,
+    /// `Digit0`…`Digit9`), `null` si inconnue.
+    pub global_shortcut_physical_key: Option<String>,
     /// Ce qu'ouvre le raccourci global.
     #[ts(type = "'overlay' | 'app'")]
     pub shortcut_mode: &'static str,
@@ -37,6 +40,8 @@ pub struct SettingsDto {
     pub enter_to_send: bool,
     /// Lancement au démarrage.
     pub launch_at_startup: bool,
+    /// Icône dans la barre de menus (macOS).
+    pub show_menu_bar_icon: bool,
     /// Thème ou `system`.
     #[ts(type = "string")]
     pub theme: &'static str,
@@ -86,11 +91,13 @@ impl From<&AppSettings> for SettingsDto {
         Self {
             language: settings.language.as_str(),
             global_shortcut: settings.global_shortcut.clone(),
+            global_shortcut_physical_key: settings.global_shortcut_physical_key.clone(),
             shortcut_mode: settings.shortcut_mode.as_str(),
             overlay_width: settings.overlay_width,
             overlay_height: settings.overlay_height,
             enter_to_send: settings.enter_to_send,
             launch_at_startup: settings.launch_at_startup,
+            show_menu_bar_icon: settings.show_menu_bar_icon,
             theme: settings.theme.as_str(),
             preferred_dark_theme: settings.preferred_dark_theme.as_str(),
             preferred_light_theme: settings.preferred_light_theme.as_str(),

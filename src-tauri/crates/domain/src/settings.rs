@@ -33,6 +33,11 @@ pub struct AppSettings {
     pub language: Language,
     /// Raccourci global (format accélérateur, ex. `CommandOrControl+Alt+Q`).
     pub global_shortcut: String,
+    /// Touche physique de la touche finale du raccourci global (`KeyboardEvent.code` :
+    /// `KeyA`…`KeyZ`, `Digit0`…`Digit9`), `None` si inconnue. Sur macOS le raccourci global
+    /// s'enregistre par code de touche physique : la lettre de `global_shortcut` suit la
+    /// disposition (sur AZERTY la touche « Q » est la touche physique `KeyA`).
+    pub global_shortcut_physical_key: Option<String>,
     /// Ce qu'ouvre le raccourci global.
     pub shortcut_mode: ShortcutMode,
     /// Largeur de l'overlay.
@@ -43,6 +48,9 @@ pub struct AppSettings {
     pub enter_to_send: bool,
     /// Lancement au démarrage de Windows (dans le tray).
     pub launch_at_startup: bool,
+    /// Icône dans la barre de menus (macOS seulement) ; masquée, l'app reste active en
+    /// arrière-plan et le Dock rouvre la fenêtre. Ignoré sous Windows : l'app vit dans le tray.
+    pub show_menu_bar_icon: bool,
     /// Thème, ou `system` pour suivre l'OS.
     pub theme: ThemePreference,
     /// Thème de `system` quand l'OS est en mode sombre.
@@ -89,6 +97,12 @@ impl AppSettings {
             height: self.overlay_height,
         }
     }
+
+    /// Même raccourci global : même accélérateur et même touche physique.
+    pub fn same_global_shortcut(&self, other: &Self) -> bool {
+        self.global_shortcut == other.global_shortcut
+            && self.global_shortcut_physical_key == other.global_shortcut_physical_key
+    }
 }
 
 impl Default for AppSettings {
@@ -96,11 +110,13 @@ impl Default for AppSettings {
         Self {
             language: DEFAULT_LANGUAGE,
             global_shortcut: "CommandOrControl+Alt+Q".to_owned(),
+            global_shortcut_physical_key: None,
             shortcut_mode: ShortcutMode::Overlay,
             overlay_width: 250,
             overlay_height: 350,
             enter_to_send: true,
             launch_at_startup: false,
+            show_menu_bar_icon: true,
             theme: ThemePreference::Theme(ThemeId::Dark),
             preferred_dark_theme: ThemeId::Dark,
             preferred_light_theme: ThemeId::Light,

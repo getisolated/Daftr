@@ -49,7 +49,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: Version de l'application (visible dans le titre de la fenêtre ou package.json)
+      description: Version de l'application (visible dans le titre de la fenêtre, dans « À propos de Daftr » sur macOS, ou package.json)
       placeholder: "Ex : 0.0.9"
     validations:
       required: false
@@ -59,7 +59,7 @@ body:
     attributes:
       label: Système d'exploitation
       description: "OS et version"
-      placeholder: "Ex : Windows 11 23H2"
+      placeholder: "Ex : Windows 11 23H2, macOS 15.1"
     validations:
       required: false
 

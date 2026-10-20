@@ -1,4 +1,4 @@
-//! Langues de l'interface et textes du processus principal (tray, dialogues natifs).
+//! Langues de l'interface et textes du processus principal (tray, menu macOS, dialogues natifs).
 //!
 //! Les textes des fenêtres vivent côté renderer (`frontend/src/app/core/i18n`).
 
@@ -52,6 +52,40 @@ pub enum MessageKey {
     FilterHtml,
     /// Filtre d'archives ZIP.
     FilterZip,
+    /// Menu d'application (macOS) : à propos.
+    MenuAbout,
+    /// Menu d'application (macOS) : services du système.
+    MenuServices,
+    /// Menu d'application (macOS) : masquer l'application.
+    MenuHide,
+    /// Menu d'application (macOS) : masquer les autres applications.
+    MenuHideOthers,
+    /// Menu d'application (macOS) : tout afficher.
+    MenuShowAll,
+    /// Menu d'application (macOS) : quitter pour de bon.
+    MenuQuit,
+    /// Menu d'application (macOS) : sous-menu Édition.
+    MenuEdit,
+    /// Menu Édition : annuler.
+    MenuUndo,
+    /// Menu Édition : rétablir.
+    MenuRedo,
+    /// Menu Édition : couper.
+    MenuCut,
+    /// Menu Édition : copier.
+    MenuCopy,
+    /// Menu Édition : coller.
+    MenuPaste,
+    /// Menu Édition : tout sélectionner.
+    MenuSelectAll,
+    /// Menu d'application (macOS) : sous-menu Fenêtre.
+    MenuWindow,
+    /// Menu Fenêtre : réduire dans le Dock.
+    MenuMinimize,
+    /// Menu Fenêtre : zoom (agrandir / rétablir).
+    MenuZoom,
+    /// Menu Fenêtre : fermer la fenêtre.
+    MenuCloseWindow,
 }
 
 /// Le texte `key` dans `language`.
@@ -78,6 +112,23 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::FilterMarkdown => "Markdown",
         MessageKey::FilterHtml => "HTML page",
         MessageKey::FilterZip => "ZIP archive",
+        MessageKey::MenuAbout => "About Daftr",
+        MessageKey::MenuServices => "Services",
+        MessageKey::MenuHide => "Hide Daftr",
+        MessageKey::MenuHideOthers => "Hide Others",
+        MessageKey::MenuShowAll => "Show All",
+        MessageKey::MenuQuit => "Quit Daftr",
+        MessageKey::MenuEdit => "Edit",
+        MessageKey::MenuUndo => "Undo",
+        MessageKey::MenuRedo => "Redo",
+        MessageKey::MenuCut => "Cut",
+        MessageKey::MenuCopy => "Copy",
+        MessageKey::MenuPaste => "Paste",
+        MessageKey::MenuSelectAll => "Select All",
+        MessageKey::MenuWindow => "Window",
+        MessageKey::MenuMinimize => "Minimize",
+        MessageKey::MenuZoom => "Zoom",
+        MessageKey::MenuCloseWindow => "Close Window",
     }
 }
 
@@ -92,6 +143,24 @@ fn french(key: MessageKey) -> &'static str {
         MessageKey::FilterMarkdown => "Markdown",
         MessageKey::FilterHtml => "Page HTML",
         MessageKey::FilterZip => "Archive ZIP",
+        // Libellés de macOS en français
+        MessageKey::MenuAbout => "À propos de Daftr",
+        MessageKey::MenuServices => "Services",
+        MessageKey::MenuHide => "Masquer Daftr",
+        MessageKey::MenuHideOthers => "Masquer les autres",
+        MessageKey::MenuShowAll => "Tout afficher",
+        MessageKey::MenuQuit => "Quitter Daftr",
+        MessageKey::MenuEdit => "Édition",
+        MessageKey::MenuUndo => "Annuler",
+        MessageKey::MenuRedo => "Rétablir",
+        MessageKey::MenuCut => "Couper",
+        MessageKey::MenuCopy => "Copier",
+        MessageKey::MenuPaste => "Coller",
+        MessageKey::MenuSelectAll => "Tout sélectionner",
+        MessageKey::MenuWindow => "Fenêtre",
+        MessageKey::MenuMinimize => "Placer dans le Dock",
+        MessageKey::MenuZoom => "Réduire/agrandir",
+        MessageKey::MenuCloseWindow => "Fermer la fenêtre",
     }
 }
 
@@ -124,5 +193,19 @@ mod tests {
     fn translates_the_main_process_texts() {
         assert_eq!(message(Language::En, MessageKey::TrayQuit), "Quit");
         assert_eq!(message(Language::Fr, MessageKey::TrayQuit), "Quitter");
+    }
+
+    #[test]
+    fn translates_the_macos_application_menu() {
+        assert_eq!(message(Language::En, MessageKey::MenuQuit), "Quit Daftr");
+        assert_eq!(message(Language::Fr, MessageKey::MenuQuit), "Quitter Daftr");
+        assert_eq!(message(Language::En, MessageKey::MenuEdit), "Edit");
+        assert_eq!(message(Language::Fr, MessageKey::MenuEdit), "Édition");
+        assert_eq!(message(Language::Fr, MessageKey::MenuCopy), "Copier");
+        assert_eq!(message(Language::Fr, MessageKey::MenuWindow), "Fenêtre");
+        assert_eq!(
+            message(Language::Fr, MessageKey::MenuMinimize),
+            "Placer dans le Dock"
+        );
     }
 }

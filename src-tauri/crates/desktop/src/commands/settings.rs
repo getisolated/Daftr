@@ -25,9 +25,10 @@ pub async fn settings_set(
     let service = &desktop(&app).services.settings;
     let before = service.current();
     let candidate = presentation::settings::candidate(service, &patch);
+    let physical_key = candidate.global_shortcut_physical_key.as_deref();
 
-    if candidate.global_shortcut != before.global_shortcut
-        && !shortcut::register(&app, &candidate.global_shortcut)
+    if !candidate.same_global_shortcut(&before)
+        && !shortcut::register(&app, &candidate.global_shortcut, physical_key)
     {
         return SettingsUpdateResultDto::shortcut_unavailable(&before);
     }

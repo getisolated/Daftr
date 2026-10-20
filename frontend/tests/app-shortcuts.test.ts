@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { isReservedAccelerator } from '../src/app/core/utils/accelerator.util';
 import { translate } from '../src/app/core/i18n/translate';
-import { APP_SHORTCUTS, findShortcutConflict, resolveAppShortcuts, shortcutLabel } from '../src/app/core/models/app-shortcuts.model';
+import { APP_SHORTCUTS, defaultAcceleratorFor, findShortcutConflict, resolveAppShortcuts, shortcutLabel } from '../src/app/core/models/app-shortcuts.model';
 
 describe('APP_SHORTCUTS', () => {
   it('has unique ids and unique default accelerators', () => {
@@ -58,5 +59,46 @@ describe('findShortcutConflict', () => {
     const custom = resolveAppShortcuts({ 'tab.close': 'Alt+Q' });
     expect(findShortcutConflict('note.new', 'CommandOrControl+W', custom)).toBeNull();
     expect(findShortcutConflict('note.new', 'Alt+Q', custom)?.id).toBe('tab.close');
+  });
+});
+
+describe('platform defaults', () => {
+  const byId = (id: string) => APP_SHORTCUTS.find(s => s.id === id)!;
+
+  it('cycles tabs with ⌃Tab on macOS and Ctrl+Tab on Windows', () => {
+    expect(defaultAcceleratorFor(byId('tab.next'), 'mac')).toBe('Control+Tab');
+    expect(defaultAcceleratorFor(byId('tab.prev'), 'mac')).toBe('Control+Shift+Tab');
+    expect(defaultAcceleratorFor(byId('tab.next'), 'windows')).toBe('CommandOrControl+Tab');
+    expect(defaultAcceleratorFor(byId('tab.prev'))).toBe('CommandOrControl+Shift+Tab');
+  });
+
+  it('moves Replace off ⌘H (Hide) on macOS', () => {
+    expect(defaultAcceleratorFor(byId('editor.replace'), 'mac')).toBe('CommandOrControl+Alt+F');
+    expect(defaultAcceleratorFor(byId('editor.replace'), 'windows')).toBe('CommandOrControl+H');
+  });
+
+  it('keeps every other default identical on both systems', () => {
+    const different = APP_SHORTCUTS.filter(s => defaultAcceleratorFor(s, 'mac') !== defaultAcceleratorFor(s, 'windows')).map(s => s.id);
+    expect(different).toEqual(['tab.next', 'tab.prev', 'editor.replace']);
+    expect(APP_SHORTCUTS.every(s => defaultAcceleratorFor(s, 'linux') === s.defaultAccelerator)).toBe(true);
+  });
+
+  it('has unique macOS defaults, none of them reserved by macOS and none clashing with another', () => {
+    const resolved = resolveAppShortcuts({}, 'mac');
+    const accelerators = Object.values(resolved);
+    expect(new Set(accelerators).size).toBe(accelerators.length);
+    for (const shortcut of APP_SHORTCUTS) {
+      for (const part of resolved[shortcut.id].split(', ')) {
+        expect(isReservedAccelerator(part, 'mac')).toBe(false);
+      }
+      expect(findShortcutConflict(shortcut.id, resolved[shortcut.id], resolved)).toBeNull();
+    }
+  });
+
+  it('resolves the macOS defaults, overrides still winning without migration', () => {
+    expect(resolveAppShortcuts({}, 'mac')['tab.next']).toBe('Control+Tab');
+    expect(resolveAppShortcuts({}, 'mac')['note.new']).toBe('CommandOrControl+N');
+    expect(resolveAppShortcuts({ 'tab.next': 'CommandOrControl+Alt+Right' }, 'mac')['tab.next']).toBe('CommandOrControl+Alt+Right');
+    expect(resolveAppShortcuts({})['tab.next']).toBe('CommandOrControl+Tab');
   });
 });

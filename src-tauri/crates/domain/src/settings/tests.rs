@@ -214,6 +214,111 @@ fn rejects_an_unknown_mode_and_an_empty_shortcut() {
 }
 
 #[test]
+fn keeps_a_valid_physical_key_with_its_shortcut() {
+    for code in ["KeyA", "KeyZ", "Digit0", "Digit9"] {
+        let result = sanitize(RawSettings {
+            global_shortcut: text("CommandOrControl+Alt+Q"),
+            global_shortcut_physical_key: text(code),
+            ..RawSettings::default()
+        });
+
+        assert_eq!(result.global_shortcut_physical_key.as_deref(), Some(code));
+    }
+}
+
+#[test]
+fn rejects_an_invalid_physical_key() {
+    for code in [
+        "", "Keya", "KeyAB", "Key1", "Digit", "Digit10", "F5", "Space", "keyA", "KéyA",
+    ] {
+        let result = sanitize(RawSettings {
+            global_shortcut: text("CommandOrControl+Alt+Q"),
+            global_shortcut_physical_key: text(code),
+            ..RawSettings::default()
+        });
+
+        assert_eq!(result.global_shortcut_physical_key, None, "{code}");
+    }
+}
+
+#[test]
+fn keeps_the_shortcut_and_its_physical_key_together() {
+    let base = AppSettings {
+        global_shortcut: "CommandOrControl+Alt+Q".to_owned(),
+        global_shortcut_physical_key: text("KeyA"),
+        ..AppSettings::default()
+    };
+    let blank = RawSettings {
+        global_shortcut: text(" "),
+        global_shortcut_physical_key: text("KeyZ"),
+        ..RawSettings::default()
+    };
+
+    let unchanged = sanitize_settings(&RawSettings::default(), &base);
+    let rejected = sanitize_settings(&blank, &base);
+
+    assert_eq!(unchanged, base);
+    assert_eq!(rejected, base);
+}
+
+#[test]
+fn a_new_shortcut_without_physical_key_drops_the_old_one() {
+    let current = AppSettings {
+        global_shortcut: "CommandOrControl+Alt+Q".to_owned(),
+        global_shortcut_physical_key: text("KeyA"),
+        ..AppSettings::default()
+    };
+    let reset = RawSettings {
+        global_shortcut: text("CommandOrControl+Alt+Q"),
+        ..RawSettings::default()
+    };
+    let other_field = RawSettings {
+        word_wrap: Some(false),
+        ..RawSettings::default()
+    };
+    let recorded = RawSettings {
+        global_shortcut: text("CommandOrControl+Alt+W"),
+        global_shortcut_physical_key: text("KeyZ"),
+        ..RawSettings::default()
+    };
+
+    let merge = |patch| {
+        sanitize_settings(
+            &RawSettings::from_settings(&current).overridden_by(patch),
+            &current,
+        )
+    };
+
+    assert_eq!(merge(reset).global_shortcut_physical_key, None);
+    assert_eq!(
+        merge(other_field).global_shortcut_physical_key.as_deref(),
+        Some("KeyA")
+    );
+    let recorded = merge(recorded);
+    assert_eq!(recorded.global_shortcut, "CommandOrControl+Alt+W");
+    assert_eq!(
+        recorded.global_shortcut_physical_key.as_deref(),
+        Some("KeyZ")
+    );
+}
+
+#[test]
+fn shows_the_menu_bar_icon_unless_turned_off() {
+    let base = AppSettings {
+        show_menu_bar_icon: false,
+        ..AppSettings::default()
+    };
+    let turned_on = RawSettings {
+        show_menu_bar_icon: Some(true),
+        ..RawSettings::default()
+    };
+
+    assert!(AppSettings::default().show_menu_bar_icon);
+    assert!(!sanitize_settings(&RawSettings::default(), &base).show_menu_bar_icon);
+    assert!(sanitize_settings(&turned_on, &base).show_menu_bar_icon);
+}
+
+#[test]
 fn falls_back_to_the_current_values_rather_than_the_defaults() {
     let base = AppSettings {
         overlay_width: 400,
@@ -265,6 +370,7 @@ fn round_trips_valid_settings() {
         theme: ThemePreference::System,
         app_shortcuts: vec![("tab.close".to_owned(), "Ctrl+W".to_owned())],
         overlay_position: Some(crate::overlay::Position { x: 1, y: 2 }),
+        global_shortcut_physical_key: text("KeyA"),
         ..AppSettings::default()
     };
 

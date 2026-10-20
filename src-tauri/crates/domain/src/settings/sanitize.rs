@@ -29,13 +29,24 @@ pub fn sanitize_settings(raw: &RawSettings, base: &AppSettings) -> AppSettings {
 
 fn apply_general(raw: &RawSettings, settings: &mut AppSettings) {
     settings.language = parsed(&raw.language, Language::parse, settings.language);
-    settings.global_shortcut = global_shortcut(&raw.global_shortcut, &settings.global_shortcut);
+    // Le raccourci et sa touche physique vont ensemble : un raccourci invalide garde la paire
+    if let Some(shortcut) = global_shortcut(&raw.global_shortcut) {
+        settings.global_shortcut = shortcut;
+        settings.global_shortcut_physical_key = raw
+            .global_shortcut_physical_key
+            .as_deref()
+            .filter(|code| is_physical_key(code))
+            .map(str::to_owned);
+    }
     settings.shortcut_mode = parsed(
         &raw.shortcut_mode,
         ShortcutMode::parse,
         settings.shortcut_mode,
     );
     settings.launch_at_startup = raw.launch_at_startup.unwrap_or(settings.launch_at_startup);
+    settings.show_menu_bar_icon = raw
+        .show_menu_bar_icon
+        .unwrap_or(settings.show_menu_bar_icon);
     settings.auto_update = raw.auto_update.unwrap_or(settings.auto_update);
     settings.app_shortcuts = app_shortcuts(raw.app_shortcuts.as_deref(), &settings.app_shortcuts);
     settings.collections_exclude = excludes(
@@ -108,12 +119,18 @@ fn parsed<T: Copy>(value: &Option<String>, parse: impl Fn(&str) -> Option<T>, fa
     value.as_deref().and_then(parse).unwrap_or(fallback)
 }
 
-fn global_shortcut(value: &Option<String>, fallback: &str) -> String {
+/// Raccourci global sans espaces autour ; `None` s'il est absent ou vide.
+fn global_shortcut(value: &Option<String>) -> Option<String> {
     let trimmed = value.as_deref().map(str::trim).unwrap_or_default();
-    if trimmed.is_empty() {
-        fallback.to_owned()
-    } else {
-        trimmed.to_owned()
+    (!trimmed.is_empty()).then(|| trimmed.to_owned())
+}
+
+/// `^Key[A-Z]$|^Digit[0-9]$` : les seuls codes de touche enregistrés pour le raccourci global.
+fn is_physical_key(code: &str) -> bool {
+    match code.as_bytes() {
+        [b'K', b'e', b'y', letter] => letter.is_ascii_uppercase(),
+        [b'D', b'i', b'g', b'i', b't', digit] => digit.is_ascii_digit(),
+        _ => false,
     }
 }
 

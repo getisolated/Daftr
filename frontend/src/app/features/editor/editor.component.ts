@@ -545,7 +545,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         background: 'var(--daftr-bg)',
         color: 'var(--daftr-text)',
         fontSize: '14px',
-        fontFamily: 'Consolas, "Courier New", monospace',
+        fontFamily: 'var(--daftr-font-mono)',
       },
       // The right padding belongs to the content so unwrapped lines keep their gap when scrolled to the end
       '.cm-content': {
@@ -555,7 +555,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         boxSizing: 'border-box',
       },
       '.cm-scroller': {
-        fontFamily: 'Consolas, "Courier New", monospace',
+        fontFamily: 'var(--daftr-font-mono)',
         lineHeight: '1.65',
         overflow: 'auto',
       },

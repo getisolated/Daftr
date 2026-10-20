@@ -8,6 +8,7 @@ import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { PlatformService } from '../../core/services/platform.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 
 const MAX_DISPLAYED_NOTES = 50;
@@ -25,7 +26,7 @@ interface OverlayMessage {
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="overlay">
+    <div class="overlay" [class.platform-mac]="platform.isMac">
       <div class="drag-handle" data-tauri-drag-region [title]="i18n.t('workspace.overlay.dragToMove')"><span class="grip" data-tauri-drag-region></span></div>
 
       <!-- column-reverse: newest message first in the DOM, rendered at the bottom, scroll anchored to the bottom -->
@@ -53,6 +54,7 @@ interface OverlayMessage {
 })
 export class OverlayComponent implements OnInit, OnDestroy {
   protected readonly i18n = inject(I18nService);
+  protected readonly platform = inject(PlatformService);
   private bridge = inject(DesktopBridgeService);
   private notesService = inject(NotesService);
   private settingsService = inject(SettingsService);
@@ -96,8 +98,8 @@ export class OverlayComponent implements OnInit, OnDestroy {
     }
     if (event.key !== 'Enter' || event.isComposing) return;
 
-    // Ctrl+Enter always sends; plain Enter sends only when configured so (Shift+Enter keeps the new line)
-    const shouldSend = event.ctrlKey || (this.settingsService.settings().enterToSend && !event.shiftKey);
+    // Ctrl+Enter (⌘↩ on macOS) always sends; plain Enter sends only when configured so (Shift+Enter keeps the new line)
+    const shouldSend = (this.platform.isMac ? event.metaKey : event.ctrlKey) || (this.settingsService.settings().enterToSend && !event.shiftKey);
     if (shouldSend) {
       event.preventDefault();
       this.send();

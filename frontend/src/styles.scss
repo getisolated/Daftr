@@ -2,6 +2,12 @@
 // Dark is the default (no attribute yet = dark); `data-theme` is set on <html> by ThemeService and,
 // before Angular boots, by the inline script of index.html. To add a theme: copy a block below and register it
 // in theme.model.ts, settings-schema.ts (electron), main.ts (window background) and index.html.
+// Theme-independent tokens. Monospace: Consolas first keeps Windows unchanged; ui-monospace (SF Mono in WebKit) then
+// Menlo (present on every Mac) give macOS a native look without bundling a font file.
+:root {
+  --daftr-font-mono: Consolas, ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;

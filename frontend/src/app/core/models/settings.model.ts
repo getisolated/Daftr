@@ -11,12 +11,19 @@ export interface AppSettings {
   /** Language of the interface; chosen from the OS locale on the first launch (see the main process). */
   language: Language;
   globalShortcut: string;
+  /**
+   * `KeyboardEvent.code` of the final key of the global shortcut (`KeyA`…`KeyZ`, `Digit0`…`Digit9`), null when
+   * unknown. macOS registers global shortcuts by physical key: on AZERTY the "Q" letter is the `KeyA` key.
+   */
+  globalShortcutPhysicalKey: string | null;
   shortcutMode: ShortcutMode;
   overlayWidth: number;
   overlayHeight: number;
   /** true: Enter sends (Shift+Enter = new line). false: Enter = new line (Ctrl+Enter sends). */
   enterToSend: boolean;
   launchAtStartup: boolean;
+  /** macOS only: false hides the menu bar icon; Daftr keeps running (global shortcut, Dock). Ignored on Windows. */
+  showMenuBarIcon: boolean;
   /** 'system' follows the OS color scheme. */
   theme: ThemePreference;
   /** Theme used by 'system' while the OS is in dark mode. */
@@ -61,11 +68,13 @@ export interface SettingsUpdateResult {
 export const DEFAULT_SETTINGS: AppSettings = {
   language: DEFAULT_LANGUAGE,
   globalShortcut: 'CommandOrControl+Alt+Q',
+  globalShortcutPhysicalKey: null,
   shortcutMode: 'overlay',
   overlayWidth: 250,
   overlayHeight: 350,
   enterToSend: true,
   launchAtStartup: false,
+  showMenuBarIcon: true,
   theme: 'dark',
   preferredDarkTheme: 'dark',
   preferredLightTheme: 'light',
