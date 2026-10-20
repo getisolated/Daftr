@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { SettingsService } from '../../core/services/settings.service';
-import { APP_SHORTCUTS, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
+import { APP_SHORTCUTS, defaultAcceleratorFor, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
 import { DEFAULT_SETTINGS, SettingsPatch } from '../../core/models/settings.model';
 import { appVersion } from '../../core/services/desktop-api';
-import { formatAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
+import { PlatformService } from '../../core/services/platform.service';
+import { formatAccelerator, isReservedAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
 import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
@@ -135,6 +136,7 @@ import {
 export class SettingsComponent {
   private settingsService = inject(SettingsService);
   protected readonly i18n = inject(I18nService);
+  private readonly platform = inject(PlatformService).platform;
 
   @ViewChild('search') searchRef?: ElementRef<HTMLInputElement>;
   @ViewChild('list') listRef?: ElementRef<HTMLElement>;
@@ -197,7 +199,7 @@ export class SettingsComponent {
 
   shortcutLabel(def: SettingDefinition): string {
     const accelerator = def.shortcutId ? this.settingsService.appShortcuts()[def.shortcutId] : this.settings().globalShortcut;
-    return formatAccelerator(accelerator ?? '');
+    return formatAccelerator(accelerator ?? '', this.platform);
   }
 
   isModified(def: SettingDefinition): boolean {
@@ -276,14 +278,22 @@ export class SettingsComponent {
       return;
     }
 
-    const accelerator = keyEventToAccelerator(event);
+    // On macOS ⌘ is recorded as CommandOrControl (⌘ in the global shortcut too) and ⌃ as Control
+    const accelerator = keyEventToAccelerator(event, { platform: this.platform });
     if (!accelerator) return;
     this.recording.set(null);
+    const shortcut = formatAccelerator(accelerator, this.platform);
+
+    // Kept by the system (⌘Q, ⌘H, ⌘M, ⌘Tab, ⌘Space… on macOS): the app would never receive it
+    if (isReservedAccelerator(accelerator, this.platform)) {
+      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut }) });
+      return;
+    }
 
     if (def.shortcutId) {
       const conflict = findShortcutConflict(def.shortcutId, accelerator, this.settingsService.appShortcuts());
       if (conflict) {
-        this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutConflict', { shortcut: formatAccelerator(accelerator), label: shortcutLabel(conflict, this.i18n.t) }) });
+        this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutConflict', { shortcut, label: shortcutLabel(conflict, this.i18n.t) }) });
         return;
       }
       await this.setAppShortcut(def.shortcutId, accelerator);
@@ -292,14 +302,15 @@ export class SettingsComponent {
 
     const result = await this.settingsService.update({ globalShortcut: accelerator });
     if (result && !result.ok) {
-      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut: formatAccelerator(accelerator) }) });
+      this.shortcutError.set({ key: def.key, message: this.i18n.t('settings.modal.shortcutUnavailable', { shortcut }) });
     }
   }
 
   /** Stores an override, or drops it (null / same as the default) so the default keeps applying. */
   private async setAppShortcut(id: string, accelerator: string | null): Promise<void> {
     const overrides = { ...this.settings().appShortcuts };
-    const defaultAccelerator = APP_SHORTCUTS.find(shortcut => shortcut.id === id)?.defaultAccelerator;
+    const definition = APP_SHORTCUTS.find(shortcut => shortcut.id === id);
+    const defaultAccelerator = definition ? defaultAcceleratorFor(definition, this.platform) : undefined;
     if (accelerator === null || accelerator === defaultAccelerator) {
       delete overrides[id];
     } else {

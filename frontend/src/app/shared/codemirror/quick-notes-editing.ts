@@ -1,6 +1,8 @@
 import { EditorState, Extension, Facet, Prec, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType, keymap } from '@codemirror/view';
 import { TranslationKey } from '../../core/i18n/translations';
+import { detectPlatform } from '../../core/services/platform.service';
+import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { translatorOf } from './translator';
 import { BlockRange, noteTimestamps, timestampBlocks } from './note-timestamps';
 
@@ -255,7 +257,8 @@ class EditBarWidget extends WidgetType {
     const t = translatorOf(view.state);
     bar.append(
       this.button(t('common.cancel'), 'Escape', 'cm-quick-note-edit-button', () => cancel(view)),
-      this.button(t('common.save'), 'Ctrl+Enter', 'cm-quick-note-edit-button primary', () => commit(view)),
+      // Same key as the `Mod-Enter` binding: Ctrl+Enter, or ⌘↩ on macOS
+      this.button(t('common.save'), formatAccelerator('CommandOrControl+Return', detectPlatform(navigator)), 'cm-quick-note-edit-button primary', () => commit(view)),
     );
     return bar;
   }

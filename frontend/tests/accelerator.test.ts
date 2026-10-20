@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { acceleratorToCodeMirrorKey, formatAccelerator, isModifierKey, keyEventToAccelerator } from '../src/app/core/utils/accelerator.util';
+import { acceleratorToCodeMirrorKey, formatAccelerator, isModifierKey, isReservedAccelerator, keyEventToAccelerator } from '../src/app/core/utils/accelerator.util';
 
 const ev = (code: string, mods: Partial<{ key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }> = {}) =>
   ({ key: '', code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
@@ -82,5 +82,94 @@ describe('acceleratorToCodeMirrorKey', () => {
 
   it('returns an empty key for an empty accelerator', () => {
     expect(acceleratorToCodeMirrorKey('')).toBe('');
+  });
+});
+
+describe('keyEventToAccelerator on macOS', () => {
+  const mac = { platform: 'mac' as const };
+
+  it('records ⌘ as CommandOrControl and ⌃ as Control', () => {
+    expect(keyEventToAccelerator(ev('KeyN', { key: 'n', metaKey: true }), mac)).toBe('CommandOrControl+N');
+    expect(keyEventToAccelerator(ev('Tab', { key: 'Tab', ctrlKey: true }), mac)).toBe('Control+Tab');
+    expect(keyEventToAccelerator(ev('KeyK', { key: 'k', metaKey: true, ctrlKey: true, altKey: true, shiftKey: true }), mac))
+      .toBe('CommandOrControl+Control+Alt+Shift+K');
+  });
+
+  it('uses the physical key when ⌥ turns the letter into a symbol', () => {
+    expect(keyEventToAccelerator(ev('KeyQ', { key: 'œ', metaKey: true, altKey: true }), mac)).toBe('CommandOrControl+Alt+Q');
+  });
+
+  it('keeps the Windows mapping by default and on Windows', () => {
+    const event = ev('KeyN', { key: 'n', ctrlKey: true, metaKey: true });
+    expect(keyEventToAccelerator(event)).toBe('CommandOrControl+Super+N');
+    expect(keyEventToAccelerator(event, { platform: 'windows' })).toBe('CommandOrControl+Super+N');
+    expect(keyEventToAccelerator(event, { platform: 'linux' })).toBe('CommandOrControl+Super+N');
+  });
+
+  it('accepts a bare second chord key', () => {
+    expect(keyEventToAccelerator(ev('KeyV', { key: 'v' }), { ...mac, allowBareKey: true })).toBe('V');
+    expect(keyEventToAccelerator(ev('KeyV', { key: 'v' }), mac)).toBeNull();
+  });
+});
+
+describe('formatAccelerator by platform', () => {
+  it('keeps the Windows notation', () => {
+    expect(formatAccelerator('CommandOrControl+Shift+F', 'windows')).toBe('Ctrl+Shift+F');
+    expect(formatAccelerator('Super+Return')).toBe('Win+Enter');
+    expect(formatAccelerator('CommandOrControl+K, CommandOrControl+T')).toBe('Ctrl+K, Ctrl+T');
+    expect(formatAccelerator('Control+Tab')).toBe('Ctrl+Tab');
+  });
+
+  it('uses Apple symbols, in the ⌃ ⌥ ⇧ ⌘ order, without +', () => {
+    expect(formatAccelerator('CommandOrControl+N', 'mac')).toBe('⌘N');
+    expect(formatAccelerator('CommandOrControl+Shift+F', 'mac')).toBe('⇧⌘F');
+    expect(formatAccelerator('CommandOrControl+Control+Alt+Shift+K', 'mac')).toBe('⌃⌥⇧⌘K');
+    expect(formatAccelerator('Shift+Alt+CommandOrControl+Control+K', 'mac')).toBe('⌃⌥⇧⌘K');
+    expect(formatAccelerator('Control+Shift+Tab', 'mac')).toBe('⌃⇧⇥');
+    expect(formatAccelerator('CommandOrControl+,', 'mac')).toBe('⌘,');
+    expect(formatAccelerator('CommandOrControl+Alt+1', 'mac')).toBe('⌥⌘1');
+    expect(formatAccelerator('Alt+W', 'mac')).toBe('⌥W');
+    expect(formatAccelerator('F1', 'mac')).toBe('F1');
+    expect(formatAccelerator('', 'mac')).toBe('');
+  });
+
+  it('maps named keys to their macOS symbol', () => {
+    const cases: [string, string][] = [
+      ['Return', '↩'], ['Tab', '⇥'], ['Backspace', '⌫'], ['Delete', '⌦'], ['Escape', '⎋'], ['Space', '␣'],
+      ['Up', '↑'], ['Down', '↓'], ['Left', '←'], ['Right', '→'], ['PageUp', '⇞'], ['PageDown', '⇟'], ['Home', '↖'], ['End', '↘'],
+    ];
+    for (const [key, symbol] of cases) {
+      expect(formatAccelerator(`CommandOrControl+${key}`, 'mac')).toBe(`⌘${symbol}`);
+    }
+    expect(formatAccelerator('CommandOrControl+a', 'mac')).toBe('⌘A');
+  });
+
+  it('separates the keys of a chord with a space', () => {
+    expect(formatAccelerator('CommandOrControl+K, CommandOrControl+T', 'mac')).toBe('⌘K ⌘T');
+    expect(formatAccelerator('CommandOrControl+K, V', 'mac')).toBe('⌘K V');
+    expect(formatAccelerator('CommandOrControl+,, V', 'mac')).toBe('⌘, V');
+  });
+});
+
+describe('isReservedAccelerator', () => {
+  it('refuses the combinations macOS keeps for itself', () => {
+    for (const accelerator of ['CommandOrControl+Q', 'CommandOrControl+H', 'CommandOrControl+M', 'CommandOrControl+Tab', 'CommandOrControl+Space']) {
+      expect(isReservedAccelerator(accelerator, 'mac')).toBe(true);
+    }
+    expect(isReservedAccelerator('CommandOrControl+Shift+L', 'mac')).toBe(false);
+    expect(isReservedAccelerator('Control+Tab', 'mac')).toBe(false);
+  });
+
+  it('reserves nothing on Windows', () => {
+    expect(isReservedAccelerator('CommandOrControl+Q', 'windows')).toBe(false);
+    expect(isReservedAccelerator('CommandOrControl+Q')).toBe(false);
+  });
+});
+
+describe('acceleratorToCodeMirrorKey with macOS modifiers', () => {
+  it('maps Control to Ctrl, CommandOrControl to Mod and Super to Meta', () => {
+    expect(acceleratorToCodeMirrorKey('Control+Tab')).toBe('Ctrl-Tab');
+    expect(acceleratorToCodeMirrorKey('CommandOrControl+Control+Alt+Shift+K')).toBe('Mod-Ctrl-Alt-Shift-k');
+    expect(acceleratorToCodeMirrorKey('Super+B')).toBe('Meta-b');
   });
 });

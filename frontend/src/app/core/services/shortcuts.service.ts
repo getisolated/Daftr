@@ -1,11 +1,13 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
 import { isModifierKey, keyEventToAccelerator } from '../utils/accelerator.util';
+import { PlatformService } from './platform.service';
 import { SettingsService } from './settings.service';
 
 type ShortcutHandler = (event: KeyboardEvent) => void;
 
 interface ShortcutDef {
   key: string;
+  /** The primary modifier: Ctrl on Windows and Linux, ⌘ on macOS. */
   ctrl?: boolean;
   shift?: boolean;
   alt?: boolean;
@@ -13,9 +15,38 @@ interface ShortcutDef {
   preventDefault?: boolean;
 }
 
+type ModifierState = Pick<KeyboardEvent, 'ctrlKey' | 'metaKey'>;
+
+/**
+ * Whether the primary modifier state of `event` is what an internal shortcut asks for (`ctrl`).
+ * macOS: ⌘ is the primary modifier and ⌃ must not be held (⌃R is not ⌘R). Windows/Linux keep the historical
+ * test (Ctrl, or the Windows key that the system mostly swallows anyway).
+ */
+export function primaryModifierMatches(ctrl: boolean, event: ModifierState, isMac: boolean): boolean {
+  if (isMac) {
+    return ctrl === event.metaKey && !event.ctrlKey;
+  }
+  return ctrl === (event.ctrlKey || event.metaKey);
+}
+
+/**
+ * macOS combinations the native menus handle (Edit: ⌘Z ⌘⇧Z ⌘X ⌘C ⌘V ⌘A; Daftr: ⌘H ⌘⌥H ⌘Q; Window: ⌘M).
+ * Unless the user bound one of them to an app action, they must reach the menu untouched.
+ */
+const MAC_MENU_ACCELERATORS = new Set([
+  'CommandOrControl+Z', 'CommandOrControl+Shift+Z', 'CommandOrControl+X', 'CommandOrControl+C', 'CommandOrControl+V',
+  'CommandOrControl+A', 'CommandOrControl+Q', 'CommandOrControl+H', 'CommandOrControl+Alt+H', 'CommandOrControl+M',
+]);
+
+/** True for a macOS menu combination (see MAC_MENU_ACCELERATORS); always false elsewhere. */
+export function isMacMenuAccelerator(accelerator: string | null, isMac: boolean): boolean {
+  return isMac && accelerator !== null && MAC_MENU_ACCELERATORS.has(accelerator);
+}
+
 @Injectable({ providedIn: 'root' })
 export class ShortcutsService implements OnDestroy {
   private settings = inject(SettingsService);
+  private readonly platform = inject(PlatformService);
   private shortcuts: ShortcutDef[] = [];
   private actions = new Map<string, ShortcutHandler>();
   private boundListener: (e: KeyboardEvent) => void;
@@ -47,7 +78,8 @@ export class ShortcutsService implements OnDestroy {
     // Let shortcut recorders (settings) receive raw key combos instead of triggering app actions
     if (event.target instanceof Element && event.target.closest('[data-shortcut-recorder]')) return;
 
-    const accelerator = keyEventToAccelerator(event);
+    const { platform, isMac } = this.platform;
+    const accelerator = keyEventToAccelerator(event, { platform });
     const resolved = this.settings.appShortcuts();
 
     if (this.pendingChord !== null) {
@@ -56,20 +88,19 @@ export class ShortcutsService implements OnDestroy {
         return;
       }
       const first = this.pendingChord;
-      const second = keyEventToAccelerator(event, { allowBareKey: true });
+      const second = keyEventToAccelerator(event, { allowBareKey: true, platform });
       this.clearChord();
+      const chord = second ? `${first}, ${second}` : null;
+      const chordId = chord === null ? undefined : [...this.actions.keys()].find(id => resolved[id] === chord);
+      // A macOS menu combination (⌘Q, ⌘C…) that completes no chord cancels it and still reaches the menu
+      if (chordId === undefined && isMacMenuAccelerator(second, isMac)) {
+        return;
+      }
       // Whatever follows the first key is consumed, even when it completes no chord (same as VS Code): Escape cancels it
       event.preventDefault();
       event.stopPropagation();
-      if (!second) {
-        return;
-      }
-      const chord = `${first}, ${second}`;
-      for (const [id, handler] of this.actions) {
-        if (resolved[id] === chord) {
-          handler(event);
-          return;
-        }
+      if (chordId !== undefined) {
+        this.actions.get(chordId)?.(event);
       }
       return;
     }
@@ -91,10 +122,15 @@ export class ShortcutsService implements OnDestroy {
       }
     }
 
+    // Not bound to an app action: the native macOS menu (Edit, Hide, Quit, Minimize) handles it
+    if (isMacMenuAccelerator(accelerator, isMac)) {
+      return;
+    }
+
     for (const shortcut of this.shortcuts) {
       const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase() ||
                        event.code.toLowerCase() === shortcut.key.toLowerCase();
-      const ctrlMatch = !!shortcut.ctrl === (event.ctrlKey || event.metaKey);
+      const ctrlMatch = primaryModifierMatches(!!shortcut.ctrl, event, isMac);
       const shiftMatch = !!shortcut.shift === event.shiftKey;
       const altMatch = !!shortcut.alt === event.altKey;
 

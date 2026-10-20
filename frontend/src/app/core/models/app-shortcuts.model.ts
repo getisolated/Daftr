@@ -1,5 +1,6 @@
 import { TranslationKey } from '../i18n/translations';
 import { Translator } from '../i18n/translate';
+import type { Platform } from '../services/platform.service';
 
 export interface AppShortcutDefinition {
   id: string;
@@ -11,6 +12,11 @@ export interface AppShortcutDefinition {
    * A chord is two accelerators separated by `, ` (e.g. `CommandOrControl+K, CommandOrControl+T`).
    */
   defaultAccelerator: string;
+  /**
+   * Default on macOS when it differs from `defaultAccelerator` (read through `defaultAcceleratorFor`).
+   * `CommandOrControl` already means ⌘ there, so only the combinations macOS uses differently need one.
+   */
+  macDefaultAccelerator?: string;
 }
 
 /** Every in-app shortcut the user can rebind. Global (system-wide) shortcut lives in its own setting. */
@@ -26,14 +32,16 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'formattingBar.toggle', labelKey: 'settings.shortcut.formattingBar.toggle', defaultAccelerator: 'Alt+T' },
   { id: 'sidebar.toggle', labelKey: 'settings.shortcut.sidebar.toggle', defaultAccelerator: 'CommandOrControl+Shift+E' },
   { id: 'tab.close', labelKey: 'settings.shortcut.tab.close', defaultAccelerator: 'CommandOrControl+W' },
-  { id: 'tab.next', labelKey: 'settings.shortcut.tab.next', defaultAccelerator: 'CommandOrControl+Tab' },
-  { id: 'tab.prev', labelKey: 'settings.shortcut.tab.prev', defaultAccelerator: 'CommandOrControl+Shift+Tab' },
+  // ⌘Tab is the macOS application switcher: tabs cycle with ⌃Tab there, like Safari and VS Code
+  { id: 'tab.next', labelKey: 'settings.shortcut.tab.next', defaultAccelerator: 'CommandOrControl+Tab', macDefaultAccelerator: 'Control+Tab' },
+  { id: 'tab.prev', labelKey: 'settings.shortcut.tab.prev', defaultAccelerator: 'CommandOrControl+Shift+Tab', macDefaultAccelerator: 'Control+Shift+Tab' },
   { id: 'tab.pin', labelKey: 'settings.shortcut.tab.pin', defaultAccelerator: 'Alt+P' },
   ...Array.from({ length: 9 }, (_, i) => ({
     id: `tab.goto.${i + 1}`, labelKey: 'settings.shortcut.tab.goto' as const, labelParams: { number: i + 1 }, defaultAccelerator: `CommandOrControl+Alt+${i + 1}`,
   })),
   { id: 'editor.find', labelKey: 'settings.shortcut.editor.find', defaultAccelerator: 'CommandOrControl+F' },
-  { id: 'editor.replace', labelKey: 'settings.shortcut.editor.replace', defaultAccelerator: 'CommandOrControl+H' },
+  // ⌘H hides the application on macOS: ⌥⌘F there, like VS Code and Xcode
+  { id: 'editor.replace', labelKey: 'settings.shortcut.editor.replace', defaultAccelerator: 'CommandOrControl+H', macDefaultAccelerator: 'CommandOrControl+Alt+F' },
   { id: 'editor.preview', labelKey: 'settings.shortcut.editor.preview', defaultAccelerator: 'CommandOrControl+Shift+V' },
   // Like VS Code: Ctrl+K then V alone
   { id: 'editor.previewSide', labelKey: 'settings.shortcut.editor.previewSide', defaultAccelerator: 'CommandOrControl+K, V' },
@@ -45,11 +53,19 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'editor.link', labelKey: 'settings.shortcut.editor.link', defaultAccelerator: 'CommandOrControl+Shift+K' },
 ];
 
-/** Accelerator in effect for every shortcut: the user's override when there is one, the default otherwise. */
-export function resolveAppShortcuts(overrides: Record<string, string>): Record<string, string> {
+/** Default accelerator of a shortcut on the given platform. */
+export function defaultAcceleratorFor(shortcut: AppShortcutDefinition, platform: Platform = 'windows'): string {
+  return platform === 'mac' ? shortcut.macDefaultAccelerator ?? shortcut.defaultAccelerator : shortcut.defaultAccelerator;
+}
+
+/**
+ * Accelerator in effect for every shortcut: the user's override when there is one, the platform default otherwise.
+ * Overrides are never migrated: `CommandOrControl+…` stays valid on both systems (Ctrl on Windows, ⌘ on macOS).
+ */
+export function resolveAppShortcuts(overrides: Record<string, string>, platform: Platform = 'windows'): Record<string, string> {
   const resolved: Record<string, string> = {};
   for (const shortcut of APP_SHORTCUTS) {
-    resolved[shortcut.id] = overrides[shortcut.id] ?? shortcut.defaultAccelerator;
+    resolved[shortcut.id] = overrides[shortcut.id] ?? defaultAcceleratorFor(shortcut, platform);
   }
   return resolved;
 }
