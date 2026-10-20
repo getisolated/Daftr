@@ -77,7 +77,7 @@ fn sends_the_tree_of_a_watched_folder() {
 #[test]
 fn reports_a_missing_folder() {
     let (watcher, events) = start();
-    let missing = std::env::temp_dir().join("evn-missing-collection-folder");
+    let missing = std::env::temp_dir().join("daftr-missing-collection-folder");
 
     watcher.watch(&missing.to_string_lossy(), CollectionKind::Folder);
 

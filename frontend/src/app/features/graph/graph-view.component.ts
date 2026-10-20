@@ -561,14 +561,14 @@ export class GraphViewComponent implements OnDestroy {
     const read = (name: string): string => style.getPropertyValue(name).trim();
 
     return {
-      node: read('--evn-text-dimmed'),
-      open: read('--evn-accent'),
-      active: read('--evn-accent-text'),
-      link: read('--evn-border'),
-      linkHighlight: read('--evn-accent-text'),
-      missing: read('--evn-text-faint'),
-      label: read('--evn-text-soft'),
-      halo: read('--evn-bg'),
+      node: read('--daftr-text-dimmed'),
+      open: read('--daftr-accent'),
+      active: read('--daftr-accent-text'),
+      link: read('--daftr-border'),
+      linkHighlight: read('--daftr-accent-text'),
+      missing: read('--daftr-text-faint'),
+      label: read('--daftr-text-soft'),
+      halo: read('--daftr-bg'),
     };
   }
 

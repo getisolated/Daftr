@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Everything Note",
+  "productName": "Daftr",
   "version": "../../../package.json",
-  "identifier": "com.everything.note",
+  "identifier": "com.daftr.app",
   "build": {
     "beforeDevCommand": "npm run start -w frontend",
     "beforeBuildCommand": "npm run build -w frontend",
@@ -52,12 +52,12 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNGM0VCMDIwNzFCMDJCNjYKUldSbUs3QnhJTEErUCtRMnJSRWZxVVc2eFdUN1hMT3IwUFBtOXZ0UkVnSnp2M2sydS9RYWdmSzAK",
       "endpoints": [
-        "https://github.com/getisolated/Everything-Note/releases/latest/download/latest.json"
+        "https://github.com/getisolated/daftr/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
       }
     }
   },
-  "mainBinaryName": "EverythingNote"
+  "mainBinaryName": "Daftr"
 }

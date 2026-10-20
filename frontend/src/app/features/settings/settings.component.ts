@@ -3,9 +3,11 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { APP_SHORTCUTS, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
 import { DEFAULT_SETTINGS, SettingsPatch } from '../../core/models/settings.model';
+import { appVersion } from '../../core/services/desktop-api';
 import { formatAccelerator, keyEventToAccelerator } from '../../core/utils/accelerator.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
+import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
 import {
   SETTING_DEFINITIONS, SettingDefinition, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
 } from './settings-definitions';
@@ -13,7 +15,7 @@ import {
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CheckboxComponent, SelectComponent],
+  imports: [CheckboxComponent, SelectComponent, DaftrLogotypeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isOpen()) {
@@ -39,13 +41,21 @@ import {
 
           <div class="body">
             <nav class="toc">
-              @for (section of sections(); track section.categoryKey) {
-                <button
-                  class="toc-item"
-                  [class.active]="section.categoryKey === activeCategory()"
-                  (click)="scrollToCategory(section.categoryKey)"
-                >{{ section.category }}</button>
-              }
+              <div class="toc-items">
+                @for (section of sections(); track section.categoryKey) {
+                  <button
+                    class="toc-item"
+                    [class.active]="section.categoryKey === activeCategory()"
+                    (click)="scrollToCategory(section.categoryKey)"
+                  >{{ section.category }}</button>
+                }
+              </div>
+              <div class="brand">
+                <app-daftr-logotype [width]="104" />
+                @if (version(); as version) {
+                  <span class="version">v{{ version }}</span>
+                }
+              </div>
             </nav>
 
             <div class="list" #list (scroll)="onListScroll()">
@@ -135,6 +145,8 @@ export class SettingsComponent {
   /** Key of the shortcut setting waiting for a key combination. */
   readonly recording = signal<string | null>(null);
   readonly shortcutError = signal<{ key: string; message: string } | null>(null);
+  /** Version shown under the logotype; null until known, or outside the desktop app. */
+  readonly version = signal<string | null>(null);
   readonly sections = computed(() => groupByCategory(filterSettings(SETTING_DEFINITIONS, this.query(), this.i18n.t), this.i18n.t));
   private readonly scrolledCategory = signal<string | null>(null);
   // Falls back to the first visible section when the scrolled one has been filtered out
@@ -150,6 +162,7 @@ export class SettingsComponent {
   });
 
   constructor() {
+    void appVersion().then(version => this.version.set(version));
     effect(() => {
       if (!this.isOpen()) return;
       // Fresh state on every opening, search focused like VS Code

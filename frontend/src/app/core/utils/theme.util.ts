@@ -3,10 +3,10 @@ import { ThemePreference } from '../models/settings.model';
 import { THEMES, ThemeChoice, ThemeDefinition, ThemeId, ThemeKind, ThemePickerItem } from '../models/theme.model';
 
 /** localStorage key mirroring the preference, read by the inline script of index.html before the first paint. */
-export const THEME_STORAGE_KEY = 'evn-theme';
+export const THEME_STORAGE_KEY = 'daftr-theme';
 /** localStorage keys mirroring the themes used by 'system' in dark / light mode (same purpose). */
-export const DARK_THEME_STORAGE_KEY = 'evn-theme-dark';
-export const LIGHT_THEME_STORAGE_KEY = 'evn-theme-light';
+export const DARK_THEME_STORAGE_KEY = 'daftr-theme-dark';
+export const LIGHT_THEME_STORAGE_KEY = 'daftr-theme-light';
 
 export interface SystemThemes {
   dark: ThemeId;

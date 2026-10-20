@@ -38,7 +38,7 @@ impl ThemeId {
         }
     }
 
-    /// Couleur de fond `--evn-bg` du thème (`styles.scss`) : la fenêtre la montre avant que
+    /// Couleur de fond `--daftr-bg` du thème (`styles.scss`) : la fenêtre la montre avant que
     /// le renderer ne peigne, un thème clair ne clignote donc pas en sombre.
     pub const fn background_rgb(self) -> (u8, u8, u8) {
         match self {

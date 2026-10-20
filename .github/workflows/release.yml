@@ -13,8 +13,11 @@ name: Release
 # c'est lui qui décide du niveau d'incrément. Une fusion classique garde les commits de la
 # PR, et le plus fort d'entre eux l'emporte.
 #
-# La version n'est jamais réécrite dans le dépôt : elle est injectée dans `package.json`
-# (lu par `tauri.conf.json`) le temps du build, et portée par le tag.
+# La version est ensuite écrite dans le dépôt (`scripts/stamp-version.mjs` : package.json,
+# package-lock.json, Cargo.toml, Cargo.lock) par un commit `chore(release)` poussé sur `main` ;
+# le build et le tag partent de ce commit, le dépôt porte donc toujours la version publiée.
+# `main` étant protégée, ce push demande le secret `RELEASE_TOKEN` (PAT `contents: write`
+# d'un compte autorisé à contourner la protection) ; sans lui, le jeton du workflow est tenté.
 # Un commit dont le message contient `[skip release]` ne publie rien.
 #
 # L'application interroge `releases/latest/download/latest.json` pour proposer les mises
@@ -100,14 +103,59 @@ jobs:
     if: needs.version.outputs.skip == 'false'
     uses: ./.github/workflows/ci.yml
 
+  stamp:
+    name: Stamp version
+    needs: version
+    if: needs.version.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Write version into the repository
+        run: node scripts/stamp-version.mjs "${{ needs.version.outputs.version }}"
+
+      # Rien à commiter quand la version est déjà en place (build précédent échoué après le
+      # commit) : le commit courant est alors publié tel quel.
+      - name: Commit and push
+        id: commit
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git add package.json frontend/package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore(release): v$VERSION [skip release]"
+            # Une fusion a pu arriver entre-temps : le commit est rejoué par-dessus
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build (Windows)
-    needs: [version, check]
+    needs: [version, stamp, check]
     runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout stamped commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stamp.outputs.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -119,24 +167,19 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinen/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      # Tauri lit la version dans `package.json` : on l'aligne avant tout build.
-      # Le fichier n'est pas commité.
-      - name: Stamp version
+      # Tauri lit la version dans `package.json` (via `tauri.conf.json`) : le commit estampillé
+      # doit porter celle qui sera publiée.
+      - name: Check version
         shell: bash
         env:
           APP_VERSION: ${{ needs.version.outputs.version }}
         run: |
-          node -e "
-            const fs = require('node:fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = process.env.APP_VERSION;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-          node -p "'Stamped version: ' + require('./package.json').version"
+          actual=$(node -p "require('./package.json').version")
+          [ "$actual" = "$APP_VERSION" ] || { echo "::error::package.json carries $actual, expected $APP_VERSION."; exit 1; }
 
       - name: Install dependencies
         run: npm ci
@@ -146,7 +189,7 @@ jobs:
         run: |
           $cert = New-SelfSignedCertificate `
             -Type CodeSigningCert `
-            -Subject "CN=Everything Note, O=EvNote" `
+            -Subject "CN=Daftr, O=Daftr" `
             -CertStoreLocation Cert:\CurrentUser\My `
             -NotAfter (Get-Date).AddYears(3)
           echo "SIGN_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
@@ -191,7 +234,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: [version, build]
+    needs: [version, stamp, build]
     runs-on: ubuntu-latest
 
     steps:
@@ -211,9 +254,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.version.outputs.tag }}
           VERSION: ${{ needs.version.outputs.version }}
+          TARGET: ${{ needs.stamp.outputs.sha }}
         run: |
           gh release create "$TAG" artifacts/* \
-            --target "$GITHUB_SHA" \
+            --target "$TARGET" \
             --title "$VERSION" \
             --generate-notes \
             --latest

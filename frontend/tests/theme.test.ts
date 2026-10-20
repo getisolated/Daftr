@@ -68,7 +68,7 @@ describe('theme registry', () => {
     [...styles.matchAll(/:root\[data-theme='(?<id>[a-z-]+)'\] \{(?<body>.*?)\n\}/gs)]
       .map(match => [match.groups?.['id'] ?? '', match.groups?.['body'] ?? '']),
   );
-  const variablesOf = (body: string): string[] => [...body.matchAll(/(?<name>--evn-[a-z0-9-]+):/g)].map(match => match.groups?.['name'] ?? '').sort();
+  const variablesOf = (body: string): string[] => [...body.matchAll(/(?<name>--daftr-[a-z0-9-]+):/g)].map(match => match.groups?.['name'] ?? '').sort();
 
   it('has a styles.scss block for every theme, and no orphan block', () => {
     expect([...blocks.keys()].sort()).toEqual(THEMES.map(theme => theme.id).sort());

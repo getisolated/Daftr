@@ -5,7 +5,7 @@
   padding: 16px 12px 12px 4px;
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 13px;
-  color: var(--evn-text);
+  color: var(--daftr-text);
 }
 
 // ── Fields: one grid column for the expander, one for the inputs, so both rows line up ──
@@ -32,13 +32,13 @@
   height: 28px;
   min-width: 0;
   padding: 0 2px 0 8px;
-  background: var(--evn-bg-input);
-  border: 1px solid var(--evn-border-soft);
+  background: var(--daftr-bg-input);
+  border: 1px solid var(--daftr-border-soft);
   border-radius: 4px;
   transition: border-color 0.12s;
 
-  &:focus-within { border-color: var(--evn-accent); }
-  &.invalid { border-color: var(--evn-danger); }
+  &:focus-within { border-color: var(--daftr-accent); }
+  &.invalid { border-color: var(--daftr-danger); }
 
   input {
     flex: 1;
@@ -48,11 +48,11 @@
     background: transparent;
     border: none;
     outline: none;
-    color: var(--evn-text);
+    color: var(--daftr-text);
     font: inherit;
     line-height: 26px;
 
-    &::placeholder { color: var(--evn-text-dimmed); }
+    &::placeholder { color: var(--daftr-text-dimmed); }
   }
 }
 
@@ -75,13 +75,13 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  color: var(--evn-text-soft);
+  color: var(--daftr-text-soft);
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 
   &:hover:not(:disabled) {
-    background: rgba(var(--evn-hover-rgb), 0.08);
-    color: var(--evn-text);
+    background: rgba(var(--daftr-hover-rgb), 0.08);
+    color: var(--daftr-text);
   }
 
   &:disabled {
@@ -94,9 +94,9 @@
     height: 22px;
 
     &.on {
-      background: rgba(var(--evn-accent-strong-rgb), 0.3);
-      border-color: var(--evn-accent);
-      color: var(--evn-text-bright);
+      background: rgba(var(--daftr-accent-strong-rgb), 0.3);
+      border-color: var(--daftr-accent);
+      color: var(--daftr-text-bright);
     }
   }
 
@@ -118,10 +118,10 @@
 
 .count {
   font-size: 12px;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   white-space: nowrap;
 
-  &.empty { color: var(--evn-danger); }
+  &.empty { color: var(--daftr-danger); }
 }
 
 .actions {
@@ -134,7 +134,7 @@
   width: 1px;
   height: 16px;
   margin: 0 3px;
-  background: var(--evn-border);
+  background: var(--daftr-border);
 }
 
 // ── Results ──
@@ -145,7 +145,7 @@
   overflow-y: auto;
   min-height: 0;
   scrollbar-width: thin;
-  scrollbar-color: var(--evn-scrollbar) transparent;
+  scrollbar-color: var(--daftr-scrollbar) transparent;
 }
 
 .result {
@@ -160,15 +160,15 @@
   text-align: left;
   font: inherit;
   font-size: 12px;
-  color: var(--evn-text-soft);
+  color: var(--daftr-text-soft);
   cursor: pointer;
 
-  &:hover { background: rgba(var(--evn-hover-rgb), 0.05); }
+  &:hover { background: rgba(var(--daftr-hover-rgb), 0.05); }
 
   &.current {
-    background: var(--evn-bg-active);
-    border-left-color: var(--evn-accent);
-    color: var(--evn-text);
+    background: var(--daftr-bg-active);
+    border-left-color: var(--daftr-accent);
+    color: var(--daftr-text);
   }
 
   mark {
@@ -183,7 +183,7 @@
   min-width: 22px;
   text-align: right;
   font-size: 11px;
-  color: var(--evn-text-faint);
+  color: var(--daftr-text-faint);
   font-variant-numeric: tabular-nums;
 }
 

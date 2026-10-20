@@ -21,7 +21,7 @@ export const EN_SETTINGS = {
   'settings.language.title': 'Language',
   'settings.language.description': 'Language of the app. The initial value follows the language of your PC; the change applies immediately.',
   'settings.launchAtStartup.title': 'Launch At Startup',
-  'settings.launchAtStartup.description': 'Start Everything Note silently in the system tray when you log in to Windows.',
+  'settings.launchAtStartup.description': 'Start Daftr silently in the system tray when you log in to Windows.',
   'settings.autoUpdate.title': 'Automatic Updates',
   'settings.autoUpdate.description': 'Download new versions in the background and install them when the app closes. When unchecked, you are asked before anything is downloaded.',
   'settings.theme.title': 'Theme',

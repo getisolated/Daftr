@@ -36,8 +36,10 @@ pub fn run(app: &mut App) -> anyhow::Result<()> {
 }
 
 fn build_services(app: &AppHandle, directory: &Path) -> anyhow::Result<Services> {
-    let store =
-        Arc::new(SqliteStore::open(&directory.join("evnote.db")).context("ouverture de la base")?);
+    let store = Arc::new(
+        SqliteStore::open(&directory.join(data_dir::DATABASE_FILE))
+            .context("ouverture de la base")?,
+    );
     let settings =
         SettingsService::new(Arc::new(SettingsFile::new(directory.join("settings.json"))));
     let loaded = settings.load(sys_locale::get_locale().as_deref());

@@ -27,13 +27,6 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
       <div class="home-inner">
       <div class="home-header">
         <div class="home-brand">
-          <svg class="brand-logo" width="28" height="28" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
-            <g transform="translate(0,1000) scale(0.1,-0.1)" fill="currentColor" stroke="none">
-              <path d="M4605 7590 l-380 -5 -3 -537 -2 -538 -1400 0 -1400 0 2 -405 3 -406 1267 1 c779 0 1269 -3 1272 -9 4 -5 6 -254 6 -553 l1 -543 -1276 -3 -1275 -2 0 -520 0 -520 1400 -2 1400 -3 3 -570 2 -570 383 -5 c210 -3 387 -3 392 -2 16 6 14 5189 -2 5193 -7 2 -184 2 -393 -1z"/>
-              <path d="M6660 7581 c0 -7 38 -68 83 -135 46 -66 248 -364 449 -661 200 -297 512 -758 693 -1025 181 -267 407 -601 502 -742 96 -142 176 -258 179 -258 2 0 4 637 4 1415 l0 1415 -955 2 c-799 3 -955 1 -955 -11z"/>
-              <path d="M6650 3784 c0 -760 2 -1383 4 -1385 2 -2 433 -3 956 -1 753 2 951 5 947 15 -2 6 -256 374 -562 817 -307 443 -597 861 -645 930 -333 482 -684 987 -691 995 -5 5 -9 -573 -9 -1371z"/>
-            </g>
-          </svg>
           <h1 class="home-title">{{ title() }}</h1>
         </div>
         <div class="view-switch" role="group" [attr.aria-label]="i18n.t('workspace.home.viewSwitch')">

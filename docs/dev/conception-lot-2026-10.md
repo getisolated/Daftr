@@ -42,11 +42,11 @@ Justification des regroupements non évidents :
 
 ## 1. Gris sombre légèrement bleuté ✅
 
-**Actuel** : `--evn-bg-panel: #252526` (sidebar, titlebar), `--evn-bg: #1e1e1e`, etc. ([styles.scss](../../src/styles.scss)).
+**Actuel** : `--daftr-bg-panel: #252526` (sidebar, titlebar), `--daftr-bg: #1e1e1e`, etc. ([styles.scss](../../src/styles.scss)).
 
 **Décision** : tous les gris du thème `dark` actuel (surfaces, gris moyens, noirs clairs, bordures), à la manière de GitHub Dark Dimmed : du gris qui *tire* vers le bleu, le bleu ne doit pas se ressentir.
 - Teinte ~215–220°, saturation 3–6 % (plus faible sur les gris les plus sombres), luminosité conservée pour ne pas modifier les contrastes.
-- Ex. `--evn-bg-panel` `#252526` → `#24252a`, `--evn-bg` `#1e1e1e` → `#1d1e21`.
+- Ex. `--daftr-bg-panel` `#252526` → `#24252a`, `--daftr-bg` `#1e1e1e` → `#1d1e21`.
 - Les couleurs d'accent, de syntaxe et sémantiques (erreur, succès…) ne bougent pas.
 - Les nouveaux thèmes sombres (#20) ne sont pas concernés.
 
@@ -206,7 +206,7 @@ Les fichiers de collection ne sont pas dans la base. Trois façons de les cherch
 ## 16. Preview GitHub-like ✅
 
 - Rendu : `markdown-it` + GFM (tables, tasks, autolinks, footnotes, callouts) + coloration syntaxique + **assainissement** (`DOMPurify`) — le contenu peut venir de fichiers externes.
-- CSS inspiré de `github-markdown-css`, adapté aux variables `--evn-*`.
+- CSS inspiré de `github-markdown-css`, adapté aux variables `--daftr-*`.
 - Modes : **Source** / **Preview** / **Côte à côte**. Bouton dans la barre + raccourcis (`Ctrl+Shift+V`, `Ctrl+K V`). Mode non mémorisé par onglet.
 - Réglage `openInPreview: boolean` (défaut `false`).
 - Côte à côte : preview à droite, contenu et scroll synchronisés (attribut `data-line` posé à la génération).
@@ -242,7 +242,7 @@ Pin, drag & drop et restauration de session ne sont garantis que dans **pills**.
 
 **Proposition**
 - Registre de thèmes : `{ id, label, kind: 'dark' | 'light' }`. `data-theme` = id du thème ; un attribut `data-theme-kind` sert à CodeMirror (base light/dark) et à mermaid.
-- Thèmes : `dark` (actuel), `light` (actuel), `solarized-light`, `violet-light`, `github-light`, `github-dark-dimmed`. Chaque thème = un bloc de variables `--evn-*` (palettes officielles pour Solarized et GitHub Primer ; `violet-light` composé : fond blanc légèrement lavande, accents violets, contrastes AA).
+- Thèmes : `dark` (actuel), `light` (actuel), `solarized-light`, `violet-light`, `github-light`, `github-dark-dimmed`. Chaque thème = un bloc de variables `--daftr-*` (palettes officielles pour Solarized et GitHub Primer ; `violet-light` composé : fond blanc légèrement lavande, accents violets, contrastes AA).
 - `settings.theme` : un id de thème ou `'system'`. Pour `'system'`, deux réglages `preferredDarkTheme` / `preferredLightTheme` (comme VS Code), défauts `dark` / `light`.
 - L'overlay garde son propre look translucide (inchangé).
 - Test unitaire : chaque thème définit **toutes** les variables du thème de référence (parse du SCSS compilé ou registre TS des tokens).

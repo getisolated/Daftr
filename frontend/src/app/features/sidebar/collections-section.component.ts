@@ -14,8 +14,8 @@ import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-men
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 
-const EXPANDED_KEY = 'evnote-collections-expanded';
-const SECTION_KEY = 'evnote-collections-open';
+const EXPANDED_KEY = 'daftr-collections-expanded';
+const SECTION_KEY = 'daftr-collections-open';
 
 const ICON_FILE = 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6';
 const ICON_RENAME = 'M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z';

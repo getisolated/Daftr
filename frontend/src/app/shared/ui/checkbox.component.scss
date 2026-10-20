@@ -16,22 +16,22 @@
   height: 16px;
   margin-top: 1px;
   box-sizing: border-box;
-  background: var(--evn-bg-input);
-  border: 1px solid var(--evn-border-soft);
+  background: var(--daftr-bg-input);
+  border: 1px solid var(--daftr-border-soft);
   border-radius: 3px;
   color: #fff;
   transition: background 0.1s, border-color 0.1s;
 }
 
-:host(:hover) .box { border-color: var(--evn-text-faint); }
+:host(:hover) .box { border-color: var(--daftr-text-faint); }
 
 :host(.checked) .box {
-  background: var(--evn-accent);
-  border-color: var(--evn-accent);
+  background: var(--daftr-accent);
+  border-color: var(--daftr-accent);
 }
 
 :host(:focus-visible) .box {
-  outline: 1px solid var(--evn-accent);
+  outline: 1px solid var(--daftr-accent);
   outline-offset: 2px;
 }
 

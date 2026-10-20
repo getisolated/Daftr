@@ -11,22 +11,22 @@
   width: 100%;
   min-width: 240px;
   padding: 4px 8px;
-  background: var(--evn-bg-input);
-  border: 1px solid var(--evn-border-soft);
+  background: var(--daftr-bg-input);
+  border: 1px solid var(--daftr-border-soft);
   border-radius: 2px;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
   outline: none;
 
-  &:hover { border-color: var(--evn-text-faint); }
-  &:focus-visible, &.open { border-color: var(--evn-accent); }
+  &:hover { border-color: var(--daftr-text-faint); }
+  &:focus-visible, &.open { border-color: var(--daftr-accent); }
 }
 
 .chevron {
   flex: none;
-  color: var(--evn-text-soft);
+  color: var(--daftr-text-soft);
   transition: transform 0.12s;
 }
 
@@ -41,7 +41,7 @@
 
 .option-icon {
   margin-right: -4px;
-  color: var(--evn-text-soft);
+  color: var(--daftr-text-soft);
 }
 
 .panel {
@@ -51,8 +51,8 @@
   max-height: 240px;
   overflow-y: auto;
   padding: 4px 0;
-  background: var(--evn-bg-menu);
-  border: 1px solid var(--evn-border);
+  background: var(--daftr-bg-menu);
+  border: 1px solid var(--daftr-border);
   border-radius: 4px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
   animation: panel-in 0.1s ease;
@@ -71,11 +71,11 @@
   height: 28px;
   padding: 0 10px;
   box-sizing: border-box;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   cursor: pointer;
 
-  &.highlighted { background: var(--evn-bg-selected); color: var(--evn-text-bright); }
-  &.selected { color: var(--evn-text-bright); }
+  &.highlighted { background: var(--daftr-bg-selected); color: var(--daftr-text-bright); }
+  &.selected { color: var(--daftr-text-bright); }
 }
 
 // With an icon, the label takes the room and the check mark stays at the end

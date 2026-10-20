@@ -5,7 +5,7 @@ import { BacklinksService } from '../../core/services/backlinks.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { Backlink } from '../../core/utils/note-links.util';
 
-const STORAGE_KEY = 'evnote-backlinks-open';
+const STORAGE_KEY = 'daftr-backlinks-open';
 
 /** Notes linking to the active note, under the editor. */
 @Component({

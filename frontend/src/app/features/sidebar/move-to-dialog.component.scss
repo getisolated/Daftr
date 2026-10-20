@@ -22,8 +22,8 @@
   width: 380px;
   max-width: calc(100vw - 32px);
   max-height: min(520px, calc(100vh - 64px));
-  background: var(--evn-bg-panel);
-  border: 1px solid var(--evn-border);
+  background: var(--daftr-bg-panel);
+  border: 1px solid var(--daftr-border);
   border-radius: 8px;
   padding: 18px 20px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
@@ -33,21 +33,21 @@
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--evn-text-strong);
+  color: var(--daftr-text-strong);
 }
 
 .filter {
   height: 28px;
   padding: 0 8px;
-  background: var(--evn-bg-input);
-  border: 1px solid var(--evn-border-soft);
+  background: var(--daftr-bg-input);
+  border: 1px solid var(--daftr-border-soft);
   border-radius: 4px;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   font: inherit;
   font-size: 13px;
   outline: none;
 
-  &:focus { border-color: var(--evn-accent); }
+  &:focus { border-color: var(--daftr-accent); }
 }
 
 .options {
@@ -56,7 +56,7 @@
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--evn-scrollbar) transparent;
+  scrollbar-color: var(--daftr-scrollbar) transparent;
 }
 
 .option {
@@ -71,12 +71,12 @@
   text-align: left;
   font: inherit;
   font-size: 13px;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   cursor: pointer;
 
-  svg { flex-shrink: 0; color: var(--evn-text-soft); }
+  svg { flex-shrink: 0; color: var(--daftr-text-soft); }
 
-  &:hover:not(:disabled) { background: var(--evn-bg-hover); }
+  &:hover:not(:disabled) { background: var(--daftr-bg-hover); }
 
   &:disabled {
     cursor: default;
@@ -93,7 +93,7 @@
 .empty {
   padding: 8px 10px;
   font-size: 12.5px;
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
 }
 
 .actions {
@@ -105,12 +105,12 @@
   height: 28px;
   padding: 0 14px;
   background: transparent;
-  border: 1px solid var(--evn-border-soft);
+  border: 1px solid var(--daftr-border-soft);
   border-radius: 4px;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   font: inherit;
   font-size: 12.5px;
   cursor: pointer;
 
-  &:hover { background: rgba(var(--evn-hover-rgb), 0.06); }
+  &:hover { background: rgba(var(--daftr-hover-rgb), 0.06); }
 }

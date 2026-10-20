@@ -17,7 +17,7 @@ const QUIT: &str = "quit";
 /// Crée l'icône et son menu.
 pub fn create(app: &AppHandle, language: Language) -> tauri::Result<()> {
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
-        .tooltip("Everything Note")
+        .tooltip("Daftr")
         .menu(&build_menu(app, language)?)
         .show_menu_on_left_click(false)
         .on_menu_event(on_menu_event)

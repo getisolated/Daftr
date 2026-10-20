@@ -31,7 +31,7 @@ const TREE_RESERVED_HEIGHT = 120;
       position: relative;
       flex-shrink: 0;
       height: 1px;
-      background: var(--evn-border);
+      background: var(--daftr-border);
       cursor: row-resize;
       touch-action: none;
     }
@@ -46,7 +46,7 @@ const TREE_RESERVED_HEIGHT = 120;
 
     :host(:hover),
     :host(:active) {
-      background: rgba(var(--evn-accent-strong-rgb), 0.8);
+      background: rgba(var(--daftr-accent-strong-rgb), 0.8);
     }
   `,
 })

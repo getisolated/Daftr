@@ -15,7 +15,7 @@
   box-sizing: border-box;
   height: var(--bar-thickness);
   padding: 0 10px;
-  background: var(--evn-bg-panel);
+  background: var(--daftr-bg-panel);
   user-select: none;
   overflow-x: auto;
   overflow-y: hidden;
@@ -34,15 +34,15 @@
 
   // ── Horizontal (top / bottom of the page) ──
   &[data-style='pinned'] {
-    &[data-position='top'] { border-bottom: 1px solid var(--evn-border-subtle); }
-    &[data-position='bottom'] { border-top: 1px solid var(--evn-border-subtle); }
-    &[data-position='left'] { border-right: 1px solid var(--evn-border-subtle); }
-    &[data-position='right'] { border-left: 1px solid var(--evn-border-subtle); }
+    &[data-position='top'] { border-bottom: 1px solid var(--daftr-border-subtle); }
+    &[data-position='bottom'] { border-top: 1px solid var(--daftr-border-subtle); }
+    &[data-position='left'] { border-right: 1px solid var(--daftr-border-subtle); }
+    &[data-position='right'] { border-left: 1px solid var(--daftr-border-subtle); }
   }
 
   &[data-style='floating'] {
     margin: 8px 12px;
-    border: 1px solid var(--evn-border-soft);
+    border: 1px solid var(--daftr-border-soft);
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   }
@@ -109,7 +109,7 @@
   width: 1px;
   height: var(--separator-length);
   margin: 0 var(--separator-margin);
-  background: var(--evn-border);
+  background: var(--daftr-border);
   flex-shrink: 0;
 }
 
@@ -123,7 +123,7 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--evn-text-soft);
+  color: var(--daftr-text-soft);
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
@@ -134,13 +134,13 @@
   }
 
   &:hover:not(:disabled) {
-    background: rgba(var(--evn-hover-rgb), 0.07);
-    color: var(--evn-text);
+    background: rgba(var(--daftr-hover-rgb), 0.07);
+    color: var(--daftr-text);
   }
 
   &.active:not(:disabled) {
-    background: rgba(var(--evn-accent-strong-rgb), 0.35);
-    color: var(--evn-accent-text);
+    background: rgba(var(--daftr-accent-strong-rgb), 0.35);
+    color: var(--daftr-accent-text);
   }
 
   &:disabled {
@@ -159,13 +159,13 @@
   background: transparent;
   border-color: transparent;
   border-radius: 4px;
-  color: var(--evn-text-soft);
+  color: var(--daftr-text-soft);
   font-size: 12px;
 
   &:hover {
     border-color: transparent;
-    background: rgba(var(--evn-hover-rgb), 0.07);
-    color: var(--evn-text);
+    background: rgba(var(--daftr-hover-rgb), 0.07);
+    color: var(--daftr-text);
   }
 }
 
@@ -175,8 +175,8 @@
 
   // One of the toggles of the group is in effect under the caret, as for a pressed button
   &.active {
-    background: rgba(var(--evn-accent-strong-rgb), 0.35);
-    color: var(--evn-accent-text);
+    background: rgba(var(--daftr-accent-strong-rgb), 0.35);
+    color: var(--daftr-accent-text);
   }
 
   .trigger-icon {

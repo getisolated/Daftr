@@ -14,13 +14,13 @@
   position: fixed;
   min-width: 180px;
   max-width: 280px;
-  background: var(--evn-bg-menu);
-  border: 1px solid var(--evn-border);
+  background: var(--daftr-bg-menu);
+  border: 1px solid var(--daftr-border);
   border-radius: 8px;
   padding: 4px 0;
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(var(--evn-hover-rgb), 0.04);
+    0 0 0 1px rgba(var(--daftr-hover-rgb), 0.04);
   animation: ctxIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: 'Segoe UI', system-ui, sans-serif;
   z-index: 2001;
@@ -39,7 +39,7 @@
 
 .ctx-divider {
   height: 1px;
-  background: var(--evn-border);
+  background: var(--daftr-border);
   margin: 4px 8px;
 }
 
@@ -51,7 +51,7 @@
   padding: 6px 12px;
   border: none;
   background: transparent;
-  color: var(--evn-text);
+  color: var(--daftr-text);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
@@ -61,14 +61,14 @@
   outline: none;
 
   &:hover:not(.disabled) {
-    background: var(--evn-bg-selected);
+    background: var(--daftr-bg-selected);
   }
 
   &.danger {
-    color: var(--evn-danger);
+    color: var(--daftr-danger);
 
     .ctx-icon {
-      color: var(--evn-danger);
+      color: var(--daftr-danger);
     }
 
     &:hover:not(.disabled) {
@@ -77,17 +77,17 @@
   }
 
   &.disabled {
-    color: var(--evn-text-faint);
+    color: var(--daftr-text-faint);
     cursor: default;
 
     .ctx-icon {
-      color: var(--evn-text-faint);
+      color: var(--daftr-text-faint);
     }
   }
 }
 
 .ctx-icon {
-  color: var(--evn-text-dimmed);
+  color: var(--daftr-text-dimmed);
   flex-shrink: 0;
   pointer-events: none;
 }
@@ -106,7 +106,7 @@
 
 .ctx-shortcut {
   font-size: 11px;
-  color: var(--evn-text-disabled);
+  color: var(--daftr-text-disabled);
   background: transparent;
   border: none;
   font-family: 'Consolas', monospace;
@@ -115,7 +115,7 @@
 }
 
 .ctx-chevron {
-  color: var(--evn-text-disabled);
+  color: var(--daftr-text-disabled);
   flex-shrink: 0;
   margin-left: 4px;
 }
@@ -127,12 +127,12 @@
   left: 100%;
   top: -4px;
   min-width: 160px;
-  background: var(--evn-bg-menu);
-  border: 1px solid var(--evn-border);
+  background: var(--daftr-bg-menu);
+  border: 1px solid var(--daftr-border);
   border-radius: 8px;
   padding: 4px 0;
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(var(--evn-hover-rgb), 0.04);
+    0 0 0 1px rgba(var(--daftr-hover-rgb), 0.04);
   animation: ctxIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }

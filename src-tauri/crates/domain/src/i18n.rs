@@ -69,7 +69,7 @@ pub fn message(language: Language, key: MessageKey) -> &'static str {
 
 fn english(key: MessageKey) -> &'static str {
     match key {
-        MessageKey::TrayOpenApp => "Open Everything Note",
+        MessageKey::TrayOpenApp => "Open Daftr",
         MessageKey::TrayQuickNote => "Quick note",
         MessageKey::TraySettings => "Settings…",
         MessageKey::TrayQuit => "Quit",
@@ -83,7 +83,7 @@ fn english(key: MessageKey) -> &'static str {
 
 fn french(key: MessageKey) -> &'static str {
     match key {
-        MessageKey::TrayOpenApp => "Ouvrir Everything Note",
+        MessageKey::TrayOpenApp => "Ouvrir Daftr",
         MessageKey::TrayQuickNote => "Note rapide",
         MessageKey::TraySettings => "Paramètres…",
         MessageKey::TrayQuit => "Quitter",

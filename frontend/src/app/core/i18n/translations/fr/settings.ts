@@ -23,7 +23,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.language.title': 'Langue',
   'settings.language.description': 'Langue de l\'application. La valeur initiale suit la langue de votre PC ; le changement s\'applique immédiatement.',
   'settings.launchAtStartup.title': 'Lancer au démarrage',
-  'settings.launchAtStartup.description': 'Démarrer Everything Note silencieusement dans la zone de notification à l\'ouverture de session Windows.',
+  'settings.launchAtStartup.description': 'Démarrer Daftr silencieusement dans la zone de notification à l\'ouverture de session Windows.',
   'settings.autoUpdate.title': 'Mises à jour automatiques',
   'settings.autoUpdate.description': 'Télécharger les nouvelles versions en arrière-plan et les installer à la fermeture de l\'application. Si la case est décochée, une confirmation est demandée avant tout téléchargement.',
   'settings.theme.title': 'Thème',

@@ -1,3 +1,4 @@
+import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { IpcError } from '../bindings/IpcError';
@@ -5,6 +6,11 @@ import type { IpcError } from '../bindings/IpcError';
 /** True inside the desktop app (Tauri); false in a plain browser (`ng serve` alone, tests). */
 export function inDesktop(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+/** Version of the desktop app (`package.json`, stamped by the release workflow); null in a plain browser. */
+export async function appVersion(): Promise<string | null> {
+  return inDesktop() ? getVersion() : null;
 }
 
 /** Label of the current window: `main` or `overlay` (see the Rust crate `desktop`). */

@@ -85,7 +85,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
-      background: var(--evn-bg);
+      background: var(--daftr-bg);
     }
     .app-body {
       display: flex;

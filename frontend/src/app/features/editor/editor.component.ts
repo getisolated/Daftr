@@ -539,11 +539,11 @@ export class EditorComponent implements OnDestroy, OnChanges {
       }
     });
 
-    const evnoteTheme = EditorView.theme({
+    const daftrTheme = EditorView.theme({
       '&': {
         height: '100%',
-        background: 'var(--evn-bg)',
-        color: 'var(--evn-text)',
+        background: 'var(--daftr-bg)',
+        color: 'var(--daftr-text)',
         fontSize: '14px',
         fontFamily: 'Consolas, "Courier New", monospace',
       },
@@ -551,7 +551,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       '.cm-content': {
         padding: '32px 48px 32px 16px',
         minHeight: '100%',
-        caretColor: 'var(--evn-caret)',
+        caretColor: 'var(--daftr-caret)',
         boxSizing: 'border-box',
       },
       '.cm-scroller': {
@@ -565,7 +565,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       '.cm-gutters': {
         background: 'transparent',
         border: 'none',
-        color: 'var(--evn-text-faint)',
+        color: 'var(--daftr-text-faint)',
         userSelect: 'none',
       },
       // Numbers hug the text, right-aligned like in VS Code: the gutter and the content are centered together
@@ -578,13 +578,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
         fontSize: '12px',
       },
       '&.cm-focused .cm-cursor': {
-        borderLeftColor: 'var(--evn-caret)',
+        borderLeftColor: 'var(--daftr-caret)',
       },
       '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-        background: 'var(--evn-selection)',
+        background: 'var(--daftr-selection)',
       },
       '.cm-activeLine': {
-        background: 'rgba(var(--evn-hover-rgb), 0.02)',
+        background: 'rgba(var(--daftr-hover-rgb), 0.02)',
       },
     });
 
@@ -607,7 +607,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         codeLanguages: languages,
       }),
       editorHighlight,
-      evnoteTheme,
+      daftrTheme,
       // Colors follow the CSS variables; only CodeMirror's own light/dark base styles (search panel, tooltips…) need swapping
       this.themeCompartment.of(this.buildThemeMode()),
       markdownDecorationTheme,

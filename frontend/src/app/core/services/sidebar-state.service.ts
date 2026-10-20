@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { clampSidebarWidth, SIDEBAR_DEFAULT_WIDTH } from '../utils/folder-tree.util';
 
-const STORAGE_KEY = 'evnote-sidebar';
+const STORAGE_KEY = 'daftr-sidebar';
 
 interface PersistedSidebarState {
   visible: boolean;
