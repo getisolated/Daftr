@@ -28,6 +28,7 @@ import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
 import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
+import { externallyChangedContent } from '../../core/utils/external-change.util';
 import { EditorViewMode, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
 import { TranslationKey } from '../../core/i18n/translations';
@@ -335,6 +336,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
           ],
         });
       });
+    });
+
+    // The open note was changed outside the editor (an AI through the MCP server, then `notes:changed` reloaded the list)
+    effect(() => {
+      const notes = this.notes.notes();
+      untracked(() => this.onExternalNoteChange(notes));
     });
 
     // A collection file open here was changed by another program
@@ -1024,6 +1031,30 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.fileContentOnDisk = null;
       this.fileBanner.set({ kind: 'unsaved', path: file.path, error: err instanceof Error ? err.message : String(err) });
     }
+  }
+
+  /** Reloads the open note from the stored list when it changed elsewhere and the editor holds no unsaved edit. */
+  private onExternalNoteChange(notes: readonly Note[]): void {
+    const open = this.activeNote();
+    const view = this.editorView;
+
+    if (!open || !view || open.id === QUICK_NOTES_TAB_ID || this.fileDocs.isFileDoc(open.id)) {
+      return;
+    }
+
+    const stored = notes.find(n => n.id === open.id);
+    const dirty = this.tabs.tabs().find(tab => tab.noteId === open.id)?.isDirty ?? false;
+    const content = externallyChangedContent(open.content, stored?.content, view.state.doc.toString(), dirty);
+
+    if (content === null || !stored) {
+      return;
+    }
+
+    this.isUpdatingFromModel = true;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
+    this.isUpdatingFromModel = false;
+    this.activeNote.set(stored);
+    this.tabs.updateTitle(stored.id, stored.title);
   }
 
   /** The open file changed on disk: reloaded when it holds no unsaved edit, otherwise the user chooses. */

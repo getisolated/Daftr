@@ -12,7 +12,7 @@ use platform::sync::lock;
 
 use crate::ports::{
     CollectionFiles, CollectionStore, CollectionWatcher, EntryKind, ExportWriter, FolderStore,
-    NoteStore, SettingsStore, ZipEntry,
+    NoteStore, SecretSource, SettingsStore, ZipEntry,
 };
 use crate::{AppError, AppResult};
 
@@ -419,6 +419,34 @@ impl SettingsStore for MemorySettings {
     fn save(&self, settings: &AppSettings) -> AppResult<()> {
         lock(&self.saved).push(settings.clone());
         Ok(())
+    }
+}
+
+/// Jetons prévisibles : `0…01`, `0…02`… ; `failing` simule l'absence de source de hasard.
+#[derive(Default)]
+pub struct CountingSecrets {
+    issued: Mutex<u64>,
+    failing: bool,
+}
+
+impl CountingSecrets {
+    /// Source qui échoue toujours.
+    pub fn failing() -> Self {
+        Self {
+            failing: true,
+            ..Self::default()
+        }
+    }
+}
+
+impl SecretSource for CountingSecrets {
+    fn new_token(&self) -> AppResult<String> {
+        if self.failing {
+            return Err(AppError::Storage("no randomness".to_owned()));
+        }
+        let mut issued = lock(&self.issued);
+        *issued += 1;
+        Ok(format!("{:064x}", *issued))
     }
 }
 
