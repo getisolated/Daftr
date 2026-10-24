@@ -15,6 +15,6 @@ pub use collection::{
     FileMatchDto, GraphLinkDto, GraphNodeDto,
 };
 pub use folder::FolderDto;
-pub use note::{ExportedNoteDto, NoteChangesDto, NoteDto};
+pub use note::{ExportProgressDto, ExportedNoteDto, NoteChangesDto, NoteDto};
 pub use settings::{OverlayPositionDto, SettingsDto, SettingsUpdateResultDto};
 pub use update::{UpdateInfoDto, UpdateProgressDto};

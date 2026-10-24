@@ -26,6 +26,7 @@ domain = { path = "crates/domain" }
 app = { path = "crates/app" }
 adapter-sqlite = { path = "crates/adapter-sqlite" }
 adapter-fs = { path = "crates/adapter-fs" }
+adapter-print = { path = "crates/adapter-print" }
 presentation = { path = "crates/presentation" }
 
 anyhow = "1"
