@@ -56,7 +56,7 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 - **Tabs** — drag & drop reordering, pinning, session restore.
 - **Formatting bar** — a Word-like toolbar reflecting the formatting under the caret. `Alt+T` toggles it; size, style and position are settings.
 - **Quick-note overlay** — a global shortcut (`Ctrl+Alt+Q` by default, `⌥⌘Q` on macOS) pops a small always-on-top window anywhere on screen. Notes sent from it are gathered in a single *Quick notes* document, where each one can be copied, edited or deleted.
-- **Copy & export** — copy a note as markdown, export it as Markdown or standalone HTML, export a folder as a ZIP of `.md` files.
+- **Copy & export** — copy a note as markdown, export it as Markdown, standalone HTML or PDF (A4 pages, rendered like the preview: tables, colored code, Mermaid diagrams). Export a folder, or a multi-selection of notes and folders, as a ZIP of `.md` files or of PDF files.
 - **Themes** — Dark (default), Light, GitHub Light, Solarized Light, Violet Light, GitHub Dark Dimmed, or *System* following the OS. `Ctrl+K Ctrl+T` previews them live.
 - **Settings** — a VS Code-like settings editor (`Ctrl+,`) with search, categories and reset to default. Every shortcut can be rebound there.
 - **System tray / menu bar** — closing the window keeps Daftr running in the tray; optional launch at Windows startup. On macOS it stays in the Dock and the menu bar (`⇧⌘W` closes the window the same way), `⌘Q` quits, and *Launch at login* is optional; the menu bar icon can be turned off in Settings (Daftr keeps running in the Dock).
@@ -151,6 +151,7 @@ src-tauri/                   # Rust workspace
     app/                     # Use cases (notes, folders, collections, settings, export) and their ports (traits)
     adapter-sqlite/          # SQLite store: schema, idempotent migrations, FTS5 triggers, queries
     adapter-fs/              # settings.json, collection files, Recycle Bin, ZIP export, scan/watch/search thread
+    adapter-print/           # PDF export: a hidden window prints the page natively (WKWebView / WebView2), the only `unsafe` code
     presentation/            # DTOs exported to TypeScript (ts-rs), IPC errors, event names
     desktop/                 # Tauri shell: IPC commands, main + overlay windows, tray, global shortcut, autostart, updater
       tauri.conf.json        # Bundle, updater endpoint and public key, NSIS hook (removes the Everything Note versions)

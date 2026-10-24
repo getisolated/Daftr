@@ -35,7 +35,12 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   'editor.export.copyContent': 'Copier le contenu',
   'editor.export.markdown': 'Markdown…',
   'editor.export.html': 'HTML…',
-  'editor.export.zip': 'Exporter en ZIP…',
+  'editor.export.pdf': 'PDF…',
+  'editor.export.zip': 'Exporter en ZIP de Markdown…',
+  'editor.export.pdfZip': 'Exporter en ZIP de PDF…',
+  'editor.export.export': 'Exporter',
+  'editor.export.selectionMarkdown': 'Markdown (ZIP)…',
+  'editor.export.selectionPdf': 'PDF (ZIP)…',
 
   // Panneau de recherche
   'editor.find.showReplace': 'Afficher le remplacement',
