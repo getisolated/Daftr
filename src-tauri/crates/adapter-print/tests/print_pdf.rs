@@ -2,11 +2,11 @@
 //! cachée, WKWebView ou WebView2) rend des pages HTML en PDF.
 //!
 //! La boucle d'événements doit tourner sur le thread principal (macOS) : ce test se passe du
-//! harnais de `cargo test` et ne fait rien sans `DAFTR_PRINT_PDF_OUT`, le dossier où écrire
-//! les PDF.
+//! harnais de `cargo test`, n'est compilé qu'avec la feature `manual-tests` et ne fait rien
+//! sans `DAFTR_PRINT_PDF_OUT`, le dossier où écrire les PDF.
 //!
 //! ```text
-//! DAFTR_PRINT_PDF_OUT=/tmp/pdf cargo test -p adapter-print --test print_pdf
+//! DAFTR_PRINT_PDF_OUT=/tmp/pdf cargo test -p adapter-print --features manual-tests --test print_pdf
 //! ```
 //!
 //! Pages rendues : `tests/fixtures/note.html` (plusieurs pages A4 : tableau, code coloré,

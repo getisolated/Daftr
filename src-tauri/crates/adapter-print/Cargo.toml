@@ -58,6 +58,11 @@ objc2-web-kit = { version = "0.3.2", default-features = false, features = [
 webview2-com = "0.39"
 windows-core = "0.62"
 
+[features]
+# Test d'impression réelle (`tests/print_pdf.rs`), compilé seulement sur demande : son binaire
+# ne démarre pas sur les runners Windows de la CI (STATUS_ENTRYPOINT_NOT_FOUND)
+manual-tests = []
+
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 
@@ -66,3 +71,4 @@ tauri = { workspace = true, features = ["test"] }
 [[test]]
 name = "print_pdf"
 harness = false
+required-features = ["manual-tests"]
