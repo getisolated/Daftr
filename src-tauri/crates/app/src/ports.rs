@@ -141,6 +141,12 @@ pub trait SettingsStore: Send + Sync {
     fn save(&self, settings: &AppSettings) -> AppResult<()>;
 }
 
+/// Source de secrets aléatoires (jeton du serveur MCP).
+pub trait SecretSource: Send + Sync {
+    /// Un nouveau jeton : 32 octets aléatoires en hexadécimal minuscule.
+    fn new_token(&self) -> AppResult<String>;
+}
+
 /// Une entrée d'archive ZIP.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZipEntry {
