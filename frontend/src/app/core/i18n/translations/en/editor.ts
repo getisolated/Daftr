@@ -134,6 +134,7 @@ export const EN_EDITOR = {
   'editor.draft.confirm': 'Confirm',
   'editor.draft.discard': 'Discard',
   'editor.quickNote.edit': 'Edit',
+  'editor.quickNote.convert': 'Convert to note',
 
   // Backlinks
   'editor.backlinks.title': 'Backlinks',

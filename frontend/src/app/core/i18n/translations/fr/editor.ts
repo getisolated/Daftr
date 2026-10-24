@@ -136,6 +136,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   'editor.draft.confirm': 'Confirmer',
   'editor.draft.discard': 'Rejeter',
   'editor.quickNote.edit': 'Modifier',
+  'editor.quickNote.convert': 'Convertir en note',
 
   // Références (rétroliens)
   'editor.backlinks.title': 'Références',

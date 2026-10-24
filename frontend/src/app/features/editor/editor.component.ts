@@ -18,7 +18,7 @@ import { bracketMatching, syntaxTree } from '@codemirror/language';
 
 import { editorHighlight } from '../../shared/codemirror/editor-highlight';
 import { linkStatusFacet, markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
-import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks } from '../../shared/codemirror/note-timestamps';
+import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks, timestampBlocks } from '../../shared/codemirror/note-timestamps';
 import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
@@ -749,8 +749,26 @@ export class EditorComponent implements OnDestroy, OnChanges {
       save: (id, text) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text) }); },
       remove: id => { void this.notes.delete(id); },
       copy: text => { void navigator.clipboard.writeText(text); },
+      convert: id => this.convertQuickNote(id),
       editEnded: () => this.refreshQuickNotesView(this.notes.quickNotesDocument()),
     };
+  }
+
+  /** Converts a quick note and opens the resulting note in a tab. */
+  private convertQuickNote(id: number): void {
+    void this.notes.convertQuickNote(id).then(note => {
+      if (note) {
+        this.tabs.openNote(note.id, note.title);
+      }
+    });
+  }
+
+  /** Id of the quick note under the pointer, null outside the quick notes document. */
+  private quickNoteAt(event: MouseEvent): number | null {
+    const view = this.editorView;
+    if (!view || this.activeNote()?.id !== QUICK_NOTES_TAB_ID) return null;
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+    return timestampBlocks(view.state).find(range => pos >= range.from && pos <= range.to)?.id ?? null;
   }
 
   private contextMenuHandler(): Extension {
@@ -761,6 +779,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
         const items: ContextMenuEntry[] = [
           { id: 'draft', label: t('editor.menu.toggleDraft'), shortcut: this.shortcutLabel('editor.draft') },
         ];
+        const quickNoteId = this.quickNoteAt(event);
+
+        if (quickNoteId !== null) {
+          items.push({ divider: true }, { id: `quick:convert:${quickNoteId}`, label: t('editor.quickNote.convert') });
+        }
+
         const table = this.editorView ? describeTableAtCursor(this.editorView.state) : null;
 
         if (table) {
@@ -794,6 +818,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
     if (id.startsWith('export:') && noteId !== undefined) {
       // What was typed in the last second is not saved yet: the export must include it
       void this.flushPendingSave().then(() => this.noteExport.runNoteAction(id, noteId));
+    } else if (id.startsWith('quick:convert:')) {
+      this.convertQuickNote(Number(id.slice('quick:convert:'.length)));
     } else if (id === 'draft' && view) {
       toggleDraft(view);
       view.focus();

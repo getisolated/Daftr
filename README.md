@@ -55,7 +55,7 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 - **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. `.md` files open with Daftr from the Explorer or the Finder.
 - **Tabs** — drag & drop reordering, pinning, session restore.
 - **Formatting bar** — a Word-like toolbar reflecting the formatting under the caret. `Alt+T` toggles it; size, style and position are settings.
-- **Quick-note overlay** — a global shortcut (`Ctrl+Alt+Q` by default, `⌥⌘Q` on macOS) pops a small always-on-top window anywhere on screen. Notes sent from it are gathered in a single *Quick notes* document, where each one can be copied, edited or deleted.
+- **Quick-note overlay** — a global shortcut (`Ctrl+Alt+Q` by default, `⌥⌘Q` on macOS) pops a small always-on-top window anywhere on screen. Notes sent from it are gathered in a single *Quick notes* document, where each one can be copied, edited, deleted or converted into a regular note (filed in *Inbox* if it has no folder).
 - **Copy & export** — copy a note as markdown, export it as Markdown or standalone HTML, export a folder as a ZIP of `.md` files.
 - **Themes** — Dark (default), Light, GitHub Light, Solarized Light, Violet Light, GitHub Dark Dimmed, or *System* following the OS. `Ctrl+K Ctrl+T` previews them live.
 - **Settings** — a VS Code-like settings editor (`Ctrl+,`) with search, categories and reset to default. Every shortcut can be rebound there.
