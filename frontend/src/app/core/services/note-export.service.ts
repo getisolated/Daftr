@@ -172,9 +172,17 @@ export class NoteExportService {
     ]);
     const container = document.createElement('div');
     container.innerHTML = renderMarkdown(createMarkdownRenderer({ linkStatus: () => 'note', t: this.i18n.t }), note.content);
-    await highlightCodeBlocks(container);
-    await renderMermaidBlocks(container, false);
 
-    return buildHtmlDocument(this.titleOf(note), container.innerHTML, this.i18n.language(), { print });
+    // Mermaid only draws diagrams attached to the document: the page is built off screen
+    container.style.cssText = 'position: fixed; top: 0; left: -10000px; width: 860px; visibility: hidden; pointer-events: none;';
+    document.body.append(container);
+
+    try {
+      await highlightCodeBlocks(container);
+      await renderMermaidBlocks(container, false);
+      return buildHtmlDocument(this.titleOf(note), container.innerHTML, this.i18n.language(), { print });
+    } finally {
+      container.remove();
+    }
   }
 }
