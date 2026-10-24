@@ -34,7 +34,7 @@ import { MarkdownPreviewComponent } from '../preview/markdown-preview.component'
 import { TranslationKey } from '../../core/i18n/translations';
 import { noteExportMenu, NoteExportService } from '../../core/services/note-export.service';
 import { FoldersService } from '../../core/services/folders.service';
-import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
+import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { insertLink } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
@@ -322,17 +322,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
     });
 
     effect(() => {
-      this.settingsService.settings().showLineNumbers;
-      this.settingsService.settings().wordWrap;
-      this.settingsService.settings().trailingLine;
-      this.settingsService.settings().hideScrollbar;
+      const settings = this.settingsService.settings();
       untracked(() => {
         this.editorView?.dispatch({
           effects: [
-            this.trailingLineCompartment.reconfigure(this.buildTrailingLine()),
-            this.lineNumbersCompartment.reconfigure(this.buildLineNumbers()),
-            this.wrapCompartment.reconfigure(this.buildWrapping()),
-            this.scrollbarCompartment.reconfigure(this.buildScrollbar()),
+            this.trailingLineCompartment.reconfigure(this.buildTrailingLine(settings)),
+            this.lineNumbersCompartment.reconfigure(this.buildLineNumbers(settings)),
+            this.wrapCompartment.reconfigure(this.buildWrapping(settings)),
+            this.scrollbarCompartment.reconfigure(this.buildScrollbar(settings)),
           ],
         });
       });
@@ -606,6 +603,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       return false;
     }
 
+    const settings = this.settingsService.settings();
     const extensions: Extension[] = [
       history(),
       closeBrackets(),
@@ -664,10 +662,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
       // Reads the language at each call: what is drawn on demand (menus, tooltips, widgets) follows it
       translatorFacet.of(this.i18n.t),
       updateListener,
-      this.wrapCompartment.of(this.buildWrapping()),
-      this.scrollbarCompartment.of(this.buildScrollbar()),
-      this.lineNumbersCompartment.of(this.buildLineNumbers()),
-      this.trailingLineCompartment.of(this.buildTrailingLine()),
+      this.wrapCompartment.of(this.buildWrapping(settings)),
+      this.scrollbarCompartment.of(this.buildScrollbar(settings)),
+      this.lineNumbersCompartment.of(this.buildLineNumbers(settings)),
+      this.trailingLineCompartment.of(this.buildTrailingLine(settings)),
       linkNavigation(target => this.followLink(target)),
       cursorResync,
       EditorView.domEventHandlers({
@@ -836,15 +834,15 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   /** Never in the quick notes document: its lines are notes, not a file. */
-  private buildLineNumbers(): Extension {
-    return this.settingsService.settings().showLineNumbers && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
+  private buildLineNumbers(settings: AppSettings): Extension {
+    return settings.showLineNumbers && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
       ? [lineNumbers(), EditorView.editorAttributes.of({ class: 'cm-with-numbers' })]
       : [];
   }
 
   /** Keeps an empty line at the end of the note while the setting is on (never in the read-only overlay document). */
-  private buildTrailingLine(): Extension {
-    if (!this.settingsService.settings().trailingLine) return [];
+  private buildTrailingLine(settings: AppSettings): Extension {
+    if (!settings.trailingLine) return [];
     const NEWLINE = String.fromCharCode(10);
     return EditorState.transactionFilter.of(tr => {
       const length = tr.newDoc.length;
@@ -853,12 +851,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
     });
   }
 
-  private buildWrapping(): Extension {
-    return this.settingsService.settings().wordWrap ? EditorView.lineWrapping : [];
+  private buildWrapping(settings: AppSettings): Extension {
+    return settings.wordWrap ? EditorView.lineWrapping : [];
   }
 
-  private buildScrollbar(): Extension {
-    return this.settingsService.settings().hideScrollbar ? hiddenScrollbar : [];
+  private buildScrollbar(settings: AppSettings): Extension {
+    return settings.hideScrollbar ? hiddenScrollbar : [];
   }
 
   /** Ctrl+click on a link (or a click in the preview): a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
