@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use adapter_fs::{CollectionsWatcher, DiskExportWriter, DiskFiles, SettingsFile};
 use adapter_mcp::RandomSecrets;
+use adapter_print::WebviewPdfRenderer;
 use adapter_sqlite::SqliteStore;
 use anyhow::Context;
 use app::collections::{CollectionPorts, CollectionsService};
@@ -61,7 +62,10 @@ fn build_services(app: &AppHandle, directory: &Path) -> anyhow::Result<Services>
         folders: Arc::new(FoldersService::new(store)),
         collections,
         settings,
-        export: ExportService::new(Arc::new(DiskExportWriter)),
+        export: ExportService::new(
+            Arc::new(DiskExportWriter),
+            Arc::new(WebviewPdfRenderer::new(app.clone())),
+        ),
     })
 }
 

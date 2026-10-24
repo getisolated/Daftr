@@ -27,6 +27,7 @@ app = { path = "crates/app" }
 adapter-sqlite = { path = "crates/adapter-sqlite" }
 adapter-fs = { path = "crates/adapter-fs" }
 adapter-mcp = { path = "crates/adapter-mcp" }
+adapter-print = { path = "crates/adapter-print" }
 presentation = { path = "crates/presentation" }
 
 anyhow = "1"

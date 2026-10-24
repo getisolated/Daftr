@@ -16,6 +16,7 @@ tauri-build.workspace = true
 [dependencies]
 adapter-fs.workspace = true
 adapter-mcp.workspace = true
+adapter-print.workspace = true
 adapter-sqlite.workspace = true
 app.workspace = true
 domain.workspace = true

@@ -17,6 +17,6 @@ pub use collection::{
 };
 pub use folder::FolderDto;
 pub use mcp::{McpErrorKind, McpState, McpStatusDto};
-pub use note::{ExportedNoteDto, NoteChangesDto, NoteDto};
+pub use note::{ExportProgressDto, ExportedNoteDto, NoteChangesDto, NoteDto};
 pub use settings::{OverlayPositionDto, SettingsDto, SettingsUpdateResultDto};
 pub use update::{UpdateInfoDto, UpdateProgressDto};

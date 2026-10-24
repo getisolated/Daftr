@@ -152,14 +152,21 @@ pub trait SecretSource: Send + Sync {
 pub struct ZipEntry {
     /// Chemin dans l'archive, séparateurs `/`.
     pub path: String,
-    /// Texte du fichier (UTF-8).
-    pub content: String,
+    /// Contenu du fichier (texte UTF-8 ou PDF).
+    pub content: Vec<u8>,
 }
 
 /// Écriture des exports sur le disque.
 pub trait ExportWriter: Send + Sync {
-    /// Écrit un fichier texte.
-    fn write_text(&self, path: &Path, text: &str) -> AppResult<()>;
+    /// Écrit un fichier (texte UTF-8 ou PDF).
+    fn write_file(&self, path: &Path, content: &[u8]) -> AppResult<()>;
     /// Écrit une archive ZIP (deflate, noms UTF-8).
     fn write_zip(&self, path: &Path, entries: &[ZipEntry]) -> AppResult<()>;
+}
+
+/// Rendu de pages HTML autonomes en PDF (impression native d'un webview).
+pub trait PdfRenderer: Send + Sync {
+    /// Rend chaque page, dans l'ordre, en un document PDF ; `rendered(n)` est appelé dès que
+    /// les `n` premières pages le sont. Bloque jusqu'à la fin ; le premier échec arrête tout.
+    fn render(&self, pages: &[String], rendered: &mut dyn FnMut(usize)) -> AppResult<Vec<Vec<u8>>>;
 }

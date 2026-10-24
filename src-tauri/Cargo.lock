@@ -37,6 +37,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "adapter-print"
+version = "1.1.0"
+dependencies = [
+ "app",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-web-kit",
+ "platform",
+ "tauri",
+ "tracing",
+ "webview2-com",
+ "windows-core",
+]
+
+[[package]]
 name = "adapter-sqlite"
 version = "1.1.0"
 dependencies = [
@@ -904,6 +920,7 @@ version = "1.1.0"
 dependencies = [
  "adapter-fs",
  "adapter-mcp",
+ "adapter-print",
  "adapter-sqlite",
  "anyhow",
  "app",

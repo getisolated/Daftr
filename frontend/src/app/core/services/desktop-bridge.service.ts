@@ -52,8 +52,11 @@ export class DesktopBridgeService {
     return this.available ? call('shell_open_external', { url }) : Promise.resolve();
   }
 
-  /** Asks where to save the export, then writes it: the written path, `null` when cancelled (or outside the app). */
-  saveExport(kind: 'md' | 'html' | 'zip', suggestedName: string, payload: string | { path: string; content: string }[]): Promise<string | null> {
+  /**
+   * Asks where to save the export, then writes it: the written path, `null` when cancelled (or outside the app). `pdf` and
+   * `pdf-zip` take standalone HTML pages, printed to PDF by the main process.
+   */
+  saveExport(kind: 'md' | 'html' | 'pdf' | 'zip' | 'pdf-zip', suggestedName: string, payload: string | { path: string; content: string }[]): Promise<string | null> {
     return this.available ? call('export_save', { kind, suggestedName, payload }) : Promise.resolve(null);
   }
 
