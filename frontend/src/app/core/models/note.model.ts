@@ -31,6 +31,8 @@ export interface Tab {
   title: string;
   isDirty: boolean;
   isPinned: boolean;
+  /** Opened but never edited (in italics): the next note opened takes its place (setting `temporaryTabs`). */
+  isTemporary?: boolean;
   /** Set for a file of a collection: what the tab shows (kept across sessions, unlike its id). */
   file?: CollectionFileRef;
 }

@@ -114,6 +114,7 @@ fn apply_editor(raw: &RawSettings, settings: &mut AppSettings) {
     settings.show_breadcrumbs = raw.show_breadcrumbs.unwrap_or(settings.show_breadcrumbs);
     settings.hide_scrollbar = raw.hide_scrollbar.unwrap_or(settings.hide_scrollbar);
     settings.open_in_preview = raw.open_in_preview.unwrap_or(settings.open_in_preview);
+    settings.temporary_tabs = raw.temporary_tabs.unwrap_or(settings.temporary_tabs);
 }
 
 fn apply_mcp(raw: &RawSettings, settings: &mut AppSettings) {

@@ -500,6 +500,6 @@ export class PaletteComponent implements OnDestroy {
 
   private async createNote(): Promise<void> {
     const note = await this.notes.create();
-    this.tabs.openNote(note.id, note.title);
+    this.tabs.openNewNote(note.id, note.title);
   }
 }

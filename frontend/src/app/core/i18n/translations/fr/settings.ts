@@ -50,6 +50,8 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.hideScrollbar.description': 'Masquer la barre de défilement de l\'éditeur ; elle réapparaît lorsque la souris survole son bord. Le défilement continue de fonctionner.',
   'settings.openInPreview.title': 'Ouvrir les notes en aperçu',
   'settings.openInPreview.description': 'Ouvrir une note rendue comme sur GitHub (lecture seule) au lieu de sa source markdown. Les boutons en haut à droite de la note permettent de passer de la source à l\'affichage côte à côte, puis à l\'aperçu.',
+  'settings.temporaryTabs.title': 'Onglets temporaires',
+  'settings.temporaryTabs.description': 'Une note ouverte sans être modifiée occupe un onglet temporaire, en italique, remplacé par la prochaine note ouverte. Modifier la note, épingler son onglet ou double-cliquer dessus conserve l\'onglet.',
   'settings.formattingBarEnabled.title': 'Afficher la barre de mise en forme',
   'settings.formattingBarEnabled.description': 'Barre d\'outils avec les principales actions de mise en forme (titres, gras, listes…). Décochez pour la masquer définitivement ; le raccourci permet aussi de l\'afficher ou de la masquer.',
   'settings.formattingBarMode.title': 'Taille',

@@ -126,6 +126,11 @@
     }
   }
 
+  // ── Temporary tab: replaced by the next note opened until it is edited ──
+  &.temporary .tab-title {
+    font-style: italic;
+  }
+
   // ── Drag states ─────────────────────────────────────────────────────────
   &.dragging {
     opacity: 0.4;

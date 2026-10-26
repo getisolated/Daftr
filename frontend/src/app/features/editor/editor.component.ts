@@ -763,7 +763,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private convertQuickNote(id: number): void {
     void this.notes.convertQuickNote(id).then(note => {
       if (note) {
-        this.tabs.openNote(note.id, note.title);
+        this.tabs.openNewNote(note.id, note.title);
       }
     });
   }
