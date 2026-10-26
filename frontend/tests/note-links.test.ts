@@ -93,12 +93,12 @@ describe('buildNoteGraph', () => {
     expect(graph.links).toEqual([{ source: 1, target: 99 }]);
   });
 
-  it('filters by folder without turning outside notes into missing ones', () => {
-    const notes = [note(1, 'note://2 note://3', 10), note(2, '', 20), note(3, '', 10)];
-    const graph = buildNoteGraph(notes, t, { folderId: 10 });
+  it('filters by folders without turning outside notes into missing ones', () => {
+    const notes = [note(1, 'note://2 note://3 note://4', 10), note(2, '', 20), note(3, '', 10), note(4, '', 11), note(5)];
+    const graph = buildNoteGraph(notes, t, { folderIds: new Set([10, 11]) });
 
-    expect(graph.nodes.map(n => n.id)).toEqual([1, 3]);
-    expect(graph.links).toEqual([{ source: 1, target: 3 }]);
+    expect(graph.nodes.map(n => n.id)).toEqual([1, 3, 4]);
+    expect(graph.links).toEqual([{ source: 1, target: 3 }, { source: 1, target: 4 }]);
   });
 
   it('can hide the orphans', () => {

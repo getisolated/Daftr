@@ -39,8 +39,8 @@ export interface NoteGraph {
 }
 
 export interface GraphOptions {
-  /** Keeps the notes of this folder only; `null` keeps everything. */
-  folderId?: number | null;
+  /** Keeps the notes of these folders only (a folder and its sub-folders); `null` keeps everything. */
+  folderIds?: ReadonlySet<number> | null;
   /** Note around which a large graph is cut. */
   focusId?: number | null;
   /** Notes without any link stay out of the graph. */
@@ -191,8 +191,8 @@ function collectNeighbourhood(links: readonly GraphLink[], focusId: number, dept
  * Two notes linking each other keep one link per direction (A→B and B→A), so a cycle stays visible.
  */
 export function buildNoteGraph(notes: readonly LinkableNote[], t: Translator, options: GraphOptions = {}): NoteGraph {
-  const { folderId = null, focusId = null, hideOrphans = false, resolve } = options;
-  const scoped = folderId === null ? notes : notes.filter(n => n.folderId === folderId);
+  const { folderIds = null, focusId = null, hideOrphans = false, resolve } = options;
+  const scoped = folderIds === null ? notes : notes.filter(n => n.folderId !== null && folderIds.has(n.folderId));
   const known = new Map(scoped.map(n => [n.id, n]));
   const existing = new Set(notes.map(n => n.id));
   const links: GraphLink[] = [];
