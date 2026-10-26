@@ -47,7 +47,7 @@ export const EN_SETTINGS = {
   'settings.hideScrollbar.title': 'Hide Scrollbar',
   'settings.hideScrollbar.description': 'Hide the scrollbar of the editor; it shows again while the mouse is over its edge. Scrolling keeps working.',
   'settings.openInPreview.title': 'Open Notes In Preview',
-  'settings.openInPreview.description': 'Open a note rendered like on GitHub (read-only) instead of its markdown source. The buttons at the top right of the note switch between source, side by side and preview.',
+  'settings.openInPreview.description': 'Open a note rendered like on GitHub (read-only) instead of its markdown source, when no other note is shown (otherwise it takes the mode of the note left). The buttons at the top right of the note switch between source, side by side and preview.',
   'settings.formattingBarEnabled.title': 'Show Formatting Bar',
   'settings.formattingBarEnabled.description': 'Toolbar with the main formatting actions (headings, bold, lists…). Uncheck to hide it for good; the shortcut toggles it too.',
   'settings.formattingBarMode.title': 'Size',

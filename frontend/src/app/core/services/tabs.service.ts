@@ -3,6 +3,8 @@ import { CollectionFileRef } from '../models/collection.model';
 import { QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE, Tab } from '../models/note.model';
 import { FileDocsService } from './file-docs.service';
 import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
+import { EditorViewMode } from '../models/editor.model';
+import { isEditorViewMode } from '../utils/tab-view-mode.util';
 
 const SESSION_KEY = 'daftr-session';
 
@@ -46,12 +48,13 @@ export class TabsService {
           .filter(t => validNoteIds.has(t.noteId) || t.noteId === QUICK_NOTES_TAB_ID || !!t.file)
           // File ids only last a session: the saved file gets a fresh one (a missing file shows an error when opened).
           // Sessions saved before the rename still say "Overlay notes"
-          .map(t => ({
+          .map(({ viewMode, ...t }) => ({
             ...t,
             isPinned: t.isPinned ?? false,
             isDirty: false,
             noteId: t.file ? this.fileDocs.idFor(t.file) : t.noteId,
             title: t.noteId === QUICK_NOTES_TAB_ID ? QUICK_NOTES_TITLE : t.title,
+            ...(isEditorViewMode(viewMode) ? { viewMode } : {}),
           }));
         if (validTabs.length > 0) {
           this._tabs.set(validTabs);
@@ -173,6 +176,15 @@ export class TabsService {
     this._tabs.update(tabs =>
       tabs.map(t => t.noteId === noteId ? { ...t, isDirty: dirty } : t)
     );
+  }
+
+  /** Remembers how the note of a tab is shown (source, side by side or preview). */
+  setViewMode(noteId: number, viewMode: EditorViewMode): void {
+    if (this._tabs().find(t => t.noteId === noteId)?.viewMode === viewMode) return;
+    this._tabs.update(tabs =>
+      tabs.map(t => t.noteId === noteId ? { ...t, viewMode } : t)
+    );
+    this.persist();
   }
 
   updateTitle(noteId: number, title: string): void {

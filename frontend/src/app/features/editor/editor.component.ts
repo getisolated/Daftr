@@ -58,6 +58,7 @@ import { inDesktop } from '../../core/services/desktop-api';
 import { ImageResolver } from '../../shared/markdown/markdown-renderer';
 import { fileBreadcrumbs, noteBreadcrumbs } from '../../core/utils/breadcrumbs.util';
 import { noteDisplayTitle } from '../../core/utils/note-title.util';
+import { viewModeOnOpen } from '../../core/utils/tab-view-mode.util';
 
 /** Protocol of the main process serving the images of the collections (crate `desktop`, file_protocol.rs). */
 const COLLECTION_FILE_SCHEME = 'collection-file';
@@ -72,9 +73,6 @@ function hiddenSearchPanel(): HTMLElement {
   dom.hidden = true;
   return dom;
 }
-
-/** How long the view mode of a followed link waits for the note it opens (a collection file is read from the disk). */
-const CARRIED_VIEW_MODE_MS = 3000;
 
 /** Delay before the preview follows the text being typed. */
 const PREVIEW_REFRESH_MS = 150;
@@ -229,9 +227,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.settingsService.settings().showOutline && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
   );
 
-  /** Source, preview, or both side by side. Not remembered per note: each opened note starts as the settings say. */
+  /** Source, preview, or both side by side. Remembered by each tab; a newly opened note takes the mode of the note left. */
   protected readonly viewMode = signal<EditorViewMode>('source');
-  private carriedViewMode: { mode: EditorViewMode; at: number } | null = null;
   /** Text shown by the preview; follows the editor with a short delay while the preview is shown. */
   protected readonly previewContent = signal('');
   /** Line the preview must bring to the top (editor scrolled, side by side). */
@@ -370,6 +367,11 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
     this.viewMode.set(mode);
 
+    const noteId = this.activeNote()?.id;
+    if (noteId !== undefined) {
+      this.tabs.setViewMode(noteId, mode);
+    }
+
     if (mode !== 'preview') {
       setTimeout(() => this.editorView?.focus(), 0);
     }
@@ -444,6 +446,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private async loadNote(id: number | null): Promise<void> {
     const generation = ++this.loadGeneration;
     const previousId = this.activeNote()?.id ?? null;
+    // Read before any wait: the mode of the note being left, inherited by a newly opened one
+    const leftMode = previousId !== null ? this.viewMode() : null;
 
     // Always flush pending save before switching notes
     await this.flushPendingSave();
@@ -478,7 +482,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
       if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
       this.previewContent.set(note?.content ?? '');
-      this.viewMode.set(this.takeCarriedViewMode() ?? (this.settingsService.settings().openInPreview ? 'preview' : 'source'));
+      const tabMode = this.tabs.tabs().find(tab => tab.noteId === id)?.viewMode;
+      const mode = viewModeOnOpen(tabMode, leftMode, this.settingsService.settings().openInPreview);
+      this.viewMode.set(mode);
+      this.tabs.setViewMode(id, mode);
       // Wait for DOM to update
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
@@ -866,7 +873,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const relative = file && !/^[a-z][a-z0-9+.-]*:/i.test(target.trim()) ? resolveRelativeLink(file.path, target) : null;
 
     if (file && relative !== null) {
-      this.carryViewMode();
       this.openCollectionTarget(file.root, relative);
       return;
     }
@@ -885,22 +891,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const note = notes.find(n => n.id === noteId);
 
     if (note) {
-      this.carryViewMode();
       this.tabs.openNote(note.id, note.title);
     }
-  }
-
-  /** A note opened by a link keeps the view mode of the note holding the link (source, side by side or preview). */
-  private carryViewMode(): void {
-    this.carriedViewMode = { mode: this.viewMode(), at: Date.now() };
-  }
-
-  /** The mode left by a link just followed, once: a stale one (the link opened nothing new) is ignored. */
-  private takeCarriedViewMode(): EditorViewMode | null {
-    const carried = this.carriedViewMode;
-    this.carriedViewMode = null;
-
-    return carried && Date.now() - carried.at < CARRIED_VIEW_MODE_MS ? carried.mode : null;
   }
 
   /** Files and folders of a loaded folder collection, `null` until its tree is read. */
