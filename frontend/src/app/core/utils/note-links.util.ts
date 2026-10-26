@@ -88,18 +88,26 @@ function findLinkOccurrences(content: string, resolve?: LinkResolver): LinkOccur
   return occurrences.sort((a, b) => a.index - b.index);
 }
 
+/** `link` (a match of {@link MARKDOWN_LINK} whose target is `target`) pointed at `path`, its label and title kept. */
+export function replaceLinkTarget(link: string, target: string, path: string): string {
+  const newTarget = needsAngleBrackets(path) ? `<${path}>` : path;
+  // The target follows the label, which cannot hold a `]`: searching from there never touches a label reading like it
+  const at = link.indexOf(target, link.indexOf('](') + 2);
+  return `${link.slice(0, at)}${newTarget}${link.slice(at + target.length)}`;
+}
+
 /**
- * `content` with every `[label](path)` link to `fromPath` pointed at `toPath`; `null` when none was found.
- * The label, the `./` prefix and the `.md` suffix of each link are kept.
+ * `content` with every `[label](path)` link to a moved note pointed at its new path; `null` when none was found.
+ * `moves` maps the {@link pathKey} of each previous path to the new path. The `./` prefix and the `.md` suffix of each link are kept.
  */
-export function retargetNoteLinks(content: string, fromPath: string, toPath: string): string | null {
-  const fromKey = pathKey(fromPath);
+export function retargetNoteLinks(content: string, moves: ReadonlyMap<string, string>): string | null {
   let changed = false;
 
   const rewritten = content.replace(MARKDOWN_LINK, (link: string, target: string) => {
     const normalized = normalizeLinkTarget(target);
+    const toPath = normalized === null ? undefined : moves.get(pathKey(normalized));
 
-    if (normalized === null || pathKey(normalized) !== fromKey) {
+    if (toPath === undefined) {
       return link;
     }
 
@@ -107,10 +115,7 @@ export function retargetNoteLinks(content: string, fromPath: string, toPath: str
 
     const prefix = /^<?\.\//.test(target) ? './' : '';
     const suffix = /\.md>?$/i.test(target) ? '.md' : '';
-    const path = `${prefix}${toPath}${suffix}`;
-    const newTarget = needsAngleBrackets(path) ? `<${path}>` : path;
-
-    return link.replace(target, () => newTarget);
+    return replaceLinkTarget(link, target, `${prefix}${toPath}${suffix}`);
   });
 
   return changed ? rewritten : null;

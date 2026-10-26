@@ -1,7 +1,7 @@
 import { CollectionFileRef, CollectionNode } from '../models/collection.model';
 import { resolveRelativeLink } from './collection.util';
-import { MARKDOWN_LINK } from './note-links.util';
-import { PathFolder, needsAngleBrackets, notePath } from './note-paths.util';
+import { MARKDOWN_LINK, replaceLinkTarget } from './note-links.util';
+import { PathFolder, notePath } from './note-paths.util';
 import { extractNoteTitle } from './note-title.util';
 
 /** A file or folder of a collection picked for "Copy To…" (a whole folder collection is a folder of path `''`). */
@@ -124,13 +124,6 @@ export function retargetCopiedLinks(content: string, from: CollectionFileRef, pa
   return content.replace(MARKDOWN_LINK, (link: string, target: string) => {
     const path = copiedLinkTarget(from, target, paths);
 
-    if (path === null) {
-      return link;
-    }
-
-    const newTarget = needsAngleBrackets(path) ? `<${path}>` : path;
-    // The target follows the label, which cannot hold a `]`
-    const at = link.indexOf(target, link.indexOf('](') + 2);
-    return `${link.slice(0, at)}${newTarget}${link.slice(at + target.length)}`;
+    return path === null ? link : replaceLinkTarget(link, target, path);
   });
 }

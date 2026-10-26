@@ -8,6 +8,8 @@ import {
   findBacklinks,
   GRAPH_LARGE_THRESHOLD,
   LinkableNote,
+  replaceLinkTarget,
+  retargetNoteLinks,
 } from '../src/app/core/utils/note-links.util';
 
 const t = (key: TranslationKey, params?: TranslationParams): string => translate('en', key, params);
@@ -16,6 +18,31 @@ const tFr = (key: TranslationKey, params?: TranslationParams): string => transla
 function note(id: number, content = '', folderId: number | null = null): LinkableNote {
   return { id, title: `Note ${id}`, content, folderId };
 }
+
+describe('retargetNoteLinks', () => {
+  const moves = new Map([['work/plan', 'Archive/Work/Plan'], ['ideas', 'Work/My ideas']]);
+
+  it('points the links to the moved notes at their new path, whatever their case or form', () => {
+    const content = 'See [plan](Work/Plan), [again](./work/plan.md "Plan"), [ideas](<Ideas>) and [encoded](Work/Plan%20B).';
+
+    expect(retargetNoteLinks(content, moves))
+      .toBe('See [plan](Archive/Work/Plan), [again](./Archive/Work/Plan.md "Plan"), [ideas](<Work/My ideas>) and [encoded](Work/Plan%20B).');
+  });
+
+  it('is null when no link leads to a moved note', () => {
+    expect(retargetNoteLinks('[x](Other) ![img](Work/Plan) https://example.com', moves)).toBeNull();
+  });
+});
+
+describe('replaceLinkTarget', () => {
+  it('replaces the target, never a label reading like it', () => {
+    expect(replaceLinkTarget('[Work/Plan](Work/Plan)', 'Work/Plan', 'Archive/Plan')).toBe('[Work/Plan](Archive/Plan)');
+  });
+
+  it('wraps a target holding spaces in angle brackets', () => {
+    expect(replaceLinkTarget('[a](b "t")', 'b', 'My note')).toBe('[a](<My note> "t")');
+  });
+});
 
 describe('extractNoteLinks', () => {
   it('finds the linked ids once each, in order', () => {
