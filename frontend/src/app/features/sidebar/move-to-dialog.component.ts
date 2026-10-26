@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { FolderOption } from '../../core/models/folder.model';
+import { VisibleFolderOption, visibleFolderOptions } from '../../core/utils/folder-tree.util';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 
-/** "Move to…" destination picker of the sidebar: the folder tree, filterable, the root first. */
+/** Destination picker of the sidebar ("Move to…", "Copy to…"): the folder tree, collapsible and filterable, the root first. */
 @Component({
   selector: 'app-move-to-dialog',
   standalone: true,
@@ -26,23 +27,37 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
         (keydown.enter)="chooseFirst()"
       />
       <div class="options">
-        @for (option of filtered(); track option.id) {
-          <button
-            type="button"
-            class="option"
-            [disabled]="option.disabled"
-            [style.padding-left.px]="10 + (query() ? 0 : option.depth * 14)"
-            (click)="chosen.emit(option.id)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              @if (option.id === null) {
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-              } @else {
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              }
-            </svg>
-            <span class="option-label">{{ option.label }}</span>
-          </button>
+        @for (row of shown(); track row.option.id) {
+          <div class="option-row" [style.padding-left.px]="query() ? 0 : row.option.depth * 14">
+            @if (row.expandable) {
+              <button
+                type="button"
+                class="twisty"
+                [attr.aria-expanded]="!isCollapsed(row.option.id)"
+                [attr.aria-label]="row.option.label"
+                (click)="toggle(row.option.id)"
+              >
+                <svg class="chevron" [class.open]="!isCollapsed(row.option.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+              </button>
+            } @else if (!query()) {
+              <span class="twisty-space"></span>
+            }
+            <button
+              type="button"
+              class="option"
+              [disabled]="row.option.disabled"
+              (click)="chosen.emit(row.option.id)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                @if (row.option.id === null) {
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                } @else {
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                }
+              </svg>
+              <span class="option-label">{{ row.option.label }}</span>
+            </button>
+          </div>
         } @empty {
           <div class="empty">{{ i18n.t('sidebar.moveTo.empty') }}</div>
         }
@@ -63,18 +78,48 @@ export class MoveToDialogComponent {
   readonly chosen = output<number | null>();
   readonly closed = output<void>();
 
+  /** true: the tree opens collapsed to its top-level folders, to be browsed; false: fully expanded. */
+  readonly startCollapsed = input(false);
+
   protected readonly query = signal('');
 
-  protected readonly filtered = computed(() => {
+  /** Folders whose sub-folders are hidden; reset with the options. */
+  private readonly collapsed = linkedSignal<ReadonlySet<number>>(() => this.startCollapsed()
+    ? new Set(this.options().flatMap(option => (option.id === null ? [] : [option.id])))
+    : new Set());
+
+  /** A filter lists every matching folder flat; otherwise the tree, folded as the user left it. */
+  protected readonly shown = computed<VisibleFolderOption[]>(() => {
     const needle = this.query().trim().toLowerCase();
-    return needle ? this.options().filter(option => option.label.toLowerCase().includes(needle)) : this.options();
+
+    if (needle) {
+      return this.options().filter(option => option.label.toLowerCase().includes(needle)).map(option => ({ option, expandable: false }));
+    }
+    return visibleFolderOptions(this.options(), this.collapsed());
   });
 
+  protected isCollapsed(id: number | null): boolean {
+    return id !== null && this.collapsed().has(id);
+  }
+
+  protected toggle(id: number | null): void {
+    if (id === null) {
+      return;
+    }
+
+    const next = new Set(this.collapsed());
+
+    if (!next.delete(id)) {
+      next.add(id);
+    }
+    this.collapsed.set(next);
+  }
+
   protected chooseFirst(): void {
-    const first = this.filtered().find(option => !option.disabled);
+    const first = this.shown().find(row => !row.option.disabled);
 
     if (first) {
-      this.chosen.emit(first.id);
+      this.chosen.emit(first.option.id);
     }
   }
 }

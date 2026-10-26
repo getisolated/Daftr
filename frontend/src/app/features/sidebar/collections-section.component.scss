@@ -83,6 +83,11 @@
     color: var(--daftr-text-bright);
   }
 
+  &.multi-selected {
+    background: var(--daftr-bg-selected);
+    color: var(--daftr-text-bright);
+  }
+
   &.drop-target {
     background: rgba(var(--daftr-accent-strong-rgb), 0.35);
     outline: 1px solid var(--daftr-accent-strong);

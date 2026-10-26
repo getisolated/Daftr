@@ -31,6 +31,7 @@ import {
   flattenVisibleTree,
   folderDepth,
   folderDisplayName,
+  folderOptions,
   insertSibling,
   resolveFolderRowDrop,
   resolveNoteRowDrop,
@@ -165,13 +166,7 @@ export class SidebarComponent {
     const targets = this.moveTargets() ?? [];
     const folders = this.foldersService.folders();
     const blocked = new Set(targets.filter(item => item.kind === 'folder').flatMap(item => collectSubtreeIds(folders, item.id)));
-    const allExpanded = new Set(folders.map(folder => folder.id));
-    const folderRows = flattenVisibleTree(this.tree(), allExpanded).filter(row => row.kind === 'folder');
-
-    return [
-      { id: null, label: this.i18n.t('sidebar.moveTo.root'), depth: 0, disabled: false },
-      ...folderRows.map(row => ({ id: row.node.folder.id, label: folderDisplayName(row.node.folder, this.i18n.t), depth: row.depth, disabled: blocked.has(row.node.folder.id) })),
-    ];
+    return folderOptions(folders, this.i18n.t('sidebar.moveTo.root'), blocked, this.i18n.t);
   });
 
   // ── Drag & drop ────────────────────────────────────────────────────────────

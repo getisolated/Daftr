@@ -6,6 +6,11 @@ import { TranslationKey } from '../../core/i18n/translations';
 import { CollectionEditing, CollectionRow } from '../../core/models/collection-tree.model';
 import { CollectionFileRef, CollectionNode, CollectionState } from '../../core/models/collection.model';
 import { CollectionsService } from '../../core/services/collections.service';
+import { CollectionCopyService } from '../../core/services/collection-copy.service';
+import { FoldersService } from '../../core/services/folders.service';
+import { CollectionCopySource } from '../../core/utils/collection-copy.util';
+import { folderOptions } from '../../core/utils/folder-tree.util';
+import { rangeBetween } from '../../core/utils/sidebar-selection.util';
 import { FileDocsService } from '../../core/services/file-docs.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
@@ -15,6 +20,7 @@ import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
+import { MoveToDialogComponent } from './move-to-dialog.component';
 
 const EXPANDED_KEY = 'daftr-collections-expanded';
 const SECTION_KEY = 'daftr-collections-open';
@@ -25,6 +31,7 @@ const ICON_DELETE = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0
 const ICON_REVEAL = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14l3 3 3-3';
 const ICON_REFRESH = 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5';
 const ICON_REMOVE = 'M18 6 6 18M6 6l12 12';
+const ICON_COPY = 'M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1';
 
 function nodeKey(root: string, path: string): string {
   return `${root}\u0000${path}`;
@@ -55,7 +62,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
 @Component({
   selector: 'app-collections-section',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective],
+  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, MoveToDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="header">
@@ -143,15 +150,16 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
               [attr.aria-expanded]="row.node.kind === 'folder' ? isExpanded(row.key) : null"
               [draggable]="!isEditing('renamePath', row.root, row.node.path)"
               [class.selected]="isActive(row.root, row.node)"
+              [class.multi-selected]="isMultiSelected(row.key)"
               [class.drop-target]="dropKey() === row.key"
               [style.padding-left.px]="8 + row.depth * 14"
               [title]="absolutePath(row.root, row.node.path)"
-              (click)="onNodeClick(row.root, row.node)"
+              (click)="onNodeClick(row.root, row.node, $event)"
               (keydown.enter)="onNodeClick(row.root, row.node)"
               (keydown.f2)="startEditing({ kind: 'renamePath', root: row.root, path: row.node.path })"
               (keydown.delete)="confirmTrash.set({ root: row.root, path: row.node.path })"
               (keydown.meta.backspace)="isMacDeleteKey($event) && confirmTrash.set({ root: row.root, path: row.node.path })"
-              (contextmenu)="onNodeMenu($event, row.root, row.node)"
+              (contextmenu)="onNodeMenu($event, row.key, row.root, row.node)"
               (dragstart)="onDragStart($event, row.root, row.node.path)"
               (dragend)="dragged = null; dropKey.set(null)"
               (dragover)="onDragOver($event, row.root, folderOf(row.node), row.key)"
@@ -203,6 +211,16 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
       />
     }
 
+    @if (copySources(); as sources) {
+      <app-move-to-dialog
+        [title]="sources.length > 1 ? i18n.t('sidebar.copyTo.titleMany', { count: sources.length }) : i18n.t('sidebar.copyTo.title')"
+        [options]="copyOptions()"
+        [startCollapsed]="true"
+        (chosen)="onCopyChosen($event)"
+        (closed)="copySources.set(null)"
+      />
+    }
+
     @if (failure(); as message) {
       <div class="failure" role="alert" (click)="failure.set(null)">{{ message }}</div>
     }
@@ -217,6 +235,8 @@ export class CollectionsSectionComponent {
   protected readonly tabs = inject(TabsService);
   private readonly sidebarState = inject(SidebarStateService);
   private readonly platform = inject(PlatformService);
+  private readonly folders = inject(FoldersService);
+  private readonly copier = inject(CollectionCopyService);
 
   /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
   protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
@@ -245,11 +265,23 @@ export class CollectionsSectionComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   protected readonly editing = signal<CollectionEditing | null>(null);
-  protected readonly menu = signal<{ items: ContextMenuEntry[]; x: number; y: number; target: { root: string; node: CollectionNode | null } } | null>(null);
+  protected readonly menu = signal<{
+    items: ContextMenuEntry[]; x: number; y: number; target: { root: string; node: CollectionNode | null }; copySources: CollectionCopySource[];
+  } | null>(null);
   protected readonly dropKey = signal<string | null>(null);
   protected readonly failure = signal<string | null>(null);
   protected readonly confirmTrash = signal<CollectionFileRef | null>(null);
   protected dragged: CollectionFileRef | null = null;
+
+  // ── Multi-selection (Ctrl+click / Shift+click), for "Copy To…" ──────────────
+  /** Keys of the selected files / folders; a single key is the plain "last clicked" row. */
+  private readonly selection = signal<ReadonlySet<string>>(new Set());
+  /** Start of a Shift+click range. */
+  private anchorKey: string | null = null;
+
+  /** What "Copy To…" is choosing a destination for; null when the dialog is closed. */
+  protected readonly copySources = signal<CollectionCopySource[] | null>(null);
+  protected readonly copyOptions = computed(() => folderOptions(this.folders.folders(), this.i18n.t('common.notes'), new Set(), this.i18n.t));
 
   private readonly activeFile = computed(() => this.fileDocs.refFor(this.tabs.activeNoteId()));
 
@@ -406,11 +438,101 @@ export class CollectionsSectionComponent {
     this.tabs.goHome();
   }
 
-  protected onNodeClick(root: string, node: CollectionNode): void {
+  protected onNodeClick(root: string, node: CollectionNode, event?: MouseEvent): void {
+    if (event && this.extendSelection(event, nodeKey(root, node.path))) {
+      return;
+    }
+
     if (node.kind === 'folder') {
       this.toggle(nodeKey(root, node.path));
     } else {
       this.collections.open({ root, path: node.path });
+    }
+  }
+
+  // ── Multi-selection ────────────────────────────────────────────────────────
+
+  protected isMultiSelected(key: string): boolean {
+    return this.selection().size > 1 && this.selection().has(key);
+  }
+
+  /**
+   * Ctrl+click adds / removes the row, Shift+click selects the range from the anchor: true when the click did
+   * that (the row must then not open). A plain click selects the row alone.
+   */
+  private extendSelection(event: MouseEvent, key: string): boolean {
+    const active = this.activeFile();
+    const current = active ? nodeKey(active.root, active.path) : null;
+
+    if (event.ctrlKey || event.metaKey) {
+      const next = new Set(this.selection());
+
+      // The open file is part of the selection being started
+      if (next.size === 0 && current !== null && current !== key) {
+        next.add(current);
+      }
+
+      if (!next.delete(key)) {
+        next.add(key);
+      }
+
+      this.selection.set(next);
+      this.anchorKey = key;
+      return true;
+    }
+
+    if (event.shiftKey) {
+      this.selection.set(new Set(rangeBetween(this.nodeRows().map(row => row.key), this.anchorKey ?? current, key)));
+      return true;
+    }
+
+    this.selection.set(new Set([key]));
+    this.anchorKey = key;
+    return false;
+  }
+
+  /** The visible files and folders, in display order. */
+  private nodeRows(): Extract<CollectionRow, { kind: 'node' }>[] {
+    return this.rows().filter((row): row is Extract<CollectionRow, { kind: 'node' }> => row.kind === 'node');
+  }
+
+  /** The selected rows still shown, in display order. */
+  private selectedSources(): CollectionCopySource[] {
+    const selection = this.selection();
+    return this.nodeRows().filter(row => selection.has(row.key)).map(row => ({ root: row.root, node: row.node }));
+  }
+
+  private clearSelection(): void {
+    this.selection.set(new Set());
+    this.anchorKey = null;
+  }
+
+  /** A loaded folder collection is copied whole, as one folder named like it; a file collection as its file. */
+  private collectionSource(state: CollectionState): CollectionCopySource | null {
+    const root = state.collection.path;
+
+    if (state.collection.kind === 'file') {
+      const name = baseName(root);
+      return { root, node: { name, path: name, kind: 'file' } };
+    }
+    return state.status === 'ready' ? { root, node: { name: state.label, path: '', kind: 'folder', children: state.tree } } : null;
+  }
+
+  // ── Copy to the notes ──────────────────────────────────────────────────────
+
+  protected async onCopyChosen(folderId: number | null): Promise<void> {
+    const sources = this.copySources() ?? [];
+    this.copySources.set(null);
+    this.clearSelection();
+
+    const result = await this.copier.copyToNotes(sources, folderId);
+
+    if (folderId !== null) {
+      this.sidebarState.expand(folderId);
+    }
+
+    if (result.failed > 0) {
+      this.failure.set(this.i18n.plural('sidebar.copyTo.failed', result.failed));
     }
   }
 
@@ -489,6 +611,10 @@ export class CollectionsSectionComponent {
       items.push({ id: 'newFile', label: t('sidebar.collections.menu.newFile'), icon: ICON_FILE }, { divider: true });
     }
 
+    // An unloaded folder collection has no tree to copy yet
+    const source = this.collectionSource(state);
+    items.push({ id: 'copyTo', label: t('sidebar.collections.menu.copyTo'), icon: ICON_COPY, disabled: !source }, { divider: true });
+
     items.push(
       { id: 'renameCollection', label: t('sidebar.collections.menu.renameCollection'), icon: ICON_RENAME, shortcut: 'F2' },
       { id: 'reveal', label: t(this.platformKey('sidebar.collections.menu.reveal')), icon: ICON_REVEAL, disabled: state.status === 'error' },
@@ -497,13 +623,26 @@ export class CollectionsSectionComponent {
       { id: 'remove', label: t('sidebar.collections.menu.remove'), icon: ICON_REMOVE },
     );
 
-    this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root: state.collection.path, node: null } });
+    this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root: state.collection.path, node: null }, copySources: source ? [source] : [] });
   }
 
-  protected onNodeMenu(event: MouseEvent, root: string, node: CollectionNode): void {
+  protected onNodeMenu(event: MouseEvent, key: string, root: string, node: CollectionNode): void {
     event.preventDefault();
     event.stopPropagation();
     const t = this.i18n.t;
+
+    // Right-clicking a row of the multi-selection acts on the whole selection
+    if (this.isMultiSelected(key)) {
+      const sources = this.selectedSources();
+      const items: ContextMenuEntry[] = [
+        { id: 'copyTo', label: t('sidebar.collections.menu.copyItems', { count: sources.length }), icon: ICON_COPY },
+      ];
+      this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root, node }, copySources: sources });
+      return;
+    }
+
+    this.selection.set(new Set([key]));
+    this.anchorKey = key;
     const items: ContextMenuEntry[] = [];
 
     if (node.kind === 'folder') {
@@ -511,13 +650,15 @@ export class CollectionsSectionComponent {
     }
 
     items.push(
+      { id: 'copyTo', label: t('sidebar.collections.menu.copyTo'), icon: ICON_COPY },
+      { divider: true },
       { id: 'renamePath', label: t('common.rename'), icon: ICON_RENAME, shortcut: 'F2' },
       { id: 'reveal', label: t(this.platformKey('sidebar.collections.menu.reveal')), icon: ICON_REVEAL },
       { divider: true },
       { id: 'trash', label: t('common.delete'), icon: ICON_DELETE, danger: true, shortcut: this.deleteShortcut },
     );
 
-    this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root, node } });
+    this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root, node }, copySources: [{ root, node }] });
   }
 
   protected async onMenuAction(actionId: string): Promise<void> {
@@ -565,6 +706,9 @@ export class CollectionsSectionComponent {
         break;
       case 'trash':
         this.confirmTrash.set(ref);
+        break;
+      case 'copyTo':
+        this.copySources.set(current.copySources);
         break;
     }
   }
