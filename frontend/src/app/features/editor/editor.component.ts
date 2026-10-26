@@ -45,6 +45,7 @@ import { SettingsService } from '../../core/services/settings.service';
 import { FormattingBarService } from '../../core/services/formatting-bar.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { TabsService } from '../../core/services/tabs.service';
+import { LayoutService } from '../../core/services/layout.service';
 import { acceleratorToCodeMirrorKey } from '../../core/utils/accelerator.util';
 import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/note.model';
 import { CollectionFileRef } from '../../core/models/collection.model';
@@ -215,6 +216,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly find = inject(FindService);
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
+  private layout = inject(LayoutService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
@@ -224,9 +226,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Last text written to (or read from) the disk for the open file: its own change events are not reloads. */
   private fileContentOnDisk: string | null = null;
 
-  /** The quick notes are a list of short notes: an outline of their headings would mean nothing. */
+  /** The quick notes are a list of short notes: an outline of their headings would mean nothing. Never in zen mode. */
   protected readonly outlineShown = computed(() =>
-    this.settingsService.settings().showOutline && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
+    this.settingsService.settings().showOutline && !this.layout.zenMode() && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
   );
 
   /** Source, preview, or both side by side. Not remembered per note: each opened note starts as the settings say. */

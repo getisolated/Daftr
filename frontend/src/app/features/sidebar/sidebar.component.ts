@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
 
 import {
   DropPlacement,
@@ -80,6 +80,7 @@ export class SidebarComponent {
   private readonly noteExport = inject(NoteExportService);
   protected readonly i18n = inject(I18nService);
   private readonly platform = inject(PlatformService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
   protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
@@ -1080,8 +1081,8 @@ export class SidebarComponent {
       return;
     }
 
-    // The sidebar is glued to the left edge of the window: the pointer position is the width
-    this.state.setWidth(event.clientX, false);
+    // Measured from its left side: in zen mode it floats a few pixels away from the edge of the window
+    this.state.setWidth(event.clientX - this.host.nativeElement.getBoundingClientRect().left, false);
   }
 
   protected onResizeEnd(event: PointerEvent): void {

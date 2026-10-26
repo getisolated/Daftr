@@ -247,6 +247,14 @@ export class PaletteComponent implements OnDestroy {
       {
         type: 'command',
         command: {
+          id: 'zen-mode', label: this.i18n.t('workspace.palette.cmd.zenMode'), shortcut: this.settings.shortcutLabel('layout.zen'),
+          description: this.i18n.t('workspace.palette.cmd.zenModeDesc'), category: 'action',
+          action: () => this.layout.toggleZenMode(),
+        }
+      },
+      {
+        type: 'command',
+        command: {
           id: 'color-theme', label: this.i18n.t('workspace.palette.cmd.colorTheme'), shortcut: this.settings.shortcutLabel('theme.select'),
           description: this.i18n.t('workspace.palette.cmd.colorThemeDesc'), category: 'settings',
           action: () => this.palette.open('theme'),
