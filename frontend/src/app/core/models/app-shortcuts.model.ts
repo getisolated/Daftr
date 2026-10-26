@@ -48,7 +48,10 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'editor.save', labelKey: 'settings.shortcut.editor.save', defaultAccelerator: 'CommandOrControl+S' },
   { id: 'editor.bold', labelKey: 'settings.shortcut.editor.bold', defaultAccelerator: 'CommandOrControl+B' },
   { id: 'editor.italic', labelKey: 'settings.shortcut.editor.italic', defaultAccelerator: 'CommandOrControl+I' },
-  { id: 'editor.draft', labelKey: 'settings.shortcut.editor.draft', defaultAccelerator: 'CommandOrControl+D' },
+  // Ctrl+D adds the next match to the selection, like VS Code
+  { id: 'editor.draft', labelKey: 'settings.shortcut.editor.draft', defaultAccelerator: 'CommandOrControl+Shift+D' },
+  { id: 'editor.selectNextMatch', labelKey: 'settings.shortcut.editor.selectNextMatch', defaultAccelerator: 'CommandOrControl+D' },
+  { id: 'editor.selectAllMatches', labelKey: 'settings.shortcut.editor.selectAllMatches', defaultAccelerator: 'CommandOrControl+Shift+L' },
   // Not Ctrl+K: it starts the chords (theme)
   { id: 'editor.link', labelKey: 'settings.shortcut.editor.link', defaultAccelerator: 'CommandOrControl+Shift+K' },
 ];

@@ -130,4 +130,6 @@ export const EN_SETTINGS = {
   'settings.shortcut.editor.italic': 'Italic',
   'settings.shortcut.editor.draft': 'Toggle Draft Block',
   'settings.shortcut.editor.link': 'Insert Link',
+  'settings.shortcut.editor.selectNextMatch': 'Add Selection To Next Find Match',
+  'settings.shortcut.editor.selectAllMatches': 'Select All Occurrences Of Find Match',
 } as const;

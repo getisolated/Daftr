@@ -32,6 +32,18 @@ describe('resolveAppShortcuts', () => {
     expect(resolved['tab.close']).toBe('CommandOrControl+W');
   });
 
+  it('adds the next match to the selection with Ctrl+D, the draft block moving to Ctrl+Shift+D', () => {
+    const resolved = resolveAppShortcuts({});
+    expect(resolved['editor.selectNextMatch']).toBe('CommandOrControl+D');
+    expect(resolved['editor.selectAllMatches']).toBe('CommandOrControl+Shift+L');
+    expect(resolved['editor.draft']).toBe('CommandOrControl+Shift+D');
+    expect(findShortcutConflict('editor.draft', 'CommandOrControl+Shift+D', resolved)).toBeNull();
+  });
+
+  it('keeps a draft shortcut the user chose', () => {
+    expect(resolveAppShortcuts({ 'editor.draft': 'Alt+D' })['editor.draft']).toBe('Alt+D');
+  });
+
   it('ignores overrides of unknown shortcuts', () => {
     expect('ghost' in resolveAppShortcuts({ ghost: 'Alt+G' })).toBe(false);
   });

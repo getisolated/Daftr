@@ -132,4 +132,6 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.shortcut.editor.italic': 'Italique',
   'settings.shortcut.editor.draft': 'Basculer le bloc brouillon',
   'settings.shortcut.editor.link': 'Insérer un lien',
+  'settings.shortcut.editor.selectNextMatch': 'Ajouter la sélection à la correspondance suivante',
+  'settings.shortcut.editor.selectAllMatches': 'Sélectionner toutes les correspondances',
 };

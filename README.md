@@ -46,7 +46,7 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 
 ## Features
 
-- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables.
+- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables. Multiple cursors like VS Code: `Alt+click` adds a cursor, `Shift+Alt+drag` selects a column, `Ctrl+D` adds the next occurrence to the selection, `Ctrl+Shift+L` selects them all, `Esc` goes back to a single cursor.
 - **Preview** — GitHub-like rendering (tables, task lists, footnotes, `> [!NOTE]` alerts, syntax-colored code, Mermaid diagrams). *Source*, *side by side* with synchronized scrolling, or *Preview*; notes can open rendered by default.
 - **Full-text search** — instant search across every note (SQLite FTS5), from the command palette (`Ctrl+Shift+F`). Find & replace inside a note (`Ctrl+F` / `Ctrl+H`) with match case, whole word and regular expressions, and the list of matches.
 - **Command palette** — `F1` to search notes, commands and tags.
@@ -80,6 +80,10 @@ Every shortcut below is a default and can be rebound in **Settings → Keyboard 
 | `Ctrl+Shift+F`                       | `⇧⌘F`                        | Search all notes |
 | `Ctrl+F` / `Ctrl+H`                  | `⌘F` / `⌥⌘F`                 | Find / find & replace in the note |
 | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+K` | `⌘B` / `⌘I` / `⇧⌘K`          | Bold / italic / link |
+| `Ctrl+Shift+D`                       | `⇧⌘D`                        | Toggle a draft block |
+| `Ctrl+D`                             | `⌘D`                         | Add the next occurrence to the selection |
+| `Ctrl+Shift+L`                       | `⇧⌘L`                        | Select every occurrence of the selection |
+| `Alt+click` / `Shift+Alt+drag`       | `⌥click` / `⇧⌥drag`          | Add a cursor / column selection |
 | `Ctrl+Shift+V`                       | `⇧⌘V`                        | Toggle the preview |
 | `Ctrl+K` `V` (chord)                 | `⌘K` `V` (chord)             | Toggle the side-by-side preview |
 | `Ctrl+Shift+E`                       | `⇧⌘E`                        | Toggle the sidebar |
