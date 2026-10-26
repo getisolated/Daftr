@@ -1,4 +1,7 @@
 import { CollectionFileRef, CollectionNode } from '../models/collection.model';
+import { resolveRelativeLink } from './collection.util';
+import { MARKDOWN_LINK } from './note-links.util';
+import { PathFolder, needsAngleBrackets, notePath } from './note-paths.util';
 import { extractNoteTitle } from './note-title.util';
 
 /** A file or folder of a collection picked for "Copy To…" (a whole folder collection is a folder of path `''`). */
@@ -19,6 +22,16 @@ export interface CopyPlanFile {
   name: string;
   folder: number | null;
 }
+
+/** A copied file once its note is placed: `folderId` is the folder that receives it. */
+export interface CopiedNote {
+  ref: CollectionFileRef;
+  title: string;
+  folderId: number | null;
+}
+
+/** Path of the note of each copied file, by {@link copiedNoteKey}. */
+export type CopiedNotePaths = ReadonlyMap<string, string>;
 
 /** What "Copy To…" creates: the folders first (parents before children), then the notes. */
 export interface CollectionCopyPlan {
@@ -66,7 +79,58 @@ export function planCollectionCopy(sources: readonly CollectionCopySource[]): Co
   return plan;
 }
 
-/** Title of a copied note: its first line, like any note; the file name (without extension) when the file is empty. */
-export function copiedNoteTitle(content: string, fileName: string): string {
-  return extractNoteTitle(content) || fileName.replace(/\.[^.]+$/, '') || fileName;
+/** Title of a copied note: the file name without its extension. */
+export function copiedNoteTitle(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, '') || fileName;
+}
+
+/** Content of a copied note: the title as first line (unless the file already starts with it), then the file. */
+export function copiedNoteContent(content: string, title: string): string {
+  return extractNoteTitle(content) === title ? content : `# ${title}\n\n${content}`;
+}
+
+/** Key of a collection file in {@link CopiedNotePaths}: the disk is case-insensitive, so are the links. */
+function copiedNoteKey(root: string, path: string): string {
+  return `${root}\u0000${path.toLowerCase()}`;
+}
+
+/** Note path (as written in the links between notes) of each copied file. */
+export function copiedNotePaths(notes: readonly CopiedNote[], folders: readonly PathFolder[]): CopiedNotePaths {
+  return new Map(notes.map(note => [copiedNoteKey(note.ref.root, note.ref.path), notePath({ id: 0, ...note }, folders)]));
+}
+
+/** Note path a link of the copied file `from` leads to; `null` when its target was not copied (or is not a page). */
+function copiedLinkTarget(from: CollectionFileRef, target: string, paths: CopiedNotePaths): string | null {
+  const resolved = resolveRelativeLink(from.path, target);
+
+  if (resolved === null) {
+    return null;
+  }
+  if (resolved.kind === 'file') {
+    return paths.get(copiedNoteKey(from.root, resolved.path)) ?? null;
+  }
+
+  // A link to a folder opens its index page, as in the collection (see folderPage)
+  const prefix = resolved.path ? `${resolved.path}/` : '';
+  return paths.get(copiedNoteKey(from.root, `${prefix}index.md`)) ?? paths.get(copiedNoteKey(from.root, `${prefix}readme.md`)) ?? null;
+}
+
+/**
+ * `content` of the copied file `from` with its relative links to the other copied files pointed at their notes: links
+ * between notes are paths from the root of the notes, so the relative ones of the disk would break. An anchor is dropped
+ * (note links have none); a link to a file left out of the copy is kept as written.
+ */
+export function retargetCopiedLinks(content: string, from: CollectionFileRef, paths: CopiedNotePaths): string {
+  return content.replace(MARKDOWN_LINK, (link: string, target: string) => {
+    const path = copiedLinkTarget(from, target, paths);
+
+    if (path === null) {
+      return link;
+    }
+
+    const newTarget = needsAngleBrackets(path) ? `<${path}>` : path;
+    // The target follows the label, which cannot hold a `]`
+    const at = link.indexOf(target, link.indexOf('](') + 2);
+    return `${link.slice(0, at)}${newTarget}${link.slice(at + target.length)}`;
+  });
 }

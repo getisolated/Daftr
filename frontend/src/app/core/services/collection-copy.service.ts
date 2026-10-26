@@ -1,5 +1,13 @@
 import { Injectable, inject } from '@angular/core';
-import { CollectionCopySource, copiedNoteTitle, planCollectionCopy } from '../utils/collection-copy.util';
+import {
+  CollectionCopySource,
+  CopiedNote,
+  copiedNoteContent,
+  copiedNotePaths,
+  copiedNoteTitle,
+  planCollectionCopy,
+  retargetCopiedLinks,
+} from '../utils/collection-copy.util';
 import { CollectionsService } from './collections.service';
 import { DesktopBridgeService } from './desktop-bridge.service';
 import { FoldersService } from './folders.service';
@@ -32,16 +40,25 @@ export class CollectionCopyService {
     }
 
     const result: CollectionCopyResult = { copied: 0, failed: 0 };
+    const notes: CopiedNote[] = [];
 
     for (const file of plan.files) {
       const folderId = file.folder === null ? targetFolderId : folderIds[file.folder];
 
+      if (folderId === undefined) {
+        result.failed++;
+      } else {
+        notes.push({ ref: file.ref, title: copiedNoteTitle(file.name), folderId });
+      }
+    }
+
+    // Known before any note is created, so the links between the copied files lead to their notes
+    const paths = copiedNotePaths(notes, this.folders.folders());
+
+    for (const note of notes) {
       try {
-        if (folderId === undefined) {
-          throw new Error('Folder not created');
-        }
-        const content = await this.collections.read(file.ref);
-        await this.bridge.createNote(copiedNoteTitle(content, file.name), content, [], folderId);
+        const content = retargetCopiedLinks(await this.collections.read(note.ref), note.ref, paths);
+        await this.bridge.createNote(note.title, copiedNoteContent(content, note.title), [], note.folderId);
         result.copied++;
       } catch {
         result.failed++;

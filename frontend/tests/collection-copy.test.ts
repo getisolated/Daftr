@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { CollectionNode } from '../src/app/core/models/collection.model';
-import { copiedNoteTitle, planCollectionCopy, topLevelSources } from '../src/app/core/utils/collection-copy.util';
+import {
+  copiedNoteContent,
+  copiedNotePaths,
+  copiedNoteTitle,
+  planCollectionCopy,
+  retargetCopiedLinks,
+  topLevelSources,
+} from '../src/app/core/utils/collection-copy.util';
 
 const ROOT = 'C:\\docs';
 
@@ -79,12 +86,65 @@ describe('planCollectionCopy', () => {
 });
 
 describe('copiedNoteTitle', () => {
-  it('takes the first line, like any note', () => {
-    expect(copiedNoteTitle('\n# Getting started\n\nText', 'intro.md')).toBe('Getting started');
+  it('is the file name without its extension', () => {
+    expect(copiedNoteTitle('meeting notes.md')).toBe('meeting notes');
+    expect(copiedNoteTitle('todo.markdown')).toBe('todo');
+    expect(copiedNoteTitle('v1.2.md')).toBe('v1.2');
   });
 
-  it('falls back to the file name without its extension', () => {
-    expect(copiedNoteTitle('', 'meeting notes.md')).toBe('meeting notes');
-    expect(copiedNoteTitle('<!-- draft -->\n', 'todo.markdown')).toBe('todo');
+  it('keeps a name made of an extension only', () => {
+    expect(copiedNoteTitle('.md')).toBe('.md');
+  });
+});
+
+describe('copiedNoteContent', () => {
+  it('puts the title as first line', () => {
+    expect(copiedNoteContent('# Getting started\n\nText', 'intro')).toBe('# intro\n\n# Getting started\n\nText');
+    expect(copiedNoteContent('', 'intro')).toBe('# intro\n\n');
+  });
+
+  it('keeps a file already starting with its title', () => {
+    expect(copiedNoteContent('<!-- draft -->\n# intro\nText', 'intro')).toBe('<!-- draft -->\n# intro\nText');
+  });
+});
+
+describe('retargetCopiedLinks', () => {
+  const folders = [{ id: 1, name: 'Docs', parentId: null }, { id: 2, name: 'guide', parentId: 1 }, { id: 3, name: 'api', parentId: 2 }];
+  const paths = copiedNotePaths([
+    { ref: { root: ROOT, path: 'guide/intro.md' }, title: 'intro', folderId: 2 },
+    { ref: { root: ROOT, path: 'guide/api/Auth Flow.md' }, title: 'Auth Flow', folderId: 3 },
+    { ref: { root: ROOT, path: 'guide/api/index.md' }, title: 'index', folderId: 3 },
+    { ref: { root: ROOT, path: 'README.md' }, title: 'README', folderId: 1 },
+  ], folders);
+  const intro = { root: ROOT, path: 'guide/intro.md' };
+
+  it('points the relative links to the copied files at their notes', () => {
+    const content = 'See [auth](api/Auth%20Flow.md), [home](../readme.md) and [again](<./api/Auth Flow>).';
+
+    expect(retargetCopiedLinks(content, intro, paths))
+      .toBe('See [auth](<Docs/guide/api/Auth Flow>), [home](Docs/README) and [again](<Docs/guide/api/Auth Flow>).');
+  });
+
+  it('resolves links from the root of the collection, and drops their anchor', () => {
+    expect(retargetCopiedLinks('[a](/guide/intro.md#setup "Intro")', { root: ROOT, path: 'README.md' }, paths))
+      .toBe('[a](Docs/guide/intro "Intro")');
+  });
+
+  it('leads a link to a folder to its index page', () => {
+    expect(retargetCopiedLinks('[api](api/)', intro, paths)).toBe('[api](Docs/guide/api/index)');
+  });
+
+  it('keeps the label even when it reads like the target', () => {
+    expect(retargetCopiedLinks('[../README.md](../README.md)', intro, paths)).toBe('[../README.md](Docs/README)');
+  });
+
+  it('keeps what does not lead to a copied file', () => {
+    const content = '[web](https://example.com) [top](#top) [gone](missing.md) ![img](api/index.md) [other](../../out.md)';
+
+    expect(retargetCopiedLinks(content, intro, paths)).toBe(content);
+  });
+
+  it('never resolves a link into another collection', () => {
+    expect(retargetCopiedLinks('[x](intro.md)', { root: 'D:\\other', path: 'guide/a.md' }, paths)).toBe('[x](intro.md)');
   });
 });

@@ -24,7 +24,7 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
         spellcheck="false"
         [value]="query()"
         (input)="query.set($any($event.target).value)"
-        (keydown.enter)="chooseFirst()"
+        (keydown.enter)="onEnter()"
       />
       <div class="options">
         @for (row of shown(); track row.option.id) {
@@ -45,8 +45,10 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
             <button
               type="button"
               class="option"
+              [class.selected]="isPicked(row.option.id)"
               [disabled]="row.option.disabled"
-              (click)="chosen.emit(row.option.id)"
+              (click)="pick(row.option.id)"
+              (dblclick)="chosen.emit(row.option.id)"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 @if (row.option.id === null) {
@@ -64,6 +66,9 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
       </div>
       <div class="actions">
         <button type="button" class="btn" (click)="closed.emit()">{{ i18n.t('common.cancel') }}</button>
+        @if (confirmLabel(); as label) {
+          <button type="button" class="btn primary" [disabled]="picked() === undefined" (click)="confirm()">{{ label }}</button>
+        }
       </div>
     </div>
   `,
@@ -78,10 +83,16 @@ export class MoveToDialogComponent {
   readonly chosen = output<number | null>();
   readonly closed = output<void>();
 
+  /** Label of a confirm button: a click then only selects the folder (a double click still chooses it); `null`: a click chooses. */
+  readonly confirmLabel = input<string | null>(null);
+
   /** true: the tree opens collapsed to its top-level folders, to be browsed; false: fully expanded. */
   readonly startCollapsed = input(false);
 
   protected readonly query = signal('');
+
+  /** Folder selected, waiting for the confirm button; `undefined` while none is (`null` is the root). */
+  protected readonly picked = signal<number | null | undefined>(undefined);
 
   /** Folders whose sub-folders are hidden; reset with the options. */
   private readonly collapsed = linkedSignal<ReadonlySet<number>>(() => this.startCollapsed()
@@ -115,11 +126,37 @@ export class MoveToDialogComponent {
     this.collapsed.set(next);
   }
 
-  protected chooseFirst(): void {
+  protected isPicked(id: number | null): boolean {
+    return this.confirmLabel() !== null && this.picked() === id;
+  }
+
+  protected pick(id: number | null): void {
+    if (this.confirmLabel() === null) {
+      this.chosen.emit(id);
+    } else {
+      this.picked.set(id);
+    }
+  }
+
+  protected confirm(): void {
+    const id = this.picked();
+
+    if (id !== undefined) {
+      this.chosen.emit(id);
+    }
+  }
+
+  /** Enter confirms the selected folder, or picks the first one the filter shows. */
+  protected onEnter(): void {
+    if (this.picked() !== undefined) {
+      this.confirm();
+      return;
+    }
+
     const first = this.shown().find(row => !row.option.disabled);
 
     if (first) {
-      this.chosen.emit(first.option.id);
+      this.pick(first.option.id);
     }
   }
 }

@@ -57,7 +57,7 @@ export const GRAPH_FOCUS_DEPTH = 2;
 const EXCERPT_RADIUS = 60;
 const NOTE_LINK = /note:\/\/(?<id>\d+)/g;
 /** `[label](target)` and `[label](<target with spaces>)`, an optional title after the target; images are left out. */
-const MARKDOWN_LINK = /(?<!!)\[[^\]\n]*\]\((?<target><[^>\n]*>|[^)\s\n]*)(?:\s+"[^"\n]*")?\)/g;
+export const MARKDOWN_LINK = /(?<!!)\[[^\]\n]*\]\((?<target><[^>\n]*>|[^)\s\n]*)(?:\s+"[^"\n]*")?\)/g;
 
 interface LinkOccurrence {
   noteId: number;

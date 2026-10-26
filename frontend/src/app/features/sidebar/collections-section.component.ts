@@ -216,6 +216,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
         [title]="sources.length > 1 ? i18n.t('sidebar.copyTo.titleMany', { count: sources.length }) : i18n.t('sidebar.copyTo.title')"
         [options]="copyOptions()"
         [startCollapsed]="true"
+        [confirmLabel]="i18n.t('common.copy')"
         (chosen)="onCopyChosen($event)"
         (closed)="copySources.set(null)"
       />

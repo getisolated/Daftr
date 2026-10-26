@@ -78,6 +78,9 @@
 
   &:hover:not(:disabled) { background: var(--daftr-bg-hover); }
 
+  &.selected,
+  &.selected:hover { background: var(--daftr-bg-selected); }
+
   &:disabled {
     cursor: default;
     opacity: 0.4;
@@ -99,6 +102,7 @@
 .actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .btn {
@@ -113,6 +117,19 @@
   cursor: pointer;
 
   &:hover { background: rgba(var(--daftr-hover-rgb), 0.06); }
+
+  &.primary {
+    background: var(--daftr-accent-strong);
+    border-color: var(--daftr-accent-strong);
+    color: #fff;
+
+    &:hover:not(:disabled) { background: var(--daftr-accent-hover); }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.5;
+    }
+  }
 }
 
 .option-row {
