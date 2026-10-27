@@ -14,6 +14,7 @@ import {
 import { I18nService } from '../../core/i18n/i18n.service';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { FoldersService } from '../../core/services/folders.service';
+import { LinkRenameService } from '../../core/services/link-rename.service';
 import { NotesService } from '../../core/services/notes.service';
 import { PaletteService } from '../../core/services/palette.service';
 import { SettingsService } from '../../core/services/settings.service';
@@ -31,6 +32,7 @@ import {
   flattenVisibleTree,
   folderDepth,
   folderDisplayName,
+  folderOptions,
   insertSibling,
   resolveFolderRowDrop,
   resolveNoteRowDrop,
@@ -71,6 +73,7 @@ const ICON_EMPTY = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9
 export class SidebarComponent {
   private readonly notesService = inject(NotesService);
   private readonly foldersService = inject(FoldersService);
+  private readonly linkRename = inject(LinkRenameService);
   private readonly state = inject(SidebarStateService);
   private readonly tabs = inject(TabsService);
   private readonly palette = inject(PaletteService);
@@ -165,13 +168,7 @@ export class SidebarComponent {
     const targets = this.moveTargets() ?? [];
     const folders = this.foldersService.folders();
     const blocked = new Set(targets.filter(item => item.kind === 'folder').flatMap(item => collectSubtreeIds(folders, item.id)));
-    const allExpanded = new Set(folders.map(folder => folder.id));
-    const folderRows = flattenVisibleTree(this.tree(), allExpanded).filter(row => row.kind === 'folder');
-
-    return [
-      { id: null, label: this.i18n.t('sidebar.moveTo.root'), depth: 0, disabled: false },
-      ...folderRows.map(row => ({ id: row.node.folder.id, label: folderDisplayName(row.node.folder, this.i18n.t), depth: row.depth, disabled: blocked.has(row.node.folder.id) })),
-    ];
+    return folderOptions(folders, this.i18n.t('sidebar.moveTo.root'), blocked, this.i18n.t);
   });
 
   // ── Drag & drop ────────────────────────────────────────────────────────────
@@ -455,7 +452,7 @@ export class SidebarComponent {
     const current = this.foldersService.getById(folderId);
 
     if (name && current && name !== current.name) {
-      await this.foldersService.rename(folderId, name);
+      await this.linkRename.keepLinks(() => this.foldersService.rename(folderId, name));
     }
   }
 
@@ -710,13 +707,17 @@ export class SidebarComponent {
       await this.notesService.delete(item.id);
     }
 
-    for (const item of items.filter(entry => entry.kind === 'folder')) {
-      const deletedNoteIds = await this.foldersService.delete(item.id, mode);
-      deletedNoteIds?.forEach(id => this.tabs.closeByNoteId(id));
-    }
+    // The notes of the deleted folders may move to the root
+    await this.linkRename.keepLinks(async () => {
+      for (const item of items.filter(entry => entry.kind === 'folder')) {
+        const deletedNoteIds = await this.foldersService.delete(item.id, mode);
+        deletedNoteIds?.forEach(id => this.tabs.closeByNoteId(id));
+      }
+
+      await this.notesService.loadAll();
+    });
 
     this.clearSelection();
-    await this.notesService.loadAll();
     this.state.prune(new Set(this.foldersService.folders().map(f => f.id)));
   }
 
@@ -741,13 +742,15 @@ export class SidebarComponent {
   private async moveItems(items: SidebarDragItem[], folderId: number | null): Promise<void> {
     const folders = this.foldersService.folders();
 
-    for (const item of items) {
-      if (item.kind === 'note') {
-        await this.notesService.moveToFolder(item.id, folderId);
-      } else if (canMoveFolder(folders, item.id, folderId)) {
-        await this.foldersService.move(item.id, folderId);
+    await this.linkRename.keepLinks(async () => {
+      for (const item of items) {
+        if (item.kind === 'note') {
+          await this.notesService.moveToFolder(item.id, folderId);
+        } else if (canMoveFolder(folders, item.id, folderId)) {
+          await this.foldersService.move(item.id, folderId);
+        }
       }
-    }
+    });
 
     if (folderId !== null) {
       this.state.expand(folderId);
@@ -818,14 +821,22 @@ export class SidebarComponent {
     }
 
     const mode = choice === 'deleteAll' ? 'deleteAll' : 'moveToRoot';
-    const deletedNoteIds = await this.foldersService.delete(dialog.folderId, mode);
+    const folderId = dialog.folderId;
+    // Moved to the root, the notes of the folder change path
+    const deletedNoteIds = await this.linkRename.keepLinks(async () => {
+      const deleted = await this.foldersService.delete(folderId, mode);
+
+      if (deleted !== null) {
+        await this.notesService.loadAll();
+      }
+      return deleted;
+    });
 
     if (deletedNoteIds === null) {
       return;
     }
 
     deletedNoteIds.forEach(id => this.tabs.closeByNoteId(id));
-    await this.notesService.loadAll();
     this.state.prune(new Set(this.foldersService.folders().map(f => f.id)));
   }
 
@@ -967,9 +978,9 @@ export class SidebarComponent {
 
   private async dropInto(item: SidebarDragItem, folderId: number | null): Promise<void> {
     if (item.kind === 'note') {
-      await this.notesService.moveToFolder(item.id, folderId);
+      await this.linkRename.keepLinks(() => this.notesService.moveToFolder(item.id, folderId));
     } else {
-      await this.foldersService.move(item.id, folderId);
+      await this.linkRename.keepLinks(() => this.foldersService.move(item.id, folderId));
     }
 
     if (folderId !== null) {
@@ -983,14 +994,14 @@ export class SidebarComponent {
     if (item.kind === 'note') {
       const orderedIds = insertSibling(this.noteSiblingIds(parentId), item.id, anchorId, side);
 
-      await this.notesService.place(item.id, parentId, orderedIds);
+      await this.linkRename.keepLinks(() => this.notesService.place(item.id, parentId, orderedIds));
     } else {
       const siblings = this.folderSiblingIds(parentId);
       // The default folder stays first: nothing can be placed above it
       const firstIsDefault = siblings.length > 0 && !!this.foldersService.getById(siblings[0] as number)?.isDefault;
       const orderedIds = insertSibling(siblings, item.id, anchorId, side, firstIsDefault ? 1 : 0);
 
-      await this.foldersService.place(item.id, parentId, orderedIds);
+      await this.linkRename.keepLinks(() => this.foldersService.place(item.id, parentId, orderedIds));
     }
 
     if (parentId !== null) {
