@@ -38,6 +38,9 @@ import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { insertLink, wrapRanges } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
+import {
+  DEFAULT_OCCURRENCE_OPTIONS, OccurrenceOptions, occurrenceSelection, selectAllMatches, selectNextMatch,
+} from '../../shared/codemirror/occurrence-selection';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
 import { LinkRenameService } from '../../core/services/link-rename.service';
@@ -302,6 +305,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private readonly linkStatusCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
+  /** Ctrl+D / Ctrl+Shift+L options, kept from one note to the next. */
+  private occurrenceOptions: OccurrenceOptions = DEFAULT_OCCURRENCE_OPTIONS;
   private loadGeneration = 0;
 
   protected shortcutLabel(id: string): string {
@@ -631,6 +636,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
       EditorState.allowMultipleSelections.of(true),
       EditorView.clickAddsSelectionRange.of(event => event.altKey),
       rectangularSelection({ eventFilter: event => event.altKey && event.shiftKey && event.button === 0 }),
+      // Ctrl+D / Ctrl+Shift+L compare accents exactly, with Match Case / Match Whole Word toggles next to the selection
+      occurrenceSelection(this.occurrenceOptions, options => {
+        this.occurrenceOptions = options;
+      }),
       dropCursor(),
       highlightActiveLine(),
       bracketMatching(),
@@ -948,12 +957,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
       },
       {
         key: keyFor('editor.selectNextMatch'),
-        run: selectNextOccurrence,
+        run: selectNextMatch,
         preventDefault: true,
       },
       {
         key: keyFor('editor.selectAllMatches'),
-        run: selectSelectionMatches,
+        run: selectAllMatches,
         preventDefault: true,
       },
       {
