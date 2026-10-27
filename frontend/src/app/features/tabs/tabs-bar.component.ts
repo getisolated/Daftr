@@ -72,11 +72,12 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
             [class.active]="i === activeIndex()"
             [class.dirty]="tab.isDirty"
             [class.pinned]="tab.isPinned"
+            [class.temporary]="tab.isTemporary"
             [class.drag-over-left]="dragOverIndex() === i && dragSide() === 'left'"
             [class.drag-over-right]="dragOverIndex() === i && dragSide() === 'right'"
             [class.dragging]="dragIndex() === i"
             (click)="selectTab(i)"
-            (dblclick)="$event.stopPropagation()"
+            (dblclick)="$event.stopPropagation(); keepTab(i)"
             (mousedown)="onTabMouseDown($event)"
             (auxclick)="onAuxClick($event, i)"
             (contextmenu)="onTabContextMenu($event, i)"
@@ -227,6 +228,8 @@ export class TabsBarComponent {
 
   goHome(): void { this.tabs$.goHome(); }
   selectTab(index: number): void { this.tabs$.setActiveIndex(index); }
+  /** Double-click: a temporary tab is kept (no longer replaced by the next note opened). */
+  keepTab(index: number): void { this.tabs$.keepTab(index); }
   toggleWideMode(): void { this.layout.toggle(); }
 
   toggleSidebar(): void { this.sidebarState.toggleVisible(); }

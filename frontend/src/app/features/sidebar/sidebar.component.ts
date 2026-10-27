@@ -278,7 +278,7 @@ export class SidebarComponent {
       this.state.expand(note.folderId);
     }
 
-    this.tabs.openNote(note.id, note.title);
+    this.tabs.openNewNote(note.id, note.title);
   }
 
   protected async newFolder(parentId: number | null = null): Promise<void> {

@@ -41,6 +41,7 @@ pub fn raw_from_json(value: &Value) -> RawSettings {
         show_breadcrumbs: flag("showBreadcrumbs"),
         hide_scrollbar: flag("hideScrollbar"),
         open_in_preview: flag("openInPreview"),
+        temporary_tabs: flag("temporaryTabs"),
         collections_exclude: object.get("collectionsExclude").and_then(exclude_items),
         overlay_position: object
             .get("overlayPosition")
@@ -108,6 +109,7 @@ pub fn settings_to_json(settings: &AppSettings) -> Value {
         "showBreadcrumbs": settings.show_breadcrumbs,
         "hideScrollbar": settings.hide_scrollbar,
         "openInPreview": settings.open_in_preview,
+        "temporaryTabs": settings.temporary_tabs,
         "collectionsExclude": settings.collections_exclude,
         "overlayPosition": settings.overlay_position.map(|p| json!({ "x": p.x, "y": p.y })),
         "mcpEnabled": settings.mcp_enabled,

@@ -321,6 +321,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private async createNote(): Promise<void> {
     const note = await this.notesService.create();
-    this.tabsService.openNote(note.id, note.title);
+    this.tabsService.openNewNote(note.id, note.title);
   }
 }
