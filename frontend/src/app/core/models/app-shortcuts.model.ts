@@ -29,6 +29,8 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'editor.wordWrap', labelKey: 'settings.shortcut.editor.wordWrap', defaultAccelerator: 'Alt+Z' },
   // Not Ctrl+B: it is Bold in the editor
   { id: 'theme.select', labelKey: 'settings.shortcut.theme.select', defaultAccelerator: 'CommandOrControl+K, CommandOrControl+T' },
+  // Like VS Code: Ctrl+K then Z alone
+  { id: 'layout.zen', labelKey: 'settings.shortcut.layout.zen', defaultAccelerator: 'CommandOrControl+K, Z' },
   { id: 'formattingBar.toggle', labelKey: 'settings.shortcut.formattingBar.toggle', defaultAccelerator: 'Alt+T' },
   { id: 'sidebar.toggle', labelKey: 'settings.shortcut.sidebar.toggle', defaultAccelerator: 'CommandOrControl+Shift+E' },
   { id: 'tab.close', labelKey: 'settings.shortcut.tab.close', defaultAccelerator: 'CommandOrControl+W' },

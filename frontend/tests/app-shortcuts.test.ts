@@ -40,6 +40,16 @@ describe('resolveAppShortcuts', () => {
 describe('findShortcutConflict', () => {
   const resolved = resolveAppShortcuts({});
 
+  it('finds no clash between the defaults, chords sharing their first key included', () => {
+    for (const platform of ['windows', 'mac'] as const) {
+      const defaults = resolveAppShortcuts({}, platform);
+      for (const shortcut of APP_SHORTCUTS) {
+        expect(findShortcutConflict(shortcut.id, defaults[shortcut.id]!, defaults)).toBeNull();
+      }
+    }
+    expect(resolved['layout.zen']).toBe('CommandOrControl+K, Z');
+  });
+
   it('finds the other shortcut using the accelerator', () => {
     expect(findShortcutConflict('note.new', 'CommandOrControl+W', resolved)?.id).toBe('tab.close');
   });

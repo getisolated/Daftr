@@ -291,6 +291,39 @@
   }
 }
 
+// ── Zen mode ──────────────────────────────────────────────────────────────────
+
+// Blends into the page: only a strip dragging the window remains, its buttons shown while it is hovered
+.tabs-bar.zen {
+  height: 30px;
+  background: var(--daftr-bg);
+  border-bottom-color: transparent;
+
+  // macOS: the native traffic lights still need the full height
+  &:has(.traffic-lights-inset) {
+    height: 38px;
+  }
+
+  .window-controls {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  &:hover .window-controls,
+  .window-controls:focus-within {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .window-controls { transition: none; }
+  }
+}
+
+.zen-drag-region {
+  flex: 1;
+  height: 100%;
+}
+
 // ── GitHub themes: flat tabs underlined like GitHub's navigation, instead of pills ──
 
 @mixin github-tabs($underline) {
