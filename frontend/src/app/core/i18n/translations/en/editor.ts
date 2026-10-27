@@ -58,6 +58,10 @@ export const EN_EDITOR = {
   'editor.find.results.other': '{count} results',
   'editor.find.currentOf': '{current} of {total}',
 
+  // Ctrl+D / Ctrl+Shift+L option toggles
+  'editor.occurrence.matchCase': 'Match Case',
+  'editor.occurrence.wholeWord': 'Match Whole Word',
+
   // Breadcrumbs
   'editor.breadcrumbs.label': 'Path of the note',
 

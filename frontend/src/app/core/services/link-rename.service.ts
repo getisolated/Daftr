@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { QUICK_NOTE_TAG } from '../models/settings.model';
 import { retargetNoteLinks } from '../utils/note-links.util';
-import { notePath, toPathSegment } from '../utils/note-paths.util';
+import { notePath, pathKey } from '../utils/note-paths.util';
 import { FoldersService } from './folders.service';
 import { NotesService } from './notes.service';
 
@@ -16,7 +16,7 @@ interface PendingRename {
   timer: ReturnType<typeof setTimeout>;
 }
 
-/** Keeps the `[label](Folder/Note title)` links valid when a note is retitled; all done in the background. */
+/** Keeps the `[label](Folder/Note title)` links valid when a note is retitled or moved, or a folder renamed or moved; all done in the background. */
 @Injectable({ providedIn: 'root' })
 export class LinkRenameService {
   private notes = inject(NotesService);
@@ -40,11 +40,44 @@ export class LinkRenameService {
     this.pending.set(noteId, { fromTitle, timer });
   }
 
+  /**
+   * Runs `operation` (a move of notes, a rename or move of folders), then points the links at the notes whose path it
+   * changed: the note paths are compared before and after it.
+   */
+  async keepLinks<T>(operation: () => Promise<T>): Promise<T> {
+    const before = this.notePaths();
+    const result = await operation();
+    const moves = new Map<string, string>();
+
+    for (const [id, path] of this.notePaths()) {
+      const previous = before.get(id);
+
+      if (previous !== undefined && pathKey(previous) !== pathKey(path)) {
+        moves.set(pathKey(previous), path);
+      }
+    }
+
+    if (moves.size > 0) {
+      this.chain(() => this.retarget(moves, null));
+    }
+    return result;
+  }
+
+  /** Path of every note that links can reach, by id. */
+  private notePaths(): Map<number, string> {
+    const folders = this.folders.folders();
+    return new Map(this.notes.notes().filter(n => !n.tags.includes(QUICK_NOTE_TAG)).map(n => [n.id, notePath(n, folders)]));
+  }
+
   private enqueue(noteId: number, fromTitle: string): void {
     this.pending.delete(noteId);
+    this.chain(() => this.rewriteLinks(noteId, fromTitle));
+  }
+
+  private chain(rewrite: () => Promise<void>): void {
     // A failure must not break the chain; the links stay as they were
     this.queue = this.queue
-      .then(() => this.rewriteLinks(noteId, fromTitle))
+      .then(rewrite)
       .catch(err => console.error('[LinkRename] Failed to update the links:', err));
   }
 
@@ -59,29 +92,22 @@ export class LinkRenameService {
     const fromPath = notePath({ ...renamed, title: fromTitle }, folders);
     const toPath = notePath(renamed, folders);
 
-    if (fromPath.toLowerCase() === toPath.toLowerCase()) {
-      return;
+    if (pathKey(fromPath) !== pathKey(toPath)) {
+      // The retitled note is being typed in: its own content is left alone
+      await this.retarget(new Map([[pathKey(fromPath), toPath]]), noteId);
     }
+  }
 
-    // Cheap filter: a link to the old path holds the old title, as typed or percent-encoded
-    const segment = toPathSegment(fromTitle).toLowerCase();
-    const encodedSegment = encodeURIComponent(toPathSegment(fromTitle)).toLowerCase();
-    const candidates = this.notes.notes().filter(n => {
-      if (n.id === noteId || n.tags.includes(QUICK_NOTE_TAG)) {
-        return false;
-      }
-
-      const lowered = n.content.toLowerCase();
-
-      return lowered.includes(segment) || lowered.includes(encodedSegment);
-    });
-
+  /** Rewrites the links of every note (but `skipId`) to the moved paths. */
+  private async retarget(moves: ReadonlyMap<string, string>, skipId: number | null): Promise<void> {
+    // Cheap filter: a note without any markdown link has nothing to rewrite
+    const candidates = this.notes.notes().filter(n => n.id !== skipId && !n.tags.includes(QUICK_NOTE_TAG) && n.content.includes(']('));
     let sliceStart = performance.now();
 
     for (const candidate of candidates) {
       // Re-read: the note may have been edited since the list was taken
       const current = this.notes.notes().find(n => n.id === candidate.id);
-      const content = current ? retargetNoteLinks(current.content, fromPath, toPath) : null;
+      const content = current ? retargetNoteLinks(current.content, moves) : null;
 
       if (content !== null) {
         await this.notes.update(candidate.id, { content });

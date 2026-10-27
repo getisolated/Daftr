@@ -107,6 +107,10 @@ hideScrollbar: boolean,
  */
 openInPreview: boolean, 
 /**
+ * Onglets temporaires.
+ */
+temporaryTabs: boolean, 
+/**
  * Dossiers ignorés des collections.
  */
 collectionsExclude: Array<string>, 

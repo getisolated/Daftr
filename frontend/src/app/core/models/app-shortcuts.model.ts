@@ -29,6 +29,8 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'editor.wordWrap', labelKey: 'settings.shortcut.editor.wordWrap', defaultAccelerator: 'Alt+Z' },
   // Not Ctrl+B: it is Bold in the editor
   { id: 'theme.select', labelKey: 'settings.shortcut.theme.select', defaultAccelerator: 'CommandOrControl+K, CommandOrControl+T' },
+  // Like VS Code: Ctrl+K then Z alone
+  { id: 'layout.zen', labelKey: 'settings.shortcut.layout.zen', defaultAccelerator: 'CommandOrControl+K, Z' },
   { id: 'formattingBar.toggle', labelKey: 'settings.shortcut.formattingBar.toggle', defaultAccelerator: 'Alt+T' },
   { id: 'sidebar.toggle', labelKey: 'settings.shortcut.sidebar.toggle', defaultAccelerator: 'CommandOrControl+Shift+E' },
   { id: 'tab.close', labelKey: 'settings.shortcut.tab.close', defaultAccelerator: 'CommandOrControl+W' },
@@ -48,7 +50,10 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'editor.save', labelKey: 'settings.shortcut.editor.save', defaultAccelerator: 'CommandOrControl+S' },
   { id: 'editor.bold', labelKey: 'settings.shortcut.editor.bold', defaultAccelerator: 'CommandOrControl+B' },
   { id: 'editor.italic', labelKey: 'settings.shortcut.editor.italic', defaultAccelerator: 'CommandOrControl+I' },
-  { id: 'editor.draft', labelKey: 'settings.shortcut.editor.draft', defaultAccelerator: 'CommandOrControl+D' },
+  // Ctrl+D adds the next match to the selection, like VS Code
+  { id: 'editor.draft', labelKey: 'settings.shortcut.editor.draft', defaultAccelerator: 'CommandOrControl+Shift+D' },
+  { id: 'editor.selectNextMatch', labelKey: 'settings.shortcut.editor.selectNextMatch', defaultAccelerator: 'CommandOrControl+D' },
+  { id: 'editor.selectAllMatches', labelKey: 'settings.shortcut.editor.selectAllMatches', defaultAccelerator: 'CommandOrControl+Shift+L' },
   // Not Ctrl+K: it starts the chords (theme)
   { id: 'editor.link', labelKey: 'settings.shortcut.editor.link', defaultAccelerator: 'CommandOrControl+Shift+K' },
 ];

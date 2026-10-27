@@ -47,6 +47,12 @@ export const EN_SIDEBAR = {
   'sidebar.moveTo.filter': 'Filter folders',
   'sidebar.moveTo.empty': 'No folder matches',
 
+  // Copy to… dialog (collections to notes)
+  'sidebar.copyTo.title': 'Copy to',
+  'sidebar.copyTo.titleMany': 'Copy {count} items to',
+  'sidebar.copyTo.failed.one': '{count} file could not be copied',
+  'sidebar.copyTo.failed.other': '{count} files could not be copied',
+
   // Confirmations
   'sidebar.dialog.deepFolder.title': 'Deeply nested folder',
   'sidebar.dialog.deepFolder.message': 'This folder would be more than {max} levels deep. Deep trees get hard to navigate: 3 to {max} levels are recommended.',
@@ -80,6 +86,8 @@ export const EN_SIDEBAR = {
   'sidebar.collections.trash.confirm.mac': 'Move to Trash',
   'sidebar.collections.menu.locate': 'Locate on Disk…',
   'sidebar.collections.menu.newFile': 'New File',
+  'sidebar.collections.menu.copyTo': 'Copy To…',
+  'sidebar.collections.menu.copyItems': 'Copy {count} Items To…',
   'sidebar.collections.menu.renameCollection': 'Rename Collection',
   'sidebar.collections.menu.reveal': 'Reveal in File Explorer',
   'sidebar.collections.menu.reveal.mac': 'Reveal in Finder',

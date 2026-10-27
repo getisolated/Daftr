@@ -9,6 +9,8 @@ import {
   collectSubtreeIds,
   flattenVisibleTree,
   folderDisplayName,
+  folderOptions,
+  visibleFolderOptions,
   isGettingStartedFolderName,
   DROP_EDGE_RATIO,
   folderDepth,
@@ -314,5 +316,45 @@ describe('folderDisplayName', () => {
     expect(isGettingStartedFolderName('Getting started')).toBe(true);
     expect(isGettingStartedFolderName('Premiers pas')).toBe(true);
     expect(isGettingStartedFolderName('Inbox')).toBe(false);
+  });
+});
+
+describe('folderOptions', () => {
+  const t = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate('en', key, params);
+
+  it('lists the root first, then every folder in tree order with its depth', () => {
+    const options = folderOptions(FOLDERS, 'Notes', new Set([3, 4]), t);
+
+    expect(options[0]).toEqual({ id: null, label: 'Notes', depth: 0, disabled: false });
+    expect(options.map(option => option.id).slice(1).sort()).toEqual([1, 2, 3, 4, 5]);
+    const work = options.findIndex(option => option.id === 2);
+    expect(options.slice(work, work + 3).map(option => [option.id, option.depth, option.disabled])).toEqual([
+      [2, 0, false], [3, 1, true], [4, 2, true],
+    ]);
+  });
+});
+
+describe('visibleFolderOptions', () => {
+  const options = [
+    { id: null, label: 'Notes', depth: 0, disabled: false },
+    { id: 2, label: 'Work', depth: 0, disabled: false },
+    { id: 3, label: 'Projects', depth: 1, disabled: false },
+    { id: 4, label: 'Archive', depth: 2, disabled: false },
+    { id: 5, label: 'Perso', depth: 0, disabled: false },
+  ];
+
+  it('shows everything when nothing is collapsed, marking the folders with sub-folders', () => {
+    expect(visibleFolderOptions(options, new Set()).map(row => [row.option.id, row.expandable])).toEqual([
+      [null, false], [2, true], [3, true], [4, false], [5, false],
+    ]);
+  });
+
+  it('hides every sub-folder of a collapsed folder, not its next siblings', () => {
+    expect(visibleFolderOptions(options, new Set([2])).map(row => row.option.id)).toEqual([null, 2, 5]);
+    expect(visibleFolderOptions(options, new Set([3])).map(row => row.option.id)).toEqual([null, 2, 3, 5]);
+  });
+
+  it('ignores a collapsed folder without sub-folders', () => {
+    expect(visibleFolderOptions(options, new Set([4, 5]))).toHaveLength(5);
   });
 });

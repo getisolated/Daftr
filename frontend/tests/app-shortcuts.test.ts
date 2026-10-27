@@ -32,6 +32,18 @@ describe('resolveAppShortcuts', () => {
     expect(resolved['tab.close']).toBe('CommandOrControl+W');
   });
 
+  it('adds the next match to the selection with Ctrl+D, the draft block moving to Ctrl+Shift+D', () => {
+    const resolved = resolveAppShortcuts({});
+    expect(resolved['editor.selectNextMatch']).toBe('CommandOrControl+D');
+    expect(resolved['editor.selectAllMatches']).toBe('CommandOrControl+Shift+L');
+    expect(resolved['editor.draft']).toBe('CommandOrControl+Shift+D');
+    expect(findShortcutConflict('editor.draft', 'CommandOrControl+Shift+D', resolved)).toBeNull();
+  });
+
+  it('keeps a draft shortcut the user chose', () => {
+    expect(resolveAppShortcuts({ 'editor.draft': 'Alt+D' })['editor.draft']).toBe('Alt+D');
+  });
+
   it('ignores overrides of unknown shortcuts', () => {
     expect('ghost' in resolveAppShortcuts({ ghost: 'Alt+G' })).toBe(false);
   });
@@ -39,6 +51,16 @@ describe('resolveAppShortcuts', () => {
 
 describe('findShortcutConflict', () => {
   const resolved = resolveAppShortcuts({});
+
+  it('finds no clash between the defaults, chords sharing their first key included', () => {
+    for (const platform of ['windows', 'mac'] as const) {
+      const defaults = resolveAppShortcuts({}, platform);
+      for (const shortcut of APP_SHORTCUTS) {
+        expect(findShortcutConflict(shortcut.id, defaults[shortcut.id]!, defaults)).toBeNull();
+      }
+    }
+    expect(resolved['layout.zen']).toBe('CommandOrControl+K, Z');
+  });
 
   it('finds the other shortcut using the accelerator', () => {
     expect(findShortcutConflict('note.new', 'CommandOrControl+W', resolved)?.id).toBe('tab.close');

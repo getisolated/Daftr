@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Injector } from '@angular/core';
 import { FileDocsService } from '../src/app/core/services/file-docs.service';
 import { TabsService } from '../src/app/core/services/tabs.service';
+import { Tab as AppTab } from '../src/app/core/models/note.model';
+import { keepTabs, openTab } from '../src/app/core/utils/tabs-opening.util';
 
 // Mock localStorage
 const store: Record<string, string> = {};
@@ -198,5 +200,85 @@ describe('TabsService view modes', () => {
 
     const saved = JSON.parse(localStorage.getItem('daftr-session') ?? '{}') as { tabs: { viewMode?: string }[] };
     expect(saved.tabs[0]!.viewMode).toBe('preview');
+  });
+});
+
+function appTab(noteId: number, extra: Partial<AppTab> = {}): AppTab {
+  return { noteId, title: `n${noteId}`, isDirty: false, isPinned: false, ...extra };
+}
+
+/** Opens the notes one after the other, as TabsService.openNote does. */
+function openAll(noteIds: number[], temporary: boolean, tabs: AppTab[] = []): { tabs: AppTab[]; activeIndex: number } {
+  let state = { tabs, activeIndex: -1 };
+  for (const id of noteIds) state = openTab(state.tabs, appTab(id), temporary);
+  return state;
+}
+
+describe('openTab (temporary tabs)', () => {
+  it('opens a note in a temporary tab', () => {
+    const result = openAll([1], true);
+
+    expect(result.tabs).toEqual([{ ...appTab(1), isTemporary: true }]);
+    expect(result.activeIndex).toBe(0);
+  });
+
+  it('replaces the temporary tab, at its position, with the next note opened', () => {
+    const result = openAll([2, 3], true, [appTab(1)]);
+
+    expect(result.tabs.map(t => t.noteId)).toEqual([1, 3]);
+    expect(result.tabs[1]?.isTemporary).toBe(true);
+    expect(result.activeIndex).toBe(1);
+  });
+
+  it('replaces the temporary tab even when it is not the last one nor the active one', () => {
+    const tabs = [appTab(1), appTab(2, { isTemporary: true }), appTab(3)];
+    const result = openTab(tabs, appTab(4), true);
+
+    expect(result.tabs.map(t => t.noteId)).toEqual([1, 4, 3]);
+    expect(result.activeIndex).toBe(1);
+  });
+
+  it('shows the tab of a note already open without replacing anything', () => {
+    const tabs = [appTab(1), appTab(2, { isTemporary: true })];
+    const result = openTab(tabs, appTab(1), true);
+
+    expect(result.tabs).toBe(tabs);
+    expect(result.activeIndex).toBe(0);
+  });
+
+  it('keeps a tab opened as a regular one (new note, setting off): nothing is replaced', () => {
+    const result = openAll([2, 3], false, [appTab(1)]);
+
+    expect(result.tabs.map(t => t.noteId)).toEqual([1, 2, 3]);
+    expect(result.tabs.some(t => t.isTemporary)).toBe(false);
+  });
+
+  it('opening a temporary note to keep it makes its tab a regular one', () => {
+    const result = openTab([appTab(1, { isTemporary: true })], appTab(1), false);
+
+    expect(result.tabs[0]?.isTemporary).toBe(false);
+  });
+
+  it('adds a regular tab next to the temporary one without replacing it', () => {
+    const result = openTab([appTab(1, { isTemporary: true })], appTab(2), false);
+
+    expect(result.tabs.map(t => [t.noteId, t.isTemporary ?? false])).toEqual([[1, true], [2, false]]);
+  });
+});
+
+describe('keepTabs', () => {
+  it('makes the matching temporary tabs regular ones (edited, pinned, double-clicked)', () => {
+    const tabs = [appTab(1, { isTemporary: true }), appTab(2)];
+    const kept = keepTabs(tabs, t => t.noteId === 1);
+
+    expect(kept[0]?.isTemporary).toBe(false);
+    // A kept tab is no longer replaced
+    expect(openTab(kept, appTab(3), true).tabs.map(t => t.noteId)).toEqual([1, 2, 3]);
+  });
+
+  it('returns the same array when there is nothing to keep', () => {
+    const tabs = [appTab(1), appTab(2, { isTemporary: true })];
+
+    expect(keepTabs(tabs, t => t.noteId === 1)).toBe(tabs);
   });
 });

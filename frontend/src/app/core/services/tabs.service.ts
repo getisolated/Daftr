@@ -1,19 +1,31 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, effect, untracked } from '@angular/core';
 import { CollectionFileRef } from '../models/collection.model';
 import { QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE, Tab } from '../models/note.model';
 import { FileDocsService } from './file-docs.service';
+import { SettingsService } from './settings.service';
 import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
 import { EditorViewMode } from '../models/editor.model';
 import { isEditorViewMode } from '../utils/tab-view-mode.util';
+import { keepTabs, openTab } from '../utils/tabs-opening.util';
 
 const SESSION_KEY = 'daftr-session';
 
 @Injectable({ providedIn: 'root' })
 export class TabsService {
   private readonly fileDocs = inject(FileDocsService);
+  private readonly settings = inject(SettingsService);
   private readonly _tabs = signal<Tab[]>([]);
   private readonly _activeIndex = signal<number>(-1);
   private _initialized = false;
+
+  constructor() {
+    // Setting turned off (or loaded off after the session was restored): the temporary tabs become regular ones
+    effect(() => {
+      if (!this.settings.settings().temporaryTabs) {
+        untracked(() => this.keepWhere(() => true));
+      }
+    });
+  }
 
   readonly tabs = this._tabs.asReadonly();
   readonly activeIndex = this._activeIndex.asReadonly();
@@ -52,6 +64,7 @@ export class TabsService {
             ...t,
             isPinned: t.isPinned ?? false,
             isDirty: false,
+            isTemporary: t.isTemporary === true && this.settings.settings().temporaryTabs,
             noteId: t.file ? this.fileDocs.idFor(t.file) : t.noteId,
             title: t.noteId === QUICK_NOTES_TAB_ID ? QUICK_NOTES_TITLE : t.title,
             ...(isEditorViewMode(viewMode) ? { viewMode } : {}),
@@ -81,15 +94,36 @@ export class TabsService {
     this.persist();
   }
 
+  /** Opens a note in a temporary tab (setting `temporaryTabs`): it is kept once edited, pinned or double-clicked. */
   openNote(noteId: number, title: string, file?: CollectionFileRef): void {
-    const existing = this._tabs().findIndex(t => t.noteId === noteId);
-    if (existing >= 0) {
-      this._activeIndex.set(existing);
-    } else {
-      this._tabs.update(tabs => [...tabs, { noteId, title, isDirty: false, isPinned: false, ...(file ? { file } : {}) }]);
-      this._activeIndex.set(this._tabs().length - 1);
-    }
+    this.open({ noteId, title, isDirty: false, isPinned: false, ...(file ? { file } : {}) }, this.settings.settings().temporaryTabs);
+  }
+
+  /** A note just created is meant to be written: its tab is kept from the start. */
+  openNewNote(noteId: number, title: string): void {
+    this.open({ noteId, title, isDirty: false, isPinned: false }, false);
+  }
+
+  private open(tab: Tab, temporary: boolean): void {
+    const result = openTab(this._tabs(), tab, temporary);
+    this._tabs.set(result.tabs);
+    this._activeIndex.set(result.activeIndex);
     this.persist();
+  }
+
+  /** Double-click on a temporary tab: it stays open when the next note is opened. */
+  keepTab(index: number): void {
+    const tab = this._tabs()[index];
+    if (tab) this.keepWhere(t => t.noteId === tab.noteId);
+  }
+
+  private keepWhere(shouldKeep: (tab: Tab) => boolean): void {
+    const tabs = this._tabs();
+    const kept = keepTabs(tabs, shouldKeep);
+    if (kept !== tabs) {
+      this._tabs.set(kept);
+      this.persist();
+    }
   }
 
   /** A file of a collection was renamed or moved: its tab follows. */
@@ -172,7 +206,9 @@ export class TabsService {
     }
   }
 
+  /** An edited note keeps its tab: it is no longer temporary. */
   markDirty(noteId: number, dirty: boolean): void {
+    if (dirty) this.keepWhere(t => t.noteId === noteId);
     this._tabs.update(tabs =>
       tabs.map(t => t.noteId === noteId ? { ...t, isDirty: dirty } : t)
     );
@@ -202,8 +238,8 @@ export class TabsService {
     const tab = tabs[index];
     const newPinned = !tab.isPinned;
 
-    // Update the pin state
-    const updated = tabs.map((t, i) => i === index ? { ...t, isPinned: newPinned } : t);
+    // Update the pin state (a pinned tab is never temporary)
+    const updated = tabs.map((t, i) => i === index ? { ...t, isPinned: newPinned, isTemporary: false } : t);
 
     if (newPinned) {
       // Move tab to end of pinned section

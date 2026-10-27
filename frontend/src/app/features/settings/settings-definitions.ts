@@ -180,6 +180,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'temporaryTabs',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.temporaryTabs.title',
+    descriptionKey: 'settings.temporaryTabs.description',
+    control: 'checkbox',
+  },
+  {
     key: 'formattingBarEnabled',
     categoryKey: 'settings.category.formattingBar',
     titleKey: 'settings.formattingBarEnabled.title',
