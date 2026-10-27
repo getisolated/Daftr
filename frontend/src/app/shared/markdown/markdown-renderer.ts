@@ -3,6 +3,7 @@ import type { MarkdownIt, RendererRule, StateCore, Token } from 'markdown-it';
 import footnote from 'markdown-it-footnote';
 import DOMPurify from 'dompurify';
 import { LinkStatus } from '../../core/utils/note-paths.util';
+import { createHeadingSlugger } from '../../core/utils/heading-anchor.util';
 import { Translator } from '../../core/i18n/translate';
 import { TranslationKey } from '../../core/i18n/translations';
 
@@ -89,6 +90,32 @@ function alerts(md: MarkdownIt, context: MarkdownRenderContext): void {
       const title = new state.Token('html_block', '', 0);
       title.content = `<p class="markdown-alert-title">${md.utils.escapeHtml(context.t(`editor.alert.${type}` as TranslationKey))}</p>\n`;
       tokens.splice(i + 1, 0, title);
+    }
+  });
+}
+
+/**
+ * Headings get their GitHub anchor, so that `#chapter` links reach them. `data-anchor` too: DOMPurify drops an `id`
+ * that names a property of `document` (`title`, `images`…), the preview looks the anchors up by both.
+ */
+function headingAnchors(md: MarkdownIt): void {
+  md.core.ruler.push('heading_anchors', (state: StateCore) => {
+    const slugOf = createHeadingSlugger();
+    const tokens = state.tokens;
+
+    for (let i = 0; i < tokens.length - 1; i++) {
+      const open = tokens[i] as Token;
+      const inline = tokens[i + 1] as Token;
+
+      if (open.type !== 'heading_open' || inline.type !== 'inline') {
+        continue;
+      }
+
+      // The text as shown: markup, images and the badge of `[!NEW]` (already replaced) are no part of it
+      const text = (inline.children ?? []).filter(child => child.type === 'text' || child.type === 'code_inline').map(child => child.content).join('');
+      const slug = slugOf(text);
+      open.attrSet('id', slug);
+      open.attrSet('data-anchor', slug);
     }
   });
 }
@@ -186,6 +213,8 @@ export function createMarkdownRenderer(context: MarkdownRenderContext): Markdown
   md.use(taskLists);
   md.use(alerts, context);
   md.use(newBadges, context);
+  // After the badges: the `[!NEW]` marker is no part of the anchor
+  md.use(headingAnchors);
   md.use(mermaidFences);
   linkTargets(md, context);
 
@@ -213,7 +242,7 @@ export function renderMarkdown(md: MarkdownIt, source: string, resolveImage?: Im
   DOMPurify.addHook('afterSanitizeAttributes', rewrite);
   try {
     return DOMPurify.sanitize(md.render(source), {
-      ADD_ATTR: ['data-line', 'data-href', 'data-mermaid'],
+      ADD_ATTR: ['data-line', 'data-href', 'data-mermaid', 'data-anchor'],
       FORBID_TAGS: ['style', 'form'],
     });
   } finally {
