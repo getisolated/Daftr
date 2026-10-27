@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { EditorState, Extension, TransactionSpec } from '@codemirror/state';
+import { EditorSelection, EditorState, Extension, TransactionSpec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { ensureSyntaxTree } from '@codemirror/language';
 import {
   FORMAT_ACTIONS, clearInlineFormatting, detectActiveFormats, findTagAround, insertLink, insertRuleBelow, insertTableBelow,
-  stripInlineFormatting, toggleCodeBlock, toggleHtmlTag, toggleInlineMark, toggleLineKind,
+  stripInlineFormatting, toggleCodeBlock, toggleHtmlTag, toggleInlineMark, toggleLineKind, wrapRanges,
 } from '../src/app/shared/codemirror/formatting-commands';
 import { slashCommands } from '../src/app/shared/codemirror/slash-commands';
 import { translatorFacet } from '../src/app/shared/codemirror/translator';
@@ -310,6 +310,57 @@ describe('insertLink', () => {
     const link = createView('', 0, 0, [translatorFacet.of((key, params) => translate('fr', key, params))]);
     insertLink(link);
     expect(text(link)).toBe('[texte](url)');
+  });
+});
+
+describe('several cursors', () => {
+  /** A view holding one selection range per `[from, to]` pair, the last one being the main range. */
+  function createMultiView(doc: string, ranges: [number, number][]): EditorView {
+    const selection = EditorSelection.create(ranges.map(([from, to]) => EditorSelection.range(from, to)), ranges.length - 1);
+    const view = createView(doc, 0, 0, [EditorState.allowMultipleSelections.of(true)]);
+    view.dispatch({ selection });
+    return view;
+  }
+
+  const selections = (view: EditorView): string[] => view.state.selection.ranges.map(range => view.state.sliceDoc(range.from, range.to));
+
+  it('wraps every range, each staying selected', () => {
+    const state = EditorState.create({
+      doc: 'un et deux',
+      selection: EditorSelection.create([EditorSelection.range(0, 2), EditorSelection.range(6, 10)]),
+      extensions: EditorState.allowMultipleSelections.of(true),
+    });
+    const next = state.update(wrapRanges(state, '**', '**')).state;
+    expect(next.doc.toString()).toBe('**un** et **deux**');
+    expect(next.selection.ranges.map(range => next.sliceDoc(range.from, range.to))).toEqual(['un', 'deux']);
+  });
+
+  it('puts the caret between the marks of each empty range', () => {
+    const view = createMultiView('a\nb', [[1, 1], [3, 3]]);
+    toggleInlineMark(view, '*', 'Emphasis');
+    expect(text(view)).toBe('a**\nb**');
+    expect(view.state.selection.ranges.map(range => range.head)).toEqual([2, 6]);
+  });
+
+  it('unwraps the mark around each range, once for a mark holding two cursors', () => {
+    const view = createMultiView('**un deux** et **trois**', [[3, 3], [6, 6], [18, 18]]);
+    toggleInlineMark(view, '**', 'StrongEmphasis');
+    expect(text(view)).toBe('un deux et trois');
+  });
+
+  it('wraps and unwraps an HTML tag on every range', () => {
+    const view = createMultiView('a b', [[0, 1], [2, 3]]);
+    toggleHtmlTag(view, 'u');
+    expect(text(view)).toBe('<u>a</u> <u>b</u>');
+    toggleHtmlTag(view, 'u');
+    expect(text(view)).toBe('a b');
+  });
+
+  it('turns every range into a link, each url placeholder selected', () => {
+    const view = createMultiView('a b', [[0, 1], [2, 3]]);
+    insertLink(view);
+    expect(text(view)).toBe('[a](url) [b](url)');
+    expect(selections(view)).toEqual(['url', 'url']);
   });
 });
 

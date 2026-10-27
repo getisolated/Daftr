@@ -42,8 +42,6 @@ pub fn create(app: &AppHandle, show: bool) -> tauri::Result<WebviewWindow> {
         let window = window.clone();
         move |event| on_window_event(&window, event)
     });
-    #[cfg(debug_assertions)]
-    window.open_devtools();
     Ok(window)
 }
 

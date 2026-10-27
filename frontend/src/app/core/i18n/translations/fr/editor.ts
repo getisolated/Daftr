@@ -60,6 +60,10 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
   'editor.find.results.other': '{count} résultats',
   'editor.find.currentOf': '{current} sur {total}',
 
+  // Options de Ctrl+D / Ctrl+Shift+L
+  'editor.occurrence.matchCase': 'Respecter la casse',
+  'editor.occurrence.wholeWord': 'Mot entier',
+
   // Fil d'Ariane
   'editor.breadcrumbs.label': 'Chemin de la note',
 
