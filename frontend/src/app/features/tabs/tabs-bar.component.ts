@@ -23,12 +23,16 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Title bar: drags the window, double-click maximizes (Tauri drag region; tabs and buttons excluded) -->
-    <div class="tabs-bar" data-tauri-drag-region="deep">
+    <!-- Zen mode: an empty strip that still drags the window, its buttons only show while hovered -->
+    <div class="tabs-bar" [class.zen]="zenMode()" data-tauri-drag-region="deep">
       <!-- macOS: the native traffic lights float over the top left corner; this empty zone keeps the tabs clear of them but still drags the window -->
       @if (trafficLightsInset()) {
         <div class="traffic-lights-inset" data-tauri-drag-region></div>
       }
 
+      @if (zenMode()) {
+        <div class="zen-drag-region"></div>
+      } @else {
       <!-- Sidebar toggle -->
       <button
         class="home-btn"
@@ -129,6 +133,7 @@ import { NoteExportService, noteExportMenu } from '../../core/services/note-expo
           </svg>
         }
       </button>
+      }
 
       <!-- Window controls (macOS has the native traffic lights instead) -->
       @if (!platform.isMac) {
@@ -204,6 +209,7 @@ export class TabsBarComponent {
   }
 
   readonly wideMode = this.layout.wideMode;
+  readonly zenMode = this.layout.zenMode;
   readonly sidebarVisible = this.sidebarState.visible;
 
   readonly tabs = this.tabs$.tabs;

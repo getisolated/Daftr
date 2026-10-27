@@ -39,8 +39,8 @@ export interface NoteGraph {
 }
 
 export interface GraphOptions {
-  /** Keeps the notes of this folder only; `null` keeps everything. */
-  folderId?: number | null;
+  /** Keeps the notes of these folders only (a folder and its sub-folders); `null` keeps everything. */
+  folderIds?: ReadonlySet<number> | null;
   /** Note around which a large graph is cut. */
   focusId?: number | null;
   /** Notes without any link stay out of the graph. */
@@ -57,7 +57,7 @@ export const GRAPH_FOCUS_DEPTH = 2;
 const EXCERPT_RADIUS = 60;
 const NOTE_LINK = /note:\/\/(?<id>\d+)/g;
 /** `[label](target)` and `[label](<target with spaces>)`, an optional title after the target; images are left out. */
-const MARKDOWN_LINK = /(?<!!)\[[^\]\n]*\]\((?<target><[^>\n]*>|[^)\s\n]*)(?:\s+"[^"\n]*")?\)/g;
+export const MARKDOWN_LINK = /(?<!!)\[[^\]\n]*\]\((?<target><[^>\n]*>|[^)\s\n]*)(?:\s+"[^"\n]*")?\)/g;
 
 interface LinkOccurrence {
   noteId: number;
@@ -88,18 +88,26 @@ function findLinkOccurrences(content: string, resolve?: LinkResolver): LinkOccur
   return occurrences.sort((a, b) => a.index - b.index);
 }
 
+/** `link` (a match of {@link MARKDOWN_LINK} whose target is `target`) pointed at `path`, its label and title kept. */
+export function replaceLinkTarget(link: string, target: string, path: string): string {
+  const newTarget = needsAngleBrackets(path) ? `<${path}>` : path;
+  // The target follows the label, which cannot hold a `]`: searching from there never touches a label reading like it
+  const at = link.indexOf(target, link.indexOf('](') + 2);
+  return `${link.slice(0, at)}${newTarget}${link.slice(at + target.length)}`;
+}
+
 /**
- * `content` with every `[label](path)` link to `fromPath` pointed at `toPath`; `null` when none was found.
- * The label, the `./` prefix and the `.md` suffix of each link are kept.
+ * `content` with every `[label](path)` link to a moved note pointed at its new path; `null` when none was found.
+ * `moves` maps the {@link pathKey} of each previous path to the new path. The `./` prefix and the `.md` suffix of each link are kept.
  */
-export function retargetNoteLinks(content: string, fromPath: string, toPath: string): string | null {
-  const fromKey = pathKey(fromPath);
+export function retargetNoteLinks(content: string, moves: ReadonlyMap<string, string>): string | null {
   let changed = false;
 
   const rewritten = content.replace(MARKDOWN_LINK, (link: string, target: string) => {
     const normalized = normalizeLinkTarget(target);
+    const toPath = normalized === null ? undefined : moves.get(pathKey(normalized));
 
-    if (normalized === null || pathKey(normalized) !== fromKey) {
+    if (toPath === undefined) {
       return link;
     }
 
@@ -107,10 +115,7 @@ export function retargetNoteLinks(content: string, fromPath: string, toPath: str
 
     const prefix = /^<?\.\//.test(target) ? './' : '';
     const suffix = /\.md>?$/i.test(target) ? '.md' : '';
-    const path = `${prefix}${toPath}${suffix}`;
-    const newTarget = needsAngleBrackets(path) ? `<${path}>` : path;
-
-    return link.replace(target, () => newTarget);
+    return replaceLinkTarget(link, target, `${prefix}${toPath}${suffix}`);
   });
 
   return changed ? rewritten : null;
@@ -191,8 +196,8 @@ function collectNeighbourhood(links: readonly GraphLink[], focusId: number, dept
  * Two notes linking each other keep one link per direction (A→B and B→A), so a cycle stays visible.
  */
 export function buildNoteGraph(notes: readonly LinkableNote[], t: Translator, options: GraphOptions = {}): NoteGraph {
-  const { folderId = null, focusId = null, hideOrphans = false, resolve } = options;
-  const scoped = folderId === null ? notes : notes.filter(n => n.folderId === folderId);
+  const { folderIds = null, focusId = null, hideOrphans = false, resolve } = options;
+  const scoped = folderIds === null ? notes : notes.filter(n => n.folderId !== null && folderIds.has(n.folderId));
   const known = new Map(scoped.map(n => [n.id, n]));
   const existing = new Set(notes.map(n => n.id));
   const links: GraphLink[] = [];

@@ -60,6 +60,8 @@ export const EN_WORKSPACE = {
   'workspace.palette.cmd.nextTabDesc': 'Switch to next tab',
   'workspace.palette.cmd.prevTab': 'Previous Tab',
   'workspace.palette.cmd.prevTabDesc': 'Switch to previous tab',
+  'workspace.palette.cmd.zenMode': 'Toggle Zen Mode',
+  'workspace.palette.cmd.zenModeDesc': 'Hide the tabs, the outline and the sidebar (brought back from the left edge)',
   'workspace.palette.cmd.colorTheme': 'Color Theme',
   'workspace.palette.cmd.colorThemeDesc': 'Pick the color theme, previewed as you move',
   'workspace.palette.cmd.settings': 'Settings',

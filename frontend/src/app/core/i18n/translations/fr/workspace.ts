@@ -62,6 +62,8 @@ export const FR_WORKSPACE: Record<keyof typeof EN_WORKSPACE, string> = {
   'workspace.palette.cmd.nextTabDesc': 'Passer à l’onglet suivant',
   'workspace.palette.cmd.prevTab': 'Onglet précédent',
   'workspace.palette.cmd.prevTabDesc': 'Passer à l’onglet précédent',
+  'workspace.palette.cmd.zenMode': 'Basculer le mode zen',
+  'workspace.palette.cmd.zenModeDesc': 'Masquer les onglets, le plan et la barre latérale (rappelée depuis le bord gauche)',
   'workspace.palette.cmd.colorTheme': 'Thème de couleurs',
   'workspace.palette.cmd.colorThemeDesc': 'Choisir le thème de couleurs, prévisualisé au fil de la sélection',
   'workspace.palette.cmd.settings': 'Paramètres',

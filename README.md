@@ -53,8 +53,9 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 - **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. New notes land in `Inbox`.
 - **Tags** — organize notes with tags and filter from the sidebar.
 - **Backlinks & graph** — link notes with `[label](Folder/Note title)` (autocompleted) or `note://ID`. A panel under the editor lists the notes linking to the active one; the home page draws an Obsidian-like graph of all links (zoom, pan, drag, click to open, colored by folder). `Ctrl+click` follows a link.
-- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. `.md` files open with Daftr from the Explorer or the Finder.
-- **Tabs** — drag & drop reordering, pinning, session restore. A note opened without being edited takes a temporary tab (in italics) that the next note opened replaces, like VS Code; editing the note, pinning or double-clicking its tab keeps it (setting *Temporary Tabs*).
+- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. Right-click a file, a folder or a multi-selection (`Ctrl+click` / `Shift+click`) and *Copy To…* to copy them into your notes, folder structure included: each note is titled after its file, and the links between the copied files keep working. `.md` files open with Daftr from the Explorer or the Finder.
+- **Tabs** — drag & drop reordering, pinning, session restore.
+- **Zen mode** — `Ctrl+K` `Z` hides the tabs, the outline and the sidebar. The sidebar then floats tucked away on the left edge and slides in when the pointer reaches it (or with `Ctrl+Shift+E`).
 - **Formatting bar** — a Word-like toolbar reflecting the formatting under the caret. `Alt+T` toggles it; size, style and position are settings.
 - **Quick-note overlay** — a global shortcut (`Ctrl+Alt+Q` by default, `⌥⌘Q` on macOS) pops a small always-on-top window anywhere on screen. Notes sent from it are gathered in a single *Quick notes* document, where each one can be copied, edited, deleted or converted into a regular note (filed in *Inbox* if it has no folder).
 - **Copy & export** — copy a note as markdown, export it as Markdown, standalone HTML or PDF (A4 pages, rendered like the preview: tables, colored code, Mermaid diagrams). Export a folder, or a multi-selection of notes and folders, as a ZIP of `.md` files or of PDF files.
@@ -86,6 +87,7 @@ Every shortcut below is a default and can be rebound in **Settings → Keyboard 
 | `Alt+T`                              | `⌥T`                         | Toggle the formatting bar |
 | `Alt+Z`                              | `⌥Z`                         | Toggle line wrap |
 | `Alt+W`                              | `⌥W`                         | Toggle wide mode |
+| `Ctrl+K` `Z` (chord)                 | `⌘K` `Z` (chord)             | Toggle zen mode |
 | `Ctrl+K` `Ctrl+T` (chord)            | `⌘K` `⌘T` (chord)            | Theme picker (live preview) |
 | `Ctrl+,`                             | `⌘,`                         | Settings |
 | `Ctrl+Alt+Q` (global, configurable)  | `⌥⌘Q` (global, configurable) | Toggle the quick-note overlay |

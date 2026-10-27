@@ -116,6 +116,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.shortcut.palette.commands': 'Palette de commandes',
   'settings.shortcut.settings.open': 'Ouvrir les paramètres',
   'settings.shortcut.layout.toggle': 'Basculer la mise en page pleine largeur',
+  'settings.shortcut.layout.zen': 'Basculer le mode zen',
   'settings.shortcut.editor.wordWrap': 'Basculer le retour à la ligne',
   'settings.shortcut.theme.select': 'Thème de couleurs',
   'settings.shortcut.formattingBar.toggle': 'Afficher / masquer la barre de mise en forme',

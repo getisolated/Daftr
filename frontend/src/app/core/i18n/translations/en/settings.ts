@@ -114,6 +114,7 @@ export const EN_SETTINGS = {
   'settings.shortcut.palette.commands': 'Command Palette',
   'settings.shortcut.settings.open': 'Open Settings',
   'settings.shortcut.layout.toggle': 'Toggle Full Width Layout',
+  'settings.shortcut.layout.zen': 'Toggle Zen Mode',
   'settings.shortcut.editor.wordWrap': 'Toggle Line Wrap',
   'settings.shortcut.theme.select': 'Color Theme',
   'settings.shortcut.formattingBar.toggle': 'Toggle Formatting Bar',

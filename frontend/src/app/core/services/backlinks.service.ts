@@ -12,6 +12,7 @@ import { CollectionsService } from './collections.service';
 import { FileDocsService } from './file-docs.service';
 import { baseName, parentPath } from '../utils/collection.util';
 import { graphGroups } from '../utils/graph-groups.util';
+import { collectSubtreeIds } from '../utils/folder-tree.util';
 import { Folder } from '../models/folder.model';
 
 /** Links between notes (`note://id`): who points at the active note, and the whole graph. */
@@ -60,7 +61,7 @@ export class BacklinksService {
     return activeId === null || activeId === QUICK_NOTES_TAB_ID ? [] : findBacklinks(this.linkableNotes(), activeId, this.i18n.t, this.resolver());
   });
 
-  /** Graph of the folder selected in the sidebar (everything when none is), or of the selected collection. */
+  /** Graph of the folder selected in the sidebar with its sub-folders (everything when none is), or of the selected collection. */
   readonly graph = computed<NoteGraph>(() => {
     const root = this.collections.selectedRoot();
 
@@ -68,8 +69,9 @@ export class BacklinksService {
       return this.collectionGraph(root);
     }
 
+    const folderId = this.sidebarState.selectedFolderId();
     const graph = buildNoteGraph(this.linkableNotes(), this.i18n.t, {
-      folderId: this.sidebarState.selectedFolderId(),
+      folderIds: folderId === null ? null : new Set(collectSubtreeIds(this.folders.folders(), folderId)),
       focusId: this.referenceNoteId(),
       hideOrphans: this._hideOrphans(),
       resolve: this.resolver(),
