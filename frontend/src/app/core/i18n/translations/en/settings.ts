@@ -50,6 +50,8 @@ export const EN_SETTINGS = {
   'settings.openInPreview.description': 'Open a note rendered like on GitHub (read-only) instead of its markdown source. The buttons at the top right of the note switch between source, side by side and preview.',
   'settings.temporaryTabs.title': 'Temporary Tabs',
   'settings.temporaryTabs.description': 'A note opened without being edited takes a temporary tab, in italics, replaced by the next note opened. Editing the note, pinning its tab or double-clicking it keeps the tab.',
+  'settings.zenAlwaysOnTop.title': 'Zen Mode Always on Top',
+  'settings.zenAlwaysOnTop.description': 'In zen mode, the window stays above the other applications. It goes back to normal when leaving zen mode.',
   'settings.formattingBarEnabled.title': 'Show Formatting Bar',
   'settings.formattingBarEnabled.description': 'Toolbar with the main formatting actions (headings, bold, lists…). Uncheck to hide it for good; the shortcut toggles it too.',
   'settings.formattingBarMode.title': 'Size',
