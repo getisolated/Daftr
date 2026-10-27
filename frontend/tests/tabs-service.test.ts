@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Injector } from '@angular/core';
+import {
+  Injector, signal, ɵChangeDetectionScheduler as ChangeDetectionScheduler, ɵEffectScheduler as EffectScheduler,
+} from '@angular/core';
 import { FileDocsService } from '../src/app/core/services/file-docs.service';
 import { TabsService } from '../src/app/core/services/tabs.service';
+import { SettingsService } from '../src/app/core/services/settings.service';
+import { DEFAULT_SETTINGS } from '../src/app/core/models/settings.model';
 import { Tab as AppTab } from '../src/app/core/models/note.model';
 import { keepTabs, openTab } from '../src/app/core/utils/tabs-opening.util';
 
@@ -159,6 +163,11 @@ describe('TabsService view modes', () => {
   const createService = (): TabsService => Injector.create({
     providers: [
       { provide: FileDocsService, useClass: FileDocsService, deps: [] },
+      // Only its settings are read; no temporary tab, a note opened next would take the place of the previous one
+      { provide: SettingsService, useValue: { settings: signal({ ...DEFAULT_SETTINGS, temporaryTabs: false }) } },
+      // The effect of the service (temporary tabs turned off) needs schedulers outside of an application; it never runs here
+      { provide: ChangeDetectionScheduler, useValue: { notify: () => undefined, runningTick: false } },
+      { provide: EffectScheduler, useValue: { add: () => undefined, schedule: () => undefined, remove: () => undefined, flush: () => undefined } },
       { provide: TabsService, useClass: TabsService, deps: [] },
     ],
   }).get(TabsService);
