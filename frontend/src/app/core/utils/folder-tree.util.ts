@@ -1,5 +1,7 @@
 import { Translator } from '../i18n/translate';
-import { DropPlacement, Folder, FolderTreeNode, FolderTreeRow, GETTING_STARTED_FOLDER_NAMES, TreeNote } from '../models/folder.model';
+import {
+  DropPlacement, Folder, FolderOption, FolderTreeNode, FolderTreeRow, GETTING_STARTED_FOLDER_NAMES, TreeNote,
+} from '../models/folder.model';
 
 export const SIDEBAR_MIN_WIDTH = 180;
 export const SIDEBAR_MAX_WIDTH = 600;
@@ -122,6 +124,49 @@ export function flattenVisibleTree(nodes: FolderTreeNode[], expandedIds: Readonl
   walk(nodes);
 
   return rows;
+}
+
+/** Destinations of a folder picker: the root (labelled `rootLabel`) first, then every folder in tree order. */
+export function folderOptions(folders: Folder[], rootLabel: string, blocked: ReadonlySet<number>, t: Translator): FolderOption[] {
+  const allExpanded = new Set(folders.map(folder => folder.id));
+  const rows = flattenVisibleTree(buildFolderTree(folders, []), allExpanded);
+
+  return [
+    { id: null, label: rootLabel, depth: 0, disabled: false },
+    ...rows
+      .filter(row => row.kind === 'folder')
+      .map(row => ({ id: row.node.folder.id, label: folderDisplayName(row.node.folder, t), depth: row.depth, disabled: blocked.has(row.node.folder.id) })),
+  ];
+}
+
+/** A row of a folder picker: hidden below a collapsed folder; `expandable` when sub-folders follow it. */
+export interface VisibleFolderOption {
+  option: FolderOption;
+  expandable: boolean;
+}
+
+/** The options (in tree order, see `folderOptions`) left visible once the `collapsed` folders hide their sub-folders. */
+export function visibleFolderOptions(options: readonly FolderOption[], collapsed: ReadonlySet<number>): VisibleFolderOption[] {
+  const visible: VisibleFolderOption[] = [];
+  // Depth of the collapsed folder whose sub-folders are being skipped
+  let hiddenBelow: number | null = null;
+
+  options.forEach((option, index) => {
+    if (hiddenBelow !== null && option.depth > hiddenBelow) {
+      return;
+    }
+    hiddenBelow = null;
+
+    const next = options[index + 1];
+    const expandable = option.id !== null && next !== undefined && next.depth > option.depth;
+    visible.push({ option, expandable });
+
+    if (expandable && option.id !== null && collapsed.has(option.id)) {
+      hiddenBelow = option.depth;
+    }
+  });
+
+  return visible;
 }
 
 function indexById(folders: Folder[]): Map<number, Folder> {

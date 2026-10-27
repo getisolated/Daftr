@@ -53,6 +53,8 @@ export interface AppSettings {
   hideScrollbar: boolean;
   /** true: a note opens in preview (rendered, read-only) instead of its markdown source. */
   openInPreview: boolean;
+  /** true: a note opened without being edited takes a temporary tab (in italics), replaced by the next note opened. */
+  temporaryTabs: boolean;
   /** Folder names never listed in the collections (hidden folders are always skipped). */
   collectionsExclude: string[];
   /** true: the local MCP server lets AI assistants read and write the notes (see the Rust crate `adapter-mcp`). */
@@ -97,6 +99,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showBreadcrumbs: true,
   hideScrollbar: false,
   openInPreview: false,
+  temporaryTabs: true,
   collectionsExclude: [
     'node_modules', 'bin', 'obj', 'build', 'dist', 'out', 'target', 'coverage', 'vendor',
     '__pycache__', 'venv', '.venv', '.git', '.angular', '.next', '.nuxt', '.vs', '.vscode', '.idea',

@@ -46,15 +46,16 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 
 ## Features
 
-- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables.
+- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables. Multiple cursors like VS Code: `Alt+click` adds a cursor, `Shift+Alt+drag` selects a column, `Ctrl+D` adds the next occurrence to the selection, `Ctrl+Shift+L` selects them all (accents compared exactly, Match Case / Match Whole Word toggles shown above the selection), `Esc` goes back to a single cursor.
 - **Preview** — GitHub-like rendering (tables, task lists, footnotes, `> [!NOTE]` alerts, syntax-colored code, Mermaid diagrams). *Source*, *side by side* with synchronized scrolling, or *Preview*; notes can open rendered by default.
 - **Full-text search** — instant search across every note (SQLite FTS5), from the command palette (`Ctrl+Shift+F`). Find & replace inside a note (`Ctrl+F` / `Ctrl+H`) with match case, whole word and regular expressions, and the list of matches.
 - **Command palette** — `F1` to search notes, commands and tags.
 - **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. New notes land in `Inbox`.
 - **Tags** — organize notes with tags and filter from the sidebar.
 - **Backlinks & graph** — link notes with `[label](Folder/Note title)` (autocompleted) or `note://ID`. A panel under the editor lists the notes linking to the active one; the home page draws an Obsidian-like graph of all links (zoom, pan, drag, click to open, colored by folder). `Ctrl+click` follows a link.
-- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. `.md` files open with Daftr from the Explorer or the Finder.
+- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. Right-click a file, a folder or a multi-selection (`Ctrl+click` / `Shift+click`) and *Copy To…* to copy them into your notes, folder structure included: each note is titled after its file, and the links between the copied files keep working. `.md` files open with Daftr from the Explorer or the Finder.
 - **Tabs** — drag & drop reordering, pinning, session restore.
+- **Zen mode** — `Ctrl+K` `Z` hides the tabs, the outline and the sidebar. The sidebar then floats tucked away on the left edge and slides in when the pointer reaches it (or with `Ctrl+Shift+E`).
 - **Formatting bar** — a Word-like toolbar reflecting the formatting under the caret. `Alt+T` toggles it; size, style and position are settings.
 - **Quick-note overlay** — a global shortcut (`Ctrl+Alt+Q` by default, `⌥⌘Q` on macOS) pops a small always-on-top window anywhere on screen. Notes sent from it are gathered in a single *Quick notes* document, where each one can be copied, edited, deleted or converted into a regular note (filed in *Inbox* if it has no folder).
 - **Copy & export** — copy a note as markdown, export it as Markdown, standalone HTML or PDF (A4 pages, rendered like the preview: tables, colored code, Mermaid diagrams). Export a folder, or a multi-selection of notes and folders, as a ZIP of `.md` files or of PDF files.
@@ -80,12 +81,17 @@ Every shortcut below is a default and can be rebound in **Settings → Keyboard 
 | `Ctrl+Shift+F`                       | `⇧⌘F`                        | Search all notes |
 | `Ctrl+F` / `Ctrl+H`                  | `⌘F` / `⌥⌘F`                 | Find / find & replace in the note |
 | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+K` | `⌘B` / `⌘I` / `⇧⌘K`          | Bold / italic / link |
+| `Ctrl+Shift+D`                       | `⇧⌘D`                        | Toggle a draft block |
+| `Ctrl+D`                             | `⌘D`                         | Add the next occurrence to the selection |
+| `Ctrl+Shift+L`                       | `⇧⌘L`                        | Select every occurrence of the selection |
+| `Alt+click` / `Shift+Alt+drag`       | `⌥click` / `⇧⌥drag`          | Add a cursor / column selection |
 | `Ctrl+Shift+V`                       | `⇧⌘V`                        | Toggle the preview |
 | `Ctrl+K` `V` (chord)                 | `⌘K` `V` (chord)             | Toggle the side-by-side preview |
 | `Ctrl+Shift+E`                       | `⇧⌘E`                        | Toggle the sidebar |
 | `Alt+T`                              | `⌥T`                         | Toggle the formatting bar |
 | `Alt+Z`                              | `⌥Z`                         | Toggle line wrap |
 | `Alt+W`                              | `⌥W`                         | Toggle wide mode |
+| `Ctrl+K` `Z` (chord)                 | `⌘K` `Z` (chord)             | Toggle zen mode |
 | `Ctrl+K` `Ctrl+T` (chord)            | `⌘K` `⌘T` (chord)            | Theme picker (live preview) |
 | `Ctrl+,`                             | `⌘,`                         | Settings |
 | `Ctrl+Alt+Q` (global, configurable)  | `⌥⌘Q` (global, configurable) | Toggle the quick-note overlay |

@@ -74,6 +74,8 @@ pub struct RawSettings {
     pub hide_scrollbar: Option<bool>,
     /// Voir [`AppSettings::open_in_preview`].
     pub open_in_preview: Option<bool>,
+    /// Voir [`AppSettings::temporary_tabs`].
+    pub temporary_tabs: Option<bool>,
     /// Éléments d'un tableau JSON (`None` pour un élément non textuel) ; `None` si ce n'est
     /// pas un tableau.
     pub collections_exclude: Option<Vec<Option<String>>>,
@@ -116,6 +118,7 @@ impl RawSettings {
             show_breadcrumbs: Some(settings.show_breadcrumbs),
             hide_scrollbar: Some(settings.hide_scrollbar),
             open_in_preview: Some(settings.open_in_preview),
+            temporary_tabs: Some(settings.temporary_tabs),
             collections_exclude: Some(
                 settings
                     .collections_exclude
@@ -171,6 +174,7 @@ impl RawSettings {
             show_breadcrumbs: patch.show_breadcrumbs.or(self.show_breadcrumbs),
             hide_scrollbar: patch.hide_scrollbar.or(self.hide_scrollbar),
             open_in_preview: patch.open_in_preview.or(self.open_in_preview),
+            temporary_tabs: patch.temporary_tabs.or(self.temporary_tabs),
             collections_exclude: patch.collections_exclude.or(self.collections_exclude),
             overlay_position: merge_position(self.overlay_position, patch.overlay_position),
             mcp_enabled: patch.mcp_enabled.or(self.mcp_enabled),

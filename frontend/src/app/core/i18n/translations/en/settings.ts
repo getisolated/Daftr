@@ -48,6 +48,8 @@ export const EN_SETTINGS = {
   'settings.hideScrollbar.description': 'Hide the scrollbar of the editor; it shows again while the mouse is over its edge. Scrolling keeps working.',
   'settings.openInPreview.title': 'Open Notes In Preview',
   'settings.openInPreview.description': 'Open a note rendered like on GitHub (read-only) instead of its markdown source. The buttons at the top right of the note switch between source, side by side and preview.',
+  'settings.temporaryTabs.title': 'Temporary Tabs',
+  'settings.temporaryTabs.description': 'A note opened without being edited takes a temporary tab, in italics, replaced by the next note opened. Editing the note, pinning its tab or double-clicking it keeps the tab.',
   'settings.formattingBarEnabled.title': 'Show Formatting Bar',
   'settings.formattingBarEnabled.description': 'Toolbar with the main formatting actions (headings, bold, lists…). Uncheck to hide it for good; the shortcut toggles it too.',
   'settings.formattingBarMode.title': 'Size',
@@ -112,6 +114,7 @@ export const EN_SETTINGS = {
   'settings.shortcut.palette.commands': 'Command Palette',
   'settings.shortcut.settings.open': 'Open Settings',
   'settings.shortcut.layout.toggle': 'Toggle Full Width Layout',
+  'settings.shortcut.layout.zen': 'Toggle Zen Mode',
   'settings.shortcut.editor.wordWrap': 'Toggle Line Wrap',
   'settings.shortcut.theme.select': 'Color Theme',
   'settings.shortcut.formattingBar.toggle': 'Toggle Formatting Bar',
@@ -130,4 +133,6 @@ export const EN_SETTINGS = {
   'settings.shortcut.editor.italic': 'Italic',
   'settings.shortcut.editor.draft': 'Toggle Draft Block',
   'settings.shortcut.editor.link': 'Insert Link',
+  'settings.shortcut.editor.selectNextMatch': 'Add Selection To Next Find Match',
+  'settings.shortcut.editor.selectAllMatches': 'Select All Occurrences Of Find Match',
 } as const;

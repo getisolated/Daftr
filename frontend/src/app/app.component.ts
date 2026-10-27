@@ -10,6 +10,7 @@ import { SettingsComponent } from './features/settings/settings.component';
 import { FormattingBarComponent } from './features/formatting-bar/formatting-bar.component';
 import { BacklinksPanelComponent } from './features/backlinks/backlinks-panel.component';
 import { SidebarComponent } from './features/sidebar/sidebar.component';
+import { ZenSidebarComponent } from './features/sidebar/zen-sidebar.component';
 import { NotesService } from './core/services/notes.service';
 import { TabsService } from './core/services/tabs.service';
 import { PaletteService } from './core/services/palette.service';
@@ -33,7 +34,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, FormattingBarComponent, BacklinksPanelComponent, ConfirmDialogComponent],
+  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, ZenSidebarComponent, FormattingBarComponent, BacklinksPanelComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
   },
@@ -41,7 +42,10 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
     <div class="app-shell">
       <app-tabs-bar />
       <div class="app-body">
-        @if (sidebarVisible()) {
+        <!-- Zen mode: the sidebar floats over the page, tucked away on the left edge -->
+        @if (zenMode()) {
+          <app-zen-sidebar />
+        } @else if (sidebarVisible()) {
           <app-sidebar />
         }
         <div class="app-main">
@@ -88,6 +92,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       background: var(--daftr-bg);
     }
     .app-body {
+      position: relative;
       display: flex;
       flex: 1;
       overflow: hidden;
@@ -150,6 +155,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
   readonly sidebarVisible = this.sidebarState.visible;
+  readonly zenMode = this.layoutService.zenMode;
   /** Only worth its room when there is a note to format (not on the home page). */
   readonly formattingBarShown = computed(() =>
     this.formattingBar.visible() && this.activeNoteId() !== null && !this.formattingBar.previewOnly());
@@ -285,12 +291,16 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('editor.previewSide', () => { if (this.activeNoteId() !== null) this.editorRef?.togglePreviewSide(); });
     bind('settings.open', () => this.settingsService.open());
     bind('layout.toggle', () => this.layoutService.toggle());
+    bind('layout.zen', () => this.layoutService.toggleZenMode());
     bind('editor.wordWrap', () => {
       void this.settingsService.update({ wordWrap: !this.settingsService.settings().wordWrap });
     });
     bind('theme.select', () => this.paletteService.open('theme'));
     bind('formattingBar.toggle', () => this.formattingBar.toggle());
-    bind('sidebar.toggle', () => this.sidebarState.toggleVisible());
+    bind('sidebar.toggle', () => {
+      if (this.zenMode()) this.layoutService.toggleZenSidebar();
+      else this.sidebarState.toggleVisible();
+    });
     bind('tab.pin', () => this.tabsService.togglePinActiveTab());
     for (let i = 1; i <= 9; i++) {
       bind(`tab.goto.${i}`, () => this.tabsService.setActiveIndex(i - 1));
@@ -311,6 +321,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private async createNote(): Promise<void> {
     const note = await this.notesService.create();
-    this.tabsService.openNote(note.id, note.title);
+    this.tabsService.openNewNote(note.id, note.title);
   }
 }

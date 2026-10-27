@@ -5,12 +5,12 @@ import {
 
 
 // CodeMirror
-import { EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
+import { Command, EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine, rectangularSelection } from '@codemirror/view';
 import { Compartment, EditorState, Extension, Prec } from '@codemirror/state';
 import {
   defaultKeymap, history, historyKeymap, indentWithTab,
 } from '@codemirror/commands';
-import { searchKeymap, search } from '@codemirror/search';
+import { searchKeymap, search, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
@@ -36,8 +36,11 @@ import { noteExportMenu, NoteExportService } from '../../core/services/note-expo
 import { FoldersService } from '../../core/services/folders.service';
 import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
-import { insertLink } from '../../shared/codemirror/formatting-commands';
+import { insertLink, wrapRanges } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
+import {
+  DEFAULT_OCCURRENCE_OPTIONS, OccurrenceOptions, occurrenceSelection, selectAllMatches, selectNextMatch,
+} from '../../shared/codemirror/occurrence-selection';
 import { TableAction, applyTableAction, describeTableAtCursor, formatTableAtCursor, tableExtensions } from '../../shared/codemirror/table-extension';
 import { NotesService } from '../../core/services/notes.service';
 import { LinkRenameService } from '../../core/services/link-rename.service';
@@ -45,6 +48,7 @@ import { SettingsService } from '../../core/services/settings.service';
 import { FormattingBarService } from '../../core/services/formatting-bar.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { TabsService } from '../../core/services/tabs.service';
+import { LayoutService } from '../../core/services/layout.service';
 import { acceleratorToCodeMirrorKey } from '../../core/utils/accelerator.util';
 import { Note, QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE } from '../../core/models/note.model';
 import { CollectionFileRef } from '../../core/models/collection.model';
@@ -65,6 +69,9 @@ import { FindService } from '../../core/services/find.service';
 import { FindPanelComponent } from '../find/find-panel.component';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { translatorFacet } from '../../shared/codemirror/translator';
+
+/** The multi-cursor commands of the search keymap are rebindable shortcuts (see buildShortcutsKeymap): their defaults would stay bound. */
+const MULTI_CURSOR_COMMANDS = new Set<Command>([selectNextOccurrence, selectSelectionMatches]);
 
 /** CodeMirror's search needs a panel to keep its matches highlighted: an empty, hidden one (the find panel is the UI). */
 function hiddenSearchPanel(): HTMLElement {
@@ -215,6 +222,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly find = inject(FindService);
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
+  private layout = inject(LayoutService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
@@ -224,9 +232,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Last text written to (or read from) the disk for the open file: its own change events are not reloads. */
   private fileContentOnDisk: string | null = null;
 
-  /** The quick notes are a list of short notes: an outline of their headings would mean nothing. */
+  /** The quick notes are a list of short notes: an outline of their headings would mean nothing. Never in zen mode. */
   protected readonly outlineShown = computed(() =>
-    this.settingsService.settings().showOutline && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
+    this.settingsService.settings().showOutline && !this.layout.zenMode() && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
   );
 
   /** Source, preview, or both side by side. Not remembered per note: each opened note starts as the settings say. */
@@ -299,6 +307,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private readonly linkStatusCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
+  /** Ctrl+D / Ctrl+Shift+L options, kept from one note to the next. */
+  private occurrenceOptions: OccurrenceOptions = DEFAULT_OCCURRENCE_OPTIONS;
   private loadGeneration = 0;
 
   protected shortcutLabel(id: string): string {
@@ -624,6 +634,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
         folders: () => this.folders.folders(),
       }),
       drawSelection(),
+      // Several cursors, like VS Code: Alt+click adds one (Ctrl+click follows links), Shift+Alt+drag selects a column
+      EditorState.allowMultipleSelections.of(true),
+      EditorView.clickAddsSelectionRange.of(event => event.altKey),
+      rectangularSelection({ eventFilter: event => event.altKey && event.shiftKey && event.button === 0 }),
+      // Ctrl+D / Ctrl+Shift+L compare accents exactly, with Match Case / Match Whole Word toggles next to the selection
+      occurrenceSelection(this.occurrenceOptions, options => {
+        this.occurrenceOptions = options;
+      }),
       dropCursor(),
       highlightActiveLine(),
       bracketMatching(),
@@ -633,7 +651,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         ...closeBracketsKeymap,
         ...defaultKeymap,
         ...historyKeymap,
-        ...searchKeymap,
+        ...searchKeymap.filter(binding => !binding.run || !MULTI_CURSOR_COMMANDS.has(binding.run)),
         indentWithTab,
         // Enter between matching pairs inside code blocks: expand to indented block
         {
@@ -763,7 +781,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private convertQuickNote(id: number): void {
     void this.notes.convertQuickNote(id).then(note => {
       if (note) {
-        this.tabs.openNote(note.id, note.title);
+        this.tabs.openNewNote(note.id, note.title);
       }
     });
   }
@@ -933,11 +951,21 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Formatting/save bindings use the accelerators configured in the settings (reconfigured live, see constructor). */
   private buildShortcutsKeymap(): Extension {
     const keyFor = (id: string): string => acceleratorToCodeMirrorKey(this.settingsService.appShortcuts()[id] ?? '');
-    // High precedence: the search keymap already binds Ctrl+D (select next occurrence)
+    // High precedence: the default keymap must not take a combination the user gave to one of these
     return Prec.high(keymap.of([
       {
         key: keyFor('editor.draft'),
         run: (view) => toggleDraft(view),
+      },
+      {
+        key: keyFor('editor.selectNextMatch'),
+        run: selectNextMatch,
+        preventDefault: true,
+      },
+      {
+        key: keyFor('editor.selectAllMatches'),
+        run: selectAllMatches,
+        preventDefault: true,
       },
       {
         key: keyFor('editor.bold'),
@@ -969,12 +997,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private wrapSelection(view: EditorView, before: string, after: string): boolean {
-    const sel = view.state.selection.main;
-    const selected = view.state.sliceDoc(sel.from, sel.to);
-    view.dispatch({
-      changes: { from: sel.from, to: sel.to, insert: `${before}${selected}${after}` },
-      selection: { anchor: sel.from + before.length, head: sel.to + before.length },
-    });
+    view.dispatch(wrapRanges(view.state, before, after));
     return true;
   }
 

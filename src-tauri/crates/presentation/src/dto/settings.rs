@@ -80,6 +80,8 @@ pub struct SettingsDto {
     pub hide_scrollbar: bool,
     /// Ouverture en aperçu.
     pub open_in_preview: bool,
+    /// Onglets temporaires.
+    pub temporary_tabs: bool,
     /// Dossiers ignorés des collections.
     pub collections_exclude: Vec<String>,
     /// Position de l'overlay (gérée par le processus principal).
@@ -121,6 +123,7 @@ impl From<&AppSettings> for SettingsDto {
             show_breadcrumbs: settings.show_breadcrumbs,
             hide_scrollbar: settings.hide_scrollbar,
             open_in_preview: settings.open_in_preview,
+            temporary_tabs: settings.temporary_tabs,
             collections_exclude: settings.collections_exclude.clone(),
             overlay_position: settings
                 .overlay_position

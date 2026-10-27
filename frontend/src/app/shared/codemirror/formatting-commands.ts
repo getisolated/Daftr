@@ -1,4 +1,4 @@
-import { EditorSelection, EditorState, Line } from '@codemirror/state';
+import { EditorSelection, EditorState, Line, TransactionSpec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import type { SyntaxNode } from '@lezer/common';
@@ -185,24 +185,49 @@ function findAncestor(state: EditorState, pos: number, name: string, end = pos):
   return null;
 }
 
-/** Wraps the selection with a markdown mark, or unwraps it when the caret already sits inside one. */
+/** Puts `before` and `after` around every selection range: an empty one gets the caret between them, a selected text stays selected. */
+export function wrapRanges(state: EditorState, before: string, after: string): TransactionSpec {
+  return state.changeByRange(range => ({
+    changes: { from: range.from, to: range.to, insert: `${before}${state.sliceDoc(range.from, range.to)}${after}` },
+    range: range.empty
+      ? EditorSelection.cursor(range.from + before.length)
+      : EditorSelection.range(range.from + before.length, range.to + before.length),
+  }));
+}
+
+/** Opening and closing parts of an inline element, as document positions. */
+interface EnclosingMarks {
+  open: { from: number; to: number };
+  close: { from: number; to: number };
+}
+
+/** Deletion of the opening and closing parts of each element; an element enclosing several cursors is unwrapped once. */
+function unwrapChanges(elements: readonly (EnclosingMarks | null)[]): { from: number; to: number }[] {
+  const seen = new Set<number>();
+  return elements.flatMap(element => {
+    if (!element || seen.has(element.open.from)) return [];
+    seen.add(element.open.from);
+    return [element.open, element.close];
+  });
+}
+
+/** Marks of the `nodeName` node enclosing a range, if any. */
+function markAround(state: EditorState, from: number, to: number, nodeName: string): EnclosingMarks | null {
+  const node = findAncestor(state, from, nodeName, to);
+  const open = node?.firstChild;
+  const close = node?.lastChild;
+  return open && close && open !== close ? { open: { from: open.from, to: open.to }, close: { from: close.from, to: close.to } } : null;
+}
+
+/** Wraps each selection range with a markdown mark, or unwraps them when the main caret already sits inside one. */
 export function toggleInlineMark(view: EditorView, marker: string, nodeName: string): void {
   const { state } = view;
   const main = state.selection.main;
-  const node = findAncestor(state, main.from, nodeName, main.to);
-  const open = node?.firstChild;
-  const close = node?.lastChild;
 
-  if (open && close && open !== close) {
-    view.dispatch({ changes: [{ from: open.from, to: open.to }, { from: close.from, to: close.to }] });
+  if (markAround(state, main.from, main.to, nodeName)) {
+    view.dispatch({ changes: unwrapChanges(state.selection.ranges.map(range => markAround(state, range.from, range.to, nodeName))) });
   } else {
-    view.dispatch(state.changeByRange(range => ({
-      changes: { from: range.from, to: range.to, insert: `${marker}${state.sliceDoc(range.from, range.to)}${marker}` },
-      // Empty: caret between the marks. Otherwise the text stays selected, inside them
-      range: range.empty
-        ? EditorSelection.cursor(range.from + marker.length)
-        : EditorSelection.range(range.from + marker.length, range.to + marker.length),
-    })));
+    view.dispatch(wrapRanges(state, marker, marker));
   }
   view.focus();
 }
@@ -235,28 +260,27 @@ export function findTagAround(text: string, tag: string, from: number, to = from
   return null;
 }
 
-/** Wraps the selection in an inline HTML tag, or unwraps it when the selection already sits inside one. */
+/** The `<tag>…</tag>` enclosing a range, as document positions (line-scoped, see `findTagAround`). */
+function tagAround(state: EditorState, from: number, to: number, tag: string): EnclosingMarks | null {
+  const line = state.doc.lineAt(from);
+  const enclosing = to <= line.to ? findTagAround(line.text, tag, from - line.from, to - line.from) : null;
+
+  if (!enclosing) return null;
+  return {
+    open: { from: line.from + enclosing.open.from, to: line.from + enclosing.open.to },
+    close: { from: line.from + enclosing.close.from, to: line.from + enclosing.close.to },
+  };
+}
+
+/** Wraps each selection range in an inline HTML tag, or unwraps them when the main selection already sits inside one. */
 export function toggleHtmlTag(view: EditorView, tag: string): void {
   const { state } = view;
   const main = state.selection.main;
-  const line = state.doc.lineAt(main.from);
-  const enclosing = main.to <= line.to ? findTagAround(line.text, tag, main.from - line.from, main.to - line.from) : null;
 
-  if (enclosing) {
-    view.dispatch({
-      changes: [
-        { from: line.from + enclosing.open.from, to: line.from + enclosing.open.to },
-        { from: line.from + enclosing.close.from, to: line.from + enclosing.close.to },
-      ],
-    });
+  if (tagAround(state, main.from, main.to, tag)) {
+    view.dispatch({ changes: unwrapChanges(state.selection.ranges.map(range => tagAround(state, range.from, range.to, tag))) });
   } else {
-    const openTag = `<${tag}>`;
-    view.dispatch(state.changeByRange(range => ({
-      changes: { from: range.from, to: range.to, insert: `${openTag}${state.sliceDoc(range.from, range.to)}</${tag}>` },
-      range: range.empty
-        ? EditorSelection.cursor(range.from + openTag.length)
-        : EditorSelection.range(range.from + openTag.length, range.to + openTag.length),
-    })));
+    view.dispatch(wrapRanges(state, `<${tag}>`, `</${tag}>`));
   }
   view.focus();
 }
@@ -303,16 +327,17 @@ export function clearInlineFormatting(view: EditorView): void {
   view.focus();
 }
 
-/** Turns the selection into the label of a link or an image (a placeholder label, in the editor's language, otherwise), the `url` placeholder selected. */
+/** Turns each selection range into the label of a link or an image (a placeholder label, in the editor's language, otherwise), the `url` placeholders selected. */
 export function insertLink(view: EditorView, image = false): void {
-  const main = view.state.selection.main;
-  const selected = view.state.sliceDoc(main.from, main.to);
-  const placeholder = translatorOf(view.state)(image ? 'editor.insert.image' : 'editor.insert.text');
+  const { state } = view;
+  const placeholder = translatorOf(state)(image ? 'editor.insert.image' : 'editor.insert.text');
   const prefix = image ? '!' : '';
-  const insert = `${prefix}[${selected || placeholder}](url)`;
-  const urlFrom = main.from + insert.length - 4;
 
-  view.dispatch({ changes: { from: main.from, to: main.to, insert }, selection: { anchor: urlFrom, head: urlFrom + 3 } });
+  view.dispatch(state.changeByRange(range => {
+    const insert = `${prefix}[${state.sliceDoc(range.from, range.to) || placeholder}](url)`;
+    const urlFrom = range.from + insert.length - 4;
+    return { changes: { from: range.from, to: range.to, insert }, range: EditorSelection.range(urlFrom, urlFrom + 3) };
+  }));
   view.focus();
 }
 

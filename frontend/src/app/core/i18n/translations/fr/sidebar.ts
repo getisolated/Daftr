@@ -49,6 +49,12 @@ export const FR_SIDEBAR: Record<keyof typeof EN_SIDEBAR, string> = {
   'sidebar.moveTo.filter': 'Filtrer les dossiers',
   'sidebar.moveTo.empty': 'Aucun dossier ne correspond',
 
+  // Boîte « Copier dans… » (des collections vers les notes)
+  'sidebar.copyTo.title': 'Copier dans',
+  'sidebar.copyTo.titleMany': 'Copier {count} éléments dans',
+  'sidebar.copyTo.failed.one': '{count} fichier n’a pas pu être copié',
+  'sidebar.copyTo.failed.other': '{count} fichiers n’ont pas pu être copiés',
+
   // Confirmations
   'sidebar.dialog.deepFolder.title': 'Dossier trop imbriqué',
   'sidebar.dialog.deepFolder.message': 'Ce dossier serait imbriqué sur plus de {max} niveaux. Les arborescences profondes sont difficiles à parcourir : 3 à {max} niveaux sont recommandés.',
@@ -82,6 +88,8 @@ export const FR_SIDEBAR: Record<keyof typeof EN_SIDEBAR, string> = {
   'sidebar.collections.trash.confirm.mac': 'Déplacer vers la Corbeille',
   'sidebar.collections.menu.locate': 'Localiser sur le disque…',
   'sidebar.collections.menu.newFile': 'Nouveau fichier',
+  'sidebar.collections.menu.copyTo': 'Copier dans…',
+  'sidebar.collections.menu.copyItems': 'Copier {count} éléments dans…',
   'sidebar.collections.menu.renameCollection': 'Renommer la collection',
   'sidebar.collections.menu.reveal': 'Afficher dans l’Explorateur de fichiers',
   'sidebar.collections.menu.reveal.mac': 'Afficher dans le Finder',
