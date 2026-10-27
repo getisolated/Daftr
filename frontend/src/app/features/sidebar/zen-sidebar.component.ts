@@ -8,7 +8,7 @@ import { SidebarComponent } from './sidebar.component';
 /** Gap between the slid-in sidebar and the left edge of the window. */
 const GAP_PX = 8;
 /** Part of the tucked-away sidebar left inside the window, so that it can be guessed. */
-const PEEK_PX = 6;
+const PEEK_PX = 13;
 /** Its border, around the width of the sidebar itself. */
 const BORDER_PX = 1;
 /** Grace period before the sidebar slides away: crossing its edge by accident does not close it. */
@@ -41,9 +41,18 @@ const HIDE_DELAY_MS = 300;
       transition: left 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s ease;
     }
     :host(:not(.open)) { box-shadow: none; }
-    app-sidebar { border-right: none; }
+    app-sidebar {
+      border-right: none;
+      transition: opacity 0.15s ease;
+    }
+    /* Only the tucked-away panel peeks: its content (and its scrollbar) would show through the visible strip */
+    :host(:not(.open)) app-sidebar {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+    }
     @media (prefers-reduced-motion: reduce) {
-      :host { transition: none; }
+      :host, app-sidebar, :host(:not(.open)) app-sidebar { transition: none; }
     }
   `],
 })
