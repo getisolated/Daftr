@@ -22,6 +22,7 @@ export class FindService {
   private readonly _matches = signal<FindMatch[]>([]);
   private readonly _currentIndex = signal(-1);
   private readonly _focusRequest = signal(0);
+  private readonly _revealRequest = signal(0);
 
   readonly isOpen = this._isOpen.asReadonly();
   readonly replaceVisible = computed(() => this._replaceVisible() && !this._readOnly());
@@ -31,6 +32,8 @@ export class FindService {
   readonly currentIndex = this._currentIndex.asReadonly();
   /** Incremented each time the search field must take the focus (opening, Ctrl+F while open…). */
   readonly focusRequest = this._focusRequest.asReadonly();
+  /** Incremented each time the user moves to a match: a preview shown alone scrolls to it (the editor does by itself). */
+  readonly revealRequest = this._revealRequest.asReadonly();
   readonly invalidRegexp = computed(() => {
     const options = this._options();
     return options.regexp && options.search !== '' && !new SearchQuery(options).valid;
@@ -144,6 +147,7 @@ export class FindService {
 
     if (this.view && match) {
       this.view.dispatch({ selection: EditorSelection.single(match.from, match.to), scrollIntoView: true });
+      this._revealRequest.update(count => count + 1);
     }
   }
 
@@ -156,6 +160,7 @@ export class FindService {
   private run(command: (view: EditorView) => boolean): void {
     if (this.view && getSearchQuery(this.view.state).valid) {
       command(this.view);
+      this._revealRequest.update(count => count + 1);
     }
   }
 

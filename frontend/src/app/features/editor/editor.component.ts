@@ -69,6 +69,7 @@ import { viewModeOnOpen } from '../../core/utils/tab-view-mode.util';
 const COLLECTION_FILE_SCHEME = 'collection-file';
 import { FindService } from '../../core/services/find.service';
 import { FindPanelComponent } from '../find/find-panel.component';
+import { PreviewFind } from '../../core/models/find.model';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { translatorFacet } from '../../shared/codemirror/translator';
 
@@ -93,6 +94,9 @@ const PREVIEW_REFRESH_MS = 150;
   standalone: true,
   imports: [ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.zen]': 'layout.zenMode()',
+  },
   template: `
     @if (fileBanner(); as banner) {
       <div class="file-banner" role="alert" [class.error]="banner.kind !== 'conflict'">
@@ -151,6 +155,7 @@ const PREVIEW_REFRESH_MS = 150;
               [linkStatus]="linkStatusOf()"
               [resolveImage]="imageResolver()"
               [scrollRequest]="previewScroll()"
+              [find]="previewFind()"
               (linkClicked)="followLink($event)"
               (scrolledToLine)="syncEditorToLine($event)"
             />
@@ -224,7 +229,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly find = inject(FindService);
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
-  private layout = inject(LayoutService);
+  protected readonly layout = inject(LayoutService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
@@ -247,6 +252,20 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Line the preview must bring to the top (editor scrolled, side by side). */
   protected readonly previewScroll = signal<PreviewScrollRequest | null>(null);
   private previewDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** The search, highlighted in the preview too; a new request each time the user moves to a match. */
+  protected readonly previewFind = computed<PreviewFind | null>(() => {
+    if (!this.find.isOpen()) {
+      return null;
+    }
+
+    this.find.revealRequest();
+    return {
+      options: this.find.options(),
+      lines: this.find.matches().map(match => match.line),
+      current: this.find.currentIndex(),
+      reveal: this.viewMode() === 'preview',
+    };
+  });
   /** Set while the editor scrolls because of the preview: that scroll must not be echoed back. */
   private syncingFromPreview = false;
 

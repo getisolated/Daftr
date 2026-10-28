@@ -33,6 +33,21 @@
   &:hover { opacity: 1; }
 }
 
+// Zen mode: the title bar floats over the top of the page (window buttons on the right): the controls go below it
+:host(.zen) {
+  .file-banner {
+    margin-top: var(--daftr-zen-titlebar-height);
+  }
+
+  .view-modes {
+    top: calc(8px + var(--daftr-zen-titlebar-height));
+  }
+
+  app-find-panel {
+    padding-top: calc(56px + var(--daftr-zen-titlebar-height));
+  }
+}
+
 .view-mode {
   display: flex;
   align-items: center;
