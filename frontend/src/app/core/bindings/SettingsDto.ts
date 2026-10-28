@@ -111,6 +111,10 @@ openInPreview: boolean,
  */
 temporaryTabs: boolean, 
 /**
+ * Fenêtre au premier plan en mode zen.
+ */
+zenAlwaysOnTop: boolean, 
+/**
  * Dossiers ignorés des collections.
  */
 collectionsExclude: Array<string>, 

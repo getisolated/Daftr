@@ -1,4 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  Injector, signal, ɵChangeDetectionScheduler as ChangeDetectionScheduler, ɵEffectScheduler as EffectScheduler,
+} from '@angular/core';
+import { FileDocsService } from '../src/app/core/services/file-docs.service';
+import { TabsService } from '../src/app/core/services/tabs.service';
+import { SettingsService } from '../src/app/core/services/settings.service';
+import { DEFAULT_SETTINGS } from '../src/app/core/models/settings.model';
 import { Tab as AppTab } from '../src/app/core/models/note.model';
 import { keepTabs, openTab } from '../src/app/core/utils/tabs-opening.util';
 
@@ -149,6 +156,59 @@ describe('TabsService', () => {
     expect(service.tabs()[0].isPinned).toBe(true);
     service.togglePin(0);
     expect(service.tabs()[0].isPinned).toBe(false);
+  });
+});
+
+describe('TabsService view modes', () => {
+  const createService = (): TabsService => Injector.create({
+    providers: [
+      { provide: FileDocsService, useClass: FileDocsService, deps: [] },
+      // Only its settings are read; no temporary tab, a note opened next would take the place of the previous one
+      { provide: SettingsService, useValue: { settings: signal({ ...DEFAULT_SETTINGS, temporaryTabs: false }) } },
+      // The effect of the service (temporary tabs turned off) needs schedulers outside of an application; it never runs here
+      { provide: ChangeDetectionScheduler, useValue: { notify: () => undefined, runningTick: false } },
+      { provide: EffectScheduler, useValue: { add: () => undefined, schedule: () => undefined, remove: () => undefined, flush: () => undefined } },
+      { provide: TabsService, useClass: TabsService, deps: [] },
+    ],
+  }).get(TabsService);
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('remembers the view mode of each tab', () => {
+    const service = createService();
+    service.restoreSession(new Set([1, 2]));
+    service.openNote(1, 'Note 1');
+    service.openNote(2, 'Note 2');
+    service.setViewMode(1, 'preview');
+
+    expect(service.tabs().map(t => t.viewMode)).toEqual(['preview', undefined]);
+  });
+
+  it('restores the view modes of the session and drops unknown ones', () => {
+    localStorage.setItem('daftr-session', JSON.stringify({
+      tabs: [
+        { noteId: 1, title: 'Note 1', isDirty: false, isPinned: false, viewMode: 'split' },
+        { noteId: 2, title: 'Note 2', isDirty: false, isPinned: false, viewMode: 'wysiwyg' },
+      ],
+      activeIndex: 0,
+    }));
+    const service = createService();
+    service.restoreSession(new Set([1, 2]));
+
+    expect(service.tabs()[0]!.viewMode).toBe('split');
+    expect(service.tabs()[1]).not.toHaveProperty('viewMode');
+  });
+
+  it('saves the view modes with the session', () => {
+    const service = createService();
+    service.restoreSession(new Set([1]));
+    service.openNote(1, 'Note 1');
+    service.setViewMode(1, 'preview');
+
+    const saved = JSON.parse(localStorage.getItem('daftr-session') ?? '{}') as { tabs: { viewMode?: string }[] };
+    expect(saved.tabs[0]!.viewMode).toBe('preview');
   });
 });
 

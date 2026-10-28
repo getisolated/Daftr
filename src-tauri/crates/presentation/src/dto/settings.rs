@@ -82,6 +82,8 @@ pub struct SettingsDto {
     pub open_in_preview: bool,
     /// Onglets temporaires.
     pub temporary_tabs: bool,
+    /// Fenêtre au premier plan en mode zen.
+    pub zen_always_on_top: bool,
     /// Dossiers ignorés des collections.
     pub collections_exclude: Vec<String>,
     /// Position de l'overlay (gérée par le processus principal).
@@ -124,6 +126,7 @@ impl From<&AppSettings> for SettingsDto {
             hide_scrollbar: settings.hide_scrollbar,
             open_in_preview: settings.open_in_preview,
             temporary_tabs: settings.temporary_tabs,
+            zen_always_on_top: settings.zen_always_on_top,
             collections_exclude: settings.collections_exclude.clone(),
             overlay_position: settings
                 .overlay_position

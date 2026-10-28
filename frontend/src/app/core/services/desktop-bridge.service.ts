@@ -47,6 +47,7 @@ export class DesktopBridgeService {
   maximize(): Promise<void> { return this.available ? getCurrentWindow().toggleMaximize() : Promise.resolve(); }
   close(): Promise<void> { return this.available ? getCurrentWindow().close() : Promise.resolve(); }
   isMaximized(): Promise<boolean> { return this.available ? getCurrentWindow().isMaximized() : Promise.resolve(false); }
+  setAlwaysOnTop(onTop: boolean): Promise<void> { return this.available ? getCurrentWindow().setAlwaysOnTop(onTop) : Promise.resolve(); }
 
   openExternal(url: string): Promise<void> {
     return this.available ? call('shell_open_external', { url }) : Promise.resolve();
