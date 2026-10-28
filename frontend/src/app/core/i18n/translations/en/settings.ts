@@ -47,7 +47,7 @@ export const EN_SETTINGS = {
   'settings.hideScrollbar.title': 'Hide Scrollbar',
   'settings.hideScrollbar.description': 'Hide the scrollbar of the editor; it shows again while the mouse is over its edge. Scrolling keeps working.',
   'settings.openInPreview.title': 'Open Notes In Preview',
-  'settings.openInPreview.description': 'Open a note rendered like on GitHub (read-only) instead of its markdown source, when no other note is shown (otherwise it takes the mode of the note left). The buttons at the top right of the note switch between source, side by side and preview.',
+  'settings.openInPreview.description': 'Open a note rendered like on GitHub (read-only) instead of its markdown source, when no note was shown yet (otherwise it takes the mode of the last note shown). The buttons at the top right of the note switch between source, side by side and preview.',
   'settings.temporaryTabs.title': 'Temporary Tabs',
   'settings.temporaryTabs.description': 'A note opened without being edited takes a temporary tab, in italics, replaced by the next note opened. Editing the note, pinning its tab or double-clicking it keeps the tab.',
   'settings.zenAlwaysOnTop.title': 'Zen Mode Always on Top',

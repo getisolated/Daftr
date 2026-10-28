@@ -6,12 +6,12 @@ describe('viewModeOnOpen', () => {
     expect(viewModeOnOpen('split', 'preview', false)).toBe('split');
   });
 
-  it('gives a newly opened note the mode of the note left', () => {
+  it('gives a newly opened note the mode of the last note shown', () => {
     expect(viewModeOnOpen(undefined, 'preview', false)).toBe('preview');
     expect(viewModeOnOpen(undefined, 'source', true)).toBe('source');
   });
 
-  it('follows the settings when no note was open', () => {
+  it('follows the settings when no note was shown yet', () => {
     expect(viewModeOnOpen(undefined, null, true)).toBe('preview');
     expect(viewModeOnOpen(undefined, null, false)).toBe('source');
   });

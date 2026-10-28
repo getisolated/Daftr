@@ -9,7 +9,7 @@ export function isEditorViewMode(value: unknown): value is EditorViewMode {
 
 /**
  * View mode of a note being shown: a tab already shown keeps its own mode, a newly opened one takes the mode
- * of the note just left, and the settings decide when no note was open (from the home page).
+ * of the last note shown (even with the home page shown since), and the settings decide when no note was shown yet.
  */
 export function viewModeOnOpen(tabMode: EditorViewMode | undefined, leftMode: EditorViewMode | null, openInPreview: boolean): EditorViewMode {
   return tabMode ?? leftMode ?? (openInPreview ? 'preview' : 'source');

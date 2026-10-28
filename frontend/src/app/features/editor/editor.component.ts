@@ -244,8 +244,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.settingsService.settings().showOutline && !this.layout.zenMode() && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
   );
 
-  /** Source, preview, or both side by side. Remembered by each tab; a newly opened note takes the mode of the note left. */
+  /** Source, preview, or both side by side. Remembered by each tab; a newly opened note takes the mode of the last note shown. */
   protected readonly viewMode = signal<EditorViewMode>('source');
+  /** A note was shown since the app started: `viewMode` is its mode, not the default one. */
+  private noteShown = false;
   private carriedAnchor: { anchor: string; at: number } | null = null;
   /** Text shown by the preview; follows the editor with a short delay while the preview is shown. */
   protected readonly previewContent = signal('');
@@ -480,8 +482,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private async loadNote(id: number | null): Promise<void> {
     const generation = ++this.loadGeneration;
     const previousId = this.activeNote()?.id ?? null;
-    // Read before any wait: the mode of the note being left, inherited by a newly opened one
-    const leftMode = previousId !== null ? this.viewMode() : null;
+    // Read before any wait: the mode of the last note shown, inherited by a newly opened one. Kept through the home
+    // page, which a collection opens when expanded on the way to one of its files
+    const leftMode = this.noteShown ? this.viewMode() : null;
 
     // Always flush pending save before switching notes
     await this.flushPendingSave();
@@ -520,6 +523,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       const tabMode = this.tabs.tabs().find(tab => tab.noteId === id)?.viewMode;
       const mode = viewModeOnOpen(tabMode, leftMode, this.settingsService.settings().openInPreview);
       this.viewMode.set(mode);
+      this.noteShown = true;
       this.tabs.setViewMode(id, mode);
       // Wait for DOM to update
       setTimeout(() => {
