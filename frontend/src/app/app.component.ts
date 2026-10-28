@@ -39,7 +39,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
   host: {
   },
   template: `
-    <div class="app-shell">
+    <div class="app-shell" [class.zen]="zenMode()">
       <app-tabs-bar />
       <div class="app-body">
         <!-- Zen mode: the sidebar floats over the page, tucked away on the left edge -->
@@ -114,6 +114,8 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
       min-height: 0;
       min-width: 0;
     }
+    /* Zen mode: a formatting bar on top would be under the floating title bar */
+    .app-shell.zen .app-page[data-bar-position='top']:has(app-formatting-bar) { padding-top: var(--daftr-zen-titlebar-height); }
     .app-page[data-bar-position='bottom'] { flex-direction: column-reverse; }
     .app-page[data-bar-position='left'] { flex-direction: row; }
     .app-page[data-bar-position='right'] { flex-direction: row-reverse; }

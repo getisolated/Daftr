@@ -298,10 +298,16 @@
 
 // ── Zen mode ──────────────────────────────────────────────────────────────────
 
-// Blends into the page: only a strip dragging the window remains, its buttons shown while it is hovered
+// Floats over the page, which takes the whole window: only a see-through strip dragging the window remains,
+// its buttons shown while it is hovered. Below the view mode buttons and the zen sidebar (z-index 10 and 100).
 .tabs-bar.zen {
-  height: 30px;
-  background: var(--daftr-bg);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: var(--daftr-zen-titlebar-height);
+  background: transparent;
   border-bottom-color: transparent;
 
   // macOS: the native traffic lights still need the full height

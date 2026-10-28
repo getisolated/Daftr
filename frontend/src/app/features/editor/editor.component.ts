@@ -90,6 +90,9 @@ const PREVIEW_REFRESH_MS = 150;
   standalone: true,
   imports: [ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.zen]': 'layout.zenMode()',
+  },
   template: `
     @if (fileBanner(); as banner) {
       <div class="file-banner" role="alert" [class.error]="banner.kind !== 'conflict'">
@@ -222,7 +225,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly find = inject(FindService);
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
-  private layout = inject(LayoutService);
+  protected readonly layout = inject(LayoutService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);

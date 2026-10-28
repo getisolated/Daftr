@@ -6,6 +6,8 @@
 // Menlo (present on every Mac) give macOS a native look without bundling a font file.
 :root {
   --daftr-font-mono: Consolas, ui-monospace, 'SF Mono', Menlo, monospace;
+  // Zen mode: the title bar floats over the top of the page, what must stay clickable is pushed below it
+  --daftr-zen-titlebar-height: 30px;
 }
 
 :root,
