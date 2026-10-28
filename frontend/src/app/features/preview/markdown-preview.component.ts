@@ -1,7 +1,12 @@
-import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, computed, effect, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterRenderEffect, computed, effect, inject, input, output,
+} from '@angular/core';
 import { PreviewScrollRequest } from '../../core/models/editor.model';
+import { PreviewFind } from '../../core/models/find.model';
+import { findRanges, rankInBlock } from '../../shared/markdown/preview-find';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LinkStatus } from '../../core/utils/note-paths.util';
+import { headingSlug, linkAnchor } from '../../core/utils/heading-anchor.util';
 import { ImageResolver, createMarkdownRenderer, renderMarkdown } from '../../shared/markdown/markdown-renderer';
 import { highlightCodeBlocks, renderMermaidBlocks } from '../../shared/markdown/preview-enhancers';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -9,6 +14,10 @@ import { ThemeService } from '../../core/services/theme.service';
 
 /** Space kept above the block a scroll sync brings to the top. */
 const SYNC_TOP_MARGIN_PX = 16;
+
+/** Names of the CSS highlights of the search (styles.scss): every match, and the current one. */
+const FIND_HIGHLIGHT = 'daftr-find';
+const FIND_CURRENT_HIGHLIGHT = 'daftr-find-current';
 
 /** GitHub-like, read-only rendering of a note (preview mode, or beside the editor). */
 @Component({
@@ -35,6 +44,8 @@ export class MarkdownPreviewComponent {
   readonly resolveImage = input<ImageResolver | null>(null);
   /** The editor scrolled (side by side): the preview follows. */
   readonly scrollRequest = input<PreviewScrollRequest | null>(null);
+  /** The search of the find panel, highlighted in the rendering; `null` while the panel is closed. */
+  readonly find = input<PreviewFind | null>(null);
 
   /** A link was clicked: a note path, `note://id` or web address, to open. */
   readonly linkClicked = output<string>();
@@ -43,6 +54,8 @@ export class MarkdownPreviewComponent {
 
   /** Set while the preview scrolls because of the editor: that scroll must not be echoed back. */
   private syncing = false;
+  /** Last search request scrolled to: the highlights are redrawn after each rendering, the scroll happens once. */
+  private revealed: PreviewFind | null = null;
 
   private readonly renderer = computed(() => createMarkdownRenderer({ linkStatus: this.linkStatus(), t: this.i18n.t }));
 
@@ -64,9 +77,17 @@ export class MarkdownPreviewComponent {
       const root = this.host.nativeElement;
       // Every theme block of styles.scss sets color-scheme: the diagrams follow it
       const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
-      void highlightCodeBlocks(root);
+      // The code coloring replaces the text nodes of the blocks: their highlights are drawn again
+      void highlightCodeBlocks(root).then(() => this.paintFind(this.find()));
       void renderMermaidBlocks(root, dark, this.i18n.t('editor.preview.diagramLoading'));
     });
+
+    afterRenderEffect(() => {
+      this.html();
+      this.paintFind(this.find());
+    });
+
+    inject(DestroyRef).onDestroy(() => this.paintFind(null));
   }
 
   /** Scrolls so that `line` (1-based, may be fractional) of the source is at the top, between the blocks around it. */
@@ -125,11 +146,69 @@ export class MarkdownPreviewComponent {
 
     // Anchors (footnotes, headings) stay inside the preview
     if (href.startsWith('#')) {
-      this.host.nativeElement.querySelector(`[id="${CSS.escape(href.slice(1))}"]`)?.scrollIntoView({ block: 'start' });
+      this.scrollToAnchor(linkAnchor(href) ?? '');
       return;
     }
 
     this.linkClicked.emit(href);
+  }
+
+  /** Highlights the matches of the search, then brings the current one into view once per request. */
+  private paintFind(find: PreviewFind | null): void {
+    const article = this.host.nativeElement.querySelector<HTMLElement>('.markdown-body');
+    const ranges = find && article ? findRanges(article, find.options) : [];
+    const current = find ? this.currentRange(find, ranges) : null;
+
+    // CSS Custom Highlight API: no element added to the rendering, which Angular owns (innerHTML); older webviews only scroll
+    if ('highlights' in CSS) {
+      CSS.highlights.set(FIND_HIGHLIGHT, new Highlight(...ranges.filter(range => range !== current)));
+      CSS.highlights.set(FIND_CURRENT_HIGHLIGHT, current ? new Highlight(current) : new Highlight());
+    }
+
+    if (!find?.reveal || find === this.revealed || find.current === -1) {
+      return;
+    }
+
+    this.revealed = find;
+
+    if (current) {
+      const root = this.host.nativeElement;
+      const offset = current.getBoundingClientRect().top - root.getBoundingClientRect().top;
+      root.scrollTop += offset - root.clientHeight / 2;
+    }
+    else {
+      this.scrollToLine(find.lines[find.current]!);
+    }
+  }
+
+  /** Occurrence of the preview standing for the current match: same rank in the block of its source line. */
+  private currentRange(find: PreviewFind, ranges: readonly Range[]): Range | null {
+    const line = find.lines[find.current];
+
+    if (line === undefined) {
+      return null;
+    }
+
+    const blocks = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.markdown-body > [data-line]'));
+    // The blocks are in source order: the last one starting at or before the line holds it
+    const index = blocks.filter(block => Number(block.dataset['line']) <= line).length - 1;
+    const block = blocks[index];
+
+    if (!block) {
+      return null;
+    }
+
+    const end = Number(blocks[index + 1]?.dataset['line'] ?? Infinity);
+    const inBlock = ranges.filter(range => block.contains(range.startContainer));
+    const rank = rankInBlock(find.lines, find.current, Number(block.dataset['line']), end);
+    return inBlock[Math.min(rank, inBlock.length - 1)] ?? null;
+  }
+
+  /** Brings a heading (by its anchor or its text, see headingSlug) or a footnote (by its id) to the top. */
+  private scrollToAnchor(anchor: string): void {
+    const root = this.host.nativeElement;
+    const heading = root.querySelector(`[data-anchor="${CSS.escape(headingSlug(anchor))}"]`);
+    (heading ?? root.querySelector(`[id="${CSS.escape(anchor)}"]`))?.scrollIntoView({ block: 'start' });
   }
 
   /** Top-level blocks with their source line and their offset in the scrolled content. */

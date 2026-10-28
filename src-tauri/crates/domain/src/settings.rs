@@ -93,6 +93,8 @@ pub struct AppSettings {
     pub open_in_preview: bool,
     /// Une note ouverte sans être modifiée occupe un onglet temporaire, remplacé par la suivante.
     pub temporary_tabs: bool,
+    /// En mode zen, la fenêtre reste au premier plan, au-dessus des autres applications.
+    pub zen_always_on_top: bool,
     /// Dossiers jamais listés dans les collections (les dossiers cachés sont toujours ignorés).
     pub collections_exclude: Vec<String>,
     /// Dernière position choisie pour l'overlay ; `None` tant qu'il n'a pas été déplacé.
@@ -156,6 +158,7 @@ impl Default for AppSettings {
             hide_scrollbar: false,
             open_in_preview: false,
             temporary_tabs: true,
+            zen_always_on_top: false,
             collections_exclude: DEFAULT_COLLECTION_EXCLUDES.map(str::to_owned).to_vec(),
             overlay_position: None,
             mcp_enabled: false,

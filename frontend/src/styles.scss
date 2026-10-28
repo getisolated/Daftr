@@ -6,6 +6,8 @@
 // Menlo (present on every Mac) give macOS a native look without bundling a font file.
 :root {
   --daftr-font-mono: Consolas, ui-monospace, 'SF Mono', Menlo, monospace;
+  // Zen mode: the title bar floats over the top of the page, what must stay clickable is pushed below it
+  --daftr-zen-titlebar-height: 30px;
 }
 
 :root,
@@ -580,4 +582,13 @@ html.overlay-mode body {
   width: 0;
   overflow: visible;
   white-space: nowrap;
+}
+
+// Search matches in the preview (CSS Custom Highlight API, see markdown-preview), same colors as in the editor
+::highlight(daftr-find) {
+  background-color: rgba(255, 213, 0, 0.2);
+}
+
+::highlight(daftr-find-current) {
+  background-color: rgba(255, 213, 0, 0.4);
 }

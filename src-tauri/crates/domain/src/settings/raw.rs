@@ -76,6 +76,8 @@ pub struct RawSettings {
     pub open_in_preview: Option<bool>,
     /// Voir [`AppSettings::temporary_tabs`].
     pub temporary_tabs: Option<bool>,
+    /// Voir [`AppSettings::zen_always_on_top`].
+    pub zen_always_on_top: Option<bool>,
     /// Éléments d'un tableau JSON (`None` pour un élément non textuel) ; `None` si ce n'est
     /// pas un tableau.
     pub collections_exclude: Option<Vec<Option<String>>>,
@@ -119,6 +121,7 @@ impl RawSettings {
             hide_scrollbar: Some(settings.hide_scrollbar),
             open_in_preview: Some(settings.open_in_preview),
             temporary_tabs: Some(settings.temporary_tabs),
+            zen_always_on_top: Some(settings.zen_always_on_top),
             collections_exclude: Some(
                 settings
                     .collections_exclude
@@ -175,6 +178,7 @@ impl RawSettings {
             hide_scrollbar: patch.hide_scrollbar.or(self.hide_scrollbar),
             open_in_preview: patch.open_in_preview.or(self.open_in_preview),
             temporary_tabs: patch.temporary_tabs.or(self.temporary_tabs),
+            zen_always_on_top: patch.zen_always_on_top.or(self.zen_always_on_top),
             collections_exclude: patch.collections_exclude.or(self.collections_exclude),
             overlay_position: merge_position(self.overlay_position, patch.overlay_position),
             mcp_enabled: patch.mcp_enabled.or(self.mcp_enabled),

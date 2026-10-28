@@ -115,6 +115,7 @@ fn apply_editor(raw: &RawSettings, settings: &mut AppSettings) {
     settings.hide_scrollbar = raw.hide_scrollbar.unwrap_or(settings.hide_scrollbar);
     settings.open_in_preview = raw.open_in_preview.unwrap_or(settings.open_in_preview);
     settings.temporary_tabs = raw.temporary_tabs.unwrap_or(settings.temporary_tabs);
+    settings.zen_always_on_top = raw.zen_always_on_top.unwrap_or(settings.zen_always_on_top);
 }
 
 fn apply_mcp(raw: &RawSettings, settings: &mut AppSettings) {

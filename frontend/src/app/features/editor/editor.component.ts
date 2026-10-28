@@ -22,7 +22,8 @@ import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks, timestampBlock
 import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
-import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
+import { OutlineHeading, extractHeadings, findActiveHeading, findHeadingByAnchor } from '../../shared/codemirror/outline';
+import { linkAnchor } from '../../core/utils/heading-anchor.util';
 import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
@@ -62,11 +63,13 @@ import { inDesktop } from '../../core/services/desktop-api';
 import { ImageResolver } from '../../shared/markdown/markdown-renderer';
 import { fileBreadcrumbs, noteBreadcrumbs } from '../../core/utils/breadcrumbs.util';
 import { noteDisplayTitle } from '../../core/utils/note-title.util';
+import { viewModeOnOpen } from '../../core/utils/tab-view-mode.util';
 
 /** Protocol of the main process serving the images of the collections (crate `desktop`, file_protocol.rs). */
 const COLLECTION_FILE_SCHEME = 'collection-file';
 import { FindService } from '../../core/services/find.service';
 import { FindPanelComponent } from '../find/find-panel.component';
+import { PreviewFind } from '../../core/models/find.model';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { translatorFacet } from '../../shared/codemirror/translator';
 
@@ -80,8 +83,8 @@ function hiddenSearchPanel(): HTMLElement {
   return dom;
 }
 
-/** How long the view mode of a followed link waits for the note it opens (a collection file is read from the disk). */
-const CARRIED_VIEW_MODE_MS = 3000;
+/** How long the anchor of a followed link waits for the file it opens (a collection file is read from the disk). */
+const CARRIED_ANCHOR_MS = 3000;
 
 /** Delay before the preview follows the text being typed. */
 const PREVIEW_REFRESH_MS = 150;
@@ -91,6 +94,9 @@ const PREVIEW_REFRESH_MS = 150;
   standalone: true,
   imports: [ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.zen]': 'layout.zenMode()',
+  },
   template: `
     @if (fileBanner(); as banner) {
       <div class="file-banner" role="alert" [class.error]="banner.kind !== 'conflict'">
@@ -149,6 +155,7 @@ const PREVIEW_REFRESH_MS = 150;
               [linkStatus]="linkStatusOf()"
               [resolveImage]="imageResolver()"
               [scrollRequest]="previewScroll()"
+              [find]="previewFind()"
               (linkClicked)="followLink($event)"
               (scrolledToLine)="syncEditorToLine($event)"
             />
@@ -222,7 +229,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly find = inject(FindService);
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
-  private layout = inject(LayoutService);
+  protected readonly layout = inject(LayoutService);
 
   readonly activeNote = signal<Note | null>(null);
   readonly headings = signal<OutlineHeading[]>([]);
@@ -237,14 +244,30 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.settingsService.settings().showOutline && !this.layout.zenMode() && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
   );
 
-  /** Source, preview, or both side by side. Not remembered per note: each opened note starts as the settings say. */
+  /** Source, preview, or both side by side. Remembered by each tab; a newly opened note takes the mode of the last note shown. */
   protected readonly viewMode = signal<EditorViewMode>('source');
-  private carriedViewMode: { mode: EditorViewMode; at: number } | null = null;
+  /** A note was shown since the app started: `viewMode` is its mode, not the default one. */
+  private noteShown = false;
+  private carriedAnchor: { anchor: string; at: number } | null = null;
   /** Text shown by the preview; follows the editor with a short delay while the preview is shown. */
   protected readonly previewContent = signal('');
   /** Line the preview must bring to the top (editor scrolled, side by side). */
   protected readonly previewScroll = signal<PreviewScrollRequest | null>(null);
   private previewDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** The search, highlighted in the preview too; a new request each time the user moves to a match. */
+  protected readonly previewFind = computed<PreviewFind | null>(() => {
+    if (!this.find.isOpen()) {
+      return null;
+    }
+
+    this.find.revealRequest();
+    return {
+      options: this.find.options(),
+      lines: this.find.matches().map(match => match.line),
+      current: this.find.currentIndex(),
+      reveal: this.viewMode() === 'preview',
+    };
+  });
   /** Set while the editor scrolls because of the preview: that scroll must not be echoed back. */
   private syncingFromPreview = false;
 
@@ -380,6 +403,11 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
     this.viewMode.set(mode);
 
+    const noteId = this.activeNote()?.id;
+    if (noteId !== undefined) {
+      this.tabs.setViewMode(noteId, mode);
+    }
+
     if (mode !== 'preview') {
       setTimeout(() => this.editorView?.focus(), 0);
     }
@@ -454,6 +482,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private async loadNote(id: number | null): Promise<void> {
     const generation = ++this.loadGeneration;
     const previousId = this.activeNote()?.id ?? null;
+    // Read before any wait: the mode of the last note shown, inherited by a newly opened one. Kept through the home
+    // page, which a collection opens when expanded on the way to one of its files
+    const leftMode = this.noteShown ? this.viewMode() : null;
 
     // Always flush pending save before switching notes
     await this.flushPendingSave();
@@ -488,11 +519,18 @@ export class EditorComponent implements OnDestroy, OnChanges {
       if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
       this.previewContent.set(note?.content ?? '');
-      this.viewMode.set(this.takeCarriedViewMode() ?? (this.settingsService.settings().openInPreview ? 'preview' : 'source'));
+      const anchor = this.takeCarriedAnchor();
+      const tabMode = this.tabs.tabs().find(tab => tab.noteId === id)?.viewMode;
+      const mode = viewModeOnOpen(tabMode, leftMode, this.settingsService.settings().openInPreview);
+      this.viewMode.set(mode);
+      this.noteShown = true;
+      this.tabs.setViewMode(id, mode);
       // Wait for DOM to update
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
         this.initEditor(note?.content ?? '', id === QUICK_NOTES_TAB_ID);
+        // A link to a chapter of another page (`guide.md#install`)
+        if (anchor) this.goToAnchor(anchor, 'auto');
       }, 0);
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
@@ -726,7 +764,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.refreshActiveHeading(view);
   }
 
-  private headingTop(view: EditorView, heading: OutlineHeading): number {
+  private headingTop(view: EditorView, heading: Pick<OutlineHeading, 'from'>): number {
     return view.lineBlockAt(heading.from).top + view.documentPadding.top;
   }
 
@@ -738,11 +776,25 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   protected goToHeading(heading: OutlineHeading): void {
+    this.scrollToHeading(heading, 'smooth');
+  }
+
+  /** Scrolls to the heading a link fragment designates (`#chapter`), when the page has it. */
+  private goToAnchor(anchor: string, behavior: ScrollBehavior = 'smooth'): void {
+    const from = this.editorView ? findHeadingByAnchor(this.editorView.state, anchor) : null;
+    if (from !== null) this.scrollToHeading({ from }, behavior);
+  }
+
+  private scrollToHeading(heading: Pick<OutlineHeading, 'from'>, behavior: ScrollBehavior): void {
     const view = this.editorView;
     if (!view) return;
     view.dispatch({ selection: { anchor: heading.from } });
-    view.scrollDOM.scrollTo({ top: Math.max(0, this.headingTop(view, heading) - 8), behavior: 'smooth' });
+    view.scrollDOM.scrollTo({ top: Math.max(0, this.headingTop(view, heading) - 8), behavior });
     view.contentDOM.focus({ preventScroll: true });
+    // Side by side the preview follows the editor; alone, it is brought to the heading itself
+    if (this.viewMode() === 'preview') {
+      this.previewScroll.set({ line: view.state.doc.lineAt(heading.from).number });
+    }
   }
 
   private buildQuickNotesDocument(): Note {
@@ -879,12 +931,29 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   /** Ctrl+click on a link (or a click in the preview): a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
   protected followLink(target: string): void {
+    const anchor = linkAnchor(target);
+
+    // `#chapter`: a heading of the page itself
+    if (target.trim().startsWith('#')) {
+      if (anchor) this.goToAnchor(anchor);
+      return;
+    }
+
     // In a collection file, relative links lead to the other files of the collection
     const file = this.fileDocs.refFor(this.activeNote()?.id ?? null);
     const relative = file && !/^[a-z][a-z0-9+.-]*:/i.test(target.trim()) ? resolveRelativeLink(file.path, target) : null;
+    const samePage = relative?.kind === 'file' && relative.path.toLowerCase() === file?.path.toLowerCase();
+
+    // The file already open (`./this.md#chapter`) would not be reloaded, so the anchor is reached right here
+    if (samePage && anchor) {
+      this.goToAnchor(anchor);
+      return;
+    }
 
     if (file && relative !== null) {
-      this.carryViewMode();
+      if (anchor) {
+        this.carriedAnchor = { anchor, at: Date.now() };
+      }
       this.openCollectionTarget(file.root, relative);
       return;
     }
@@ -903,22 +972,19 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const note = notes.find(n => n.id === noteId);
 
     if (note) {
-      this.carryViewMode();
       this.tabs.openNote(note.id, note.title);
     }
   }
 
-  /** A note opened by a link keeps the view mode of the note holding the link (source, side by side or preview). */
-  private carryViewMode(): void {
-    this.carriedViewMode = { mode: this.viewMode(), at: Date.now() };
-  }
+  /**
+   * The chapter named by a link just followed (`guide.md#install`), once: the file it opens scrolls to it. A stale one
+   * (the link opened nothing new) is ignored.
+   */
+  private takeCarriedAnchor(): string | null {
+    const carried = this.carriedAnchor;
+    this.carriedAnchor = null;
 
-  /** The mode left by a link just followed, once: a stale one (the link opened nothing new) is ignored. */
-  private takeCarriedViewMode(): EditorViewMode | null {
-    const carried = this.carriedViewMode;
-    this.carriedViewMode = null;
-
-    return carried && Date.now() - carried.at < CARRIED_VIEW_MODE_MS ? carried.mode : null;
+    return carried && Date.now() - carried.at < CARRIED_ANCHOR_MS ? carried.anchor : null;
   }
 
   /** Files and folders of a loaded folder collection, `null` until its tree is read. */

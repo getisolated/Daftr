@@ -1,4 +1,5 @@
 import { CollectionFileRef } from './collection.model';
+import { EditorViewMode } from './editor.model';
 import { ThemePickerItem } from './theme.model';
 
 export interface Note {
@@ -35,6 +36,8 @@ export interface Tab {
   isTemporary?: boolean;
   /** Set for a file of a collection: what the tab shows (kept across sessions, unlike its id). */
   file?: CollectionFileRef;
+  /** Last view mode of the note in this tab, restored when coming back to it; unset until first shown. */
+  viewMode?: EditorViewMode;
 }
 
 export type PaletteMode = 'command' | 'search' | 'tag' | 'theme';
