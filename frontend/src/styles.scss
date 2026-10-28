@@ -581,3 +581,12 @@ html.overlay-mode body {
   overflow: visible;
   white-space: nowrap;
 }
+
+// Search matches in the preview (CSS Custom Highlight API, see markdown-preview), same colors as in the editor
+::highlight(daftr-find) {
+  background-color: rgba(255, 213, 0, 0.2);
+}
+
+::highlight(daftr-find-current) {
+  background-color: rgba(255, 213, 0, 0.4);
+}
