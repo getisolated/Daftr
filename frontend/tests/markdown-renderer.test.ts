@@ -9,9 +9,16 @@ const mdFr = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 
 const render = (source: string): string => md.render(source);
 
 describe('createMarkdownRenderer', () => {
+  it('gives the headings their GitHub anchor, suffixed when repeated, without the markup nor the [!NEW] badge', () => {
+    const html = render('# Getting **started**\n\n## [!NEW] Use `cli`\n\n## Getting started');
+    expect(html).toContain('<h1 data-line="1" id="getting-started" data-anchor="getting-started">');
+    expect(html).toContain('id="use-cli" data-anchor="use-cli"');
+    expect(html).toContain('id="getting-started-1" data-anchor="getting-started-1"');
+  });
+
   it('tags each top-level block with its 1-based source line', () => {
     const html = render('# Title\n\nParagraph\n\n- item');
-    expect(html).toContain('<h1 data-line="1">');
+    expect(html).toContain('<h1 data-line="1" id="title" data-anchor="title">');
     expect(html).toContain('<p data-line="3">');
     expect(html).toContain('<ul data-line="5">');
   });

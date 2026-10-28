@@ -52,6 +52,8 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.openInPreview.description': 'Ouvrir une note rendue comme sur GitHub (lecture seule) au lieu de sa source markdown, quand aucune autre note n\'est affichée (sinon elle reprend le mode de la note quittée). Les boutons en haut à droite de la note permettent de passer de la source à l\'affichage côte à côte, puis à l\'aperçu.',
   'settings.temporaryTabs.title': 'Onglets temporaires',
   'settings.temporaryTabs.description': 'Une note ouverte sans être modifiée occupe un onglet temporaire, en italique, remplacé par la prochaine note ouverte. Modifier la note, épingler son onglet ou double-cliquer dessus conserve l\'onglet.',
+  'settings.zenAlwaysOnTop.title': 'Mode zen toujours au premier plan',
+  'settings.zenAlwaysOnTop.description': 'En mode zen, la fenêtre reste au-dessus des autres applications. Elle redevient normale en quittant le mode zen.',
   'settings.formattingBarEnabled.title': 'Afficher la barre de mise en forme',
   'settings.formattingBarEnabled.description': 'Barre d\'outils avec les principales actions de mise en forme (titres, gras, listes…). Décochez pour la masquer définitivement ; le raccourci permet aussi de l\'afficher ou de la masquer.',
   'settings.formattingBarMode.title': 'Taille',

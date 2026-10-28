@@ -1,5 +1,6 @@
 import { EditorState } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
+import { anchorMatches, createHeadingSlugger, headingSourceText } from '../../core/utils/heading-anchor.util';
 
 export interface OutlineHeading {
   level: 1 | 2 | 3;
@@ -40,4 +41,26 @@ export function findActiveHeading(tops: readonly number[], scrollTop: number, at
     if (tops[i]! <= scrollTop + offset) active = i;
   }
   return active;
+}
+
+/** Start of the heading (any level) a link fragment designates, named as in the preview; `null` when none matches. */
+export function findHeadingByAnchor(state: EditorState, anchor: string): number | null {
+  const slugOf = createHeadingSlugger();
+  let found: number | null = null;
+
+  syntaxTree(state).iterate({
+    enter: node => {
+      if (found !== null) return false;
+      if (!/^(?:ATXHeading[1-6]|SetextHeading[12])$/.test(node.name)) return;
+
+      const line = state.doc.lineAt(node.from);
+      const text = line.text.replace(/^\s*#{1,6}(?:\s+|$)/, '').replace(/\s+#+\s*$/, '');
+      if (anchorMatches(anchor, slugOf(headingSourceText(text)))) {
+        found = line.from;
+      }
+      return false;
+    },
+  });
+
+  return found;
 }

@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, OnDestroy, ViewChild, computed, inject, ChangeDetectionStrategy
+  Component, OnInit, OnDestroy, ViewChild, computed, effect, inject, ChangeDetectionStrategy
 } from '@angular/core';
 
 import { TabsBarComponent } from './features/tabs/tabs-bar.component';
@@ -186,6 +186,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private unregisterFns: (() => void)[] = [];
   private unsubscribeNotesChanged: () => void = () => undefined;
+
+  constructor() {
+    // Zen mode keeps the window above the other applications when the setting asks for it (`zenAlwaysOnTop`)
+    effect(() => {
+      const onTop = this.zenMode() && this.settingsService.settings().zenAlwaysOnTop;
+      void this.bridge.setAlwaysOnTop(onTop);
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     try {
