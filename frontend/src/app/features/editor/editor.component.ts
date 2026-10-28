@@ -22,7 +22,8 @@ import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks, timestampBlock
 import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
-import { OutlineHeading, extractHeadings, findActiveHeading } from '../../shared/codemirror/outline';
+import { OutlineHeading, extractHeadings, findActiveHeading, findHeadingByAnchor } from '../../shared/codemirror/outline';
+import { linkAnchor } from '../../core/utils/heading-anchor.util';
 import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
@@ -80,6 +81,9 @@ function hiddenSearchPanel(): HTMLElement {
   dom.hidden = true;
   return dom;
 }
+
+/** How long the anchor of a followed link waits for the file it opens (a collection file is read from the disk). */
+const CARRIED_ANCHOR_MS = 3000;
 
 /** Delay before the preview follows the text being typed. */
 const PREVIEW_REFRESH_MS = 150;
@@ -237,6 +241,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   /** Source, preview, or both side by side. Remembered by each tab; a newly opened note takes the mode of the note left. */
   protected readonly viewMode = signal<EditorViewMode>('source');
+  private carriedAnchor: { anchor: string; at: number } | null = null;
   /** Text shown by the preview; follows the editor with a short delay while the preview is shown. */
   protected readonly previewContent = signal('');
   /** Line the preview must bring to the top (editor scrolled, side by side). */
@@ -492,6 +497,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
       this.previewContent.set(note?.content ?? '');
+      const anchor = this.takeCarriedAnchor();
       const tabMode = this.tabs.tabs().find(tab => tab.noteId === id)?.viewMode;
       const mode = viewModeOnOpen(tabMode, leftMode, this.settingsService.settings().openInPreview);
       this.viewMode.set(mode);
@@ -500,6 +506,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
         this.initEditor(note?.content ?? '', id === QUICK_NOTES_TAB_ID);
+        // A link to a chapter of another page (`guide.md#install`)
+        if (anchor) this.goToAnchor(anchor, 'auto');
       }, 0);
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
@@ -733,7 +741,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.refreshActiveHeading(view);
   }
 
-  private headingTop(view: EditorView, heading: OutlineHeading): number {
+  private headingTop(view: EditorView, heading: Pick<OutlineHeading, 'from'>): number {
     return view.lineBlockAt(heading.from).top + view.documentPadding.top;
   }
 
@@ -745,11 +753,25 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   protected goToHeading(heading: OutlineHeading): void {
+    this.scrollToHeading(heading, 'smooth');
+  }
+
+  /** Scrolls to the heading a link fragment designates (`#chapter`), when the page has it. */
+  private goToAnchor(anchor: string, behavior: ScrollBehavior = 'smooth'): void {
+    const from = this.editorView ? findHeadingByAnchor(this.editorView.state, anchor) : null;
+    if (from !== null) this.scrollToHeading({ from }, behavior);
+  }
+
+  private scrollToHeading(heading: Pick<OutlineHeading, 'from'>, behavior: ScrollBehavior): void {
     const view = this.editorView;
     if (!view) return;
     view.dispatch({ selection: { anchor: heading.from } });
-    view.scrollDOM.scrollTo({ top: Math.max(0, this.headingTop(view, heading) - 8), behavior: 'smooth' });
+    view.scrollDOM.scrollTo({ top: Math.max(0, this.headingTop(view, heading) - 8), behavior });
     view.contentDOM.focus({ preventScroll: true });
+    // Side by side the preview follows the editor; alone, it is brought to the heading itself
+    if (this.viewMode() === 'preview') {
+      this.previewScroll.set({ line: view.state.doc.lineAt(heading.from).number });
+    }
   }
 
   private buildQuickNotesDocument(): Note {
@@ -886,11 +908,29 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   /** Ctrl+click on a link (or a click in the preview): a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
   protected followLink(target: string): void {
+    const anchor = linkAnchor(target);
+
+    // `#chapter`: a heading of the page itself
+    if (target.trim().startsWith('#')) {
+      if (anchor) this.goToAnchor(anchor);
+      return;
+    }
+
     // In a collection file, relative links lead to the other files of the collection
     const file = this.fileDocs.refFor(this.activeNote()?.id ?? null);
     const relative = file && !/^[a-z][a-z0-9+.-]*:/i.test(target.trim()) ? resolveRelativeLink(file.path, target) : null;
+    const samePage = relative?.kind === 'file' && relative.path.toLowerCase() === file?.path.toLowerCase();
+
+    // The file already open (`./this.md#chapter`) would not be reloaded, so the anchor is reached right here
+    if (samePage && anchor) {
+      this.goToAnchor(anchor);
+      return;
+    }
 
     if (file && relative !== null) {
+      if (anchor) {
+        this.carriedAnchor = { anchor, at: Date.now() };
+      }
       this.openCollectionTarget(file.root, relative);
       return;
     }
@@ -911,6 +951,17 @@ export class EditorComponent implements OnDestroy, OnChanges {
     if (note) {
       this.tabs.openNote(note.id, note.title);
     }
+  }
+
+  /**
+   * The chapter named by a link just followed (`guide.md#install`), once: the file it opens scrolls to it. A stale one
+   * (the link opened nothing new) is ignored.
+   */
+  private takeCarriedAnchor(): string | null {
+    const carried = this.carriedAnchor;
+    this.carriedAnchor = null;
+
+    return carried && Date.now() - carried.at < CARRIED_ANCHOR_MS ? carried.anchor : null;
   }
 
   /** Files and folders of a loaded folder collection, `null` until its tree is read. */

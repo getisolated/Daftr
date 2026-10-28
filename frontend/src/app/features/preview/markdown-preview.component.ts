@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, comp
 import { PreviewScrollRequest } from '../../core/models/editor.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LinkStatus } from '../../core/utils/note-paths.util';
+import { headingSlug, linkAnchor } from '../../core/utils/heading-anchor.util';
 import { ImageResolver, createMarkdownRenderer, renderMarkdown } from '../../shared/markdown/markdown-renderer';
 import { highlightCodeBlocks, renderMermaidBlocks } from '../../shared/markdown/preview-enhancers';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -125,11 +126,18 @@ export class MarkdownPreviewComponent {
 
     // Anchors (footnotes, headings) stay inside the preview
     if (href.startsWith('#')) {
-      this.host.nativeElement.querySelector(`[id="${CSS.escape(href.slice(1))}"]`)?.scrollIntoView({ block: 'start' });
+      this.scrollToAnchor(linkAnchor(href) ?? '');
       return;
     }
 
     this.linkClicked.emit(href);
+  }
+
+  /** Brings a heading (by its anchor or its text, see headingSlug) or a footnote (by its id) to the top. */
+  private scrollToAnchor(anchor: string): void {
+    const root = this.host.nativeElement;
+    const heading = root.querySelector(`[data-anchor="${CSS.escape(headingSlug(anchor))}"]`);
+    (heading ?? root.querySelector(`[id="${CSS.escape(anchor)}"]`))?.scrollIntoView({ block: 'start' });
   }
 
   /** Top-level blocks with their source line and their offset in the scrolled content. */
