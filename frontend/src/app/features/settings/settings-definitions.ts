@@ -131,6 +131,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     options: themeOptionsOfKind('light'),
   },
   {
+    key: 'zenAlwaysOnTop',
+    categoryKey: 'settings.category.appearance',
+    titleKey: 'settings.zenAlwaysOnTop.title',
+    descriptionKey: 'settings.zenAlwaysOnTop.description',
+    control: 'checkbox',
+  },
+  {
     key: 'showLineNumbers',
     categoryKey: 'settings.category.editor',
     titleKey: 'settings.showLineNumbers.title',
