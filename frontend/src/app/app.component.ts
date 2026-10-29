@@ -294,7 +294,7 @@ export class AppComponent implements OnInit, OnDestroy {
     bind('tab.close', () => this.tabsService.closeActiveTab());
     bind('tab.next', () => this.tabsService.nextTab());
     bind('tab.prev', () => this.tabsService.prevTab());
-    bind('search.global', () => this.paletteService.open('search'));
+    bind('search.global', () => this.paletteService.open('search', this.activeNoteId() !== null ? this.editorRef?.selectedText() ?? '' : ''));
     bind('editor.find', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(); });
     bind('editor.replace', () => { if (this.activeNoteId() !== null) this.editorRef?.openSearch(true); });
     bind('editor.preview', () => { if (this.activeNoteId() !== null) this.editorRef?.togglePreview(); });

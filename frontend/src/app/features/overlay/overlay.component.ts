@@ -140,6 +140,11 @@ export class OverlayComponent implements OnInit, OnDestroy {
   private resizeInput(): void {
     const element = this.inputRef.nativeElement;
     element.style.height = 'auto';
-    element.style.height = `${Math.min(element.scrollHeight, MAX_INPUT_HEIGHT_PX)}px`;
+    // border-box sizing: scrollHeight leaves the borders out, without them the field scrolls by a couple of pixels
+    const borders = element.offsetHeight - element.clientHeight;
+    const height = element.scrollHeight + borders;
+    element.style.height = `${Math.min(height, MAX_INPUT_HEIGHT_PX)}px`;
+    // Scrollable only once the text exceeds the maximum height
+    element.style.overflowY = height > MAX_INPUT_HEIGHT_PX ? 'auto' : 'hidden';
   }
 }

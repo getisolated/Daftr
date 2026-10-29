@@ -113,6 +113,28 @@ export class MarkdownPreviewComponent {
     this.host.nativeElement.scrollTop = Math.max(0, top - SYNC_TOP_MARGIN_PX);
   }
 
+  /** Text selected in the rendering, when it can be a search term (on one line); empty otherwise. */
+  selectedText(): string {
+    const selection = document.getSelection();
+
+    if (!selection || selection.isCollapsed || !this.host.nativeElement.contains(selection.anchorNode)) {
+      return '';
+    }
+
+    const text = selection.toString().trim();
+    return text.includes('\n') ? '' : text;
+  }
+
+  /** Current scroll of the preview (px), to come back to it later with `restoreScroll`. */
+  scrollTop(): number {
+    return this.host.nativeElement.scrollTop;
+  }
+
+  restoreScroll(top: number): void {
+    this.syncing = true;
+    this.host.nativeElement.scrollTop = top;
+  }
+
   protected onScroll(): void {
     if (this.syncing) {
       this.syncing = false;

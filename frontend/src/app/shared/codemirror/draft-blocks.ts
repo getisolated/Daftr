@@ -168,7 +168,8 @@ export const draftBlocksTheme = EditorView.theme({
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '6px',
-    margin: '4px 0 6px',
+    // Padding, not margin: CodeMirror measures block widgets without their margins (see the tables)
+    padding: '4px 0 6px',
     fontFamily: 'inherit',
   },
   '.cm-draft-actions button': {
