@@ -8,6 +8,13 @@ import {
 import { FindMatch, collectMatches, currentMatchIndex, matchIndexFrom } from '../../shared/codemirror/find-matches';
 import { FindOptions } from '../models/find.model';
 
+/** Text selected in the editor, when it can be a search term: a selection spanning lines is not one (VS Code does the same). */
+export function selectedSearchText(state: EditorState): string {
+  const { from, to } = state.selection.main;
+  const selected = state.sliceDoc(from, to);
+  return selected.includes('\n') ? '' : selected;
+}
+
 /**
  * Find / replace in the open note. CodeMirror's search state stays the source of truth (query, highlights, open
  * panel): this service drives it and mirrors what the find panel of the right column displays.
@@ -62,8 +69,11 @@ export class FindService {
     this.sync(update.state, update.docChanged || queryChanged);
   }
 
-  /** Opens the panel (Ctrl+F: find only, Ctrl+H: with replace), searching for the selected text if any. */
-  open(withReplace: boolean): void {
+  /**
+   * Opens the panel (Ctrl+F: find only, Ctrl+H: with replace), searching for `selected` if given (text selected in the
+   * preview), otherwise for the text selected in the editor if any.
+   */
+  open(withReplace: boolean, selected?: string): void {
     const view = this.view;
 
     if (!view) {
@@ -71,12 +81,10 @@ export class FindService {
     }
 
     this._replaceVisible.set(withReplace);
-    const selection = view.state.selection.main;
-    const selected = view.state.sliceDoc(selection.from, selection.to);
+    const search = selected ?? selectedSearchText(view.state);
 
-    // A selection spanning lines is not a search term (VS Code does the same)
-    if (selected && !selected.includes('\n')) {
-      this._options.update(options => ({ ...options, search: selected }));
+    if (search) {
+      this._options.update(options => ({ ...options, search }));
     }
 
     this._isOpen.set(true);
@@ -146,7 +154,10 @@ export class FindService {
     const match = this._matches()[index];
 
     if (this.view && match) {
-      this.view.dispatch({ selection: EditorSelection.single(match.from, match.to), scrollIntoView: true });
+      this.view.dispatch({
+        selection: EditorSelection.single(match.from, match.to),
+        effects: EditorView.scrollIntoView(EditorSelection.range(match.from, match.to), { y: 'center' }),
+      });
       this._revealRequest.update(count => count + 1);
     }
   }

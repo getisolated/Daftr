@@ -414,9 +414,39 @@ const tableDecorations = StateField.define<DecorationSet>({
 
 // ─── Keymap, paste, blur ─────────────────────────────────────────────────────
 
+/**
+ * Up / Down next to a rendered table: the caret enters its first (last) line, which shows the markdown, instead of
+ * jumping over the whole table like over any block widget.
+ */
+export function enterTableVertically(view: EditorView, forward: boolean): boolean {
+  const { state } = view;
+  const range = state.selection.main;
+
+  if (state.selection.ranges.length > 1 || !range.empty) {
+    return false;
+  }
+
+  // Where Up / Down would go: a rendered table between here and there is jumped over
+  const target = view.moveVertically(range, forward).head;
+  const skipped = findTables(state).find(table => forward
+    ? table.from > range.head && table.to < target
+    : table.to < range.head && table.from > target);
+
+  if (!skipped || selectionTouches(state, skipped)) {
+    return false;
+  }
+
+  const line = state.doc.lineAt(forward ? skipped.from : skipped.to);
+  const column = range.head - state.doc.lineAt(range.head).from;
+  view.dispatch({ selection: { anchor: line.from + Math.min(column, line.length) }, scrollIntoView: true, userEvent: 'select' });
+  return true;
+}
+
 const tableKeymap = keymap.of([
   { key: 'Tab', run: view => moveToCell(view, 1) },
   { key: 'Shift-Tab', run: view => moveToCell(view, -1) },
+  { key: 'ArrowDown', run: view => enterTableVertically(view, true) },
+  { key: 'ArrowUp', run: view => enterTableVertically(view, false) },
 ]);
 
 const tableDomHandlers = EditorView.domEventHandlers({
@@ -459,7 +489,9 @@ const tableDomHandlers = EditorView.domEventHandlers({
 const tableTheme = EditorView.baseTheme({
   '.cm-md-table-wrap': {
     overflowX: 'auto',
-    margin: '4px 0',
+    // Padding, not margin: CodeMirror measures block widgets without their margins, and every table would then shift
+    // its height map (clicks and arrow keys landing on the wrong line below it)
+    padding: '4px 0',
     cursor: 'text',
   },
   '.cm-md-table': {

@@ -6,7 +6,8 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: 15vh;
-  z-index: 1000;
+  // Above the settings modal (1100): the theme picker (shortcut) can be opened from it
+  z-index: 1200;
   animation: backdropIn 0.12s ease;
 }
 

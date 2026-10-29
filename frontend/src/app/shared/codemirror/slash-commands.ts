@@ -534,5 +534,7 @@ export const slashCommandExtensions = [
   slashInputHandler,
   slashCommandKeymap,
   slashMenuPlugin,
-  placeholderPlugin,
 ];
+
+/** "Type / to see the commands" hint on the empty line under the cursor: notes only, not the quick notes document. */
+export const slashPlaceholder = placeholderPlugin;

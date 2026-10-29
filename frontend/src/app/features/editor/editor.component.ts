@@ -30,13 +30,14 @@ import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
 import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
 import { externallyChangedContent } from '../../core/utils/external-change.util';
-import { EditorViewMode, PreviewScrollRequest } from '../../core/models/editor.model';
+import { EditorViewMode, NoteViewState, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
 import { TranslationKey } from '../../core/i18n/translations';
 import { noteExportMenu, NoteExportService } from '../../core/services/note-export.service';
 import { FoldersService } from '../../core/services/folders.service';
 import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
-import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
+import { slashCommandExtensions, slashPlaceholder } from '../../shared/codemirror/slash-commands';
+import { indentListItems, outdentListItems } from '../../shared/codemirror/list-indent';
 import { insertLink, wrapRanges } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
 import {
@@ -67,7 +68,7 @@ import { viewModeOnOpen } from '../../core/utils/tab-view-mode.util';
 
 /** Protocol of the main process serving the images of the collections (crate `desktop`, file_protocol.rs). */
 const COLLECTION_FILE_SCHEME = 'collection-file';
-import { FindService } from '../../core/services/find.service';
+import { FindService, selectedSearchText } from '../../core/services/find.service';
 import { FindPanelComponent } from '../find/find-panel.component';
 import { PreviewFind } from '../../core/models/find.model';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -215,6 +216,7 @@ const PREVIEW_REFRESH_MS = 150;
 export class EditorComponent implements OnDestroy, OnChanges {
   @Input() noteId: number | null = null;
   @ViewChild('editorHost') editorHost!: ElementRef<HTMLElement>;
+  @ViewChild(MarkdownPreviewComponent) preview?: MarkdownPreviewComponent;
 
   private notes = inject(NotesService);
   private linkRename = inject(LinkRenameService);
@@ -270,6 +272,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   });
   /** Set while the editor scrolls because of the preview: that scroll must not be echoed back. */
   private syncingFromPreview = false;
+  /** Scroll and cursor of each open tab when it was left. */
+  private readonly viewStates = new Map<number, NoteViewState>();
 
   protected readonly viewModes: { id: EditorViewMode; labelKey: TranslationKey; shortcut: string | null }[] = [
     { id: 'source', labelKey: 'editor.viewMode.source', shortcut: null },
@@ -485,6 +489,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     // Read before any wait: the mode of the last note shown, inherited by a newly opened one. Kept through the home
     // page, which a collection opens when expanded on the way to one of its files
     const leftMode = this.noteShown ? this.viewMode() : null;
+    this.saveViewState();
 
     // Always flush pending save before switching notes
     await this.flushPendingSave();
@@ -529,12 +534,68 @@ export class EditorComponent implements OnDestroy, OnChanges {
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
         this.initEditor(note?.content ?? '', id === QUICK_NOTES_TAB_ID);
-        // A link to a chapter of another page (`guide.md#install`)
+        // A link to a chapter of another page (`guide.md#install`); otherwise back where the tab was left
         if (anchor) this.goToAnchor(anchor, 'auto');
+        else this.restoreViewState(id, generation);
       }, 0);
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
     }
+  }
+
+  /** Remembers where the shown tab is (scroll, cursor), and forgets the tabs closed since. */
+  private saveViewState(): void {
+    const view = this.editorView;
+    const id = this.activeNote()?.id;
+
+    for (const noteId of this.viewStates.keys()) {
+      if (!this.tabs.isOpen(noteId)) this.viewStates.delete(noteId);
+    }
+
+    if (!view || id === undefined) {
+      return;
+    }
+
+    const { anchor, head } = view.state.selection.main;
+    const mode = this.viewMode();
+    let editorTop: NoteViewState['editorTop'] = null;
+
+    // Hidden (preview only), the editor has no scroll to read
+    if (mode !== 'preview') {
+      const scrollTop = view.scrollDOM.scrollTop;
+      const block = view.lineBlockAtHeight(scrollTop - view.documentPadding.top);
+      editorTop = { pos: block.from, offset: scrollTop - view.documentPadding.top - block.top };
+    }
+
+    const previewTop = mode === 'preview' ? this.preview?.scrollTop() ?? null : null;
+    this.viewStates.set(id, { anchor, head, editorTop, previewTop });
+  }
+
+  private restoreViewState(id: number, generation: number): void {
+    const view = this.editorView;
+    const saved = this.viewStates.get(id);
+
+    if (this.viewMode() === 'preview') {
+      // The preview stays the same element from one note to the next: a note never shown starts at the top
+      const top = saved?.previewTop ?? 0;
+      requestAnimationFrame(() => {
+        if (generation === this.loadGeneration) this.preview?.restoreScroll(top);
+      });
+    }
+
+    if (!view || !saved) {
+      return;
+    }
+
+    // The note may have changed meanwhile (another program, the AI): the positions stay inside it
+    const length = view.state.doc.length;
+    const clamp = (pos: number): number => Math.min(pos, length);
+    view.dispatch({
+      selection: { anchor: clamp(saved.anchor), head: clamp(saved.head) },
+      effects: saved.editorTop && this.viewMode() !== 'preview'
+        ? EditorView.scrollIntoView(clamp(saved.editorTop.pos), { y: 'start', yMargin: -saved.editorTop.offset })
+        : [],
+    });
   }
 
   private async flushPendingSave(): Promise<void> {
@@ -684,12 +745,15 @@ export class EditorComponent implements OnDestroy, OnChanges {
       highlightActiveLine(),
       bracketMatching(),
       // CodeMirror keeps the search state (query, highlights); the UI is the find panel of the right column
-      search({ createPanel: () => ({ dom: hiddenSearchPanel() }) }),
+      // Matches are centered like VS Code: at the edge of the editor, a match could stay under the formatting bar
+      search({ createPanel: () => ({ dom: hiddenSearchPanel() }), scrollToMatch: range => EditorView.scrollIntoView(range, { y: 'center' }) }),
       keymap.of([
         ...closeBracketsKeymap,
         ...defaultKeymap,
         ...historyKeymap,
         ...searchKeymap.filter(binding => !binding.run || !MULTI_CURSOR_COMMANDS.has(binding.run)),
+        // On list items, Tab / Shift+Tab nest under the previous item (or go back up) and renumber the ordered lists
+        { key: 'Tab', run: indentListItems, shift: outdentListItems },
         indentWithTab,
         // Enter between matching pairs inside code blocks: expand to indented block
         {
@@ -731,10 +795,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
         },
       }),
       this.linkStatusCompartment.of(linkStatusFacet.of(this.linkStatusOf())),
-      // The quick notes are edited one at a time, from their hover actions: no drafts, no context menu
+      // The quick notes are edited one at a time, from their hover actions: no drafts, no "/" hint, no context menu
       ...(readOnly
         ? [noteTimestamps, noteTimestampsTheme, quickNotesEditing(this.quickNoteHandlers())]
-        : [draftBlocks, this.contextMenuHandler()]),
+        : [draftBlocks, slashPlaceholder, this.contextMenuHandler()]),
     ];
 
     const state = EditorState.create({ doc: content, extensions });
@@ -1198,9 +1262,22 @@ export class EditorComponent implements OnDestroy, OnChanges {
     this.activeNote.update(n => (n ? { ...n, content } : n));
   }
 
-  /** Ctrl+F (find only) / Ctrl+H (with replace). */
+  /** Ctrl+F (find only) / Ctrl+H (with replace), searching for the selected text. */
   openSearch(withReplace = false): void {
-    this.find.open(withReplace);
+    // Shown alone, the preview's selection only: the hidden editor's one is a leftover
+    const fromPreview = this.preview?.selectedText() || (this.viewMode() === 'preview' ? '' : undefined);
+    this.find.open(withReplace, fromPreview);
+  }
+
+  /** Text selected in the preview, or else in the editor (Ctrl+Shift+F searches all the notes for it). */
+  selectedText(): string {
+    const fromPreview = this.preview?.selectedText() ?? '';
+
+    if (fromPreview || this.viewMode() === 'preview' || !this.editorView) {
+      return fromPreview;
+    }
+
+    return selectedSearchText(this.editorView.state);
   }
 
   closeSearch(): void {
