@@ -40,6 +40,9 @@ yarn-error.log
 testem.log
 /typings
 
+# Claude Code pipeline runs (agent memory stays versioned)
+/.claude/runs/
+
 # System files
 .DS_Store
 Thumbs.db

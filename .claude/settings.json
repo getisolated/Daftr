@@ -1,0 +1,50 @@
+{
+  "env": {
+    "CLAUDE_CODE_FORK_SUBAGENT": "0"
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git branch)",
+      "Bash(git branch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git show *)",
+      "Bash(git rev-parse *)",
+      "Bash(git merge-base *)",
+      "Bash(git symbolic-ref *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view)",
+      "Bash(gh pr view *)",
+      "Bash(npm test)",
+      "Bash(npm test *)",
+      "Bash(npm run test:rust)",
+      "Bash(npm run test:rust *)",
+      "Bash(npm run test:scripts)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint *)",
+      "Bash(npm run build)",
+      "Bash(npm run build:frontend)",
+      "Bash(npm run tauri -- build *)",
+      "Bash(npx vitest run *)",
+      "Bash(npx tsc *)",
+      "Bash(node --test *)",
+      "Bash(cargo test *)",
+      "Bash(cargo check *)",
+      "Bash(cargo clippy *)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo build *)"
+    ]
+  }
+}
