@@ -10,7 +10,12 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL='*'
 
+# AI_FLOW_ROOT: where the flow's own files are (.ai-flow/flow.env, labels, forbidden paths).
+# AI_FLOW_WORKDIR: the git checkout the flow works on (run folders, commits). They are the
+# same folder locally; in an agent job the tools come from main (.ai-flow-tools/) while the
+# work tree is the flow branch (see ai-agent-run.yml).
 AI_FLOW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+AI_FLOW_WORKDIR="${AI_FLOW_WORKDIR:-$AI_FLOW_ROOT}"
 
 info() { printf '  %s\n' "$*"; }
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }

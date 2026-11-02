@@ -44,7 +44,7 @@ echo "| URL | $(jq -r '.html_url' <<< "$issue") |"
 echo "| Labels | $(jq -r '[.labels[].name] | join(", ")' <<< "$issue") |"
 echo "| Agent | ${AI_FLOW_AGENT:-?} |"
 echo "| Tour | ${AI_FLOW_TOUR:-?} |"
-echo "| Branche | $(git rev-parse --abbrev-ref HEAD 2> /dev/null || echo '?') |"
+echo "| Branche | $(git -C "$AI_FLOW_WORKDIR" rev-parse --abbrev-ref HEAD 2> /dev/null || echo '?') |"
 echo "| Dossier du run | \`$run_dir/\` |"
 echo "| Logins PM | $(jq -r 'join(", ")' <<< "$pm_json") |"
 echo
@@ -86,8 +86,8 @@ fi
 
 echo "## Fichiers du run (\`$run_dir/\`)"
 echo
-if [ -d "$AI_FLOW_ROOT/$run_dir" ] && [ -n "$(ls -A "$AI_FLOW_ROOT/$run_dir" 2> /dev/null)" ]; then
-  for file in "$AI_FLOW_ROOT/$run_dir"/*; do
+if [ -d "$AI_FLOW_WORKDIR/$run_dir" ] && [ -n "$(ls -A "$AI_FLOW_WORKDIR/$run_dir" 2> /dev/null)" ]; then
+  for file in "$AI_FLOW_WORKDIR/$run_dir"/*; do
     [ -f "$file" ] || continue
     echo "### $(basename "$file")"
     echo

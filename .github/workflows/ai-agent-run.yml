@@ -3,7 +3,9 @@ name: AI flow · agent run (shared)
 # Shared body of every agent job, called by the thin ai-agent-<name>.yml workflows (which
 # the router calls). One run of one agent on one issue:
 #
-#   1. checkout the flow branch with the App token (pushes then come from the bot);
+#   1. checkout the flow branch with the App token (pushes then come from the bot), and the
+#      flow's own files (rules, prompts, scripts) from the default branch into .ai-flow-tools/:
+#      the flow branch may predate them, and an agent must never run rules it could edit;
 #   2. assemble .ai-flow-context.md at the root of the checkout (scripts/ai-flow/build-context.sh);
 #   3. run Claude Code (claude-code-action, Max token) with the agent's prompt, turn budget
 #      and model from .ai-flow/flow.env, and a structured result (.ai-flow/result-schema.json);
@@ -50,6 +52,10 @@ jobs:
     name: Agent ${{ inputs.agent }} (#${{ inputs.issue_number }}, tour ${{ inputs.tour }})
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      # Work tree of the flow branch; the scripts take their own files from .ai-flow-tools/.
+      AI_FLOW_WORKDIR: ${{ github.workspace }}
+      TOOLS: ${{ github.workspace }}/.ai-flow-tools
 
     steps:
       - name: GitHub App token
@@ -66,8 +72,20 @@ jobs:
           token: ${{ steps.app.outputs.token }}
           fetch-depth: 0
 
+      - name: Checkout flow tools (default branch)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .ai-flow-tools
+          sparse-checkout: |
+            .ai-flow
+            scripts/ai-flow
+
       - name: Load flow configuration
-        run: bash scripts/ai-flow/export-env.sh
+        run: |
+          # Never committed, never seen as a change of the agent.
+          printf '%s\n' .ai-flow-tools/ .ai-flow-context.md >> .git/info/exclude
+          bash "$TOOLS/scripts/ai-flow/export-env.sh"
 
       - name: Prepare
         id: prep
@@ -90,7 +108,7 @@ jobs:
           model_var="AI_FLOW_MODEL_${upper}"
           turns="${!turns_var:?no turn budget for $AGENT in flow.env}"
           model="${!model_var:?no model for $AGENT in flow.env}"
-          schema="$(jq -c . .ai-flow/result-schema.json)"
+          schema="$(jq -c . "$TOOLS/.ai-flow/result-schema.json")"
           {
             echo "claude_args<<EOF_ARGS"
             echo "--max-turns $turns --model $model --allowedTools \"$ALLOWED_TOOLS\" --json-schema '$schema'"
@@ -104,9 +122,8 @@ jobs:
           AI_FLOW_AGENT: ${{ inputs.agent }}
           AI_FLOW_TOUR: ${{ inputs.tour }}
         run: |
-          # In the workspace, where Claude Code may read; excluded from git, never committed.
-          echo ".ai-flow-context.md" >> .git/info/exclude
-          bash scripts/ai-flow/build-context.sh "${{ inputs.issue_number }}" > .ai-flow-context.md
+          # In the workspace, where Claude Code may read; excluded from git (see above).
+          bash "$TOOLS/scripts/ai-flow/build-context.sh" "${{ inputs.issue_number }}" > .ai-flow-context.md
           echo "Context: $(wc -c < .ai-flow-context.md) bytes"
 
       - name: Setup Node.js
@@ -149,7 +166,8 @@ jobs:
             Tu es l'agent ${{ inputs.agent }} du flux IA de Daftr.
             Issue : #${{ inputs.issue_number }} · tour : ${{ inputs.tour }} · limite de tours de questions (agent specs) : ${{ env.AI_FLOW_MAX_SPEC_ROUNDS }}.
             Branche de travail (déjà extraite) : ${{ inputs.branch }} · dossier du run : ${{ inputs.run_dir }}/
-            Lis dans l'ordre .ai-flow/CLAUDE.md, .ai-flow/prompts/${{ inputs.agent }}.md, puis .ai-flow-context.md, et exécute ta mission.
+            Les règles du flux sont dans .ai-flow-tools/.ai-flow/ (version de référence, lecture seule).
+            Lis dans l'ordre .ai-flow-tools/.ai-flow/CLAUDE.md, .ai-flow-tools/.ai-flow/prompts/${{ inputs.agent }}.md, puis .ai-flow-context.md, et exécute ta mission.
             Termine par le résultat structuré demandé (status, comment, summary).
           claude_args: ${{ steps.prep.outputs.claude_args }}
 
@@ -165,7 +183,7 @@ jobs:
           AI_FLOW_ZONE: ${{ inputs.zone }}
           AI_FLOW_BASE_SHA: ${{ steps.prep.outputs.base_sha }}
           STRUCTURED_OUTPUT: ${{ steps.claude.outputs.structured_output }}
-        run: bash scripts/ai-flow/collect.sh
+        run: bash "$TOOLS/scripts/ai-flow/collect.sh"
 
       - name: Finalize
         if: always() && steps.app.outcome == 'success'
@@ -183,5 +201,5 @@ jobs:
         with:
           github-token: ${{ steps.app.outputs.token }}
           script: |
-            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ai-flow/finalize-action.mjs`);
+            const { run } = await import(`${process.env.TOOLS}/scripts/ai-flow/finalize-action.mjs`);
             await run({ github, context, core });
