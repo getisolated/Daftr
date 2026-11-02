@@ -1,0 +1,87 @@
+name: AI flow · router
+
+# Single entry point of the AI flow: every label change on an issue, every new issue from
+# the "Demande" form, and an hourly tick wake this workflow. The `route` job applies the
+# state machine (scripts/ai-flow/lib/router.mjs) with the token of the flow's GitHub App,
+# whose labels and comments, unlike GITHUB_TOKEN's, wake workflows again. When an agent
+# must run, the matching agent job (added batch by batch) calls its reusable workflow.
+#
+# Noise is filtered by the `if:` of the route job before it enters its concurrency group:
+# GitHub keeps only one pending run per group, so the bot's inert events (labels it removes,
+# waiting states it sets) must not queue there and push out a meaningful event. The bot
+# login and the trigger labels below must match .ai-flow/flow.env and BOT_TRIGGER_LABELS in
+# router.mjs (checked by scripts/ai-flow/router.test.mjs).
+#
+# The run title carries the issue number ("ai-flow #12 · ..."): ai:stop and the hourly
+# watchdog find the runs of an issue by that title.
+run-name: >-
+  ${{ github.event_name == 'issues'
+      && format('ai-flow #{0} · {1} {2}', github.event.issue.number, github.event.action, github.event.label.name)
+      || format('ai-flow · {0}', github.event_name) }}
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled, closed]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  route:
+    name: Route
+    if: >-
+      github.event_name != 'issues'
+      || github.event.action == 'closed'
+      || (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'demande'))
+      || (github.event.action == 'labeled' && startsWith(github.event.label.name, 'ai:')
+          && (github.event.sender.login != 'daftr-ai-flow[bot]'
+              || contains(fromJSON('["ai:specs","ai:plan","ai:tests","ai:code","ai:review","ai:docs","ai:deploy","ai:livré"]'), github.event.label.name)))
+      || (github.event.action == 'unlabeled' && github.event.label.name == 'ai:erreur'
+          && github.event.sender.login != 'daftr-ai-flow[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Routing decisions are serialised: two simultaneous ai:go must not both take the lock.
+    concurrency:
+      group: ai-flow-router
+      cancel-in-progress: false
+    outputs:
+      agent: ${{ steps.route.outputs.agent }}
+      issue_number: ${{ steps.route.outputs.issue_number }}
+      branch: ${{ steps.route.outputs.branch }}
+      run_dir: ${{ steps.route.outputs.run_dir }}
+      tour: ${{ steps.route.outputs.tour }}
+
+    steps:
+      - name: Checkout flow files
+        uses: actions/checkout@v4
+        with:
+          # .github/workflows: the router runs only the agents whose workflow exists.
+          sparse-checkout: |
+            .ai-flow
+            .github/workflows
+            scripts/ai-flow
+
+      - name: GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AI_FLOW_APP_ID }}
+          private-key: ${{ secrets.AI_FLOW_APP_PRIVATE_KEY }}
+
+      - name: Route
+        id: route
+        uses: actions/github-script@v8
+        env:
+          AI_FLOW_PM_LOGINS: ${{ vars.AI_FLOW_PM_LOGINS }}
+        with:
+          github-token: ${{ steps.app.outputs.token }}
+          script: |
+            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ai-flow/router-action.mjs`);
+            await run({ github, context, core });
+
+  # Agent jobs: one per agent, each calling .github/workflows/ai-agent-<name>.yml with
+  # issue_number, branch, run_dir and tour. They arrive with the next batches:
+  #   specs, plan (batch 3) · tests, code, review (batch 4) · docs, deploy, deliver (batch 5)

@@ -1,0 +1,72 @@
+name: "Demande au flux IA"
+description: "Décrire une évolution de Daftr qui sera spécifiée, développée et testée par les agents IA"
+title: "[Demande] "
+labels: ["demande"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cette demande est traitée par le **flux IA** : un agent pose d'abord des questions, puis les agents planifient, codent, testent et préparent une version de test de l'application.
+
+        - Le flux démarre quand le PM pose le label **`ai:go`**.
+        - **Ce dépôt est public** : n'écrivez ni donnée client, ni mot de passe, ni information confidentielle.
+        - Décrivez le besoin avec vos mots, sans jargon technique : l'agent specs posera les questions qui manquent.
+
+  - type: textarea
+    id: objectif
+    attributes:
+      label: Objectif
+      description: Que doit permettre cette évolution ? En une ou deux phrases.
+      placeholder: "Ex : voir combien de mots contient la note que j'écris, et le temps qu'il faut pour la lire."
+    validations:
+      required: true
+
+  - type: textarea
+    id: contexte
+    attributes:
+      label: Contexte utilisateur
+      description: Qui en a besoin, dans quelle situation, et comment fait-on aujourd'hui ?
+      placeholder: "Ex : quand je rédige un article, je copie le texte dans un autre outil pour compter les mots."
+    validations:
+      required: true
+
+  - type: textarea
+    id: criteres
+    attributes:
+      label: Critères d'acceptation
+      description: À quoi verra-t-on que c'est réussi ? Une ligne par critère. Pas grave s'il en manque, l'agent specs complétera avec vous.
+      placeholder: |
+        - Le nombre de mots s'affiche quand une note est ouverte
+        - Il se met à jour pendant la frappe
+        - Le temps de lecture est indiqué en minutes
+    validations:
+      required: false
+
+  - type: textarea
+    id: maquettes
+    attributes:
+      label: Maquettes, captures ou liens
+      description: Glissez une image, un croquis, ou un lien vers une application qui fait déjà quelque chose de semblable.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priorite
+    attributes:
+      label: Priorité
+      options:
+        - Normale
+        - Haute
+        - Basse
+      default: 0
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: os
+    attributes:
+      label: Systèmes concernés
+      description: Sur quels systèmes l'évolution doit-elle fonctionner ?
+      options:
+        - label: Windows
+        - label: macOS
