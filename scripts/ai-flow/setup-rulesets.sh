@@ -108,10 +108,8 @@ step "Rulesets du flux IA sur $REPO"
 ghq api "repos/$REPO/git/ref/heads/$AI_FLOW_INTEGRATION_BRANCH" > /dev/null 2>&1 \
   || die "La branche $AI_FLOW_INTEGRATION_BRANCH n'existe pas : lancez d'abord setup-branches.sh."
 
-# The App id must match the public record of the App, or the bypass would target nobody.
-app_id="$(ghq api "apps/$AI_FLOW_APP_SLUG" --jq '.id' 2> /dev/null || true)"
-[ "$app_id" = "$AI_FLOW_APP_ID" ] \
-  || die "L'App « $AI_FLOW_APP_SLUG » a l'id « ${app_id:-introuvable} », .ai-flow/flow.env indique $AI_FLOW_APP_ID."
+# The App id must match the record of the App, or the bypass would target nobody.
+check_app_id
 
 upsert_ruleset "ai-flow: main" "$main_payload"
 upsert_ruleset "ai-flow: integration" "$integration_payload"

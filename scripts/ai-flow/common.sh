@@ -41,6 +41,21 @@ require_gh() {
   [ "$admin" = "true" ] || die "Le compte connecté à gh n'est pas admin de $REPO (ou le repo est introuvable)."
 }
 
+# Compares the App id of flow.env with GitHub's record of the App. A private App ("Only on
+# this account") is invisible to the gh token (404): then nothing can be checked from here,
+# and the "AI flow · self-test" workflow, which authenticates as the App, does it instead.
+# Never reads an error body as an id: the output is used only when gh succeeded.
+check_app_id() {
+  local app_id
+  if app_id="$(ghq api "apps/$AI_FLOW_APP_SLUG" --jq '.id' 2> /dev/null)"; then
+    [ "$app_id" = "$AI_FLOW_APP_ID" ] \
+      || die "L'App « $AI_FLOW_APP_SLUG » a l'id $app_id, .ai-flow/flow.env indique $AI_FLOW_APP_ID."
+    ok "App $AI_FLOW_APP_SLUG (id $app_id)"
+  else
+    info "App $AI_FLOW_APP_SLUG privée : invisible d'ici, elle est vérifiée par l'auto-test (Actions)."
+  fi
+}
+
 # Prints every label line of .ai-flow/labels.txt as: name<TAB>color<TAB>role<TAB>description
 read_labels() {
   tr -d '\r' < "$AI_FLOW_ROOT/.ai-flow/labels.txt" | while IFS= read -r line; do

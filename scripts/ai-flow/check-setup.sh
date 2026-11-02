@@ -41,12 +41,15 @@ else
   fail "variable AI_FLOW_PM_LOGINS absente ou vide"
 fi
 
-# GitHub App: the public record must match flow.env
-app_id="$(ghq api "apps/$AI_FLOW_APP_SLUG" --jq '.id' 2> /dev/null || true)"
-if [ "$app_id" = "$AI_FLOW_APP_ID" ]; then
-  ok "App $AI_FLOW_APP_SLUG (id $app_id)"
+# GitHub App: its record must match flow.env (when visible from here)
+if app_id="$(ghq api "apps/$AI_FLOW_APP_SLUG" --jq '.id' 2> /dev/null)"; then
+  if [ "$app_id" = "$AI_FLOW_APP_ID" ]; then
+    ok "App $AI_FLOW_APP_SLUG (id $app_id)"
+  else
+    fail "App $AI_FLOW_APP_SLUG : id $app_id, .ai-flow/flow.env indique $AI_FLOW_APP_ID"
+  fi
 else
-  fail "App $AI_FLOW_APP_SLUG : id « ${app_id:-introuvable} », .ai-flow/flow.env indique $AI_FLOW_APP_ID"
+  info "App $AI_FLOW_APP_SLUG privée : invisible d'ici, elle est vérifiée par l'auto-test (Actions)."
 fi
 
 # Labels
