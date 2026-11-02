@@ -1,0 +1,31 @@
+# Labels of the AI flow — single source of truth, read by scripts/ai-flow/setup-labels.sh
+# and by the router. One label per line: name | color | role | description
+#
+# Roles:
+#   state     state label set by the workflow; exactly one state label per issue at a time
+#   decision  decision set by the PM (only logins listed in AI_FLOW_PM_LOGINS)
+#   meta      not a state (set by the issue form)
+#
+# Colors: blue = machine state (light blue = waiting for the PM), green = PM decision,
+# red = error / stop.
+
+demande              | c5def5 | meta     | Demande créée via le formulaire du flux IA
+ai:go                | 1a7f37 | decision | Le PM lance le flux IA sur cette demande
+ai:file-d-attente    | 0969da | state    | Une autre demande est en cours ; celle-ci attend son tour
+ai:specs             | 0969da | state    | Agent specs en cours
+ai:question          | 54aeff | state    | Action PM : répondre aux questions de l'agent specs
+ai:réponse-donnée    | 1a7f37 | decision | Le PM a coché ses réponses
+ai:plan              | 0969da | state    | Agent plan en cours
+ai:tests             | 0969da | state    | Agent tests en cours
+ai:code              | 0969da | state    | Agent code en cours
+ai:review            | 0969da | state    | Agent review en cours
+ai:docs              | 0969da | state    | Agent docs en cours
+ai:deploy            | 0969da | state    | Build complet et version de test en cours
+ai:à-valider         | 54aeff | state    | Action PM : tester la version de test et décider
+ai:validé            | 1a7f37 | decision | Le PM a testé l'app : elle convient
+ai:problème          | 1a7f37 | decision | Le PM a constaté un problème (commentaire obligatoire)
+ai:escalade          | 54aeff | state    | Action PM : les agents n'arrivent pas à se mettre d'accord
+ai:validé-quand-même | 1a7f37 | decision | Le PM accepte malgré l'escalade
+ai:erreur            | d1242f | state    | Un agent a échoué ; retirer le label pour relancer l'étape
+ai:livré             | 0969da | state    | Fusionné dans la branche integration
+ai:stop              | d1242f | decision | Le PM arrête le flux sur cette demande

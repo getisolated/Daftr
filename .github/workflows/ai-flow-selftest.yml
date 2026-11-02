@@ -1,0 +1,157 @@
+name: AI flow · self-test
+
+# Checks, from inside GitHub Actions, what scripts/ai-flow/check-setup.sh cannot check
+# from a laptop: the secrets hold valid values, the flow's GitHub App is installed on the
+# repository and can read it, and the Claude Max token answers. Also reads the cost of the
+# Claude call from the execution file, as every agent will.
+#
+# Run it from the Actions tab (Run workflow) after scripts/ai-flow/setup.sh, and after any
+# rotation of a secret. It also runs on a pull request that changes this file.
+# Cost: one very short Claude call (a few cents of equivalent quota).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/ai-flow-selftest.yml
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ai-flow-selftest
+  cancel-in-progress: true
+
+jobs:
+  selftest:
+    name: Auto-test du flux IA
+    # Pull requests from forks get no secrets: nothing to test there.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load flow configuration
+        run: bash scripts/ai-flow/export-env.sh
+
+      - name: Check secrets and variables
+        id: secrets
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          APP_ID: ${{ secrets.AI_FLOW_APP_ID }}
+          APP_KEY: ${{ secrets.AI_FLOW_APP_PRIVATE_KEY }}
+          PM_LOGINS: ${{ vars.AI_FLOW_PM_LOGINS }}
+        run: |
+          set -uo pipefail
+          errors=0
+          error() { echo "::error::$*"; errors=$((errors + 1)); }
+          [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || error "Secret CLAUDE_CODE_OAUTH_TOKEN absent."
+          [ -n "$PM_LOGINS" ] || error "Variable AI_FLOW_PM_LOGINS absente ou vide."
+          if [ -z "$APP_ID" ]; then
+            error "Secret AI_FLOW_APP_ID absent."
+          elif [ "$APP_ID" != "$AI_FLOW_APP_ID" ]; then
+            error "Secret AI_FLOW_APP_ID différent de l'id déclaré dans .ai-flow/flow.env ($AI_FLOW_APP_ID)."
+          fi
+          case "$APP_KEY" in
+            *"BEGIN"*"PRIVATE KEY"*"END"*) ;;
+            "") error "Secret AI_FLOW_APP_PRIVATE_KEY absent." ;;
+            *) error "Secret AI_FLOW_APP_PRIVATE_KEY ne ressemble pas à une clé .pem (contenu complet du fichier attendu)." ;;
+          esac
+          [ "$errors" -eq 0 ] || exit 1
+          echo "Secrets et variable présents. PM : $PM_LOGINS"
+
+      - name: GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AI_FLOW_APP_ID }}
+          private-key: ${{ secrets.AI_FLOW_APP_PRIVATE_KEY }}
+
+      - name: Check App access
+        id: access
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -uo pipefail
+          errors=0
+          error() { echo "::error::$*"; errors=$((errors + 1)); }
+          [ "$APP_SLUG" = "$AI_FLOW_APP_SLUG" ] \
+            || error "Le token vient de l'App « $APP_SLUG », .ai-flow/flow.env attend « $AI_FLOW_APP_SLUG »."
+          gh api installation/repositories --paginate --jq '.repositories[].full_name' | grep -qx "$GITHUB_REPOSITORY" \
+            || error "L'App n'est pas installée sur $GITHUB_REPOSITORY (App > Install App > Only select repositories)."
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$AI_FLOW_INTEGRATION_BRANCH" > /dev/null 2>&1 \
+            || error "Branche $AI_FLOW_INTEGRATION_BRANCH absente : lancez scripts/ai-flow/setup.sh."
+          source scripts/ai-flow/common.sh
+          existing="$(gh label list --repo "$GITHUB_REPOSITORY" --limit 500 --json name --jq '.[].name')"
+          missing=()
+          while IFS=$'\t' read -r name _rest; do
+            grep -qxF "$name" <<< "$existing" || missing+=("$name")
+          done < <(read_labels)
+          [ "${#missing[@]}" -eq 0 ] || error "Labels absents (${missing[*]}) : lancez scripts/ai-flow/setup.sh."
+          [ "$errors" -eq 0 ] || exit 1
+          echo "L'App $APP_SLUG accède à $GITHUB_REPOSITORY ; branche et labels en place."
+
+      - name: Claude (Max token)
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.app.outputs.token }}
+          prompt: |
+            This is a connectivity self-test of the AI flow. Do not use any tool.
+            Reply with the single word OK.
+          claude_args: --max-turns 2 --model ${{ env.AI_FLOW_MODEL_SPECS }}
+
+      - name: Read Claude result and cost
+        id: cost
+        if: always() && steps.claude.outcome != 'skipped'
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          set -uo pipefail
+          if [ -z "$EXECUTION_FILE" ] || [ ! -f "$EXECUTION_FILE" ]; then
+            echo "::error::Pas de fichier d'exécution Claude : le token Max est probablement invalide ou expiré (voir l'étape précédente)."
+            exit 1
+          fi
+          # The execution file is a JSON array of messages (or one message per line): the
+          # last "result" message carries the outcome and the cost.
+          result="$(jq -cs 'if length == 1 and (.[0] | type) == "array" then .[0] else . end
+                            | map(select(.type == "result")) | last // {}' "$EXECUTION_FILE")"
+          cost="$(jq -r '.total_cost_usd // "inconnu"' <<< "$result")"
+          answer="$(jq -r '.result // ""' <<< "$result")"
+          is_error="$(jq -r '.is_error // false' <<< "$result")"
+          echo "cost=$cost" >> "$GITHUB_OUTPUT"
+          echo "Réponse : $answer — coût équivalent : $cost USD"
+          if [ "$is_error" = "true" ] || ! grep -q "OK" <<< "$answer"; then
+            echo "::error::Claude n'a pas répondu comme attendu : « $answer »."
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        env:
+          SECRETS: ${{ steps.secrets.outcome }}
+          APP: ${{ steps.app.outcome }}
+          ACCESS: ${{ steps.access.outcome }}
+          CLAUDE: ${{ steps.claude.outcome }}
+          COST_STEP: ${{ steps.cost.outcome }}
+          COST: ${{ steps.cost.outputs.cost }}
+        run: |
+          icon() { case "$1" in success) echo "✅" ;; skipped|"") echo "⏭️ non lancé" ;; *) echo "❌" ;; esac; }
+          {
+            echo "## Auto-test du flux IA"
+            echo
+            echo "| Vérification | Résultat |"
+            echo "| --- | --- |"
+            echo "| Secrets et variable AI_FLOW_PM_LOGINS | $(icon "$SECRETS") |"
+            echo "| Token de la GitHub App (id + clé privée) | $(icon "$APP") |"
+            echo "| App installée, branche integration, labels | $(icon "$ACCESS") |"
+            echo "| Token Max (appel Claude) | $(icon "$CLAUDE") |"
+            echo "| Réponse et coût lus | $(icon "$COST_STEP") ${COST:+(coût équivalent : $COST USD)} |"
+            echo
+            echo "En cas d'échec, le message d'erreur de l'étape concernée dit quoi corriger."
+          } >> "$GITHUB_STEP_SUMMARY"
