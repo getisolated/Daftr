@@ -80,6 +80,23 @@ export function parseMarkers(body) {
   return found;
 }
 
+/** Names of the flow labels (state and decision roles) of a label catalog. */
+export function flowLabelNames(labels) {
+  return new Set(labels.filter((l) => l.role === 'state' || l.role === 'decision').map((l) => l.name));
+}
+
+/**
+ * Makes `label` the only position of an issue: adds it first, so the lock never lapses,
+ * then removes every other flow label. Shared by the router and the agent finalisation.
+ */
+export async function applyPosition(api, flowLabels, number, label) {
+  const issue = await api.getIssue(number);
+  if (!issue.labels.includes(label)) await api.addLabel(number, label);
+  for (const name of issue.labels) {
+    if (name !== label && flowLabels.has(name)) await api.removeLabel(number, name);
+  }
+}
+
 /** ASCII slug of an issue title, for the branch name ai/<n>-<slug>. */
 export function slugify(title) {
   const slug = title
@@ -124,7 +141,7 @@ export function createRouter({
   now = () => new Date(),
 }) {
   const catalog = new Map(labels.map((label) => [label.name, label]));
-  const flowLabels = new Set(labels.filter((l) => l.role === 'state' || l.role === 'decision').map((l) => l.name));
+  const flowLabels = flowLabelNames(labels);
   const pms = parseLogins(pmLogins);
   const botLogin = (config.AI_FLOW_BOT_LOGIN ?? '').toLowerCase();
   const prefix = config.AI_FLOW_BRANCH_PREFIX ?? 'ai/';
@@ -151,13 +168,7 @@ export function createRouter({
   }
 
   /** Sets `label` as the only position of the issue: add first (the lock never lapses), then clean. */
-  async function setPosition(number, label) {
-    const issue = await api.getIssue(number);
-    if (!issue.labels.includes(label)) await api.addLabel(number, label);
-    for (const name of issue.labels) {
-      if (name !== label && flowLabels.has(name)) await api.removeLabel(number, name);
-    }
-  }
+  const setPosition = (number, label) => applyPosition(api, flowLabels, number, label);
 
   async function setError(number, step, reason) {
     await setPosition(number, LABEL.ERROR);

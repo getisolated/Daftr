@@ -1,0 +1,37 @@
+name: AI flow · agent plan
+
+# Agent plan: turns the final spec into plan.md for the next agents (and adds the PM feedback on later tours).
+# Called by the router (ai-router.yml) when the issue enters ai:plan. Read-only on the
+# code: it may only write in its run folder (zone "run"). Prompt: .ai-flow/prompts/plan.md.
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        type: number
+        required: true
+      branch:
+        type: string
+        required: true
+      run_dir:
+        type: string
+        required: true
+      tour:
+        type: number
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    uses: ./.github/workflows/ai-agent-run.yml
+    with:
+      agent: plan
+      issue_number: ${{ inputs.issue_number }}
+      branch: ${{ inputs.branch }}
+      run_dir: ${{ inputs.run_dir }}
+      tour: ${{ inputs.tour }}
+      zone: run
+      allowed_tools: Read,Glob,Grep,Edit,Write
+    secrets: inherit

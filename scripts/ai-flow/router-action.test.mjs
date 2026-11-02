@@ -147,3 +147,19 @@ test('agent workflow files follow the names of the specification', () => {
   assert.equal(agentWorkflowFile('specs'), 'ai-agent-specs.yml');
   assert.equal(agentWorkflowFile('deliver'), 'ai-deliver.yml');
 });
+
+test('every installed agent workflow is wired to a job of the router', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const { dirname, join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const dir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.github', 'workflows');
+  const router = readFileSync(join(dir, 'ai-router.yml'), 'utf8');
+  const agents = readdirSync(dir)
+    .map((file) => file.match(/^ai-agent-(\w+)\.yml$/)?.[1])
+    .filter((agent) => agent && agent !== 'run');
+  assert.ok(agents.length > 0);
+  for (const agent of agents) {
+    assert.ok(router.includes(`uses: ./.github/workflows/${agentWorkflowFile(agent)}`), `${agent}: job calls its workflow`);
+    assert.ok(router.includes(`needs.route.outputs.agent == '${agent}'`), `${agent}: job runs on its dispatch`);
+  }
+});

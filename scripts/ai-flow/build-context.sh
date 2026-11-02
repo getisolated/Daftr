@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Assembles the context of an agent run, as Markdown on stdout:
 #
-#   bash scripts/ai-flow/build-context.sh <issue_number> > /tmp/context.md
+#   bash scripts/ai-flow/build-context.sh <issue_number> > .ai-flow-context.md
 #
 # Content: flow metadata, the request (issue body), the answers checked in the latest
 # question block, the issue thread, and the files of .ai-flow/runs/<n>/ on the current

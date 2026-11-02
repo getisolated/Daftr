@@ -1,0 +1,187 @@
+name: AI flow · agent run (shared)
+
+# Shared body of every agent job, called by the thin ai-agent-<name>.yml workflows (which
+# the router calls). One run of one agent on one issue:
+#
+#   1. checkout the flow branch with the App token (pushes then come from the bot);
+#   2. assemble .ai-flow-context.md at the root of the checkout (scripts/ai-flow/build-context.sh);
+#   3. run Claude Code (claude-code-action, Max token) with the agent's prompt, turn budget
+#      and model from .ai-flow/flow.env, and a structured result (.ai-flow/result-schema.json);
+#   4. collect: check the changed paths, commit, push (scripts/ai-flow/collect.sh);
+#   5. finalize: comment in the issue with the cost, set the next state label, or ai:erreur
+#      (scripts/ai-flow/finalize-action.mjs). Runs even when a previous step failed.
+on:
+  workflow_call:
+    inputs:
+      agent:
+        type: string
+        required: true
+      issue_number:
+        type: number
+        required: true
+      branch:
+        type: string
+        required: true
+      run_dir:
+        type: string
+        required: true
+      tour:
+        type: number
+        required: true
+      zone:
+        description: '"run" (write only in the run folder) or "code" (anywhere but the forbidden paths)'
+        type: string
+        default: run
+      allowed_tools:
+        description: Claude Code tools the agent may use (--allowedTools)
+        type: string
+        required: true
+      toolchain:
+        description: Install Node and Rust, and the npm dependencies (agents that build or test)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  agent:
+    name: Agent ${{ inputs.agent }} (#${{ inputs.issue_number }}, tour ${{ inputs.tour }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AI_FLOW_APP_ID }}
+          private-key: ${{ secrets.AI_FLOW_APP_PRIVATE_KEY }}
+
+      - name: Checkout flow branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+
+      - name: Load flow configuration
+        run: bash scripts/ai-flow/export-env.sh
+
+      - name: Prepare
+        id: prep
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          AGENT: ${{ inputs.agent }}
+          ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
+        run: |
+          set -euo pipefail
+          # Commits are authored by the App's bot user.
+          login="$AI_FLOW_BOT_LOGIN"
+          encoded="${login//\[/%5B}"; encoded="${encoded//\]/%5D}"
+          bot_id="$(gh api "users/$encoded" --jq .id)"
+          git config user.name "$login"
+          git config user.email "${bot_id}+${login}@users.noreply.github.com"
+          echo "base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+          upper="${AGENT^^}"
+          turns_var="AI_FLOW_TURNS_${upper}"
+          model_var="AI_FLOW_MODEL_${upper}"
+          turns="${!turns_var:?no turn budget for $AGENT in flow.env}"
+          model="${!model_var:?no model for $AGENT in flow.env}"
+          schema="$(jq -c . .ai-flow/result-schema.json)"
+          {
+            echo "claude_args<<EOF_ARGS"
+            echo "--max-turns $turns --model $model --allowedTools \"$ALLOWED_TOOLS\" --json-schema '$schema'"
+            echo "EOF_ARGS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build agent context
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          AI_FLOW_PM_LOGINS: ${{ vars.AI_FLOW_PM_LOGINS }}
+          AI_FLOW_AGENT: ${{ inputs.agent }}
+          AI_FLOW_TOUR: ${{ inputs.tour }}
+        run: |
+          # In the workspace, where Claude Code may read; excluded from git, never committed.
+          echo ".ai-flow-context.md" >> .git/info/exclude
+          bash scripts/ai-flow/build-context.sh "${{ inputs.issue_number }}" > .ai-flow-context.md
+          echo "Context: $(wc -c < .ai-flow-context.md) bytes"
+
+      - name: Setup Node.js
+        if: inputs.toolchain
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        if: inputs.toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        if: inputs.toolchain
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install system and npm dependencies
+        if: inputs.toolchain
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
+          npm ci
+
+      # continue-on-error: the finalisation reports any failure in the issue (ai:erreur).
+      - name: Run agent
+        id: claude
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.app.outputs.token }}
+          # The router runs agents on the bot's own labels.
+          allowed_bots: ${{ env.AI_FLOW_BOT_LOGIN }},${{ env.AI_FLOW_APP_SLUG }}
+          prompt: |
+            Tu es l'agent ${{ inputs.agent }} du flux IA de Daftr.
+            Issue : #${{ inputs.issue_number }} · tour : ${{ inputs.tour }} · limite de tours de questions (agent specs) : ${{ env.AI_FLOW_MAX_SPEC_ROUNDS }}.
+            Branche de travail (déjà extraite) : ${{ inputs.branch }} · dossier du run : ${{ inputs.run_dir }}/
+            Lis dans l'ordre .ai-flow/CLAUDE.md, .ai-flow/prompts/${{ inputs.agent }}.md, puis .ai-flow-context.md, et exécute ta mission.
+            Termine par le résultat structuré demandé (status, comment, summary).
+          claude_args: ${{ steps.prep.outputs.claude_args }}
+
+      - name: Collect agent output
+        id: collect
+        if: always() && steps.prep.outcome == 'success'
+        env:
+          AI_FLOW_AGENT: ${{ inputs.agent }}
+          AI_FLOW_ISSUE: ${{ inputs.issue_number }}
+          AI_FLOW_TOUR: ${{ inputs.tour }}
+          AI_FLOW_RUN_DIR: ${{ inputs.run_dir }}
+          AI_FLOW_BRANCH: ${{ inputs.branch }}
+          AI_FLOW_ZONE: ${{ inputs.zone }}
+          AI_FLOW_BASE_SHA: ${{ steps.prep.outputs.base_sha }}
+          STRUCTURED_OUTPUT: ${{ steps.claude.outputs.structured_output }}
+        run: bash scripts/ai-flow/collect.sh
+
+      - name: Finalize
+        if: always() && steps.app.outcome == 'success'
+        uses: actions/github-script@v8
+        env:
+          AI_FLOW_AGENT: ${{ inputs.agent }}
+          AI_FLOW_ISSUE: ${{ inputs.issue_number }}
+          AI_FLOW_TOUR: ${{ inputs.tour }}
+          AI_FLOW_RUN_DIR: ${{ inputs.run_dir }}
+          AI_FLOW_BRANCH: ${{ inputs.branch }}
+          STRUCTURED_OUTPUT: ${{ steps.claude.outputs.structured_output }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          FORBIDDEN: ${{ steps.collect.outputs.forbidden }}
+          PUSH_ERROR: ${{ steps.collect.outcome == 'failure' && 'collect step failed' || steps.collect.outputs.push_error }}
+        with:
+          github-token: ${{ steps.app.outputs.token }}
+          script: |
+            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ai-flow/finalize-action.mjs`);
+            await run({ github, context, core });

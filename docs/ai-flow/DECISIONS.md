@@ -77,3 +77,13 @@ Fonctionnalité de test : **compteur de mots et temps de lecture de la note ouve
 - **Agents livrés par lots** : un état dont le workflow d'agent n'existe pas encore est signalé dans l'issue, sans erreur ni surveillance.
 - **Contexte des agents** (`build-context.sh`) : seuls les commentaires du PM et du bot sont recopiés ; ceux des autres sont comptés, pas transmis (repo public).
 - **Suivi PM sans Project** : la recherche « Action PM attendue » est `is:open label:"ai:question","ai:à-valider","ai:escalade","ai:erreur"`.
+
+## Agents specs et plan (lot 3)
+
+- **Un workflow générique** `ai-agent-run.yml` porte le corps commun ; chaque agent a un workflow mince `ai-agent-<nom>.yml` (zone d'écriture, outils autorisés) que le routeur appelle. Un agent à la fois par issue (groupe de concurrence par issue).
+- **Résultat structuré** : chaque agent termine par `status` / `comment` / `summary` (`.ai-flow/result-schema.json`, option `--json-schema` de Claude Code). Statuts : specs `QUESTIONS` ou `SPEC_FINALE`, autres agents `DONE`, tous `BLOCKED`.
+- **L'agent ne pose ni label ni commentaire et ne pousse pas.** Après lui, `collect.sh` vérifie les chemins modifiés (zone `run` : seulement `.ai-flow/runs/<n>/` ; zone `code` : tout sauf `.ai-flow/forbidden-paths.txt`), commite et pousse ; `finalize` publie le commentaire (avec le coût du run et le cumul de la demande), pose le label suivant, ou `ai:erreur` avec un diagnostic (token expiré, quota, budget de tours, agent bloqué, fichier interdit).
+- **Questions** : publiées dans un commentaire du bot (marqueur `questions round=N`), archivées dans `runs/<n>/questions-<N>.md`. Le PM coche dans le commentaire, précise les « Autre » en commentaire, pose `ai:réponse-donnée`. Au dernier tour autorisé, l'agent specs doit produire la spec finale.
+- **Spec finale** : `runs/<n>/spec.md` (français, critères `CA1…`), recopiée dans l'issue sous « Spec finale ». **Plan** : `runs/<n>/plan.md` (anglais, pour les agents), résumé en 5 lignes pour le PM ; à partir du tour 2, section « Retour PM, tour N ».
+- **Contexte** : `.ai-flow-context.md` à la racine du checkout (Claude Code peut refuser de lire hors du projet), exclu de git.
+- **Coût** : marqueur `cost usd=…` dans chaque commentaire d'agent ; le cumul de la demande est la somme de ces marqueurs.
