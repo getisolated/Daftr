@@ -62,3 +62,18 @@ Fonctionnalité de test : **compteur de mots et temps de lecture de la note ouve
 - Sorties utiles de `claude-code-action@v1` : `conclusion`, `execution_file` (coût : `total_cost_usd` du message `result`), `session_id`.
 - `cargo test` régénère les bindings TypeScript (`frontend/src/app/core/bindings/`) : les agents doivent les commiter.
 - `tauri.conf.json` active `createUpdaterArtifacts` : le build de test doit le désactiver (pas de clé de signature minisign dans le flux).
+
+## Routeur (lot 2)
+
+- **Un seul label de position par issue.** Le routeur pose le nouveau label avant de retirer l'ancien : le verrou ne se libère jamais par accident. Une décision du PM acceptée devient la position le temps de son traitement (ex. `ai:validé` pendant la fusion).
+- **Démarrage par `ai:go` seulement.** Une issue créée avec le formulaire reçoit un commentaire d'accueil, puis attend `ai:go`. `ai:go` après `ai:stop` relance le flux sur la même branche.
+- **Verrou** : une issue est active si elle est ouverte et porte une position autre que `ai:file-d-attente`, `ai:livré` ou `ai:stop` ; les attentes du PM (`ai:question`, `ai:à-valider`, `ai:escalade`, `ai:erreur`) gardent le verrou. La file d'attente est servie dans l'ordre d'entrée.
+- **Labels du bot** : seuls les états d'agent (`ai:specs` … `ai:deploy`) et `ai:livré` réveillent le routeur ; ses autres événements sont filtrés par le `if:` du job, avant le groupe de concurrence (GitHub ne garde qu'un run en attente par groupe).
+- **Compteurs** déduits de l'historique des labels, sans fichier d'état : tours de specs = nombre de `ai:specs` ; tour de plan = nombre de `ai:plan` (retours PM + 1) ; boucles review → code = nombre de `ai:code` depuis le dernier `ai:plan`.
+- **Marqueurs cachés** dans les commentaires du bot (`<!-- ai-flow:error step=ai:code -->`, `escalade from=review`, `pm-return`, `questions`) : retirer `ai:erreur` relance l'étape notée, `ai:validé-quand-même` reprend selon l'origine de l'escalade.
+- **`ai:problème`** exige un commentaire du PM postérieur à l'entrée dans l'état courant.
+- **`ai:stop`** et la fermeture d'une issue active : annulation des runs dont le titre porte `#<n>`, fermeture de la PR `ai/<n>-*`, suppression des pre-releases `test-issue-<n>-*`, puis la file d'attente avance.
+- **Tick horaire** : une étape d'agent sans run depuis 20 min passe en `ai:erreur` (run perdu) ; rappel au PM après 48 h sans activité sur une attente ; la file avance si le verrou est libre.
+- **Agents livrés par lots** : un état dont le workflow d'agent n'existe pas encore est signalé dans l'issue, sans erreur ni surveillance.
+- **Contexte des agents** (`build-context.sh`) : seuls les commentaires du PM et du bot sont recopiés ; ceux des autres sont comptés, pas transmis (repo public).
+- **Suivi PM sans Project** : la recherche « Action PM attendue » est `is:open label:"ai:question","ai:à-valider","ai:escalade","ai:erreur"`.
