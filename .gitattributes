@@ -1,0 +1,4 @@
+# Bash scripts and the files they read must keep LF line endings, even in a Windows
+# checkout (core.autocrlf=true): Git Bash would otherwise choke on the trailing CR.
+*.sh          text eol=lf
+.ai-flow/**   text eol=lf
