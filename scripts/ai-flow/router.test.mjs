@@ -586,3 +586,17 @@ test('an agent whose workflow is not installed yet is not dispatched, nor declar
   await sim.label(1, LABEL.STOP);
   assert.deepEqual(sim.flowLabels(1), [LABEL.STOP]);
 });
+
+test('a flow restarted after ai:stop starts its counters at zero', async () => {
+  const sim = createSim();
+  await sim.open(1, 'Demande');
+  await sim.label(1, LABEL.GO);
+  await sim.botSets(1, LABEL.QUESTION);
+  await sim.label(1, LABEL.ANSWERED);
+  assert.equal(sim.lastDispatch().tour, 2);
+  await sim.label(1, LABEL.STOP, STRANGER); // refused: does not reset anything
+  assert.deepEqual(sim.flowLabels(1), [LABEL.SPECS]);
+  await sim.label(1, LABEL.STOP);
+  await sim.label(1, LABEL.GO);
+  assert.deepEqual([sim.lastDispatch().agent, sim.lastDispatch().tour], ['specs', 1]);
+});

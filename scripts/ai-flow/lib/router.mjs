@@ -251,6 +251,21 @@ export function createRouter({
     return parts.join(' · ');
   }
 
+  /**
+   * Label history of the current flow only: after the last accepted ai:stop (set by a PM)
+   * or ai:livré (set by the bot). A flow restarted with ai:go starts its counters at zero.
+   */
+  function currentFlow(events) {
+    let start = 0;
+    events.forEach((event, index) => {
+      if (event.action !== 'labeled') return;
+      if ((event.label === LABEL.STOP && isPm(event.actor)) || (event.label === LABEL.DELIVERED && isBot(event.actor))) {
+        start = index + 1;
+      }
+    });
+    return events.slice(start);
+  }
+
   async function latestMarker(number, kind) {
     const comments = await api.listComments(number);
     for (let i = comments.length - 1; i >= 0; i -= 1) {
@@ -269,7 +284,7 @@ export function createRouter({
   async function dispatchAgent(issue, label) {
     const agent = AGENT_BY_STATE[label];
     if (!isAgentAvailable(agent)) return notInstalled(issue.number, agent);
-    const events = await api.listLabelEvents(issue.number);
+    const events = currentFlow(await api.listLabelEvents(issue.number));
     const planTour = Math.max(1, countLabeled(events, LABEL.PLAN));
     let tour;
     switch (label) {
@@ -310,7 +325,7 @@ export function createRouter({
   async function deliver(issue) {
     if (!isAgentAvailable('deliver')) return notInstalled(issue.number, 'deliver');
     const branch = await ensureBranch(issue);
-    const events = await api.listLabelEvents(issue.number);
+    const events = currentFlow(await api.listLabelEvents(issue.number));
     return {
       dispatch: {
         agent: 'deliver',
@@ -395,7 +410,7 @@ export function createRouter({
     if (current !== LABEL.TO_VALIDATE && current !== LABEL.ESCALATED) {
       return rejectDecision(issue, LABEL.PROBLEM, unexpected(LABEL.PROBLEM, current));
     }
-    const events = await api.listLabelEvents(issue.number);
+    const events = currentFlow(await api.listLabelEvents(issue.number));
     const since = lastLabeledAt(events, current) ?? '';
     const comments = await api.listComments(issue.number);
     const feedback = comments.filter((c) => isPm(c.author) && c.createdAt >= since).at(-1);
