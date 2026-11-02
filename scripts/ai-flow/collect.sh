@@ -27,7 +27,7 @@ emit() { # name value (value may span lines)
   printf '%s<<%s\n%s\n%s\n' "$1" "$delimiter" "$2" "$delimiter" >> "$out"
 }
 
-cd "$AI_FLOW_ROOT"
+cd "$AI_FLOW_WORKDIR"
 
 # Archive the questions of the specs agent next to its other outputs.
 status="$(jq -r '.status // empty' <<< "${STRUCTURED_OUTPUT:-}" 2> /dev/null || true)"
@@ -39,7 +39,7 @@ fi
 # Every path changed since the base: committed by the agent, modified, deleted or new.
 changed="$( { git diff --name-only "$AI_FLOW_BASE_SHA"; git ls-files --others --exclude-standard; } | sort -u)"
 
-mapfile -t prefixes < <(tr -d '\r' < .ai-flow/forbidden-paths.txt | sed -e 's/[[:space:]]*$//' | grep -v -e '^#' -e '^$')
+mapfile -t prefixes < <(tr -d '\r' < "$AI_FLOW_ROOT/.ai-flow/forbidden-paths.txt" | sed -e 's/[[:space:]]*$//' | grep -v -e '^#' -e '^$')
 
 forbidden=()
 while IFS= read -r path; do

@@ -16,6 +16,8 @@ import { createFinalizer } from './lib/finalize.mjs';
 import { createGithubApi } from './lib/github-api.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** Checkout of the flow branch (run files); the flow's own files come from ROOT. */
+const WORKDIR = process.env.AI_FLOW_WORKDIR || ROOT;
 const RUN_FILES = ['spec.md', 'plan.md', 'tests.md', 'code-notes.md', 'review.md', 'rapport-pm.md'];
 /** Written by an agent when structured output is unavailable (same schema). */
 const FALLBACK_RESULT = '/tmp/ai-flow-result.json';
@@ -61,7 +63,7 @@ export async function run({ github, context, core }) {
 
   const files = {};
   for (const name of RUN_FILES) {
-    const content = readIfExists(join(ROOT, runDir, name));
+    const content = readIfExists(join(WORKDIR, runDir, name));
     if (content) files[name] = content;
   }
 
