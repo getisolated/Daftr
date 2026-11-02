@@ -5,7 +5,7 @@ Ce fichier s'applique à **tous** les agents du flux (specs, plan, tests, code, 
 ## 1. Le flux et ta place dedans
 
 - Une demande du PM (chef de projet, non développeur) arrive par une issue GitHub. Sept agents la traitent à la suite : specs → plan → tests → code → review → docs → deploy. Chacun tourne dans un run GitHub Actions séparé, sans mémoire des autres runs.
-- **La mémoire partagée est le dossier `.ai-flow/runs/<n>/`** (`<n>` = numéro de l'issue) sur la branche `ai/<n>-<slug>`. Tu y lis ce que les agents précédents ont produit (`spec.md`, `plan.md`, `tests.md`, `code-notes.md`, `review.md`, `rapport-pm.md`) et tu y écris ta sortie. Ton contexte d'entrée (issue, commentaires, réponses cochées, fichiers du run) est assemblé dans `/tmp/context.md`.
+- **La mémoire partagée est le dossier `.ai-flow/runs/<n>/`** (`<n>` = numéro de l'issue) sur la branche `ai/<n>-<slug>`. Tu y lis ce que les agents précédents ont produit (`spec.md`, `plan.md`, `tests.md`, `code-notes.md`, `review.md`, `rapport-pm.md`) et tu y écris ta sortie. Ton contexte d'entrée (issue, commentaires, réponses cochées, fichiers du run) est assemblé dans `.ai-flow-context.md`.
 - Tu ne poses **jamais** de label et tu ne changes pas l'état de l'issue : le workflow s'en charge d'après tes fichiers de sortie. Tu ne fusionnes rien et tu ne touches pas à la PR au-delà de ce que ton prompt demande.
 - Tu ne vois pas l'interface de l'application desktop. Tu vérifies par les tests et la compilation ; la vérification visuelle et fonctionnelle revient au PM, sur la version de test.
 
@@ -91,10 +91,10 @@ Le workflow vérifie mécaniquement le diff : un fichier interdit modifié bloqu
 - Ajoute les fichiers explicitement (`git add <chemins>`) : pas de `git add -A`, `git add .`, `git commit -a`.
 - Interdits : `--force`, `git reset --hard`, `git rebase`, `git stash`, réécriture d'historique, modification de la configuration git.
 - Commits en **Conventional Commits, en anglais** : `feat(scope): …`, `fix: …`, `test: …`, `docs: …`, `chore(ai-flow): …` pour les fichiers de `runs/`. Un commit par unité cohérente, chacun laissant le code compilable (sauf les tests volontairement en échec de l'agent tests).
-- Toute sortie d'agent est commitée et poussée avant la fin du run : l'historique de `runs/<n>/` est la trace d'audit, et un run interrompu doit pouvoir reprendre sans perte.
+- **Tu ne pousses jamais** : après ton passage, le workflow vérifie les chemins modifiés, commite ce qui reste dans le dossier du run (et, pour les agents qui codent, le reste de ton travail), puis pousse la branche. L'historique de `runs/<n>/` est la trace d'audit.
 
 ## 9. Fin de mission
 
-- Écris ta sortie dans `.ai-flow/runs/<n>/` au format demandé par ton prompt, commite, pousse.
-- Termine par un **commentaire court dans l'issue, en français** : ce que tu as fait (2 à 4 lignes), ce qui se passe ensuite. Le workflow y ajoute le lien vers le run et le coût.
-- Si tu ne peux pas accomplir ta mission (information manquante, blocage technique, zone interdite nécessaire), ne bricole pas : écris la cause précise dans ta sortie avec le statut `BLOQUÉ`, et le workflow passera l'issue en `ai:erreur` ou `ai:escalade`.
+- Écris ta sortie dans `.ai-flow/runs/<n>/` au format demandé par ton prompt (les agents qui codent commitent aussi leur code, sans pousser).
+- Termine par le **résultat structuré** (`.ai-flow/result-schema.json`) : `status`, `comment` (en français, pour le PM : ce que tu as fait en 2 à 5 lignes, ou le bloc de questions pour l'agent specs) et `summary` (une ligne technique en anglais). Le workflow publie `comment` dans l'issue, avec le lien du run et le coût, puis pose le label de l'étape suivante.
+- Si tu ne peux pas accomplir ta mission (information manquante, blocage technique, zone interdite nécessaire), ne bricole pas : statut `BLOCKED` avec la cause précise dans `comment`. Le workflow passe l'issue en `ai:erreur` ; le PM peut répondre en commentaire puis relancer l'étape.

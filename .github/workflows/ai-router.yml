@@ -82,6 +82,41 @@ jobs:
             const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ai-flow/router-action.mjs`);
             await run({ github, context, core });
 
-  # Agent jobs: one per agent, each calling .github/workflows/ai-agent-<name>.yml with
-  # issue_number, branch, run_dir and tour. They arrive with the next batches:
-  #   specs, plan (batch 3) · tests, code, review (batch 4) · docs, deploy, deliver (batch 5)
+  # Agent jobs: one per agent, each calling .github/workflows/ai-agent-<name>.yml. One agent
+  # at a time per issue (concurrency group per issue, never cancelled). Still to come:
+  #   tests, code, review (batch 4) · docs, deploy, deliver (batch 5)
+  specs:
+    name: Agent specs
+    needs: route
+    if: needs.route.outputs.agent == 'specs'
+    concurrency:
+      group: ai-flow-agent-${{ needs.route.outputs.issue_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/ai-agent-specs.yml
+    with:
+      issue_number: ${{ fromJSON(needs.route.outputs.issue_number) }}
+      branch: ${{ needs.route.outputs.branch }}
+      run_dir: ${{ needs.route.outputs.run_dir }}
+      tour: ${{ fromJSON(needs.route.outputs.tour) }}
+    secrets: inherit
+
+  plan:
+    name: Agent plan
+    needs: route
+    if: needs.route.outputs.agent == 'plan'
+    concurrency:
+      group: ai-flow-agent-${{ needs.route.outputs.issue_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/ai-agent-plan.yml
+    with:
+      issue_number: ${{ fromJSON(needs.route.outputs.issue_number) }}
+      branch: ${{ needs.route.outputs.branch }}
+      run_dir: ${{ needs.route.outputs.run_dir }}
+      tour: ${{ fromJSON(needs.route.outputs.tour) }}
+    secrets: inherit

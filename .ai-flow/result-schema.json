@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["QUESTIONS", "SPEC_FINALE", "DONE", "BLOCKED"],
+      "description": "Outcome of the mission. specs: QUESTIONS or SPEC_FINALE. Other agents: DONE. Any agent: BLOCKED when the mission cannot be completed."
+    },
+    "comment": {
+      "type": "string",
+      "description": "Markdown posted in the issue for the PM, in French, plain language. specs QUESTIONS: the full question block. specs SPEC_FINALE: two lines introducing the final spec. plan DONE: the 5-line summary. BLOCKED: the precise cause and what the PM can do."
+    },
+    "summary": {
+      "type": "string",
+      "description": "One technical line for the run log, in English."
+    }
+  },
+  "required": ["status", "comment", "summary"],
+  "additionalProperties": false
+}

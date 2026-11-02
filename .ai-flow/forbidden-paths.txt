@@ -1,0 +1,19 @@
+# Paths no agent may change (.ai-flow/CLAUDE.md § 7), checked on the diff of every agent run
+# by scripts/ai-flow/collect.sh. One prefix per line: a line ending with "/" covers a whole
+# directory, any other line one exact file. The run folder of the current issue
+# (.ai-flow/runs/<n>/) is always allowed.
+#
+# Version fields and the protected keys of tauri.conf*.json cannot be expressed as paths:
+# the review agent checks them.
+
+.github/
+.ai-flow/
+scripts/ai-flow/
+scripts/stamp-version.mjs
+scripts/update-manifest.mjs
+scripts/update-manifest.test.mjs
+src-tauri/crates/desktop/windows/hooks.nsh
+.claude/
+CLAUDE.md
+LICENSE
+.gitattributes

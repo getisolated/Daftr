@@ -80,6 +80,23 @@ export function parseMarkers(body) {
   return found;
 }
 
+/** Names of the flow labels (state and decision roles) of a label catalog. */
+export function flowLabelNames(labels) {
+  return new Set(labels.filter((l) => l.role === 'state' || l.role === 'decision').map((l) => l.name));
+}
+
+/**
+ * Makes `label` the only position of an issue: adds it first, so the lock never lapses,
+ * then removes every other flow label. Shared by the router and the agent finalisation.
+ */
+export async function applyPosition(api, flowLabels, number, label) {
+  const issue = await api.getIssue(number);
+  if (!issue.labels.includes(label)) await api.addLabel(number, label);
+  for (const name of issue.labels) {
+    if (name !== label && flowLabels.has(name)) await api.removeLabel(number, name);
+  }
+}
+
 /** ASCII slug of an issue title, for the branch name ai/<n>-<slug>. */
 export function slugify(title) {
   const slug = title
@@ -124,7 +141,7 @@ export function createRouter({
   now = () => new Date(),
 }) {
   const catalog = new Map(labels.map((label) => [label.name, label]));
-  const flowLabels = new Set(labels.filter((l) => l.role === 'state' || l.role === 'decision').map((l) => l.name));
+  const flowLabels = flowLabelNames(labels);
   const pms = parseLogins(pmLogins);
   const botLogin = (config.AI_FLOW_BOT_LOGIN ?? '').toLowerCase();
   const prefix = config.AI_FLOW_BRANCH_PREFIX ?? 'ai/';
@@ -151,13 +168,7 @@ export function createRouter({
   }
 
   /** Sets `label` as the only position of the issue: add first (the lock never lapses), then clean. */
-  async function setPosition(number, label) {
-    const issue = await api.getIssue(number);
-    if (!issue.labels.includes(label)) await api.addLabel(number, label);
-    for (const name of issue.labels) {
-      if (name !== label && flowLabels.has(name)) await api.removeLabel(number, name);
-    }
-  }
+  const setPosition = (number, label) => applyPosition(api, flowLabels, number, label);
 
   async function setError(number, step, reason) {
     await setPosition(number, LABEL.ERROR);
@@ -251,6 +262,21 @@ export function createRouter({
     return parts.join(' · ');
   }
 
+  /**
+   * Label history of the current flow only: after the last accepted ai:stop (set by a PM)
+   * or ai:livré (set by the bot). A flow restarted with ai:go starts its counters at zero.
+   */
+  function currentFlow(events) {
+    let start = 0;
+    events.forEach((event, index) => {
+      if (event.action !== 'labeled') return;
+      if ((event.label === LABEL.STOP && isPm(event.actor)) || (event.label === LABEL.DELIVERED && isBot(event.actor))) {
+        start = index + 1;
+      }
+    });
+    return events.slice(start);
+  }
+
   async function latestMarker(number, kind) {
     const comments = await api.listComments(number);
     for (let i = comments.length - 1; i >= 0; i -= 1) {
@@ -269,7 +295,7 @@ export function createRouter({
   async function dispatchAgent(issue, label) {
     const agent = AGENT_BY_STATE[label];
     if (!isAgentAvailable(agent)) return notInstalled(issue.number, agent);
-    const events = await api.listLabelEvents(issue.number);
+    const events = currentFlow(await api.listLabelEvents(issue.number));
     const planTour = Math.max(1, countLabeled(events, LABEL.PLAN));
     let tour;
     switch (label) {
@@ -310,7 +336,7 @@ export function createRouter({
   async function deliver(issue) {
     if (!isAgentAvailable('deliver')) return notInstalled(issue.number, 'deliver');
     const branch = await ensureBranch(issue);
-    const events = await api.listLabelEvents(issue.number);
+    const events = currentFlow(await api.listLabelEvents(issue.number));
     return {
       dispatch: {
         agent: 'deliver',
@@ -395,7 +421,7 @@ export function createRouter({
     if (current !== LABEL.TO_VALIDATE && current !== LABEL.ESCALATED) {
       return rejectDecision(issue, LABEL.PROBLEM, unexpected(LABEL.PROBLEM, current));
     }
-    const events = await api.listLabelEvents(issue.number);
+    const events = currentFlow(await api.listLabelEvents(issue.number));
     const since = lastLabeledAt(events, current) ?? '';
     const comments = await api.listComments(issue.number);
     const feedback = comments.filter((c) => isPm(c.author) && c.createdAt >= since).at(-1);
