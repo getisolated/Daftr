@@ -65,6 +65,7 @@ jobs:
 
       - name: GitHub App token
         id: app
+        if: always()
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.AI_FLOW_APP_ID }}
@@ -72,6 +73,7 @@ jobs:
 
       - name: Check App access
         id: access
+        if: always() && steps.app.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
@@ -95,8 +97,11 @@ jobs:
           [ "$errors" -eq 0 ] || exit 1
           echo "L'App $APP_SLUG accède à $GITHUB_REPOSITORY ; branche et labels en place."
 
+      # Runs even if the access check failed (labels not created yet, for instance): every
+      # check reports on its own. Only the App token itself is required.
       - name: Claude (Max token)
         id: claude
+        if: always() && steps.app.outcome == 'success'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
