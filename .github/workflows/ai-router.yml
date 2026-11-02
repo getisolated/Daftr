@@ -84,7 +84,7 @@ jobs:
 
   # Agent jobs: one per agent, each calling .github/workflows/ai-agent-<name>.yml. One agent
   # at a time per issue (concurrency group per issue, never cancelled). Still to come:
-  #   tests, code, review (batch 4) · docs, deploy, deliver (batch 5)
+  #   docs, deploy, deliver (batch 5)
   specs:
     name: Agent specs
     needs: route
@@ -114,6 +114,60 @@ jobs:
       contents: read
       id-token: write
     uses: ./.github/workflows/ai-agent-plan.yml
+    with:
+      issue_number: ${{ fromJSON(needs.route.outputs.issue_number) }}
+      branch: ${{ needs.route.outputs.branch }}
+      run_dir: ${{ needs.route.outputs.run_dir }}
+      tour: ${{ fromJSON(needs.route.outputs.tour) }}
+    secrets: inherit
+
+  tests:
+    name: Agent tests
+    needs: route
+    if: needs.route.outputs.agent == 'tests'
+    concurrency:
+      group: ai-flow-agent-${{ needs.route.outputs.issue_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/ai-agent-tests.yml
+    with:
+      issue_number: ${{ fromJSON(needs.route.outputs.issue_number) }}
+      branch: ${{ needs.route.outputs.branch }}
+      run_dir: ${{ needs.route.outputs.run_dir }}
+      tour: ${{ fromJSON(needs.route.outputs.tour) }}
+    secrets: inherit
+
+  code:
+    name: Agent code
+    needs: route
+    if: needs.route.outputs.agent == 'code'
+    concurrency:
+      group: ai-flow-agent-${{ needs.route.outputs.issue_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/ai-agent-code.yml
+    with:
+      issue_number: ${{ fromJSON(needs.route.outputs.issue_number) }}
+      branch: ${{ needs.route.outputs.branch }}
+      run_dir: ${{ needs.route.outputs.run_dir }}
+      tour: ${{ fromJSON(needs.route.outputs.tour) }}
+    secrets: inherit
+
+  review:
+    name: Agent review
+    needs: route
+    if: needs.route.outputs.agent == 'review'
+    concurrency:
+      group: ai-flow-agent-${{ needs.route.outputs.issue_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/ai-agent-review.yml
     with:
       issue_number: ${{ fromJSON(needs.route.outputs.issue_number) }}
       branch: ${{ needs.route.outputs.branch }}

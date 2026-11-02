@@ -33,6 +33,7 @@ function ignore(...statuses) {
  */
 export function createGithubApi({ github, owner, repo, workflow = 'ai-router.yml' }) {
   const base = { owner, repo };
+  const base_ = base;
 
   return {
     async getIssue(number) {
@@ -97,6 +98,38 @@ export function createGithubApi({ github, owner, repo, workflow = 'ai-router.yml
       return items
         .filter((pull) => pull.head?.ref?.startsWith(prefix) && pull.head?.repo?.full_name === `${owner}/${repo}`)
         .map((pull) => ({ number: pull.number, draft: pull.draft }));
+    },
+
+    /** Open pull request from `branch` to `base`, or null. */
+    async findPull(branch, base) {
+      const { data } = await github.rest.pulls.list({ ...base_, head: `${owner}:${branch}`, base, state: 'open', per_page: 10 });
+      return data[0] ? { number: data[0].number, url: data[0].html_url, draft: data[0].draft } : null;
+    },
+
+    async createPull({ branch, base, title, body, draft }) {
+      const { data } = await github.rest.pulls.create({ ...base_, head: branch, base, title, body, draft });
+      return { number: data.number, url: data.html_url, draft: data.draft };
+    },
+
+    /**
+     * Review with line comments (event COMMENT: the flow never approves on GitHub). A comment
+     * on a line outside the diff makes GitHub refuse the whole review (422): the findings
+     * are then posted in the review body instead.
+     */
+    async createReview(number, { body, comments }) {
+      try {
+        await github.rest.pulls.createReview({
+          ...base_,
+          pull_number: number,
+          event: 'COMMENT',
+          body,
+          comments: comments.map((c) => ({ path: c.path, line: c.line, side: 'RIGHT', body: c.body })),
+        });
+      } catch (error) {
+        if (error.status !== 422) throw error;
+        const list = comments.map((c) => `- \`${c.path}:${c.line}\` — ${c.body}`).join('\n');
+        await github.rest.pulls.createReview({ ...base_, pull_number: number, event: 'COMMENT', body: `${body}\n\n${list}` });
+      }
     },
 
     async closePull(number) {

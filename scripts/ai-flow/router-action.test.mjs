@@ -163,3 +163,24 @@ test('every installed agent workflow is wired to a job of the router', async () 
     assert.ok(router.includes(`needs.route.outputs.agent == '${agent}'`), `${agent}: job runs on its dispatch`);
   }
 });
+
+test('createReview falls back to the review body when a line is outside the diff', async () => {
+  const bodies = [];
+  let first = true;
+  const github = fakeOctokit({
+    'pulls.createReview': (params) => {
+      if (first) {
+        first = false;
+        assert.equal(params.comments[0].side, 'RIGHT');
+        throw Object.assign(new Error('Unprocessable'), { status: 422 });
+      }
+      bodies.push(params);
+      return {};
+    },
+  });
+  const api = createGithubApi({ github, owner: 'o', repo: 'r' });
+  await api.createReview(40, { body: 'Review', comments: [{ path: 'a.ts', line: 3, body: 'Fix it' }] });
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0].comments, undefined);
+  assert.match(bodies[0].body, /`a\.ts:3` — Fix it/);
+});

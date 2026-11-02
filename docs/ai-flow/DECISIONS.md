@@ -87,3 +87,13 @@ Fonctionnalité de test : **compteur de mots et temps de lecture de la note ouve
 - **Spec finale** : `runs/<n>/spec.md` (français, critères `CA1…`), recopiée dans l'issue sous « Spec finale ». **Plan** : `runs/<n>/plan.md` (anglais, pour les agents), résumé en 5 lignes pour le PM ; à partir du tour 2, section « Retour PM, tour N ».
 - **Contexte** : `.ai-flow-context.md` à la racine du checkout (Claude Code peut refuser de lire hors du projet), exclu de git.
 - **Coût** : marqueur `cost usd=…` dans chaque commentaire d'agent ; le cumul de la demande est la somme de ces marqueurs.
+
+## Agents tests, code, review (lot 4)
+
+- **Linux vérifié** : `cargo fmt`, `clippy -D warnings`, `cargo test`, Vitest, `ng lint` et `ng build` passent sur ubuntu sans modifier le code (dépendances système : `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `libssl-dev`).
+- **Cargo depuis `src-tauri/`** : seule sa `.cargo/config.toml` envoie les bindings ts-rs dans `frontend/src/app/core/bindings/` ; avec `--manifest-path` depuis la racine ils atterrissent dans les crates (`/src-tauri/crates/*/bindings/` est ignoré par git par sécurité).
+- **Check rapide** (`scripts/ai-flow/fast-check.sh`) : format, clippy, tests Rust, Vitest, `ng lint`, `ng build` (seul à vérifier les templates Angular), et en CI les bindings commités. Rapport Markdown en français.
+- **CI du flux** `ai-ci.yml`, job `ai-ci-check` (check requis sur `integration`) : à chaque push `ai/*` et PR vers `integration`. Rouge juste après l'agent tests : attendu.
+- **tests** (zone code, Sonnet) : écrit les tests de la stratégie du plan, vérifie que leurs échecs viennent seulement du code absent, `tests.md`. **code** (zone code, Opus) : implémente jusqu'au check rapide vert, `code-notes.md` pour tout écart, test corrigé ou exception de lint. **Le workflow relance le check rapide après lui** : vert → PR en brouillon `[#n] titre` vers `integration` (`Closes #n`) puis review ; rouge → l'agent code est relancé avec `checks.md` (compte dans les 3 reprises de code avant escalade). **review** (zone run, Opus, git en lecture) : verdict `APPROUVÉ` / `RETOUR CODE` dans `review.md`, comparaison des tests avant/après, remarques publiées ligne à ligne sur la PR (review GitHub en simple commentaire), `rapport-pm.md` au gabarit si approuvé.
+- **Outils Bash** limités par motifs (`cargo`, `npm`, `npx`, `node`, `git add/commit/diff/log/show/status/rm/mv`, `cd`, `ls`, `mkdir`, le check rapide) : ni `git push`, ni `gh`, ni `curl`.
+- **Identité des commits** : le bot de l'App (`AI_FLOW_BOT_USER_ID`), passé aussi à claude-code-action qui imposait sinon `claude[bot]`.

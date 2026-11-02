@@ -5,7 +5,8 @@
 //
 // Inputs come from the environment (never interpolated into the script): AI_FLOW_AGENT,
 // AI_FLOW_ISSUE, AI_FLOW_TOUR, AI_FLOW_RUN_DIR, AI_FLOW_BRANCH, STRUCTURED_OUTPUT (output of
-// claude-code-action), EXECUTION_FILE, FORBIDDEN (one path per line), PUSH_ERROR.
+// claude-code-action), EXECUTION_FILE, FORBIDDEN (one path per line), PUSH_ERROR, CHECKS_STATUS
+// (pass | fail | empty: outcome of the fast check re-run after the code agent).
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -18,7 +19,7 @@ import { createGithubApi } from './lib/github-api.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** Checkout of the flow branch (run files); the flow's own files come from ROOT. */
 const WORKDIR = process.env.AI_FLOW_WORKDIR || ROOT;
-const RUN_FILES = ['spec.md', 'plan.md', 'tests.md', 'code-notes.md', 'review.md', 'rapport-pm.md'];
+const RUN_FILES = ['spec.md', 'plan.md', 'tests.md', 'code-notes.md', 'checks.md', 'review.md', 'rapport-pm.md'];
 /** Written by an agent when structured output is unavailable (same schema). */
 const FALLBACK_RESULT = '/tmp/ai-flow-result.json';
 
@@ -80,6 +81,8 @@ export async function run({ github, context, core }) {
     issueNumber: Number(env.AI_FLOW_ISSUE),
     tour: Number(env.AI_FLOW_TOUR),
     runDir,
+    branch: env.AI_FLOW_BRANCH,
+    checks: { status: env.CHECKS_STATUS?.trim() || null, report: files['checks.md'] ?? '' },
     result: readResult(env.STRUCTURED_OUTPUT, readIfExists(FALLBACK_RESULT)),
     execution: readExecution(readIfExists(env.EXECUTION_FILE)),
     forbidden: (env.FORBIDDEN ?? '').split('\n').map((s) => s.trim()).filter(Boolean),

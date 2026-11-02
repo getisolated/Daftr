@@ -1,0 +1,39 @@
+name: AI flow · agent tests
+
+# Agent tests: writes the tests of the acceptance criteria before the code exists (they fail until then), and tests.md.
+# Called by the router (ai-router.yml) when the issue enters ai:tests. Writes anywhere but the forbidden paths (zone "code"), builds and runs the tests.
+# Prompt: .ai-flow/prompts/tests.md.
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        type: number
+        required: true
+      branch:
+        type: string
+        required: true
+      run_dir:
+        type: string
+        required: true
+      tour:
+        type: number
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  tests:
+    uses: ./.github/workflows/ai-agent-run.yml
+    with:
+      agent: tests
+      issue_number: ${{ inputs.issue_number }}
+      branch: ${{ inputs.branch }}
+      run_dir: ${{ inputs.run_dir }}
+      tour: ${{ inputs.tour }}
+      zone: code
+      toolchain: true
+      verify: false
+      allowed_tools: "Read,Glob,Grep,Edit,Write,Bash(cd:*),Bash(cargo:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(bash .ai-flow-tools/scripts/ai-flow/fast-check.sh:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git rm:*),Bash(git mv:*),Bash(ls:*),Bash(mkdir:*)"
+    secrets: inherit

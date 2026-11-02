@@ -389,7 +389,7 @@ test('review sends code back at most 3 times, then escalates; forcing goes to do
   }
   await sim.botSets(1, LABEL.CODE);
   assert.deepEqual(sim.flowLabels(1), [LABEL.ESCALATED]);
-  assert.match(sim.lastComment(1), /review a renvoyé le code 3 fois/);
+  assert.match(sim.lastComment(1), /code a été repris 3 fois/);
 
   await sim.label(1, LABEL.FORCE);
   assert.deepEqual(sim.flowLabels(1), [LABEL.DOCS]);

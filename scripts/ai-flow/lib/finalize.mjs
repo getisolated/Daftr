@@ -10,13 +10,33 @@ import { LABEL, applyPosition, flowLabelNames, marker, parseMarkers } from './ro
 const TRANSITIONS = {
   specs: { QUESTIONS: LABEL.QUESTION, SPEC_FINALE: LABEL.PLAN },
   plan: { DONE: LABEL.TESTS },
+  tests: { DONE: LABEL.CODE },
+  code: { DONE: LABEL.REVIEW },
+  review: { APPROVED: LABEL.DOCS, CHANGES_REQUESTED: LABEL.CODE },
 };
 
-/** Run file that must exist for a successful (agent, status). */
-const REQUIRED_FILE = {
-  'specs:SPEC_FINALE': 'spec.md',
-  'plan:DONE': 'plan.md',
+/** Run files that must exist for a successful (agent, status); the first one is linked. */
+const REQUIRED_FILES = {
+  'specs:SPEC_FINALE': ['spec.md'],
+  'plan:DONE': ['plan.md'],
+  'tests:DONE': ['tests.md'],
+  'review:APPROVED': ['rapport-pm.md', 'review.md'],
+  'review:CHANGES_REQUESTED': ['review.md'],
 };
+
+const SEVERITY_LABEL = { critical: 'Critique', important: 'Important', suggestion: 'Suggestion' };
+
+/** "[Demande] Compteur de mots" -> "Compteur de mots" */
+export function requestTitle(title) {
+  return title.replace(/^\s*\[demande\]\s*/i, '').trim() || title;
+}
+
+/** First lines of a fast-check report (the result table), for an issue comment. */
+function checksTable(report) {
+  const lines = (report ?? '').split('\n');
+  const end = lines.findIndex((line) => line.startsWith('## '));
+  return lines.slice(0, end === -1 ? lines.length : end).filter((line) => !line.startsWith('# ')).join('\n').trim();
+}
 
 const usd = (value) => `${value.toFixed(2).replace('.', ',')} $`;
 
@@ -127,12 +147,32 @@ export function createFinalizer({ api, config, labels, runUrl, branchUrl }) {
     const next = TRANSITIONS[agent]?.[result.status];
     if (!next) return fail(`statut « ${result.status} » inattendu pour l'agent ${agent}.`);
 
-    const requiredFile = REQUIRED_FILE[`${agent}:${result.status}`];
-    const fileContent = requiredFile ? input.files?.[requiredFile]?.trim() : null;
-    if (requiredFile && !fileContent) {
-      return fail(`l'agent annonce sa sortie mais \`${input.runDir}/${requiredFile}\` est absent ou vide.`);
+    const required = REQUIRED_FILES[`${agent}:${result.status}`] ?? [];
+    const missing = required.find((name) => !input.files?.[name]?.trim());
+    if (missing) {
+      return fail(`l'agent annonce sa sortie mais \`${input.runDir}/${missing}\` est absent ou vide.`);
     }
-    const fileLink = requiredFile && branchUrl ? `[\`${requiredFile}\`](${branchUrl}/${input.runDir}/${requiredFile})` : `\`${requiredFile}\``;
+    const link = (name) => (branchUrl ? `[\`${name}\`](${branchUrl}/${input.runDir}/${name})` : `\`${name}\``);
+    const requiredFile = required[0];
+    const fileContent = requiredFile ? input.files[requiredFile].trim() : null;
+    const fileLink = requiredFile ? link(requiredFile) : '';
+
+    // The code agent is done only when the workflow's own fast check passes.
+    if (agent === 'code') {
+      const checks = input.checks ?? {};
+      if (checks.status !== 'pass' && checks.status !== 'fail') {
+        return fail("le check rapide n'a pas pu être lancé après l'agent code (voir le run).");
+      }
+      if (checks.status === 'fail') {
+        await api.comment(
+          issueNumber,
+          `🔁 **Check rapide en échec** après l'agent code : il est relancé avec le rapport (${link('checks.md')}).\n\n${checksTable(checks.report)}${footer}`,
+        );
+        await api.removeLabel(issueNumber, LABEL.CODE); // re-adding the same label wakes the router
+        await api.addLabel(issueNumber, LABEL.CODE);
+        return { outcome: 'retry', next: LABEL.CODE };
+      }
+    }
 
     let body;
     if (agent === 'specs' && result.status === 'QUESTIONS') {
@@ -141,6 +181,21 @@ export function createFinalizer({ api, config, labels, runUrl, branchUrl }) {
       body = `## Spec finale\n\n${result.comment.trim()}\n\n---\n\n${withoutTitle(fileContent)}\n\n<sub>Source : ${fileLink}</sub>`;
     } else if (agent === 'plan') {
       body = `## Plan de développement (tour ${tour})\n\n${result.comment.trim()}\n\nPlan détaillé pour les agents : ${fileLink}. La suite s'enchaîne automatiquement : tests, code, review.`;
+    } else if (agent === 'tests') {
+      body = `## Tests écrits (tour ${tour})\n\n${result.comment.trim()}\n\nDétail : ${fileLink}. Ces tests échouent tant que le code n'existe pas : c'est attendu.`;
+    } else if (agent === 'code') {
+      const pull = await ensurePull(issue, input);
+      body =
+        `## Code prêt pour la review (tour ${tour})\n\n${result.comment.trim()}\n\n` +
+        `Check rapide ✅ (${link('checks.md')}) · pull request : #${pull.number}`;
+    } else if (agent === 'review') {
+      const pull = await api.findPull(input.branch, config.AI_FLOW_INTEGRATION_BRANCH ?? 'integration');
+      const posted = pull ? await postFindings(pull.number, result) : 0;
+      const where = posted ? ` · ${posted} remarque(s) sur la pull request #${pull.number}` : '';
+      body =
+        result.status === 'APPROVED'
+          ? `## Review : approuvé ✅ (tour ${tour})\n\n${result.comment.trim()}\n\nRapport pour le PM rédigé (${link('rapport-pm.md')}) : il sera publié avec la version de test. Review : ${link('review.md')}${where}.`
+          : `## Review : retour au code 🔁 (tour ${tour})\n\n${result.comment.trim()}\n\nDétail : ${link('review.md')}${where}.`;
     } else {
       body = result.comment.trim();
     }
@@ -148,6 +203,41 @@ export function createFinalizer({ api, config, labels, runUrl, branchUrl }) {
     await api.comment(issueNumber, `${body}${footer}`);
     await applyPosition(api, flowLabels, issueNumber, next);
     return { outcome: 'ok', next };
+  }
+
+  /** Draft pull request of the flow branch towards integration, created on first need. */
+  async function ensurePull(issue, input) {
+    const base = config.AI_FLOW_INTEGRATION_BRANCH ?? 'integration';
+    const existing = await api.findPull(input.branch, base);
+    if (existing) return existing;
+    const file = (name) => (branchUrl ? `[${name}](${branchUrl}/${input.runDir}/${name})` : name);
+    return api.createPull({
+      branch: input.branch,
+      base,
+      title: `[#${issue.number}] ${requestTitle(issue.title)}`,
+      body:
+        `Closes #${issue.number}\n\n` +
+        `Pull request ouverte par le flux IA. Elle reste en brouillon jusqu'à la version de test, ` +
+        `puis est fusionnée dans \`${base}\` quand le PM pose \`${LABEL.VALIDATED}\`.\n\n` +
+        `- Spec : ${file('spec.md')}\n- Plan : ${file('plan.md')}\n- Tests : ${file('tests.md')}\n- Notes du code : ${file('code-notes.md')}`,
+      draft: true,
+    });
+  }
+
+  /** Review findings as line comments of a pull request review; returns how many were posted. */
+  async function postFindings(pullNumber, result) {
+    const findings = (result.findings ?? []).filter((f) => f.path && Number.isInteger(f.line) && f.line > 0 && f.body);
+    if (!findings.length) return 0;
+    const verdict = result.status === 'APPROVED' ? 'APPROUVÉ' : 'RETOUR CODE';
+    await api.createReview(pullNumber, {
+      body: `Review du flux IA : **${verdict}**.`,
+      comments: findings.map((f) => ({
+        path: f.path,
+        line: f.line,
+        body: `**${SEVERITY_LABEL[f.severity] ?? f.severity}** — ${f.body}`,
+      })),
+    });
+    return findings.length;
   }
 
   return { finalize };

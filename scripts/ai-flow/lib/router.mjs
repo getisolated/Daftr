@@ -313,7 +313,7 @@ export function createRouter({
           await escalate(
             issue.number,
             'review',
-            `la review a renvoyé le code ${limits.review} fois sans être satisfaite.`,
+            `le code a été repris ${limits.review} fois (retours de la review ou check rapide en échec) sans aboutir.`,
           );
           return none;
         }

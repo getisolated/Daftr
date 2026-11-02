@@ -1,0 +1,39 @@
+name: AI flow · agent review
+
+# Agent review: reviews the whole diff against spec, plan and tests, writes review.md (APPROUVÉ / RETOUR CODE) and, when approved, rapport-pm.md.
+# Called by the router (ai-router.yml) when the issue enters ai:review. Read-only on the code: writes only in its run folder (zone "run"), git read commands only.
+# Prompt: .ai-flow/prompts/review.md.
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        type: number
+        required: true
+      branch:
+        type: string
+        required: true
+      run_dir:
+        type: string
+        required: true
+      tour:
+        type: number
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  review:
+    uses: ./.github/workflows/ai-agent-run.yml
+    with:
+      agent: review
+      issue_number: ${{ inputs.issue_number }}
+      branch: ${{ inputs.branch }}
+      run_dir: ${{ inputs.run_dir }}
+      tour: ${{ inputs.tour }}
+      zone: run
+      toolchain: false
+      verify: false
+      allowed_tools: "Read,Glob,Grep,Edit,Write,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)"
+    secrets: inherit

@@ -43,6 +43,13 @@ testem.log
 # Claude Code pipeline runs (agent memory stays versioned)
 /.claude/runs/
 
+# ts-rs bindings exported by a cargo run outside src-tauri/ (the real ones live in frontend/)
+/src-tauri/crates/*/bindings/
+
+# AI flow job files (see .github/workflows/ai-agent-run.yml)
+/.ai-flow-tools/
+/.ai-flow-context.md
+
 # System files
 .DS_Store
 Thumbs.db

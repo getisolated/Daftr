@@ -1,0 +1,77 @@
+name: AI flow · CI
+
+# CI of the AI flow, on Linux, for every push on a flow branch (ai/*) and every pull request
+# towards integration. The job name `ai-ci-check` is the status check required by the
+# "ai-flow: integration" ruleset (AI_FLOW_INTEGRATION_REQUIRED_CHECKS in .ai-flow/flow.env).
+#
+# It runs scripts/ai-flow/fast-check.sh, the same check as the code agent: Rust format,
+# clippy, Rust tests, front tests, lint and build, plus the TypeScript bindings being
+# committed. Right after the tests agent, a red run is expected: the tests precede the code.
+#
+# The existing ci.yml (Windows and macOS, pull requests to main) is left untouched; the full
+# build of the test version (Windows and macOS installers) arrives with the deploy agent.
+on:
+  push:
+    branches: ['ai/**']
+  pull_request:
+    branches: [integration]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: ai-ci-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AI_FLOW_WORKDIR: ${{ github.workspace }}
+      AI_FLOW_CHECK_BINDINGS: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The flow branch may predate the flow scripts: they come from the default branch.
+      - name: Checkout flow tools (default branch)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .ai-flow-tools
+          sparse-checkout: |
+            .ai-flow
+            scripts/ai-flow
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install system and npm dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
+          npm ci
+
+      - name: Fast check
+        run: |
+          echo ".ai-flow-tools/" >> .git/info/exclude
+          status=0
+          bash .ai-flow-tools/scripts/ai-flow/fast-check.sh "$RUNNER_TEMP/checks.md" || status=$?
+          cat "$RUNNER_TEMP/checks.md" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"

@@ -9,8 +9,9 @@ name: AI flow · agent run (shared)
 #   2. assemble .ai-flow-context.md at the root of the checkout (scripts/ai-flow/build-context.sh);
 #   3. run Claude Code (claude-code-action, Max token) with the agent's prompt, turn budget
 #      and model from .ai-flow/flow.env, and a structured result (.ai-flow/result-schema.json);
-#   4. collect: check the changed paths, commit, push (scripts/ai-flow/collect.sh);
-#   5. finalize: comment in the issue with the cost, set the next state label, or ai:erreur
+#   4. verify (code agent): re-run the fast check, report in <run_dir>/checks.md;
+#   5. collect: check the changed paths, commit, push (scripts/ai-flow/collect.sh);
+#   6. finalize: comment in the issue with the cost, set the next state label, or ai:erreur
 #      (scripts/ai-flow/finalize-action.mjs). Runs even when a previous step failed.
 on:
   workflow_call:
@@ -40,6 +41,10 @@ on:
         required: true
       toolchain:
         description: Install Node and Rust, and the npm dependencies (agents that build or test)
+        type: boolean
+        default: false
+      verify:
+        description: Re-run the fast check after the agent (code agent); the finalisation requires it to pass
         type: boolean
         default: false
 
@@ -95,12 +100,10 @@ jobs:
           ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
         run: |
           set -euo pipefail
-          # Commits are authored by the App's bot user.
-          login="$AI_FLOW_BOT_LOGIN"
-          encoded="${login//\[/%5B}"; encoded="${encoded//\]/%5D}"
-          bot_id="$(gh api "users/$encoded" --jq .id)"
-          git config user.name "$login"
-          git config user.email "${bot_id}+${login}@users.noreply.github.com"
+          # Commits are authored by the App's bot user (also passed to claude-code-action,
+          # which otherwise sets its own claude[bot] identity).
+          git config user.name "$AI_FLOW_BOT_LOGIN"
+          git config user.email "${AI_FLOW_BOT_USER_ID}+${AI_FLOW_BOT_LOGIN}@users.noreply.github.com"
           echo "base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
           upper="${AGENT^^}"
@@ -160,6 +163,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ steps.app.outputs.token }}
+          bot_id: ${{ env.AI_FLOW_BOT_USER_ID }}
+          bot_name: ${{ env.AI_FLOW_BOT_LOGIN }}
           # The router runs agents on the bot's own labels.
           allowed_bots: ${{ env.AI_FLOW_BOT_LOGIN }},${{ env.AI_FLOW_APP_SLUG }}
           prompt: |
@@ -170,6 +175,15 @@ jobs:
             Lis dans l'ordre .ai-flow-tools/.ai-flow/CLAUDE.md, .ai-flow-tools/.ai-flow/prompts/${{ inputs.agent }}.md, puis .ai-flow-context.md, et exécute ta mission.
             Termine par le résultat structuré demandé (status, comment, summary).
           claude_args: ${{ steps.prep.outputs.claude_args }}
+
+      # The agent says the check passes; the workflow checks it again, on what will be pushed.
+      - name: Verify (fast check)
+        id: verify
+        if: always() && inputs.verify && steps.prep.outcome == 'success' && contains(steps.claude.outputs.structured_output, '"DONE"')
+        continue-on-error: true
+        run: |
+          mkdir -p "${{ inputs.run_dir }}"
+          bash "$TOOLS/scripts/ai-flow/fast-check.sh" "${{ inputs.run_dir }}/checks.md"
 
       - name: Collect agent output
         id: collect
@@ -198,6 +212,7 @@ jobs:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
           FORBIDDEN: ${{ steps.collect.outputs.forbidden }}
           PUSH_ERROR: ${{ steps.collect.outcome == 'failure' && 'collect step failed' || steps.collect.outputs.push_error }}
+          CHECKS_STATUS: ${{ steps.verify.outcome == 'success' && 'pass' || steps.verify.outcome == 'failure' && 'fail' || '' }}
         with:
           github-token: ${{ steps.app.outputs.token }}
           script: |

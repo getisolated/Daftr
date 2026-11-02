@@ -52,19 +52,20 @@ Règles d'architecture :
 
 ## 5. Commandes
 
-Depuis la racine du repo, avec des chemins explicites (pas de `cd`) :
+**Cargo se lance depuis `src-tauri/`** (`cd src-tauri && cargo …`), jamais avec `--manifest-path` depuis la racine : seule la configuration `src-tauri/.cargo/config.toml` envoie les bindings TypeScript régénérés par `cargo test` dans `frontend/src/app/core/bindings/`.
 
-| But | Commande |
+| But | Commande (depuis la racine du dépôt) |
 | --- | --- |
-| Dépendances front | `npm ci` |
+| Dépendances front (déjà installées dans les jobs d'agent) | `npm ci` |
 | Tests front (Vitest) | `npm test` |
 | Lint front | `npm run lint` |
-| Tests des scripts Node | `npm run test:scripts` |
-| Format Rust | `cargo fmt --manifest-path src-tauri/Cargo.toml --all --check` |
-| Lint Rust | `cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings` |
-| Tests Rust | `cargo test --manifest-path src-tauri/Cargo.toml --workspace` |
+| Build front (vérifie les templates Angular) | `npm run build:frontend` |
+| Format Rust | `cd src-tauri && cargo fmt --all --check` (`cargo fmt --all` pour corriger) |
+| Lint Rust | `cd src-tauri && cargo clippy --workspace --all-targets -- -D warnings` |
+| Tests Rust (+ régénération des bindings) | `cd src-tauri && cargo test --workspace` |
+| **Check rapide complet** | `bash .ai-flow-tools/scripts/ai-flow/fast-check.sh` |
 
-Le **check rapide** que doivent passer les agents tests et code : format, lint, tests Rust, tests front. Le build complet (`tauri build`, trois OS) est réservé à l'agent deploy, via la CI.
+Le **check rapide** enchaîne format, clippy, tests Rust, tests front, lint front et build front, et affiche un rapport. C'est ce que doit passer l'agent code, ce que le workflow relance après lui, et ce que la CI (`ai-ci-check`) exige pour fusionner dans `integration`. Le build complet de l'application (`tauri build`, Windows et macOS) est réservé à l'agent deploy, via la CI.
 
 ## 6. Règles de code
 

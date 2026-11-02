@@ -3,16 +3,31 @@
   "properties": {
     "status": {
       "type": "string",
-      "enum": ["QUESTIONS", "SPEC_FINALE", "DONE", "BLOCKED"],
-      "description": "Outcome of the mission. specs: QUESTIONS or SPEC_FINALE. Other agents: DONE. Any agent: BLOCKED when the mission cannot be completed."
+      "enum": ["QUESTIONS", "SPEC_FINALE", "DONE", "APPROVED", "CHANGES_REQUESTED", "BLOCKED"],
+      "description": "Outcome of the mission. specs: QUESTIONS or SPEC_FINALE. review: APPROVED or CHANGES_REQUESTED. Other agents: DONE. Any agent: BLOCKED when the mission cannot be completed."
     },
     "comment": {
       "type": "string",
-      "description": "Markdown posted in the issue for the PM, in French, plain language. specs QUESTIONS: the full question block. specs SPEC_FINALE: two lines introducing the final spec. plan DONE: the 5-line summary. BLOCKED: the precise cause and what the PM can do."
+      "description": "Markdown posted in the issue for the PM, in French, plain language. specs QUESTIONS: the full question block. specs SPEC_FINALE: two lines introducing the final spec. plan, tests, code, review: what was done in 2 to 5 lines. BLOCKED: the precise cause and what the PM can do."
     },
     "summary": {
       "type": "string",
       "description": "One technical line for the run log, in English."
+    },
+    "findings": {
+      "type": "array",
+      "description": "review only: line comments posted on the pull request (path relative to the repository root, line number in the new version of the file, comment in English).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "line": { "type": "integer" },
+          "severity": { "type": "string", "enum": ["critical", "important", "suggestion"] },
+          "body": { "type": "string" }
+        },
+        "required": ["path", "line", "severity", "body"],
+        "additionalProperties": false
+      }
     }
   },
   "required": ["status", "comment", "summary"],
