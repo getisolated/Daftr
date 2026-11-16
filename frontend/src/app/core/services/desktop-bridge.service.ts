@@ -53,6 +53,16 @@ export class DesktopBridgeService {
     return this.available ? call('shell_open_external', { url }) : Promise.resolve();
   }
 
+  /** Text of the system clipboard, `null` when it holds none. Read by the main process: the web view restricts reading it. */
+  async readClipboardText(): Promise<string | null> {
+    if (this.available) {
+      return await call<string | null>('clipboard_read_text');
+    }
+
+    // Outside the app (`ng serve` in a browser), the browser asks for the permission itself
+    return await navigator.clipboard.readText();
+  }
+
   /**
    * Asks where to save the export, then writes it: the written path, `null` when cancelled (or outside the app). `pdf` and
    * `pdf-zip` take standalone HTML pages, printed to PDF by the main process.

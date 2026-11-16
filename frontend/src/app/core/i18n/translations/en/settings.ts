@@ -130,6 +130,7 @@ export const EN_SETTINGS = {
   'settings.shortcut.editor.replace': 'Replace In Note',
   'settings.shortcut.editor.preview': 'Toggle Preview',
   'settings.shortcut.editor.previewSide': 'Toggle Preview To The Side',
+  'settings.shortcut.editor.pasteRaw': 'Paste As Plain Text',
   'settings.shortcut.editor.save': 'Save Note',
   'settings.shortcut.editor.bold': 'Bold',
   'settings.shortcut.editor.italic': 'Italic',

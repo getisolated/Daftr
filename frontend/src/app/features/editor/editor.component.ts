@@ -33,7 +33,8 @@ import { externallyChangedContent } from '../../core/utils/external-change.util'
 import { EditorViewMode, NoteViewState, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
 import { TranslationKey } from '../../core/i18n/translations';
-import { noteExportMenu, NoteExportService } from '../../core/services/note-export.service';
+import { NoteExportService } from '../../core/services/note-export.service';
+import { noteExportMenu } from '../../core/utils/export-menu.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions, slashPlaceholder } from '../../shared/codemirror/slash-commands';
@@ -256,6 +257,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Line the preview must bring to the top (editor scrolled, side by side). */
   protected readonly previewScroll = signal<PreviewScrollRequest | null>(null);
   private previewDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** Next slice of the parse of a long note, for its outline (see `refreshOutline`). */
+  private outlineParse: ReturnType<typeof setTimeout> | null = null;
   /** The search, highlighted in the preview too; a new request each time the user moves to a match. */
   protected readonly previewFind = computed<PreviewFind | null>(() => {
     if (!this.find.isOpen()) {
@@ -417,7 +420,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
   }
 
-  /** Ctrl+Shift+V: preview ↔ source. */
+  /** Ctrl+K P: preview ↔ source. */
   togglePreview(): void {
     this.setViewMode(this.viewMode() === 'preview' ? 'source' : 'preview');
   }
@@ -610,6 +613,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private destroyEditor(): void {
+    this.cancelOutlineParse();
     this.editorView?.destroy();
     this.editorView = null;
     this.headings.set([]);
@@ -630,6 +634,10 @@ export class EditorComponent implements OnDestroy, OnChanges {
       if (update.docChanged) {
         this.refreshOutline(update.view);
         this.schedulePreviewRefresh(update.view);
+      }
+      // The parse went further (background parse, scroll): headings may have appeared beyond the part parsed so far
+      if (!update.docChanged && syntaxTree(update.startState) !== syntaxTree(update.state)) {
+        this.refreshOutline(update.view);
       }
       if (update.docChanged && !this.isUpdatingFromModel) {
         const content = update.state.doc.toString();
@@ -820,12 +828,28 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private refreshOutline(view: EditorView): void {
-    const next = extractHeadings(view.state);
+    this.cancelOutlineParse();
+    const { headings: next, complete } = extractHeadings(view.state);
     const current = this.headings();
     const same = next.length === current.length
       && next.every((h, i) => h.from === current[i]!.from && h.text === current[i]!.text && h.level === current[i]!.level);
     if (!same) this.headings.set(next);
     this.refreshActiveHeading(view);
+
+    // A long note is parsed slice by slice, the window handling its events in between
+    if (!complete) {
+      this.outlineParse = setTimeout(() => {
+        this.outlineParse = null;
+        if (this.editorView === view) this.refreshOutline(view);
+      }, 0);
+    }
+  }
+
+  private cancelOutlineParse(): void {
+    if (this.outlineParse) {
+      clearTimeout(this.outlineParse);
+      this.outlineParse = null;
+    }
   }
 
   private headingTop(view: EditorView, heading: Pick<OutlineHeading, 'from'>): number {
@@ -941,7 +965,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         }
 
         if (this.noteExport.canExport(this.activeNote()?.id ?? null)) {
-          items.push({ divider: true }, noteExportMenu(t));
+          items.push({ divider: true }, noteExportMenu(t, this.noteExport.pdfAvailable));
         }
 
         this.ctxMenu.set({ items, x: event.clientX, y: event.clientY });
@@ -1113,6 +1137,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
         },
       },
       {
+        key: keyFor('editor.pasteRaw'),
+        run: (view) => {
+          void this.pasteRaw(view);
+          return true;
+        },
+        preventDefault: true,
+      },
+      {
         key: keyFor('editor.save'),
         run: (view) => {
           const note = this.activeNote();
@@ -1124,6 +1156,29 @@ export class EditorComponent implements OnDestroy, OnChanges {
         },
       },
     ]));
+  }
+
+  /** Ctrl+Shift+V: the clipboard text inserted as is, without the conversions of a paste (spreadsheet cells to a table). */
+  private async pasteRaw(view: EditorView): Promise<void> {
+    if (view.state.readOnly) {
+      return;
+    }
+
+    let text: string | null;
+
+    try {
+      text = await this.bridge.readClipboardText();
+    } catch (err) {
+      console.error('[Editor] Failed to read the clipboard:', err);
+      return;
+    }
+
+    // The note may have been closed or switched while the clipboard was read
+    if (!text || this.editorView !== view) {
+      return;
+    }
+
+    view.dispatch(view.state.replaceSelection(text), { userEvent: 'input.paste', scrollIntoView: true });
   }
 
   private wrapSelection(view: EditorView, before: string, after: string): boolean {

@@ -132,6 +132,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
   'settings.shortcut.editor.replace': 'Remplacer dans la note',
   'settings.shortcut.editor.preview': 'Basculer l\'aperçu',
   'settings.shortcut.editor.previewSide': 'Basculer l\'aperçu sur le côté',
+  'settings.shortcut.editor.pasteRaw': 'Coller en texte brut',
   'settings.shortcut.editor.save': 'Enregistrer la note',
   'settings.shortcut.editor.bold': 'Gras',
   'settings.shortcut.editor.italic': 'Italique',
