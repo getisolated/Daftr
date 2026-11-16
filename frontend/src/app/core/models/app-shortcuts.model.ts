@@ -44,9 +44,11 @@ export const APP_SHORTCUTS: AppShortcutDefinition[] = [
   { id: 'editor.find', labelKey: 'settings.shortcut.editor.find', defaultAccelerator: 'CommandOrControl+F' },
   // ⌘H hides the application on macOS: ⌥⌘F there, like VS Code and Xcode
   { id: 'editor.replace', labelKey: 'settings.shortcut.editor.replace', defaultAccelerator: 'CommandOrControl+H', macDefaultAccelerator: 'CommandOrControl+Alt+F' },
-  { id: 'editor.preview', labelKey: 'settings.shortcut.editor.preview', defaultAccelerator: 'CommandOrControl+Shift+V' },
+  // Not Ctrl+Shift+V: it pastes as plain text, as in most applications. Ctrl+K then P alone, next to the preview to the side
+  { id: 'editor.preview', labelKey: 'settings.shortcut.editor.preview', defaultAccelerator: 'CommandOrControl+K, P' },
   // Like VS Code: Ctrl+K then V alone
   { id: 'editor.previewSide', labelKey: 'settings.shortcut.editor.previewSide', defaultAccelerator: 'CommandOrControl+K, V' },
+  { id: 'editor.pasteRaw', labelKey: 'settings.shortcut.editor.pasteRaw', defaultAccelerator: 'CommandOrControl+Shift+V' },
   { id: 'editor.save', labelKey: 'settings.shortcut.editor.save', defaultAccelerator: 'CommandOrControl+S' },
   { id: 'editor.bold', labelKey: 'settings.shortcut.editor.bold', defaultAccelerator: 'CommandOrControl+B' },
   { id: 'editor.italic', labelKey: 'settings.shortcut.editor.italic', defaultAccelerator: 'CommandOrControl+I' },

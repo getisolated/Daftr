@@ -484,12 +484,17 @@ export class PaletteComponent implements OnDestroy {
       },
     });
 
-    return [
+    const commands = [
       command('copy-note-content', 'copyNoteContent', 'export:copy'),
       command('export-note-md', 'exportNoteMd', 'export:md'),
       command('export-note-html', 'exportNoteHtml', 'export:html'),
-      command('export-note-pdf', 'exportNotePdf', 'export:pdf'),
     ];
+
+    if (this.noteExport.pdfAvailable) {
+      commands.push(command('export-note-pdf', 'exportNotePdf', 'export:pdf'));
+    }
+
+    return commands;
   }
 
   private openGraphView(): void {

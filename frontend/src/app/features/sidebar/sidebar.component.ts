@@ -23,7 +23,8 @@ import { TabsService } from '../../core/services/tabs.service';
 import { UpdateService } from '../../core/services/update.service';
 import { CollectionsService } from '../../core/services/collections.service';
 import { PlatformService } from '../../core/services/platform.service';
-import { NoteExportService, folderExportMenu, noteExportMenu, selectionExportMenu } from '../../core/services/note-export.service';
+import { NoteExportService } from '../../core/services/note-export.service';
+import { folderExportMenu, noteExportMenu, selectionExportMenu } from '../../core/utils/export-menu.util';
 import {
   buildFolderTree,
   canMoveFolder,
@@ -482,7 +483,7 @@ export class SidebarComponent {
     ];
 
     if (node.noteCount > 0) {
-      items.push({ divider: true }, ...folderExportMenu(t));
+      items.push({ divider: true }, ...folderExportMenu(t, this.noteExport.pdfAvailable));
     }
 
     items.push({ divider: true });
@@ -522,7 +523,7 @@ export class SidebarComponent {
 
     const t = this.i18n.t;
     const items: ContextMenuEntry[] = [
-      noteExportMenu(t),
+      noteExportMenu(t, this.noteExport.pdfAvailable),
       { divider: true },
       { id: 'moveTo', label: t('sidebar.menu.moveTo'), icon: ICON_MOVE },
       { id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR },
@@ -536,7 +537,7 @@ export class SidebarComponent {
   private openSelectionMenu(event: MouseEvent, target: SidebarDragItem, targets: SidebarDragItem[]): void {
     const t = this.i18n.t;
     const items: ContextMenuEntry[] = [
-      selectionExportMenu(t),
+      selectionExportMenu(t, this.noteExport.pdfAvailable),
       { divider: true },
       { id: 'moveTo', label: t('sidebar.menu.moveItems', { count: targets.length }), icon: ICON_MOVE },
       { id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR },
@@ -545,6 +546,17 @@ export class SidebarComponent {
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, target, targets });
+  }
+
+  /** Double-click on the empty area of the tree (not on a row): a new note, as from the context menu of that area. */
+  protected async onRootDoubleClick(event: MouseEvent): Promise<void> {
+    const onRow = event.target instanceof Element && event.target.closest('.row') !== null;
+
+    if (onRow) {
+      return;
+    }
+
+    await this.newNote();
   }
 
   protected onRootContextMenu(event: MouseEvent): void {
