@@ -1,6 +1,16 @@
 import { EditorState } from '@codemirror/state';
-import { syntaxTree } from '@codemirror/language';
+import { ensureSyntaxTree, syntaxTree } from '@codemirror/language';
 import { anchorMatches, createHeadingSlugger, headingSourceText } from '../../core/utils/heading-anchor.util';
+
+/**
+ * CodeMirror only parses around the visible part (and not at all while the editor is hidden behind the preview): the
+ * headings further down a long note would be missing. The rest is parsed by slices of this duration, so that a very long
+ * note does not freeze the window. The parse is kept by the state: after an edit, only the changed part is parsed again.
+ */
+const PARSE_SLICE_MS = 100;
+
+/** Following a link fragment is a one-off action: the whole document can be parsed at once. */
+const ANCHOR_PARSE_BUDGET_MS = 2000;
 
 export interface OutlineHeading {
   level: 1 | 2 | 3;
@@ -9,11 +19,19 @@ export interface OutlineHeading {
   from: number;
 }
 
-/** h1, h2 and h3 headings of the document, read from the syntax tree so that `#` lines inside code blocks are ignored. */
-export function extractHeadings(state: EditorState): OutlineHeading[] {
-  const headings: OutlineHeading[] = [];
+/** Headings found so far, and whether the document was parsed to its end (when not, a new call continues the parse). */
+export interface OutlineExtraction {
+  headings: OutlineHeading[];
+  complete: boolean;
+}
 
-  syntaxTree(state).iterate({
+/** h1, h2 and h3 headings of the document, read from the syntax tree so that `#` lines inside code blocks are ignored. */
+export function extractHeadings(state: EditorState, budgetMs = PARSE_SLICE_MS): OutlineExtraction {
+  const headings: OutlineHeading[] = [];
+  const fullTree = ensureSyntaxTree(state, state.doc.length, budgetMs);
+  const tree = fullTree ?? syntaxTree(state);
+
+  tree.iterate({
     enter: node => {
       const match = /^(?:ATXHeading([123])|SetextHeading([12]))$/.exec(node.name);
       if (!match) return;
@@ -28,7 +46,7 @@ export function extractHeadings(state: EditorState): OutlineHeading[] {
     },
   });
 
-  return headings;
+  return { headings, complete: fullTree !== null };
 }
 
 /** Index of the heading the reader is currently in: the last one whose top went past `offset` px from the viewport top. */
@@ -48,7 +66,9 @@ export function findHeadingByAnchor(state: EditorState, anchor: string): number 
   const slugOf = createHeadingSlugger();
   let found: number | null = null;
 
-  syntaxTree(state).iterate({
+  const tree = ensureSyntaxTree(state, state.doc.length, ANCHOR_PARSE_BUDGET_MS) ?? syntaxTree(state);
+
+  tree.iterate({
     enter: node => {
       if (found !== null) return false;
       if (!/^(?:ATXHeading[1-6]|SetextHeading[12])$/.test(node.name)) return;

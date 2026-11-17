@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  A fast, keyboard-driven note-taking app for Windows and macOS.<br />
+  A fast, keyboard-driven note-taking app for Windows, macOS and Linux.<br />
   Markdown editor, full-text search, folders, tags, backlinks and a graph of your notes — all stored locally.
 </p>
 
@@ -38,19 +38,25 @@
 2. Open it and drag **Daftr** into **Applications**.
 3. The macOS build is not notarized yet, so the first launch is refused (« Apple could not verify… »). Open **System Settings → Privacy & Security** and click **Open Anyway** (the button appears after that first attempt), or run `xattr -cr /Applications/Daftr.app` once in a terminal.
 
+### Linux
+
+1. Download `Daftr_<version>_amd64.AppImage` from the [latest release](https://github.com/getisolated/Daftr/releases/latest) (x86_64, glibc 2.35 or later: Ubuntu 22.04, Debian 12, Fedora 36…).
+2. Make it executable (`chmod +x Daftr_*.AppImage`) and run it. Some distributions need `libfuse2` to run AppImages.
+3. PDF export is not available on Linux yet; Markdown and HTML exports are.
+
 ### Updates and data
 
-Daftr checks for updates at startup and every hour, and offers them in a popup. Turn on **Settings → Automatic Updates** to download them in the background and install them when the app closes. On macOS the updater replaces `Daftr.app` in place, so the steps above are needed only once.
+Daftr checks for updates at startup and every hour, and offers them in a popup. Turn on **Settings → Automatic Updates** to download them in the background and install them when the app closes. On macOS the updater replaces `Daftr.app` in place, and on Linux the AppImage itself, so the steps above are needed only once.
 
-Your data stays on your machine: notes live in a SQLite database and settings in a JSON file, both under `%APPDATA%\daftr` on Windows and `~/Library/Application Support/daftr` on macOS.
+Your data stays on your machine: notes live in a SQLite database and settings in a JSON file, both under `%APPDATA%\daftr` on Windows, `~/Library/Application Support/daftr` on macOS and `~/.local/share/daftr` on Linux.
 
 ## Features
 
-- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. `Tab` / `Shift+Tab` on a list item nests it under the previous item or brings it back up, numbered lists being renumbered at both levels. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables. Multiple cursors like VS Code: `Alt+click` adds a cursor, `Shift+Alt+drag` selects a column, `Ctrl+D` adds the next occurrence to the selection, `Ctrl+Shift+L` selects them all (accents compared exactly, Match Case / Match Whole Word toggles shown above the selection), `Esc` goes back to a single cursor.
+- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. `Tab` / `Shift+Tab` on a list item nests it under the previous item or brings it back up, numbered lists being renumbered at both levels. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables (`Ctrl+Shift+V` pastes the text as is). Multiple cursors like VS Code: `Alt+click` adds a cursor, `Shift+Alt+drag` selects a column, `Ctrl+D` adds the next occurrence to the selection, `Ctrl+Shift+L` selects them all (accents compared exactly, Match Case / Match Whole Word toggles shown above the selection), `Esc` goes back to a single cursor.
 - **Preview** — GitHub-like rendering (tables, task lists, footnotes, `> [!NOTE]` alerts, syntax-colored code, Mermaid diagrams). *Source*, *side by side* with synchronized scrolling, or *Preview*; notes can open rendered by default.
 - **Full-text search** — instant search across every note (SQLite FTS5), from the command palette (`Ctrl+Shift+F`). Find & replace inside a note (`Ctrl+F` / `Ctrl+H`) with match case, whole word and regular expressions, and the list of matches.
 - **Command palette** — `F1` to search notes, commands and tags.
-- **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. New notes land in `Inbox`.
+- **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. Double-click the empty area of the tree for a new note. New notes land in `Inbox`.
 - **Tags** — organize notes with tags and filter from the sidebar.
 - **Backlinks & graph** — link notes with `[label](Folder/Note title)` (autocompleted) or `note://ID`. A panel under the editor lists the notes linking to the active one; the home page draws an Obsidian-like graph of all links (zoom, pan, drag, click to open, colored by folder). `Ctrl+click` follows a link.
 - **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. Right-click a file, a folder or a multi-selection (`Ctrl+click` / `Shift+click`) and *Copy To…* to copy them into your notes, folder structure included: each note is titled after its file, and the links between the copied files keep working. Links to a chapter (`#heading`, `guide.md#heading`) scroll to it, in the source (`Ctrl+click`) as in the preview. `.md` files open with Daftr from the Explorer or the Finder.
@@ -58,7 +64,7 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 - **Zen mode** — `Ctrl+K` `Z` hides the tabs, the outline and the sidebar. The sidebar then floats tucked away on the left edge and slides in when the pointer reaches it (or with `Ctrl+Shift+E`). With **Settings → Zen Mode Always on Top**, the window stays above the other applications while in zen mode.
 - **Formatting bar** — a Word-like toolbar reflecting the formatting under the caret. `Alt+T` toggles it; size, style and position are settings.
 - **Quick-note overlay** — a global shortcut (`Ctrl+Alt+Q` by default, `⌥⌘Q` on macOS) pops a small always-on-top window anywhere on screen. Notes sent from it are gathered in a single *Quick notes* document, where each one can be copied, edited, deleted or converted into a regular note (filed in *Inbox* if it has no folder).
-- **Copy & export** — copy a note as markdown, export it as Markdown, standalone HTML or PDF (A4 pages, rendered like the preview: tables, colored code, Mermaid diagrams). Export a folder, or a multi-selection of notes and folders, as a ZIP of `.md` files or of PDF files.
+- **Copy & export** — copy a note as markdown, export it as Markdown, standalone HTML or PDF (Windows and macOS; A4 pages, rendered like the preview: tables, colored code, Mermaid diagrams). Export a folder, or a multi-selection of notes and folders, as a ZIP of `.md` files or of PDF files.
 - **Themes** — Dark (default), Light, GitHub Light, Solarized Light, Violet Light, GitHub Dark Dimmed, or *System* following the OS. `Ctrl+K Ctrl+T` previews them live.
 - **Settings** — a VS Code-like settings editor (`Ctrl+,`) with search, categories and reset to default. Every shortcut can be rebound there.
 - **System tray / menu bar** — closing the window keeps Daftr running in the tray; optional launch at Windows startup. On macOS it stays in the Dock and the menu bar (`⇧⌘W` closes the window the same way), `⌘Q` quits, and *Launch at login* is optional; the menu bar icon can be turned off in Settings (Daftr keeps running in the Dock).
@@ -81,11 +87,12 @@ Every shortcut below is a default and can be rebound in **Settings → Keyboard 
 | `Ctrl+Shift+F`                       | `⇧⌘F`                        | Search all notes |
 | `Ctrl+F` / `Ctrl+H`                  | `⌘F` / `⌥⌘F`                 | Find / find & replace in the note |
 | `Ctrl+B` / `Ctrl+I` / `Ctrl+Shift+K` | `⌘B` / `⌘I` / `⇧⌘K`          | Bold / italic / link |
+| `Ctrl+Shift+V`                       | `⇧⌘V`                        | Paste as plain text (no conversion to a table) |
 | `Ctrl+Shift+D`                       | `⇧⌘D`                        | Toggle a draft block |
 | `Ctrl+D`                             | `⌘D`                         | Add the next occurrence to the selection |
 | `Ctrl+Shift+L`                       | `⇧⌘L`                        | Select every occurrence of the selection |
 | `Alt+click` / `Shift+Alt+drag`       | `⌥click` / `⇧⌥drag`          | Add a cursor / column selection |
-| `Ctrl+Shift+V`                       | `⇧⌘V`                        | Toggle the preview |
+| `Ctrl+K` `P` (chord)                 | `⌘K` `P` (chord)             | Toggle the preview |
 | `Ctrl+K` `V` (chord)                 | `⌘K` `V` (chord)             | Toggle the side-by-side preview |
 | `Ctrl+Shift+E`                       | `⇧⌘E`                        | Toggle the sidebar |
 | `Alt+T`                              | `⌥T`                         | Toggle the formatting bar |
@@ -143,10 +150,10 @@ Daftr is an Angular frontend inside a Tauri 2 (Rust) shell, with SQLite for stor
 |-------|-----------|
 | Frontend | Angular 22 (standalone components, signals, OnPush) |
 | Editor | CodeMirror 6 with custom markdown decorations |
-| Desktop | Tauri 2 (Rust, WebView2 on Windows, WKWebView on macOS), frameless window with a custom title bar on Windows, native traffic lights over the tab bar on macOS |
+| Desktop | Tauri 2 (Rust, WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), frameless window with a custom title bar on Windows and Linux, native traffic lights over the tab bar on macOS |
 | Database | SQLite (rusqlite, bundled) with FTS5, WAL mode, cached prepared statements |
 | Bindings | Rust → TypeScript types generated by ts-rs (`frontend/src/app/core/bindings`) |
-| Build | Tauri bundler (NSIS installer on Windows, DMG on macOS), GitHub Actions CI/CD |
+| Build | Tauri bundler (NSIS installer on Windows, DMG on macOS, AppImage on Linux), GitHub Actions CI/CD |
 
 ### Prerequisites
 
@@ -154,6 +161,7 @@ Daftr is an Angular frontend inside a Tauri 2 (Rust) shell, with SQLite for stor
 - Rust stable (1.90+)
 - Windows: the MSVC toolchain and WebView2 (included in Windows 11)
 - macOS: Xcode Command Line Tools (`xcode-select --install`)
+- Linux (Debian / Ubuntu): `sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential`
 
 ### Run, test, build
 
@@ -210,9 +218,9 @@ frontend/src/app/
 
 ### Releases
 
-Every merge on `main` publishes a release (`.github/workflows/release.yml`). The version is computed from the commits since the last `vX.Y.Z` tag following [Conventional Commits](https://www.conventionalcommits.org/): `type!:` / `BREAKING CHANGE` bumps the major, `feat:` the minor, anything else the patch. A squash-merged PR counts as one commit whose title is the PR title, so **the PR title decides the bump**. The CI checks (Angular tests, `cargo fmt`, `clippy`, Rust tests, on Windows and macOS) must pass first.
+Every merge on `main` publishes a release (`.github/workflows/release.yml`). The version is computed from the commits since the last `vX.Y.Z` tag following [Conventional Commits](https://www.conventionalcommits.org/): `type!:` / `BREAKING CHANGE` bumps the major, `feat:` the minor, anything else the patch. A squash-merged PR counts as one commit whose title is the PR title, so **the PR title decides the bump**. The CI checks (Angular tests, `cargo fmt`, `clippy`, Rust tests, on Windows, macOS and Linux) must pass first.
 
-Two jobs build the app: `build-windows` (NSIS installer) and `build-macos` (Apple Silicon DMG and the updater archive). Each produces its artifacts and their signatures. The `release` job then merges them into a single `latest.json` (`windows-x86_64` and `darwin-aarch64` entries) that the app queries to offer updates. If one platform fails, the whole release is blocked.
+Three jobs build the app: `build-windows` (NSIS installer), `build-macos` (Apple Silicon DMG and the updater archive) and `build-linux` (x86_64 AppImage, also the updater artifact). Each produces its artifacts and their signatures. The `release` job then merges them into a single `latest.json` (`windows-x86_64`, `darwin-aarch64` and `linux-x86_64` entries) that the app queries to offer updates. If one platform fails, the whole release is blocked.
 
 For the secrets and the update manifest, see the header comments of `.github/workflows/release.yml` and `scripts/update-manifest.mjs`.
 

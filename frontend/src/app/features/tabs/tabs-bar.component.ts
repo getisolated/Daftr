@@ -14,7 +14,8 @@ import { noteDisplayTitle } from '../../core/utils/note-title.util';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { QUICK_NOTES_TAB_ID, Tab } from '../../core/models/note.model';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
-import { NoteExportService, noteExportMenu } from '../../core/services/note-export.service';
+import { NoteExportService } from '../../core/services/note-export.service';
+import { noteExportMenu } from '../../core/utils/export-menu.util';
 
 @Component({
   selector: 'app-tabs-bar',
@@ -358,7 +359,7 @@ export class TabsBarComponent {
     ];
 
     if (this.noteExport.canExport(tab.noteId)) {
-      items.push({ divider: true }, noteExportMenu(this.i18n.t));
+      items.push({ divider: true }, noteExportMenu(this.i18n.t, this.noteExport.pdfAvailable));
     }
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, tabIndex: index });

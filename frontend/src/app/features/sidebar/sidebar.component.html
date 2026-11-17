@@ -28,6 +28,7 @@
   class="tree"
   [class.drop-root]="dropTarget() === 'root'"
   (contextmenu)="onRootContextMenu($event)"
+  (dblclick)="onRootDoubleClick($event)"
   (dragover)="onRootDragOver($event)"
   (dragleave)="onTreeDragLeave($event)"
   (drop)="onDrop($event)"

@@ -17,7 +17,7 @@ function run(dir) {
   return { ...result, output };
 }
 
-function fixture({ windows = true, mac = true } = {}) {
+function fixture({ windows = true, mac = true, linux = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'manifest-'));
   if (windows) {
     writeFileSync(join(dir, 'Daftr_1.2.3_x64-setup.exe'), 'exe-bytes');
@@ -27,26 +27,31 @@ function fixture({ windows = true, mac = true } = {}) {
     writeFileSync(join(dir, 'Daftr_1.2.3_aarch64.app.tar.gz'), 'tar-bytes');
     writeFileSync(join(dir, 'Daftr_1.2.3_aarch64.app.tar.gz.sig'), 'sig-mac\n');
   }
+  if (linux) {
+    writeFileSync(join(dir, 'Daftr_1.2.3_amd64.AppImage'), 'appimage-bytes');
+    writeFileSync(join(dir, 'Daftr_1.2.3_amd64.AppImage.sig'), 'sig-linux\n');
+  }
   return dir;
 }
 
 const base = 'https://github.com/owner/repo/releases/download/v1.2.3';
 
-test('both platforms', () => {
+test('all platforms', () => {
   const { status, output } = run(fixture());
   assert.equal(status, 0);
   const m = JSON.parse(readFileSync(output, 'utf-8'));
   assert.equal(m.version, '1.2.3');
-  assert.deepEqual(Object.keys(m.platforms).sort(), ['darwin-aarch64', 'windows-x86_64']);
+  assert.deepEqual(Object.keys(m.platforms).sort(), ['darwin-aarch64', 'linux-x86_64', 'windows-x86_64']);
   assert.deepEqual(m.platforms['windows-x86_64'], { signature: 'sig-win', url: `${base}/Daftr_1.2.3_x64-setup.exe` });
   assert.deepEqual(m.platforms['darwin-aarch64'], { signature: 'sig-mac', url: `${base}/Daftr_1.2.3_aarch64.app.tar.gz` });
+  assert.deepEqual(m.platforms['linux-x86_64'], { signature: 'sig-linux', url: `${base}/Daftr_1.2.3_amd64.AppImage` });
   assert.equal(m.path, 'Daftr_1.2.3_x64-setup.exe');
   assert.equal(m.url, `${base}/Daftr_1.2.3_x64-setup.exe`);
   assert.equal(m.sha512, createHash('sha512').update('exe-bytes').digest('hex'));
 });
 
 test('missing macOS: warning, Windows kept', () => {
-  const { status, stderr, output } = run(fixture({ mac: false }));
+  const { status, stderr, output } = run(fixture({ mac: false, linux: false }));
   assert.equal(status, 0);
   assert.match(stderr, /darwin-aarch64/);
   const m = JSON.parse(readFileSync(output, 'utf-8'));
@@ -54,7 +59,7 @@ test('missing macOS: warning, Windows kept', () => {
 });
 
 test('missing Windows: no legacy fields', () => {
-  const { status, output } = run(fixture({ windows: false }));
+  const { status, output } = run(fixture({ windows: false, linux: false }));
   assert.equal(status, 0);
   const m = JSON.parse(readFileSync(output, 'utf-8'));
   assert.deepEqual(Object.keys(m.platforms), ['darwin-aarch64']);
@@ -63,11 +68,11 @@ test('missing Windows: no legacy fields', () => {
 });
 
 test('no platform: error', () => {
-  assert.notEqual(run(fixture({ windows: false, mac: false })).status, 0);
+  assert.notEqual(run(fixture({ windows: false, mac: false, linux: false })).status, 0);
 });
 
 test('artifact without signature is left out', () => {
-  const dir = fixture({ mac: false });
+  const dir = fixture({ mac: false, linux: false });
   writeFileSync(join(dir, 'Daftr_1.2.3_aarch64.app.tar.gz'), 'x');
   const m = JSON.parse(readFileSync(run(dir).output, 'utf-8'));
   assert.deepEqual(Object.keys(m.platforms), ['windows-x86_64']);

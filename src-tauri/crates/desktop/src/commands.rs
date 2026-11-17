@@ -3,6 +3,7 @@
 //! Toutes sont asynchrones : elles tournent hors du thread principal, qui garde la main sur
 //! les fenêtres (les dialogues bloquants en dépendent).
 
+mod clipboard;
 mod collections;
 mod export;
 mod folders;
@@ -61,5 +62,6 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         updates::update_get_info,
         updates::update_apply,
         shell::shell_open_external,
+        clipboard::clipboard_read_text,
     ]
 }

@@ -7,6 +7,7 @@
 // Platforms, each built by its own CI job and merged here:
 // - windows-x86_64: `*-setup.exe` + `.sig`
 // - darwin-aarch64: `*.app.tar.gz` + `.sig`
+// - linux-x86_64: `*.AppImage` + `.sig` (the AppImage replaces itself in place)
 // A missing platform is left out with a warning; no platform at all is an error.
 //
 // Usage: node scripts/update-manifest.mjs <artifacts dir> <tag> <owner/repo> <output file>
@@ -33,6 +34,7 @@ const files = listFiles(artifactsDir);
 const targets = {
   'windows-x86_64': '-setup.exe',
   'darwin-aarch64': '.app.tar.gz',
+  'linux-x86_64': '.AppImage',
 };
 
 // `basename` and not a split on `/`: the CI also runs the tests on Windows (`\` separators)
