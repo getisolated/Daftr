@@ -30,6 +30,8 @@ function fixture({ windows = true, mac = true, linux = true } = {}) {
   if (linux) {
     writeFileSync(join(dir, 'Daftr_1.2.3_amd64.AppImage'), 'appimage-bytes');
     writeFileSync(join(dir, 'Daftr_1.2.3_amd64.AppImage.sig'), 'sig-linux\n');
+    writeFileSync(join(dir, 'Daftr_1.2.3_amd64.deb'), 'deb-bytes');
+    writeFileSync(join(dir, 'Daftr_1.2.3_amd64.deb.sig'), 'sig-deb\n');
   }
   return dir;
 }
@@ -41,10 +43,11 @@ test('all platforms', () => {
   assert.equal(status, 0);
   const m = JSON.parse(readFileSync(output, 'utf-8'));
   assert.equal(m.version, '1.2.3');
-  assert.deepEqual(Object.keys(m.platforms).sort(), ['darwin-aarch64', 'linux-x86_64', 'windows-x86_64']);
+  assert.deepEqual(Object.keys(m.platforms).sort(), ['darwin-aarch64', 'linux-x86_64', 'linux-x86_64-deb', 'windows-x86_64']);
   assert.deepEqual(m.platforms['windows-x86_64'], { signature: 'sig-win', url: `${base}/Daftr_1.2.3_x64-setup.exe` });
   assert.deepEqual(m.platforms['darwin-aarch64'], { signature: 'sig-mac', url: `${base}/Daftr_1.2.3_aarch64.app.tar.gz` });
   assert.deepEqual(m.platforms['linux-x86_64'], { signature: 'sig-linux', url: `${base}/Daftr_1.2.3_amd64.AppImage` });
+  assert.deepEqual(m.platforms['linux-x86_64-deb'], { signature: 'sig-deb', url: `${base}/Daftr_1.2.3_amd64.deb` });
   assert.equal(m.path, 'Daftr_1.2.3_x64-setup.exe');
   assert.equal(m.url, `${base}/Daftr_1.2.3_x64-setup.exe`);
   assert.equal(m.sha512, createHash('sha512').update('exe-bytes').digest('hex'));

@@ -8,6 +8,8 @@
 // - windows-x86_64: `*-setup.exe` + `.sig`
 // - darwin-aarch64: `*.app.tar.gz` + `.sig`
 // - linux-x86_64: `*.AppImage` + `.sig` (the AppImage replaces itself in place)
+// - linux-x86_64-deb: `*.deb` + `.sig` (installed with `dpkg`). The updater of a .deb install
+//   looks up `linux-x86_64-deb` before `linux-x86_64`; an AppImage never reads this key.
 // A missing platform is left out with a warning; no platform at all is an error.
 //
 // Usage: node scripts/update-manifest.mjs <artifacts dir> <tag> <owner/repo> <output file>
@@ -35,6 +37,7 @@ const targets = {
   'windows-x86_64': '-setup.exe',
   'darwin-aarch64': '.app.tar.gz',
   'linux-x86_64': '.AppImage',
+  'linux-x86_64-deb': '.deb',
 };
 
 // `basename` and not a split on `/`: the CI also runs the tests on Windows (`\` separators)
