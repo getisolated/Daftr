@@ -10,7 +10,7 @@ use crate::state::desktop;
 
 #[tauri::command]
 pub async fn folders_get_all(app: AppHandle) -> IpcResult<Vec<FolderDto>> {
-    folders::all(&desktop(&app).services.folders)
+    folders::all(&desktop(&app).services.data.get()?.folders)
 }
 
 #[tauri::command]
@@ -19,12 +19,16 @@ pub async fn folders_create(
     name: String,
     parent_id: Option<i64>,
 ) -> IpcResult<Option<FolderDto>> {
-    folders::create(&desktop(&app).services.folders, &name, parent_id)
+    folders::create(
+        &desktop(&app).services.data.get()?.folders,
+        &name,
+        parent_id,
+    )
 }
 
 #[tauri::command]
 pub async fn folders_rename(app: AppHandle, id: i64, name: String) -> IpcResult<Option<FolderDto>> {
-    folders::rename(&desktop(&app).services.folders, id, &name)
+    folders::rename(&desktop(&app).services.data.get()?.folders, id, &name)
 }
 
 #[tauri::command]
@@ -33,7 +37,7 @@ pub async fn folders_move(
     id: i64,
     parent_id: Option<i64>,
 ) -> IpcResult<Option<FolderDto>> {
-    folders::move_to(&desktop(&app).services.folders, id, parent_id)
+    folders::move_to(&desktop(&app).services.data.get()?.folders, id, parent_id)
 }
 
 #[tauri::command]
@@ -43,7 +47,12 @@ pub async fn folders_place(
     parent_id: Option<i64>,
     ordered_ids: Vec<i64>,
 ) -> IpcResult<Option<FolderDto>> {
-    folders::place(&desktop(&app).services.folders, id, parent_id, &ordered_ids)
+    folders::place(
+        &desktop(&app).services.data.get()?.folders,
+        id,
+        parent_id,
+        &ordered_ids,
+    )
 }
 
 /// Supprime un dossier ; ses notes ont pu disparaître : l'autre fenêtre relit sa liste.
@@ -54,7 +63,11 @@ pub async fn folders_delete(
     id: i64,
     mode: Option<String>,
 ) -> IpcResult<Option<Vec<i64>>> {
-    let deleted = folders::delete(&desktop(&app).services.folders, id, mode.as_deref())?;
+    let deleted = folders::delete(
+        &desktop(&app).services.data.get()?.folders,
+        id,
+        mode.as_deref(),
+    )?;
     emit_except(&app, window.label(), NOTES_CHANGED, ());
     Ok(deleted)
 }
@@ -66,7 +79,7 @@ pub async fn folders_empty(
     window: WebviewWindow,
     id: i64,
 ) -> IpcResult<Option<Vec<i64>>> {
-    let deleted = folders::empty(&desktop(&app).services.folders, id)?;
+    let deleted = folders::empty(&desktop(&app).services.data.get()?.folders, id)?;
     emit_except(&app, window.label(), NOTES_CHANGED, ());
     Ok(deleted)
 }
@@ -77,5 +90,9 @@ pub async fn folders_set_color(
     ids: Vec<i64>,
     color: Option<String>,
 ) -> IpcResult<bool> {
-    folders::set_color(&desktop(&app).services.folders, &ids, color.as_deref())
+    folders::set_color(
+        &desktop(&app).services.data.get()?.folders,
+        &ids,
+        color.as_deref(),
+    )
 }

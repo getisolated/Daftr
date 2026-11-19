@@ -1024,6 +1024,7 @@ version = "1.7.0"
 dependencies = [
  "adapter-fs",
  "adapter-mcp",
+ "adapter-password",
  "adapter-print",
  "adapter-sqlite",
  "anyhow",
@@ -1043,6 +1044,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tempfile",
  "tracing",
  "window-vibrancy",
 ]

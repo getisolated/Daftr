@@ -8,6 +8,7 @@ mod collection;
 mod folder;
 mod mcp;
 mod note;
+mod profile;
 mod settings;
 mod update;
 
@@ -18,5 +19,6 @@ pub use collection::{
 pub use folder::FolderDto;
 pub use mcp::{McpErrorKind, McpState, McpStatusDto};
 pub use note::{ExportProgressDto, ExportedNoteDto, NoteChangesDto, NoteDto};
+pub use profile::{ProfileDto, ProfilesStateDto, TransferResultDto};
 pub use settings::{OverlayPositionDto, SettingsDto, SettingsUpdateResultDto};
 pub use update::{UpdateInfoDto, UpdateProgressDto};
