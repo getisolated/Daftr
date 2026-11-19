@@ -7,7 +7,9 @@ use domain::sync::{DeviceKey, DeviceName, DocId, SpaceId};
 use domain::uuid::Uuid;
 use platform::sync::lock;
 
-use crate::ports::sync::{Applied, ChangedDoc, PeerState, RemoteSnapshot, RemoteUpdate, SyncStore};
+use crate::ports::sync::{
+    Applied, ChangedDoc, PeerState, ProfileOffer, RemoteSnapshot, RemoteUpdate, SyncStore,
+};
 use crate::sync::merge::{self, LocalFolder, LocalNote, MergeInput, MergePlan};
 use crate::sync::note_doc::{self, NoteDoc, NoteEdit, NoteFields, ProjectedNote};
 use crate::sync::space_doc::{self, FolderFields, NewSpace, ProjectedSpace, SpaceDoc};
@@ -106,16 +108,7 @@ impl MemorySyncStore {
     /// Crée ou modifie un dossier de l'espace.
     pub fn put_folder(&self, uuid: Uuid, fields: &FolderFields) -> AppResult<()> {
         self.update_space(|space| space_doc::put_folder(space, uuid, fields))
-    }
-
-    /// Ajoute un appareil à l'espace.
-    pub fn add_device(&self, key: &DeviceKey, name: &DeviceName, now: &str) -> AppResult<()> {
-        self.update_space(|space| space_doc::add_device(space, key, name, now))
-    }
-
-    /// Révoque un appareil de l'espace.
-    pub fn revoke_device(&self, key: &DeviceKey, now: &str) -> AppResult<()> {
-        self.update_space(|space| space_doc::revoke_device(space, key, now))
+            .map(|_| ())
     }
 
     /// Crée une note locale.
@@ -165,16 +158,17 @@ impl MemorySyncStore {
         Ok(Some(space_doc::project(&doc, &space_id)))
     }
 
-    fn update_space(&self, change: impl FnOnce(&SpaceDoc) -> bool) -> AppResult<()> {
+    fn update_space(&self, change: impl FnOnce(&SpaceDoc) -> bool) -> AppResult<bool> {
         let mut state = self.state();
         let doc = match state.docs.get(&DocId::Space) {
             Some((blob, _)) => SpaceDoc::load(&self.device, blob)?,
             None => return Err(crate::AppError::storage("profile not synchronized")),
         };
-        if change(&doc) {
+        let changed = change(&doc);
+        if changed {
             state.write(DocId::Space, doc.encode());
         }
-        Ok(())
+        Ok(changed)
     }
 
     fn update_note(&self, uuid: Uuid, change: impl FnOnce(&NoteDoc) -> bool) -> AppResult<()> {
@@ -386,6 +380,27 @@ impl SyncStore for MemorySyncStore {
             .project_space(&state)?
             .map(|space| space.devices)
             .unwrap_or_default())
+    }
+
+    fn add_device(&self, key: &DeviceKey, name: &DeviceName, now: &str) -> AppResult<bool> {
+        self.update_space(|space| space_doc::add_device(space, key, name, now))
+    }
+
+    fn revoke_device(&self, key: &DeviceKey, now: &str) -> AppResult<bool> {
+        self.update_space(|space| space_doc::revoke_device(space, key, now))
+    }
+
+    fn offer(&self) -> AppResult<Option<ProfileOffer>> {
+        let state = self.state();
+        let Some(space) = self.project_space(&state)? else {
+            return Ok(None);
+        };
+        let notes = self.local_notes(&state)?;
+        Ok(state.space_id.map(|space_id| ProfileOffer {
+            space_id,
+            name: space.name,
+            note_count: notes.len() as u64,
+        }))
     }
 
     fn adopt_space(&self, space_id: &SpaceId, remote: &RemoteSnapshot) -> AppResult<Applied> {

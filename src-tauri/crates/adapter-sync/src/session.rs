@@ -1,0 +1,339 @@
+//! Session `Sync` avec un appareil : une seule connexion par paire d'appareils, qui porte
+//! tous leurs espaces communs. Chaque côté annonce dans `Hello` les seuls espaces où l'autre
+//! est membre ; les espaces échangés sont l'intersection. La session traite les messages un
+//! par un (l'ordre de TCP garantit qu'un `Done` arrive après les updates qu'il clôt).
+
+mod catchup;
+mod offers;
+
+use std::collections::{HashMap, HashSet};
+use std::net::SocketAddr;
+use std::sync::Arc;
+
+use app::ports::sync::{Applied, SyncEvent};
+use app::ports::trust::{TrustOrigin, TrustedDevice};
+use domain::sync::{DeviceKey, DeviceName, SpaceId};
+use tokio::net::TcpStream;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::oneshot;
+
+use crate::engine::{Command, Shared};
+use crate::error::{Error, Result};
+use crate::noise::{Channel, ChannelReader, ChannelWriter};
+use crate::pairing::LinkedDevice;
+use crate::stores::{self, ProfileKey};
+use crate::wire::{self, Hello, MAX_SPACES, Message, PROTOCOL_VERSION};
+
+use catchup::Round;
+use offers::Incoming;
+
+/// Appairage à conclure au premier `Hello` : confiance, événement, réponse à l'appelant.
+pub(crate) struct Linking {
+    /// Rend l'appareil lié à l'appelant de l'appairage (côté qui compose).
+    pub reply: Option<oneshot::Sender<LinkedDevice>>,
+}
+
+/// Ouverture d'une session.
+pub(crate) struct Opening {
+    /// L'appareil qui a composé.
+    pub initiator: DeviceKey,
+    /// L'adresse composée (côté qui compose) : la dernière adresse connue de l'appareil.
+    pub addr: Option<SocketAddr>,
+    /// Appairage à conclure.
+    pub linking: Option<Linking>,
+}
+
+/// Démarre la session sur un canal établi ; `false` si une autre connexion avec le même
+/// appareil l'emporte (le canal est alors fermé).
+pub(crate) fn spawn<P: ProfileKey>(
+    shared: &Arc<Shared<P>>,
+    channel: Channel<TcpStream>,
+    opening: Opening,
+) -> bool {
+    let (commands, receiver) = mpsc::unbounded_channel();
+    let remote = channel.remote;
+    let Some(id) = shared.register_session(remote, opening.initiator, commands) else {
+        return false;
+    };
+    let (reader, writer) = channel.split();
+    let session = Session {
+        shared: Arc::clone(shared),
+        id,
+        remote,
+        addr: opening.addr,
+        linking: opening.linking,
+        writer,
+        remote_name: None,
+        local: HashMap::new(),
+        remote_spaces: HashSet::new(),
+        rounds: HashMap::new(),
+        offered: HashMap::new(),
+        snapshots_sent: HashSet::new(),
+        accepted: HashMap::new(),
+    };
+    shared.runtime.spawn(session.run(reader, receiver));
+    true
+}
+
+/// Fin d'une session.
+enum End {
+    /// Remplacée par une autre connexion, ou fermée par le moteur.
+    Closed,
+    /// Échec ou fermeture distante : on retentera.
+    Failed(Error),
+}
+
+struct Session<P: ProfileKey> {
+    shared: Arc<Shared<P>>,
+    id: u64,
+    remote: DeviceKey,
+    addr: Option<SocketAddr>,
+    linking: Option<Linking>,
+    writer: ChannelWriter<TcpStream>,
+    remote_name: Option<DeviceName>,
+    /// Espaces que nous annonçons, avec leur profil local.
+    local: HashMap<SpaceId, P>,
+    /// Espaces annoncés par l'appareil distant.
+    remote_spaces: HashSet<SpaceId>,
+    /// Nos rattrapages en cours, par espace.
+    rounds: HashMap<SpaceId, Round>,
+    /// Nos offres en attente de réponse.
+    offered: HashMap<SpaceId, P>,
+    /// Espaces dont nous avons envoyé le contenu, en attente d'acquittement.
+    snapshots_sent: HashSet<SpaceId>,
+    /// Offres acceptées dont nous recevons le contenu.
+    accepted: HashMap<SpaceId, Incoming<P>>,
+}
+
+type Inbound = UnboundedReceiver<Result<Message>>;
+
+impl<P: ProfileKey> Session<P> {
+    async fn run(
+        mut self,
+        reader: ChannelReader<TcpStream>,
+        mut commands: UnboundedReceiver<Command<P>>,
+    ) {
+        let (sender, mut inbound) = mpsc::unbounded_channel();
+        let reading = self.shared.runtime.spawn(read_loop(reader, sender));
+        let end = match self.serve(&mut inbound, &mut commands).await {
+            Ok(()) => End::Closed,
+            Err(error) => End::Failed(error),
+        };
+        reading.abort();
+        self.finish(end);
+    }
+
+    async fn serve(
+        &mut self,
+        inbound: &mut Inbound,
+        commands: &mut UnboundedReceiver<Command<P>>,
+    ) -> Result<()> {
+        self.announce().await?;
+        self.shared.publish_status();
+        loop {
+            tokio::select! {
+                message = inbound.recv() => match message {
+                    Some(message) => self.handle(message?).await?,
+                    None => return Err(Error::Closed),
+                },
+                command = commands.recv() => match command {
+                    Some(command) => self.execute(command).await?,
+                    None => return Ok(()),
+                },
+            }
+        }
+    }
+
+    fn finish(self, end: End) {
+        let current = self.shared.unregister_session(&self.remote, self.id);
+        self.shared.publish_status();
+        if let End::Failed(error) = end {
+            tracing::debug!(remote = %self.remote, %error, "session terminée");
+            if current && self.remote_name.is_some() {
+                crate::engine::schedule_retry(&self.shared, self.remote);
+            }
+        }
+    }
+
+    async fn handle(&mut self, message: Message) -> Result<()> {
+        if self.remote_name.is_none() && !matches!(message, Message::Hello(_)) {
+            return Err(Error::Unexpected);
+        }
+        match message {
+            Message::Hello(hello) => self.on_hello(hello).await,
+            Message::Changed { space, docs } => self.on_changed(space, docs).await,
+            Message::Diffs { space, docs, last } => self.on_diffs(space, docs, last).await,
+            Message::Updates { space, docs } => self.on_updates(space, docs).await,
+            Message::Done { space, seq } => self.on_done(space, seq).await,
+            Message::Ack { space, seq } => self.on_ack(space, seq).await,
+            Message::Offer(entries) => self.on_offer(entries).await,
+            Message::OfferReply { space, accepted } => self.on_offer_reply(space, accepted).await,
+            Message::Snapshot { space, total, docs } => self.on_snapshot(space, total, docs),
+            Message::SnapshotEnd { space, seq } => self.on_snapshot_end(space, seq).await,
+            Message::Open(_) | Message::Spake(_) | Message::Confirm(_) | Message::Refused(_) => {
+                Err(Error::Unexpected)
+            }
+        }
+    }
+
+    async fn execute(&mut self, command: Command<P>) -> Result<()> {
+        match command {
+            Command::Announce => self.announce().await,
+            Command::Push(profile) => match self.common_space_of(&profile) {
+                Some(space) => self.start_round(space).await,
+                None => Ok(()),
+            },
+            Command::SendOffers => self.send_offers().await,
+            Command::AcceptOffer { space, profile } => self.accept_offer(space, profile).await,
+            Command::DeclineOffer { space } => self.reply_offer(space, false).await,
+        }
+    }
+
+    async fn send(&mut self, message: &Message) -> Result<()> {
+        self.writer.send(message).await
+    }
+
+    /// Annonce (ou réannonce) les espaces partagés avec l'appareil distant.
+    async fn announce(&mut self) -> Result<()> {
+        let remote = self.remote;
+        let spaces = self
+            .shared
+            .stores
+            .run(move |profiles| stores::shared_spaces(profiles, &remote))
+            .await?;
+        let hello = Hello {
+            protocol: PROTOCOL_VERSION,
+            name: self.shared.state().device_name.as_str().to_owned(),
+            spaces: spaces.keys().map(|space| *space.as_bytes()).collect(),
+        };
+        self.send(&Message::Hello(hello)).await?;
+
+        let before = self.common();
+        self.local = spaces;
+        self.spaces_changed(&before).await
+    }
+
+    async fn on_hello(&mut self, hello: Hello) -> Result<()> {
+        if hello.protocol != PROTOCOL_VERSION {
+            return Err(Error::Protocol(hello.protocol));
+        }
+        if hello.spaces.len() > MAX_SPACES {
+            return Err(Error::Malformed);
+        }
+        let first = self.remote_name.is_none();
+        self.remote_name = Some(wire::device_name(&hello.name)?);
+        let before = self.common();
+        self.remote_spaces = hello.spaces.into_iter().map(SpaceId::from_bytes).collect();
+
+        if first {
+            self.link().await?;
+        }
+        self.spaces_changed(&before).await?;
+        if first {
+            self.send_offers().await?;
+        }
+        Ok(())
+    }
+
+    /// Conclut un appairage : l'appareil devient de confiance (origine « appairé »).
+    async fn link(&mut self) -> Result<()> {
+        let (Some(linking), Some(name)) = (self.linking.take(), self.remote_name.clone()) else {
+            return Ok(());
+        };
+        let device = TrustedDevice {
+            key: self.remote,
+            name: name.clone(),
+            origin: TrustOrigin::Paired,
+            added_at: self.shared.clock.timestamp(),
+            revoked_at: None,
+        };
+        self.shared
+            .with_trust(move |trust| trust.put_device(&device))
+            .await?;
+        self.shared.publish(SyncEvent::DeviceLinked {
+            device: self.remote,
+            name: name.clone(),
+        });
+        match linking.reply {
+            Some(reply) => {
+                // L'appelant a pu abandonner : l'appairage reste conclu
+                let _ = reply.send(LinkedDevice {
+                    key: self.remote,
+                    name,
+                });
+            }
+            // Côté qui affichait le code : le mode appairage est fini, l'écoute peut s'arrêter
+            None => crate::engine::request_refresh(&self.shared),
+        }
+        Ok(())
+    }
+
+    /// Les espaces échangés : annoncés des deux côtés.
+    fn common(&self) -> HashSet<SpaceId> {
+        self.local
+            .keys()
+            .filter(|space| self.remote_spaces.contains(space))
+            .copied()
+            .collect()
+    }
+
+    fn is_common(&self, space: &SpaceId) -> bool {
+        self.local.contains_key(space) && self.remote_spaces.contains(space)
+    }
+
+    /// Le profil local d'un espace échangé.
+    fn common_profile(&self, space: &SpaceId) -> Option<P> {
+        self.is_common(space)
+            .then(|| self.local.get(space).cloned())
+            .flatten()
+    }
+
+    fn common_space_of(&self, profile: &P) -> Option<SpaceId> {
+        self.local
+            .iter()
+            .find(|(space, local)| *local == profile && self.remote_spaces.contains(space))
+            .map(|(space, _)| *space)
+    }
+
+    /// Rattrapage des espaces devenus communs ; abandon de ceux qui ne le sont plus.
+    async fn spaces_changed(&mut self, before: &HashSet<SpaceId>) -> Result<()> {
+        let now = self.common();
+        self.rounds.retain(|space, _| now.contains(space));
+        self.shared.set_syncing(self.id, !self.rounds.is_empty());
+        for space in now.difference(before).copied().collect::<Vec<_>>() {
+            self.start_round(space).await?;
+        }
+        Ok(())
+    }
+
+    /// Après l'application de modifications distantes : événements, propagation vers les
+    /// autres appareils, et confiance transitive si l'espace a changé.
+    fn applied(&self, profile: &P, applied: Applied) {
+        if !applied.rejected.is_empty() {
+            let rejected = applied.rejected.len();
+            tracing::warn!(remote = %self.remote, rejected, "documents refusés");
+        }
+        if applied.notes.is_empty() && !applied.space {
+            return;
+        }
+        self.shared.publish(SyncEvent::NotesSynced {
+            profile: profile.clone(),
+            notes: applied.notes,
+            folders: applied.space,
+        });
+        self.shared.request_push(profile.clone(), Some(self.id));
+        if applied.space {
+            crate::engine::request_refresh(&self.shared);
+        }
+    }
+}
+
+async fn read_loop(mut reader: ChannelReader<TcpStream>, sender: UnboundedSender<Result<Message>>) {
+    loop {
+        let message = reader.recv().await;
+        let failed = message.is_err();
+        if sender.send(message).is_err() || failed {
+            return;
+        }
+    }
+}
