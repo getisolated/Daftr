@@ -2,6 +2,10 @@
 //!
 //! Les implémentations sont synchrones et partagées entre threads (`Send + Sync`).
 
+mod profiles;
+
+pub use profiles::{NoteImporter, PasswordHasher, ProfileFiles, ProfileRegistryStore};
+
 use std::path::Path;
 
 use domain::collection::{Collection, CollectionKind};
