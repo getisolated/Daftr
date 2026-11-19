@@ -3,6 +3,7 @@
 //! Les implémentations sont synchrones et partagées entre threads (`Send + Sync`).
 
 pub mod sync;
+pub mod trust;
 
 use std::path::Path;
 
@@ -15,6 +16,7 @@ use crate::AppResult;
 use crate::collections::CollectionEvent;
 
 pub use sync::{SyncEvents, SyncProfiles, SyncStore};
+pub use trust::TrustStore;
 
 /// Stockage des notes.
 pub trait NoteStore: Send + Sync {
