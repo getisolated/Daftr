@@ -43,7 +43,7 @@ impl IpcError {
 impl From<AppError> for IpcError {
     fn from(error: AppError) -> Self {
         let code = match &error {
-            AppError::Refused(_) => IpcErrorCode::Refused,
+            AppError::Refused(_) | AppError::Sync(_) => IpcErrorCode::Refused,
             AppError::Storage(_) => IpcErrorCode::Storage,
             AppError::FileSystem(_) => IpcErrorCode::FileSystem,
         };

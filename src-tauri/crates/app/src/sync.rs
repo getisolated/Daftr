@@ -1,6 +1,6 @@
 //! Modèle CRDT pur de la synchronisation entre appareils : documents de note et d'espace,
 //! règles de fusion, projection déterministe vers les lignes SQLite, fusion d'un profil
-//! existant. Aucune I/O : le stockage passe par les ports de synchronisation.
+//! existant. Aucune I/O : le stockage passe par [`crate::ports::sync::SyncStore`].
 //!
 //! Chaque document est un `Y.Doc` (`yrs`) dont l'identifiant client est dérivé de la clé de
 //! l'appareil ; les textes sont indexés en unités UTF-16. Les règles suivent la
@@ -11,6 +11,8 @@ pub mod codec;
 pub mod merge;
 pub mod note_doc;
 pub mod space_doc;
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 #[cfg(test)]
 mod tests;
 mod text_diff;

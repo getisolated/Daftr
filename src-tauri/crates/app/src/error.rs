@@ -54,6 +54,9 @@ pub enum AppError {
     /// Échec d'une opération sur le disque, message du système.
     #[error("{0}")]
     FileSystem(String),
+    /// Donnée de synchronisation invalide ou fusion refusée.
+    #[error(transparent)]
+    Sync(#[from] SyncError),
 }
 
 impl AppError {

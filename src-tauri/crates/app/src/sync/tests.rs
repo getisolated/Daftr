@@ -7,6 +7,7 @@ mod content;
 mod convergence;
 mod deletion;
 mod folders;
+mod stores;
 
 use domain::sync::DeviceKey;
 use domain::uuid::Uuid;
