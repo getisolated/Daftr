@@ -49,6 +49,25 @@ pub fn is_purgeable(deleted_at: &str, now: &str) -> bool {
     is_timestamp(deleted_at) && deleted_at <= cutoff.as_str()
 }
 
+/// L'horodatage SQLite (`YYYY-MM-DD HH:MM:SS`, UTC) d'un instant donné en secondes depuis le
+/// 1970-01-01 : le format de `datetime('now')`, pour les dates écrites hors de SQLite.
+///
+/// ```
+/// assert_eq!(domain::sync::timestamp_from_unix(0), "1970-01-01 00:00:00");
+/// assert_eq!(domain::sync::timestamp_from_unix(1_772_353_800), "2026-03-01 08:30:00");
+/// ```
+pub fn timestamp_from_unix(seconds: i64) -> String {
+    let (year, month, day) = civil_from_days(seconds.div_euclid(86_400));
+    let second_of_day = seconds.rem_euclid(86_400);
+    let (hour, minute, second) = (
+        second_of_day / 3600,
+        second_of_day % 3600 / 60,
+        second_of_day % 60,
+    );
+
+    format!("{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}")
+}
+
 /// La date `(année, mois, jour)` et l'heure `HH:MM:SS` d'un horodatage SQLite valide.
 fn split_timestamp(timestamp: &str) -> Option<((i64, u32, u32), &str)> {
     let (date, time) = timestamp.split_once(' ')?;
@@ -149,6 +168,15 @@ mod tests {
         for days in -800_000..800_000 {
             let civil = civil_from_days(days);
             assert_eq!(days_from_civil(civil), Some(days), "{civil:?}");
+        }
+    }
+
+    #[test]
+    fn unix_instants_become_valid_timestamps() {
+        assert_eq!(timestamp_from_unix(-1), "1969-12-31 23:59:59");
+        assert_eq!(timestamp_from_unix(951_782_400), "2000-02-29 00:00:00");
+        for seconds in (0..4_000_000_000_i64).step_by(7_919_993) {
+            assert!(is_timestamp(&timestamp_from_unix(seconds)), "{seconds}");
         }
     }
 
