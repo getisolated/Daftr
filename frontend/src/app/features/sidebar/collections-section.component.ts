@@ -16,12 +16,17 @@ import { TabsService } from '../../core/services/tabs.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
 import { baseName, parentPath } from '../../core/utils/collection.util';
 import { PlatformService } from '../../core/services/platform.service';
+import { sessionStorageKey } from '../../core/services/profile-session';
+import { ProfileTransferService } from '../../core/services/profile-transfer.service';
+import { ProfilesService } from '../../core/services/profiles.service';
+import { transferMenu, transferTarget } from '../../core/utils/transfer-menu.util';
 import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { MoveToDialogComponent } from './move-to-dialog.component';
 
+/** Both saved per profile (see sessionStorageKey). */
 const EXPANDED_KEY = 'daftr-collections-expanded';
 const SECTION_KEY = 'daftr-collections-open';
 
@@ -39,7 +44,7 @@ function nodeKey(root: string, path: string): string {
 
 function readSet(key: string): Set<string> {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
+    const parsed: unknown = JSON.parse(localStorage.getItem(sessionStorageKey(key)) ?? '[]');
     return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []);
   } catch {
     return new Set();
@@ -238,6 +243,8 @@ export class CollectionsSectionComponent {
   private readonly platform = inject(PlatformService);
   private readonly folders = inject(FoldersService);
   private readonly copier = inject(CollectionCopyService);
+  private readonly profiles = inject(ProfilesService);
+  private readonly profileTransfer = inject(ProfileTransferService);
 
   /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
   protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
@@ -400,7 +407,7 @@ export class CollectionsSectionComponent {
 
   private save(key: string, values: string[]): void {
     try {
-      localStorage.setItem(key, JSON.stringify(values));
+      localStorage.setItem(sessionStorageKey(key), JSON.stringify(values));
     } catch {
       // Storage unavailable: the tree simply starts collapsed next time
     }
@@ -620,9 +627,16 @@ export class CollectionsSectionComponent {
       { id: 'renameCollection', label: t('sidebar.collections.menu.renameCollection'), icon: ICON_RENAME, shortcut: 'F2' },
       { id: 'reveal', label: t(this.platformKey('sidebar.collections.menu.reveal')), icon: ICON_REVEAL, disabled: state.status === 'error' },
       { id: 'refresh', label: t('sidebar.collections.menu.refresh'), icon: ICON_REFRESH, disabled: !isFolder },
-      { divider: true },
-      { id: 'remove', label: t('sidebar.collections.menu.remove'), icon: ICON_REMOVE },
     );
+
+    // Only its record moves to the other profile: the files stay where they are on the disk
+    const transfer = transferMenu(t, this.profiles.others());
+
+    if (transfer) {
+      items.push(transfer);
+    }
+
+    items.push({ divider: true }, { id: 'remove', label: t('sidebar.collections.menu.remove'), icon: ICON_REMOVE });
 
     this.menu.set({ items, x: event.clientX, y: event.clientY, target: { root: state.collection.path, node: null }, copySources: source ? [source] : [] });
   }
@@ -672,6 +686,12 @@ export class CollectionsSectionComponent {
 
     const { root, node } = current.target;
     const ref: CollectionFileRef = { root, path: node?.path ?? '' };
+    const transferTo = transferTarget(actionId);
+
+    if (transferTo !== null && !node) {
+      await this.profileTransfer.transfer(transferTo, { noteIds: [], folderIds: [], collections: [root] });
+      return;
+    }
 
     switch (actionId) {
       case 'newFile': {

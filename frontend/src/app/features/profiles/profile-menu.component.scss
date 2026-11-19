@@ -1,0 +1,131 @@
+// Same look as the context menus of the app
+:host {
+  position: fixed;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  width: var(--profile-menu-width, 240px);
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--daftr-bg-menu);
+  border: 1px solid var(--daftr-border);
+  border-radius: 8px;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(var(--daftr-hover-rgb), 0.04);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  animation: profileMenuIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes profileMenuIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host { animation: none; }
+}
+
+.menu-title {
+  padding: 4px 12px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--daftr-text-dimmed);
+}
+
+.profile-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  &:hover .delete,
+  .delete:focus-visible {
+    opacity: 1;
+  }
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--daftr-text);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--daftr-bg-selected);
+    color: var(--daftr-text-bright);
+  }
+
+  &.current {
+    font-weight: 600;
+  }
+
+  &.profile {
+    padding-right: 34px;
+  }
+}
+
+.item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.item-icon {
+  flex-shrink: 0;
+  width: 20px;
+  color: var(--daftr-text-soft);
+}
+
+.lock,
+.check {
+  flex-shrink: 0;
+  color: var(--daftr-text-soft);
+}
+
+.check {
+  color: var(--daftr-accent-text);
+}
+
+.delete {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--daftr-text-dimmed);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+
+  &:hover {
+    color: var(--daftr-danger);
+    background: rgba(241, 76, 76, 0.15);
+  }
+}
+
+.divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--daftr-border);
+}

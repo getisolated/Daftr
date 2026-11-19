@@ -6,6 +6,7 @@ import { formatNoteTimestamp } from '../../core/utils/note-timestamp.util';
 import { Note } from '../../core/models/note.model';
 import { QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
+import { ProfilesBridgeService } from '../../core/services/profiles-bridge.service';
 import { NotesService } from '../../core/services/notes.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { PlatformService } from '../../core/services/platform.service';
@@ -56,6 +57,7 @@ export class OverlayComponent implements OnInit, OnDestroy {
   protected readonly i18n = inject(I18nService);
   protected readonly platform = inject(PlatformService);
   private bridge = inject(DesktopBridgeService);
+  private readonly profilesBridge = inject(ProfilesBridgeService);
   private notesService = inject(NotesService);
   private settingsService = inject(SettingsService);
 
@@ -73,6 +75,8 @@ export class OverlayComponent implements OnInit, OnDestroy {
     this.unsubscribers.push(
       this.bridge.onOverlayShown(() => this.onShown()),
       this.bridge.onNotesChanged(() => this.loadMessages()),
+      // Another profile opened (or the locked one unlocked): its quick notes replace the others, the draft stays
+      this.profilesBridge.onProfileChanged(() => this.loadMessages()),
     );
     await this.loadMessages();
     this.focusInput();

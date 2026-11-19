@@ -1,0 +1,99 @@
+<div class="backdrop" (click)="closed.emit()"></div>
+<form
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="creating() ? i18n.t('profiles.settings.titleNew') : i18n.t('profiles.settings.title')"
+  (submit)="save($event)"
+>
+  <h2 class="title">{{ creating() ? i18n.t('profiles.settings.titleNew') : i18n.t('profiles.settings.title') }}</h2>
+
+  <label class="field">
+    {{ i18n.t('profiles.settings.name') }}
+    <input
+      class="input"
+      appFocusSelect
+      maxlength="64"
+      spellcheck="false"
+      [placeholder]="profile()?.isDefault ? i18n.t('profiles.defaultName') : i18n.t('profiles.unnamed')"
+      [value]="name()"
+      (input)="name.set($any($event.target).value)"
+    />
+  </label>
+
+  <div class="field">
+    {{ i18n.t('profiles.settings.icon') }}
+    <div class="icon-row">
+      <app-profile-avatar [name]="name()" [iconUrl]="shownIconUrl()" [size]="48" />
+      <div class="icon-actions">
+        <label class="btn secondary file-btn">
+          {{ i18n.t('profiles.settings.chooseIcon') }}
+          <input class="file-input" type="file" accept="image/*" (change)="onIconPicked($event)" />
+        </label>
+        @if (shownIconUrl()) {
+          <button class="btn secondary" type="button" (click)="removeIcon()">{{ i18n.t('profiles.settings.removeIcon') }}</button>
+        }
+      </div>
+    </div>
+    <p class="hint">{{ i18n.t('profiles.settings.iconHint') }}</p>
+  </div>
+
+  <fieldset class="password">
+    <legend class="field-title">{{ i18n.t('profiles.settings.password') }}</legend>
+    <p class="hint">{{ isProtected() ? i18n.t('profiles.settings.passwordOn') : i18n.t('profiles.settings.passwordOff') }}</p>
+
+    @if (isProtected()) {
+      <label class="field">
+        {{ i18n.t('profiles.settings.currentPassword') }}
+        <input
+          class="input"
+          type="password"
+          autocomplete="current-password"
+          [value]="currentPassword()"
+          (input)="currentPassword.set($any($event.target).value)"
+        />
+      </label>
+      <app-checkbox [checked]="removePassword()" (checkedChange)="removePassword.set($event)">
+        {{ i18n.t('profiles.settings.removePassword') }}
+      </app-checkbox>
+    }
+
+    @if (!removePassword()) {
+      <label class="field">
+        {{ i18n.t('profiles.settings.newPassword') }}
+        <input
+          class="input"
+          type="password"
+          autocomplete="new-password"
+          [value]="newPassword()"
+          (input)="newPassword.set($any($event.target).value)"
+        />
+      </label>
+      @if (newPassword()) {
+        <label class="field">
+          {{ i18n.t('profiles.settings.confirmPassword') }}
+          <input
+            class="input"
+            type="password"
+            autocomplete="new-password"
+            [value]="confirmPassword()"
+            (input)="confirmPassword.set($any($event.target).value)"
+          />
+        </label>
+      }
+    }
+
+    <p class="note">{{ i18n.t('profiles.settings.notEncrypted') }}</p>
+  </fieldset>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  <div class="actions">
+    <button class="btn" type="submit" [disabled]="busy()">
+      {{ creating() ? i18n.t('profiles.settings.create') : i18n.t('profiles.settings.save') }}
+    </button>
+    <button class="btn secondary" type="button" (click)="closed.emit()">{{ i18n.t('common.cancel') }}</button>
+  </div>
+</form>

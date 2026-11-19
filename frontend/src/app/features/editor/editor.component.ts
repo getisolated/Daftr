@@ -34,6 +34,7 @@ import { EditorViewMode, NoteViewState, PreviewScrollRequest } from '../../core/
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
 import { TranslationKey } from '../../core/i18n/translations';
 import { NoteExportService } from '../../core/services/note-export.service';
+import { PendingSavesService } from '../../core/services/pending-saves.service';
 import { noteExportMenu } from '../../core/utils/export-menu.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
@@ -241,6 +242,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly fileBanner = signal<{ kind: 'conflict' | 'unreadable' | 'unsaved'; path: string; error: string } | null>(null);
   /** Last text written to (or read from) the disk for the open file: its own change events are not reloads. */
   private fileContentOnDisk: string | null = null;
+  /** A profile switch reloads the window: the edit still waiting for its debounce is written first. */
+  private readonly unregisterPendingSave = inject(PendingSavesService).register(() => this.flushPendingSave());
 
   /** The quick notes are a list of short notes: an outline of their headings would mean nothing. Never in zen mode. */
   protected readonly outlineShown = computed(() =>
@@ -481,6 +484,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   ngOnDestroy(): void {
+    this.unregisterPendingSave();
     this.editorView?.destroy();
     if (this.saveDebounce) clearTimeout(this.saveDebounce);
     if (this.previewDebounce) clearTimeout(this.previewDebounce);
