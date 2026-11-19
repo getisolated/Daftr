@@ -1,0 +1,39 @@
+[package]
+name = "sync-lan-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Spike jetable du lot 0 de la synchronisation LAN (ne pas livrer)"
+
+# Projet indépendant : ne doit pas être aspiré par le workspace de l'application.
+[workspace]
+
+[dependencies]
+# Déjà embarquées par l'application (mêmes versions majeures que src-tauri/Cargo.lock).
+anyhow = "1"
+rand = "0.10"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time", "io-util"] }
+
+# Nouvelles crates évaluées par le spike.
+hmac = "0.12"
+mdns-sd = { version = "0.22", default-features = false }
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+qrcode = { version = "0.15", default-features = false, features = ["std", "svg"] }
+similar = "3"
+# Sans `std` : la feature `std` de snow active `ring/std`, donc tire `ring` entier.
+snow = { version = "0.10", default-features = false, features = [
+    "use-chacha20poly1305",
+    "use-blake2",
+    "use-curve25519",
+    "use-getrandom",
+] }
+spake2 = { version = "0.4", features = ["std"] }
+yrs = "0.28"
+
+# Aligné sur [profile.release] de src-tauri/Cargo.toml (opt-level 3 et panic=unwind par défaut).
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
