@@ -114,8 +114,11 @@ fn copies_then_deletes_a_folder_and_a_loose_note() {
     assert_eq!(bundles.len(), 1, "une seule transaction dans la cible");
     assert_eq!(bundles[0].folders.len(), 2);
     assert_eq!(bundles[0].notes.len(), 3);
-    assert_eq!(fixture.folder_calls(), ["delete 2 deleteAll"]);
-    assert_eq!(fixture.note_calls(), ["delete 13"]);
+    assert_eq!(
+        fixture.note_calls(),
+        ["delete 11", "delete 12", "delete 13"]
+    );
+    assert_eq!(fixture.folder_calls(), ["delete 2 moveToRoot"]);
     assert_eq!(moved.note_ids, [11, 12, 13]);
     assert_eq!(moved.folder_ids, [2, 3]);
 }

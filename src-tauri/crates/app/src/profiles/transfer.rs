@@ -82,17 +82,25 @@ fn transfer_notes(
     }
 
     importer.import(&plan.bundle)?;
-    for id in &plan.root_folders {
-        source.folders.delete(*id, FolderDeleteMode::DeleteAll)?;
-    }
-    for id in &plan.loose_notes {
-        source.notes.delete(*id)?;
-    }
+    remove_copied(source, &plan.moved_notes, &plan.root_folders)?;
     Ok(Transferred {
         note_ids: plan.moved_notes,
         folder_ids: plan.moved_folders,
         collections: Vec::new(),
     })
+}
+
+/// Supprime de la base d'origine ce qui a été copié : les notes une à une, puis les dossiers.
+/// Une note arrivée entre-temps dans un dossier transféré (écrite par une IA) n'a pas été
+/// copiée : elle remonte à la racine au lieu de disparaître avec son dossier.
+fn remove_copied(source: &TransferSource<'_>, notes: &[i64], folders: &[i64]) -> AppResult<()> {
+    for id in notes {
+        source.notes.delete(*id)?;
+    }
+    for id in folders {
+        source.folders.delete(*id, FolderDeleteMode::MoveToRoot)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
