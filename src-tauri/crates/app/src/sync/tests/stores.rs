@@ -223,3 +223,40 @@ fn profiles_are_found_by_space() {
         .unwrap();
     assert_eq!(seen, Some(space_id()));
 }
+
+#[test]
+fn devices_are_added_and_revoked_as_local_writes() {
+    let (a, _) = two_profiles();
+    let laptop = device(7);
+    let name = DeviceName::parse("Portable").unwrap();
+    let before = a.changed_since(0).unwrap().len();
+    let seq = catch_up(&a, &MemorySyncStore::new(device(9)), 0);
+
+    assert!(a.add_device(&laptop, &name, NOW).unwrap());
+    assert!(!a.add_device(&laptop, &name, NOW).unwrap());
+    let changed = a.changed_since(seq).unwrap();
+    assert_eq!(changed.len(), 1);
+    assert_eq!(changed[0].doc, DocId::Space);
+    assert_eq!(a.changed_since(0).unwrap().len(), before);
+
+    assert!(a.revoke_device(&laptop, NOW).unwrap());
+    assert!(!a.revoke_device(&laptop, NOW).unwrap());
+    let revoked = a.devices().unwrap();
+    assert!(
+        revoked
+            .iter()
+            .any(|d| d.key == laptop && d.revoked_at.is_some())
+    );
+}
+
+#[test]
+fn the_offer_counts_live_notes_only() {
+    let (a, b) = two_profiles();
+    assert_eq!(b.offer().unwrap(), None);
+
+    a.delete_note(id(11), NOW).unwrap();
+    let offer = a.offer().unwrap().unwrap();
+    assert_eq!(offer.space_id, space_id());
+    assert_eq!(offer.name, "Travail");
+    assert_eq!(offer.note_count, 1);
+}

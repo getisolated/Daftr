@@ -88,6 +88,16 @@ pub trait SyncStore: Send + Sync {
     fn set_peer(&self, device: &DeviceKey, state: &PeerState) -> AppResult<()>;
     /// Appareils de l'espace (membres et révoqués).
     fn devices(&self) -> AppResult<Vec<ProjectedDevice>>;
+    /// Ajoute l'appareil à l'espace, ou le réadmet s'il était révoqué (appairage, offre
+    /// acceptée) : écriture locale du document `space`, avec un nouveau `seq`. Rend `true` si
+    /// le document a changé.
+    fn add_device(&self, device: &DeviceKey, name: &DeviceName, now: &str) -> AppResult<bool>;
+    /// Révoque l'appareil dans l'espace : il ne peut plus l'échanger. Écriture locale, comme
+    /// [`SyncStore::add_device`]. Rend `true` s'il était membre.
+    fn revoke_device(&self, device: &DeviceKey, now: &str) -> AppResult<bool>;
+    /// Le profil tel qu'on le propose à un autre appareil (espace, nom de l'espace, nombre de
+    /// notes non supprimées), `None` s'il n'est pas synchronisé.
+    fn offer(&self) -> AppResult<Option<ProfileOffer>>;
     /// Fait rejoindre l'espace au profil (nouveau ou existant), après sauvegarde de la base :
     /// dossiers de même chemin unifiés, dossier par défaut à l'uuid dérivé, notes identiques
     /// dédoublonnées (`sync::merge`). Refusé pour un profil déjà synchronisé.
