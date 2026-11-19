@@ -58,10 +58,10 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 - **Preview** — GitHub-like rendering (tables, task lists, footnotes, `> [!NOTE]` alerts, syntax-colored code, Mermaid diagrams). *Source*, *side by side* with synchronized scrolling, or *Preview*; notes can open rendered by default.
 - **Full-text search** — instant search across every note (SQLite FTS5), from the command palette (`Ctrl+Shift+F`). Find & replace inside a note (`Ctrl+F` / `Ctrl+H`) with match case, whole word and regular expressions, and the list of matches.
 - **Command palette** — `F1` to search notes, commands and tags.
-- **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. Double-click the empty area of the tree for a new note. New notes land in `Inbox`.
+- **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. Hover a folder for its **+** button: a new note right in that folder. Double-click the empty area of the tree for a new note. New notes land in `Inbox`.
 - **Tags** — organize notes with tags and filter from the sidebar.
 - **Backlinks & graph** — link notes with `[label](Folder/Note title)` (autocompleted) or `note://ID`. A panel under the editor lists the notes linking to the active one; the home page draws an Obsidian-like graph of all links (zoom, pan, drag, click to open, colored by folder). `Ctrl+click` follows a link.
-- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. Right-click a file, a folder or a multi-selection (`Ctrl+click` / `Shift+click`) and *Copy To…* to copy them into your notes, folder structure included: each note is titled after its file, and the links between the copied files keep working. Links to a chapter (`#heading`, `guide.md#heading`) scroll to it, in the source (`Ctrl+click`) as in the preview. `.md` files open with Daftr from the Explorer or the Finder.
+- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Hover a folder (or the collection itself) for its **+** button: a new `.md` file right in it. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. Right-click a file, a folder or a multi-selection (`Ctrl+click` / `Shift+click`) and *Copy To…* to copy them into your notes, folder structure included: each note is titled after its file, and the links between the copied files keep working. Links to a chapter (`#heading`, `guide.md#heading`) scroll to it, in the source (`Ctrl+click`) as in the preview. `.md` files open with Daftr from the Explorer or the Finder.
 - **Tabs** — drag & drop reordering, pinning, session restore.
 - **Zen mode** — `Ctrl+K` `Z` hides the tabs, the outline and the sidebar. The sidebar then floats tucked away on the left edge and slides in when the pointer reaches it (or with `Ctrl+Shift+E`). With **Settings → Zen Mode Always on Top**, the window stays above the other applications while in zen mode.
 - **Formatting bar** — a Word-like toolbar reflecting the formatting under the caret. `Alt+T` toggles it; size, style and position are settings.
@@ -215,7 +215,7 @@ frontend/src/app/
   shared/
     codemirror/              # Highlight style, markdown decorations, widgets, link navigation
     context-menu/            # Reusable context menu component
-    ui/                      # Themed checkbox, select, confirm dialog, focus-select directive
+    ui/                      # Themed checkbox, select, confirm dialog, row "+" button, focus-select directive
 ```
 
 ### Releases

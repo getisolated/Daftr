@@ -14,12 +14,13 @@ import { rangeBetween } from '../../core/utils/sidebar-selection.util';
 import { FileDocsService } from '../../core/services/file-docs.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { SidebarStateService } from '../../core/services/sidebar-state.service';
-import { baseName, parentPath } from '../../core/utils/collection.util';
+import { baseName, canCreateFileIn, parentPath } from '../../core/utils/collection.util';
 import { PlatformService } from '../../core/services/platform.service';
 import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
+import { RowAddButtonComponent } from '../../shared/ui/row-add-button.component';
 import { MoveToDialogComponent } from './move-to-dialog.component';
 
 const EXPANDED_KEY = 'daftr-collections-expanded';
@@ -62,7 +63,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
 @Component({
   selector: 'app-collections-section',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, MoveToDialogComponent],
+  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, MoveToDialogComponent, RowAddButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="header">
@@ -92,6 +93,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
               [class.selected]="collections.selectedRoot() === row.state.collection.path && tabs.activeNoteId() === null"
               [class.loading]="row.state.status === 'loading'"
               [class.drop-target]="dropKey() === row.key"
+              [class.can-add]="canCreateFileIn(row.state)"
               [title]="rootTitle(row.state)"
               (click)="onCollectionClick(row.state)"
               (keydown.enter)="onCollectionClick(row.state)"
@@ -131,6 +133,9 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
                     <span class="status unloaded" [title]="i18n.t('sidebar.collections.notLoaded')">N</span>
                   }
                 }
+                @if (canCreateFileIn(row.state)) {
+                  <app-row-add-button [label]="i18n.t('sidebar.collections.newFileInFolder')" (pressed)="startNewFile(row.state.collection.path, null)" />
+                }
               }
             </div>
             @if (isEditing('newFile', row.state.collection.path, '') && isCollectionOpen(row.state)) {
@@ -152,6 +157,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
               [class.selected]="isActive(row.root, row.node)"
               [class.multi-selected]="isMultiSelected(row.key)"
               [class.drop-target]="dropKey() === row.key"
+              [class.can-add]="row.node.kind === 'folder'"
               [style.padding-left.px]="8 + row.depth * 14"
               [title]="absolutePath(row.root, row.node.path)"
               (click)="onNodeClick(row.root, row.node, $event)"
@@ -182,6 +188,9 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
                   (click)="$event.stopPropagation()" (keydown.enter)="commitEditing($event)" (keydown.escape)="editing.set(null); $event.stopPropagation()" (blur)="commitEditing($event)" />
               } @else {
                 <span class="row-label">{{ row.node.name }}</span>
+                @if (row.node.kind === 'folder') {
+                  <app-row-add-button [label]="i18n.t('sidebar.collections.newFileInFolder')" (pressed)="startNewFile(row.root, row.node)" />
+                }
               }
             </div>
             @if (row.node.kind === 'folder' && isEditing('newFile', row.root, row.node.path) && isExpanded(row.key)) {
@@ -255,6 +264,7 @@ export class CollectionsSectionComponent {
     { id: 'trash', label: this.i18n.t(this.platformKey('sidebar.collections.trash.confirm')), danger: true },
   ]);
   protected readonly baseName = baseName;
+  protected readonly canCreateFileIn = canCreateFileIn;
 
   /** Picks the macOS wording (Trash, Finder) over the Windows one. */
   protected platformKey<K extends string>(key: K): K | `${K}.mac` {
@@ -552,6 +562,21 @@ export class CollectionsSectionComponent {
     return editing.kind === 'newFile' ? editing.folder === path : true;
   }
 
+  /** Opens the inline name field of a new markdown file in a folder (`node` null: at the top of the collection). */
+  protected startNewFile(root: string, node: CollectionNode | null): void {
+    const folder = node?.path ?? '';
+    const state = this.collections.states().find(candidate => candidate.collection.path === root);
+
+    // The field shows under its folder: the collection (loaded if needed) or the folder is expanded first
+    if (!node && state) {
+      this.openCollection(state);
+    } else {
+      this.expand(nodeKey(root, folder));
+    }
+
+    this.startEditing({ kind: 'newFile', root, folder });
+  }
+
   protected startEditing(editing: CollectionEditing): void {
     this.editing.set(editing);
   }
@@ -608,7 +633,7 @@ export class CollectionsSectionComponent {
 
     if (state.status === 'error') {
       items.push({ id: 'relocate', label: t('sidebar.collections.menu.locate'), icon: ICON_REVEAL }, { divider: true });
-    } else if (isFolder) {
+    } else if (canCreateFileIn(state)) {
       items.push({ id: 'newFile', label: t('sidebar.collections.menu.newFile'), icon: ICON_FILE }, { divider: true });
     }
 
@@ -674,19 +699,9 @@ export class CollectionsSectionComponent {
     const ref: CollectionFileRef = { root, path: node?.path ?? '' };
 
     switch (actionId) {
-      case 'newFile': {
-        const folder = node?.path ?? '';
-        const state = this.collections.states().find(candidate => candidate.collection.path === root);
-
-        if (!node && state) {
-          this.openCollection(state);
-        } else {
-          this.expand(nodeKey(root, folder));
-        }
-
-        this.startEditing({ kind: 'newFile', root, folder });
+      case 'newFile':
+        this.startNewFile(root, node);
         break;
-      }
       case 'renameCollection':
         this.startEditing({ kind: 'renameCollection', root });
         break;
