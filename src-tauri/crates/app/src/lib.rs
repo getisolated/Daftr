@@ -10,8 +10,9 @@ pub mod folders;
 pub mod notes;
 pub mod ports;
 pub mod settings;
+pub mod sync;
 
 #[cfg(test)]
 mod testing;
 
-pub use error::{AppError, AppResult, Refusal};
+pub use error::{AppError, AppResult, Refusal, SyncError, SyncResult};

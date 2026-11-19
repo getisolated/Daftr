@@ -71,6 +71,33 @@ impl AppError {
 /// Résultat d'un cas d'usage.
 pub type AppResult<T> = Result<T, AppError>;
 
+/// Erreur de la synchronisation : donnée reçue invalide ou opération refusée par une règle de
+/// fusion. Les données reçues étant non fiables, ces erreurs ne sont jamais des paniques.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SyncError {
+    /// Update, blob ou state vector au-delà de la taille maximale.
+    #[error("sync payload too large: {size} bytes")]
+    TooLarge {
+        /// Taille reçue, en octets.
+        size: usize,
+    },
+    /// Update illisible ou incohérente.
+    #[error("malformed sync update")]
+    Malformed,
+    /// State vector illisible.
+    #[error("malformed state vector")]
+    MalformedStateVector,
+    /// Update lisible mais refusée par le CRDT.
+    #[error("sync update rejected: {0}")]
+    Rejected(String),
+    /// Fusion d'un profil qui appartient déjà à un espace.
+    #[error("profile already synchronized")]
+    AlreadySynced,
+}
+
+/// Résultat d'une opération de synchronisation pure.
+pub type SyncResult<T> = Result<T, SyncError>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
