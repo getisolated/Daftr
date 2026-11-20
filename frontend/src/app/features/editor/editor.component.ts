@@ -1,6 +1,6 @@
 import {
   Component, OnDestroy, OnChanges, Input, SimpleChanges,
-  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, computed, effect, untracked
+  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, computed, effect, untracked, afterRenderEffect, viewChild
 } from '@angular/core';
 
 
@@ -22,7 +22,8 @@ import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks, timestampBlock
 import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
-import { OutlineHeading, extractHeadings, findActiveHeading, findHeadingByAnchor } from '../../shared/codemirror/outline';
+import { OutlineHeading, extractHeadings, findHeadingByAnchor } from '../../shared/codemirror/outline';
+import { findActiveHeading, revealScrollTop } from '../../core/utils/outline-tracking.util';
 import { linkAnchor } from '../../core/utils/heading-anchor.util';
 import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
@@ -39,7 +40,7 @@ import { noteExportMenu } from '../../core/utils/export-menu.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions, slashPlaceholder } from '../../shared/codemirror/slash-commands';
-import { indentListItems, outdentListItems } from '../../shared/codemirror/list-indent';
+import { indentListItems, orderedListRenumbering, outdentListItems } from '../../shared/codemirror/list-indent';
 import { insertLink, wrapRanges } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
 import {
@@ -159,8 +160,10 @@ const PREVIEW_REFRESH_MS = 150;
               [resolveImage]="imageResolver()"
               [scrollRequest]="previewScroll()"
               [find]="previewFind()"
+              [headingLines]="previewHeadingLines()"
               (linkClicked)="followLink($event)"
               (scrolledToLine)="syncEditorToLine($event)"
+              (activeHeadingChange)="followPreviewHeading($event)"
             />
           }
         }
@@ -168,7 +171,7 @@ const PREVIEW_REFRESH_MS = 150;
         @if (find.isOpen()) {
           <app-find-panel />
         } @else if (outlineShown()) {
-          <nav class="toc" [attr.aria-label]="i18n.t('editor.toc.label')">
+          <nav #toc class="toc" [attr.aria-label]="i18n.t('editor.toc.label')">
             @for (heading of headings(); track heading.from; let i = $index) {
               <button
                 type="button"
@@ -219,6 +222,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   @Input() noteId: number | null = null;
   @ViewChild('editorHost') editorHost!: ElementRef<HTMLElement>;
   @ViewChild(MarkdownPreviewComponent) preview?: MarkdownPreviewComponent;
+  private readonly toc = viewChild<ElementRef<HTMLElement>>('toc');
 
   private notes = inject(NotesService);
   private linkRename = inject(LinkRenameService);
@@ -248,6 +252,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** The quick notes are a list of short notes: an outline of their headings would mean nothing. Never in zen mode. */
   protected readonly outlineShown = computed(() =>
     this.settingsService.settings().showOutline && !this.layout.zenMode() && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
+  );
+
+  /**
+   * Source lines of the headings whose chapter the preview follows: shown alone only. Side by side, the editor leads the
+   * outline (exact heading positions, and the preview follows its scroll anyway): a single source, no back and forth.
+   */
+  protected readonly previewHeadingLines = computed(() =>
+    this.viewMode() === 'preview' ? this.headings().map(heading => heading.line) : []
   );
 
   /** Source, preview, or both side by side. Remembered by each tab; a newly opened note takes the mode of the last note shown. */
@@ -349,6 +361,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   constructor() {
+    // A long outline scrolls along with the reading
+    afterRenderEffect(() => {
+      const index = this.activeHeading();
+      const toc = this.toc()?.nativeElement;
+      if (toc) this.revealActiveHeading(toc, index);
+    });
+
     // Full preview: the formatting bar has nothing to act on
     effect(() => this.formattingBar.setPreviewOnly(this.viewMode() === 'preview'));
     // The quick notes document follows new notes sent from the overlay while it is open
@@ -419,7 +438,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
 
     if (mode !== 'preview') {
-      setTimeout(() => this.editorView?.focus(), 0);
+      setTimeout(() => {
+        if (!this.editorView) return;
+        // Shown again, the editor leads the outline
+        this.refreshActiveHeading(this.editorView);
+        this.editorView.focus();
+      }, 0);
     }
   }
 
@@ -732,6 +756,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
         base: markdownLanguage,
         codeLanguages: languages,
       }),
+      // Deleting an item of a numbered list renumbers the items below it (Enter already does when inserting one)
+      orderedListRenumbering,
       editorHighlight,
       daftrTheme,
       // Colors follow the CSS variables; only CodeMirror's own light/dark base styles (search panel, tooltips…) need swapping
@@ -861,10 +887,35 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private refreshActiveHeading(view: EditorView): void {
+    // Hidden behind the preview, the editor has no scroll: the preview tells the chapter (see followPreviewHeading)
+    if (this.viewMode() === 'preview') return;
+
     const scroller = view.scrollDOM;
     const tops = this.headings().map(h => this.headingTop(view, h));
     const atBottom = scroller.scrollTop > 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
     this.activeHeading.set(findActiveHeading(tops, scroller.scrollTop, atBottom));
+  }
+
+  /** Chapter being read in the preview shown alone. */
+  protected followPreviewHeading(index: number): void {
+    if (this.viewMode() === 'preview') this.activeHeading.set(index);
+  }
+
+  /** Brings the outline entry of the chapter being read into view, scrolling the outline only. */
+  private revealActiveHeading(toc: HTMLElement, index: number): void {
+    const item = toc.children.item(index);
+    if (!item) return;
+
+    // The padding is kept clear (the view-mode buttons are over the top of the outline)
+    const style = getComputedStyle(toc);
+    const origin = toc.getBoundingClientRect().top - toc.scrollTop;
+    const rect = item.getBoundingClientRect();
+    const view = {
+      top: toc.scrollTop + parseFloat(style.paddingTop),
+      bottom: toc.scrollTop + toc.clientHeight - parseFloat(style.paddingBottom),
+    };
+    const top = revealScrollTop(toc.scrollTop, view, { top: rect.top - origin, bottom: rect.bottom - origin });
+    if (top !== toc.scrollTop) toc.scrollTop = top;
   }
 
   protected goToHeading(heading: OutlineHeading): void {

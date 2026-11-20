@@ -1,4 +1,4 @@
-import { Collection, CollectionFileRef, CollectionNode } from '../models/collection.model';
+import { Collection, CollectionFileRef, CollectionNode, CollectionState } from '../models/collection.model';
 import { LinkStatus } from './note-paths.util';
 
 /** Last segment of a path, whatever its separators. */
@@ -36,6 +36,14 @@ export function labelCollections(collections: readonly Collection[]): { label: s
     const parentShared = homonyms.filter(other => baseName(parentPath(other.path)).toLowerCase() === parent.toLowerCase()).length > 1;
     return { label: collection.displayName, hint: parentShared ? parentPath(collection.path) : parent };
   });
+}
+
+/**
+ * Whether new markdown files can be created at the top of a collection: only in a folder collection still found on the
+ * disk (an unloaded one is loaded first).
+ */
+export function canCreateFileIn(state: CollectionState): boolean {
+  return state.collection.kind === 'folder' && state.status !== 'error';
 }
 
 /** Where a path ends up once `from` (a file or a folder) became `to`; `null` when it is not concerned. */
