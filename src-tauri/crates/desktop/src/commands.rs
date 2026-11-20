@@ -9,6 +9,7 @@ mod export;
 mod folders;
 mod mcp;
 mod notes;
+mod profiles;
 mod settings;
 mod shell;
 mod updates;
@@ -53,6 +54,17 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         collections::collections_search,
         collections::collections_cancel_search,
         collections::collections_graph,
+        profiles::profiles_state,
+        profiles::profiles_unlock,
+        profiles::profiles_switch,
+        profiles::profiles_create,
+        profiles::profiles_rename,
+        profiles::profiles_set_icon,
+        profiles::profiles_remove_icon,
+        profiles::profiles_icon,
+        profiles::profiles_set_password,
+        profiles::profiles_delete,
+        profiles::profiles_transfer,
         settings::settings_get,
         settings::settings_set,
         settings::overlay_hide,

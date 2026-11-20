@@ -5,6 +5,7 @@
 
 mod collections;
 mod folders;
+mod import;
 mod notes;
 mod rows;
 mod schema;

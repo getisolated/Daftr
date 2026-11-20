@@ -2,6 +2,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use adapter_fs::ProfileDirectories;
 use presentation::Services;
 use tauri::{AppHandle, Manager};
 
@@ -14,6 +15,8 @@ use crate::windows::overlay::OverlayState;
 pub struct DesktopState {
     /// Cas d'usage.
     pub services: Services,
+    /// Dossiers des profils (le profil par défaut a la racine des données).
+    pub directories: ProfileDirectories,
     /// Fermer la fenêtre la cache dans le tray ; seul un vrai « Quitter » ferme l'app.
     quitting: AtomicBool,
     /// Les fichiers passés au lancement ne s'ouvrent qu'au premier chargement de la fenêtre.
@@ -30,9 +33,10 @@ pub struct DesktopState {
 
 impl DesktopState {
     /// État initial.
-    pub fn new(services: Services) -> Self {
+    pub fn new(services: Services, directories: ProfileDirectories) -> Self {
         Self {
             services,
+            directories,
             quitting: AtomicBool::new(false),
             launch_files_opened: AtomicBool::new(false),
             overlay: OverlayState::default(),

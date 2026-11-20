@@ -14,7 +14,7 @@ use crate::state::desktop;
 
 #[tauri::command]
 pub async fn collections_list(app: AppHandle) -> IpcResult<Vec<CollectionDto>> {
-    collections::list(&desktop(&app).services.collections)
+    collections::list(&desktop(&app).services.data.get()?.collections)
 }
 
 /// Demande des dossiers (ou des fichiers markdown) à ouvrir comme collections.
@@ -32,12 +32,12 @@ pub async fn collections_pick(
     let language = desktop(&app).services.settings.current().language;
     let paths = pick(&app, &window, kind, Some(language), true);
 
-    collections::add_all(&desktop(&app).services.collections, &paths)
+    collections::add_all(&desktop(&app).services.data.get()?.collections, &paths)
 }
 
 #[tauri::command]
 pub async fn collections_remove(app: AppHandle, root: String) -> IpcResult<bool> {
-    collections::remove(&desktop(&app).services.collections, &root)
+    collections::remove(&desktop(&app).services.data.get()?.collections, &root)
 }
 
 #[tauri::command]
@@ -46,7 +46,11 @@ pub async fn collections_rename(
     root: String,
     name: Option<String>,
 ) -> IpcResult<Option<CollectionDto>> {
-    collections::rename(&desktop(&app).services.collections, &root, name.as_deref())
+    collections::rename(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        name.as_deref(),
+    )
 }
 
 /// Le dossier a été déplacé sur le disque : l'utilisateur montre son nouvel emplacement.
@@ -56,7 +60,8 @@ pub async fn collections_relocate(
     window: WebviewWindow,
     root: String,
 ) -> IpcResult<Option<CollectionDto>> {
-    let service = &desktop(&app).services.collections;
+    let data = desktop(&app).services.data.get()?;
+    let service = &data.collections;
     let kind = service
         .list()?
         .into_iter()
@@ -69,12 +74,16 @@ pub async fn collections_relocate(
 
 #[tauri::command]
 pub async fn collections_load(app: AppHandle, root: String) -> IpcResult<bool> {
-    collections::load(&desktop(&app).services.collections, &root)
+    collections::load(&desktop(&app).services.data.get()?.collections, &root)
 }
 
 #[tauri::command]
 pub async fn collections_read(app: AppHandle, root: String, path: String) -> IpcResult<String> {
-    collections::read(&desktop(&app).services.collections, &root, &path)
+    collections::read(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        &path,
+    )
 }
 
 #[tauri::command]
@@ -84,7 +93,12 @@ pub async fn collections_write(
     path: String,
     content: String,
 ) -> IpcResult<bool> {
-    collections::write(&desktop(&app).services.collections, &root, &path, &content)
+    collections::write(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        &path,
+        &content,
+    )
 }
 
 #[tauri::command]
@@ -94,7 +108,12 @@ pub async fn collections_create_file(
     folder: String,
     name: String,
 ) -> IpcResult<String> {
-    collections::create_file(&desktop(&app).services.collections, &root, &folder, &name)
+    collections::create_file(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        &folder,
+        &name,
+    )
 }
 
 #[tauri::command]
@@ -104,7 +123,12 @@ pub async fn collections_rename_path(
     path: String,
     name: String,
 ) -> IpcResult<String> {
-    collections::rename_path(&desktop(&app).services.collections, &root, &path, &name)
+    collections::rename_path(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        &path,
+        &name,
+    )
 }
 
 #[tauri::command]
@@ -114,12 +138,21 @@ pub async fn collections_move_path(
     path: String,
     folder: String,
 ) -> IpcResult<String> {
-    collections::move_path(&desktop(&app).services.collections, &root, &path, &folder)
+    collections::move_path(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        &path,
+        &folder,
+    )
 }
 
 #[tauri::command]
 pub async fn collections_trash(app: AppHandle, root: String, path: String) -> IpcResult<bool> {
-    collections::trash(&desktop(&app).services.collections, &root, &path)
+    collections::trash(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        &path,
+    )
 }
 
 /// Montre le fichier (ou la collection) dans l'Explorateur.
@@ -129,8 +162,11 @@ pub async fn collections_reveal(
     root: String,
     path: Option<String>,
 ) -> IpcResult<bool> {
-    let target =
-        collections::reveal_target(&desktop(&app).services.collections, &root, path.as_deref())?;
+    let target = collections::reveal_target(
+        &desktop(&app).services.data.get()?.collections,
+        &root,
+        path.as_deref(),
+    )?;
 
     app.opener()
         .reveal_item_in_dir(target)
@@ -139,18 +175,20 @@ pub async fn collections_reveal(
 }
 
 #[tauri::command]
-pub async fn collections_search(app: AppHandle, query: String) -> u64 {
-    collections::search(&desktop(&app).services.collections, &query)
+pub async fn collections_search(app: AppHandle, query: String) -> IpcResult<u64> {
+    let data = desktop(&app).services.data.get()?;
+    Ok(collections::search(&data.collections, &query))
 }
 
 #[tauri::command]
-pub async fn collections_cancel_search(app: AppHandle, request_id: u64) -> bool {
-    collections::cancel_search(&desktop(&app).services.collections, request_id)
+pub async fn collections_cancel_search(app: AppHandle, request_id: u64) -> IpcResult<bool> {
+    let data = desktop(&app).services.data.get()?;
+    Ok(collections::cancel_search(&data.collections, request_id))
 }
 
 #[tauri::command]
 pub async fn collections_graph(app: AppHandle, root: String) -> IpcResult<bool> {
-    collections::request_graph(&desktop(&app).services.collections, &root)
+    collections::request_graph(&desktop(&app).services.data.get()?.collections, &root)
 }
 
 /// Dialogue d'ouverture de dossiers ou de fichiers markdown (titré si `language` est donné).

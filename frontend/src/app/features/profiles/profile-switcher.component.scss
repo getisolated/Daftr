@@ -1,0 +1,46 @@
+:host {
+  display: block;
+}
+
+// Same metrics as the settings button of the footer, right below it
+.profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px 0 9px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--daftr-text-soft);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover,
+  &.open,
+  &:focus-visible {
+    color: var(--daftr-text-bright);
+    background: rgba(var(--daftr-hover-rgb), 0.06);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--daftr-accent);
+    outline-offset: -1px;
+  }
+}
+
+.profile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--daftr-text-dimmed);
+}

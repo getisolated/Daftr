@@ -40,6 +40,21 @@ pub enum Refusal {
     /// Aucune mise à jour disponible.
     #[error("No update available")]
     NoUpdate,
+    /// Profil inconnu.
+    #[error("Unknown profile")]
+    UnknownProfile,
+    /// Mot de passe du profil incorrect (ou mot de passe vide ou trop long).
+    #[error("Wrong password")]
+    WrongPassword,
+    /// Le profil actif est verrouillé : ses données restent fermées jusqu'au mot de passe.
+    #[error("The profile is locked")]
+    ProfileLocked,
+    /// Le profil actif ne reçoit pas un transfert de lui-même.
+    #[error("Not possible on the active profile")]
+    ActiveProfile,
+    /// Icône refusée (format autre que PNG ou WebP, ou trop lourde).
+    #[error("Invalid icon")]
+    InvalidIcon,
 }
 
 /// Erreur d'un cas d'usage.

@@ -55,7 +55,7 @@ impl CollectionFiles for DiskFiles {
 
 /// Corbeille de Windows (et de Linux) : appel par défaut du crate `trash`.
 #[cfg(not(target_os = "macos"))]
-fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
+pub(crate) fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     trash::delete(path)
 }
 
@@ -64,7 +64,7 @@ fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
 /// En contrepartie, « Remettre » n'est pas proposé (le fichier se sort de la Corbeille à la
 /// main).
 #[cfg(target_os = "macos")]
-fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
+pub(crate) fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     use trash::TrashContext;
     use trash::macos::{DeleteMethod, TrashContextExtMacos};
 

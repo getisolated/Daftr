@@ -24,7 +24,10 @@ import { UpdateService } from '../../core/services/update.service';
 import { CollectionsService } from '../../core/services/collections.service';
 import { PlatformService } from '../../core/services/platform.service';
 import { NoteExportService } from '../../core/services/note-export.service';
+import { ProfileTransferService } from '../../core/services/profile-transfer.service';
+import { ProfilesService } from '../../core/services/profiles.service';
 import { folderExportMenu, noteExportMenu, selectionExportMenu } from '../../core/utils/export-menu.util';
+import { transferMenu, transferTarget } from '../../core/utils/transfer-menu.util';
 import {
   buildFolderTree,
   canMoveFolder,
@@ -46,6 +49,7 @@ import { ColorPickerComponent } from '../../shared/ui/color-picker.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { SectionSplitterComponent } from '../../shared/ui/section-splitter.component';
+import { ProfileSwitcherComponent } from '../profiles/profile-switcher.component';
 import { CollectionsSectionComponent } from './collections-section.component';
 import { RowAddButtonComponent } from '../../shared/ui/row-add-button.component';
 import { MoveToDialogComponent } from './move-to-dialog.component';
@@ -63,7 +67,7 @@ const ICON_EMPTY = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9
   standalone: true,
   imports: [
     ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, ColorPickerComponent, MoveToDialogComponent,
-    CollectionsSectionComponent, SectionSplitterComponent, RowAddButtonComponent,
+    CollectionsSectionComponent, SectionSplitterComponent, ProfileSwitcherComponent, RowAddButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -83,6 +87,8 @@ export class SidebarComponent {
   private readonly updates = inject(UpdateService);
   private readonly collections = inject(CollectionsService);
   private readonly noteExport = inject(NoteExportService);
+  private readonly profiles = inject(ProfilesService);
+  private readonly profileTransfer = inject(ProfileTransferService);
   protected readonly i18n = inject(I18nService);
   private readonly platform = inject(PlatformService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -494,6 +500,7 @@ export class SidebarComponent {
       items.push(
         { id: 'rename', label: t('common.rename'), icon: ICON_RENAME, shortcut: 'F2' },
         { id: 'moveTo', label: t('sidebar.menu.moveTo'), icon: ICON_MOVE },
+        ...this.transferEntries(),
       );
     }
 
@@ -527,6 +534,7 @@ export class SidebarComponent {
       noteExportMenu(t, this.noteExport.pdfAvailable),
       { divider: true },
       { id: 'moveTo', label: t('sidebar.menu.moveTo'), icon: ICON_MOVE },
+      ...this.transferEntries(),
       { id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR },
       { divider: true },
       { id: 'delete', label: t('sidebar.menu.deleteNote'), icon: ICON_DELETE, danger: true },
@@ -541,12 +549,29 @@ export class SidebarComponent {
       selectionExportMenu(t, this.noteExport.pdfAvailable),
       { divider: true },
       { id: 'moveTo', label: t('sidebar.menu.moveItems', { count: targets.length }), icon: ICON_MOVE },
+      ...this.transferEntries(),
       { id: 'color', label: t('sidebar.menu.color'), icon: ICON_COLOR },
       { divider: true },
       { id: 'delete', label: t('sidebar.menu.deleteItems', { count: targets.length }), icon: ICON_DELETE, danger: true, shortcut: this.deleteShortcut },
     ];
 
     this.ctxMenu.set({ items, x: event.clientX, y: event.clientY, target, targets });
+  }
+
+  /** "Transfer to profile" submenu: one entry per other profile; nothing when there is none. */
+  private transferEntries(): ContextMenuEntry[] {
+    const entry = transferMenu(this.i18n.t, this.profiles.others());
+    return entry ? [entry] : [];
+  }
+
+  /** Moves the items (reduced to the top-level ones, the default folder left out) to another profile. */
+  private async transferItems(profileId: string, targets: SidebarDragItem[]): Promise<void> {
+    const items = topLevelItems(targets, this.foldersService.folders(), this.treeNotes());
+    const folderIds = items.filter(item => item.kind === 'folder').map(item => item.id);
+    const noteIds = items.filter(item => item.kind === 'note').map(item => item.id);
+
+    this.clearSelection();
+    await this.profileTransfer.transfer(profileId, { noteIds, folderIds, collections: [] });
   }
 
   /** Double-click on the empty area of the tree (not on a row): a new note, as from the context menu of that area. */
@@ -584,6 +609,13 @@ export class SidebarComponent {
     const folderId = target?.kind === 'folder' ? target.id : null;
 
     if (target?.kind === 'note' && await this.noteExport.runNoteAction(actionId, target.id)) {
+      return;
+    }
+
+    const transferTo = transferTarget(actionId);
+
+    if (transferTo !== null) {
+      await this.transferItems(transferTo, targets);
       return;
     }
 

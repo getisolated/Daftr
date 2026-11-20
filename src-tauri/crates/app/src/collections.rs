@@ -6,6 +6,7 @@
 mod disk;
 mod events;
 mod open;
+mod transfer;
 
 pub use events::CollectionEvent;
 
