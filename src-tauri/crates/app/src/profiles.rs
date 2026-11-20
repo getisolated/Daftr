@@ -171,27 +171,37 @@ impl ProfilesService {
         self.change(id, |profile| profile.password_hash = hash)
     }
 
-    /// Supprime un profil : son dossier part à la corbeille. Jamais le profil par défaut ni le
-    /// profil actif ; un profil protégé demande son mot de passe.
-    pub fn delete(
-        &self,
-        id: &ProfileId,
-        active: &ProfileId,
-        password: Option<&str>,
-    ) -> AppResult<()> {
-        if id.is_default() {
-            return Err(Refusal::DefaultProfile.into());
-        }
-        if id == active {
-            return Err(Refusal::ActiveProfile.into());
-        }
+    /// Supprime un profil : ses données partent à la corbeille ; un profil protégé demande son
+    /// mot de passe. Le profil par défaut ne disparaît pas du registre : il repart vide, sans
+    /// nom, icône ni mot de passe. Fermer le profil actif avant revient à l'appelant.
+    pub fn delete(&self, id: &ProfileId, password: Option<&str>) -> AppResult<()> {
         self.check_password(id, password)?;
 
         self.ports.files.trash_directory(id)?;
         self.update(|registry| {
-            registry.remove(id);
+            if id.is_default() {
+                registry.upsert(Profile::new(id.clone()));
+            } else {
+                registry.remove(id);
+            }
             Ok(())
         })
+    }
+
+    /// Le profil à ouvrir quand `id` disparaît : un autre sans mot de passe de préférence (il
+    /// s'ouvre directement), sinon le premier autre ; `None` s'il n'y en a pas.
+    pub fn successor(&self, id: &ProfileId) -> Option<Profile> {
+        let registry = lock(&self.registry);
+        let mut others = registry
+            .profiles()
+            .iter()
+            .filter(|profile| &profile.id != id);
+        let first = others.clone().next().cloned();
+
+        others
+            .find(|profile| !profile.is_protected())
+            .cloned()
+            .or(first)
     }
 
     /// Retient le profil actif, rouvert au prochain lancement.

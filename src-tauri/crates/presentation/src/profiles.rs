@@ -99,14 +99,9 @@ pub fn set_password(
     Ok(ProfileDto::from(&profiles.set_password(id, current, next)?))
 }
 
-/// Supprime un profil (son dossier part à la corbeille).
-pub fn delete(
-    profiles: &ProfilesService,
-    data: &ActiveData,
-    id: &ProfileId,
-    password: Option<&str>,
-) -> IpcResult<()> {
-    Ok(profiles.delete(id, &data.profile(), password)?)
+/// Supprime un profil (ses données partent à la corbeille).
+pub fn delete(profiles: &ProfilesService, id: &ProfileId, password: Option<&str>) -> IpcResult<()> {
+    Ok(profiles.delete(id, password)?)
 }
 
 /// La base d'un autre profil, qui reçoit un transfert.

@@ -11,7 +11,7 @@ use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, WebviewWindow};
 
 use crate::events::emit_except;
-use crate::profiles::{activate, open_store};
+use crate::profiles::{activate, delete_profile, open_store};
 use crate::state::desktop;
 
 /// En-tête portant le profil d'une icône envoyée en octets bruts.
@@ -141,16 +141,16 @@ pub async fn profiles_set_password(
 #[tauri::command]
 pub async fn profiles_delete(
     app: AppHandle,
+    window: WebviewWindow,
     id: String,
     password: Option<String>,
 ) -> IpcResult<()> {
-    let services = &desktop(&app).services;
-    profiles::delete(
-        &services.profiles,
-        &services.data,
+    Ok(delete_profile(
+        &app,
+        window.label(),
         &parse_id(&id)?,
         password.as_deref(),
-    )
+    )?)
 }
 
 /// Déplace notes, dossiers et collections vers un autre profil. Le profil cible n'est pas

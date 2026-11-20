@@ -25,8 +25,8 @@ pub trait ProfileFiles: Send + Sync {
     fn read_icon(&self, id: &ProfileId, format: IconFormat) -> AppResult<Vec<u8>>;
     /// Supprime l'icône du profil ; absente, rien à faire.
     fn delete_icon(&self, id: &ProfileId, format: IconFormat) -> AppResult<()>;
-    /// Envoie le dossier du profil à la corbeille ; refusé pour le profil par défaut, dont le
-    /// dossier est celui de toutes les données.
+    /// Envoie les données du profil à la corbeille : son dossier, ou pour le profil par défaut
+    /// (dont le dossier est celui de toutes les données) sa seule base et son icône.
     fn trash_directory(&self, id: &ProfileId) -> AppResult<()>;
 }
 

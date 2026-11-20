@@ -49,10 +49,7 @@ pub enum Refusal {
     /// Le profil actif est verrouillé : ses données restent fermées jusqu'au mot de passe.
     #[error("The profile is locked")]
     ProfileLocked,
-    /// Le profil par défaut ne se supprime pas.
-    #[error("The default profile cannot be deleted")]
-    DefaultProfile,
-    /// Le profil actif ne se supprime pas, ni ne reçoit un transfert de lui-même.
+    /// Le profil actif ne reçoit pas un transfert de lui-même.
     #[error("Not possible on the active profile")]
     ActiveProfile,
     /// Icône refusée (format autre que PNG ou WebP, ou trop lourde).

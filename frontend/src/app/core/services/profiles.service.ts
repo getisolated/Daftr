@@ -76,10 +76,24 @@ export class ProfilesService {
     }
   }
 
-  /** Deletes a profile (not the default nor the active one): its folder goes to the trash. */
+  /**
+   * Deletes a profile: its data goes to the trash. Deleting the active one opens another profile in its place (the
+   * default profile starts again empty when it was the only one), so the window reloads.
+   */
   async delete(id: string, password: string | null): Promise<void> {
+    const wasActive = id === this.activeId();
+
+    if (wasActive) {
+      await this.pendingSaves.flushAll();
+    }
+
     await this.bridge.delete(id, password);
-    await this.load();
+
+    if (wasActive) {
+      location.reload();
+    } else {
+      await this.load();
+    }
   }
 
   private async applyIcon(id: string, draft: ProfileDraft): Promise<void> {

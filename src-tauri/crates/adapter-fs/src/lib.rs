@@ -11,7 +11,7 @@ mod watcher;
 
 pub use disk::DiskFiles;
 pub use export::DiskExportWriter;
-pub use profile_directories::{PROFILES_FOLDER, ProfileDirectories};
+pub use profile_directories::{DATABASE_FILE, PROFILES_FOLDER, ProfileDirectories};
 pub use profile_registry_file::ProfileRegistryFile;
 pub use scan::{ScanResult, scan_folder};
 pub use settings_file::SettingsFile;

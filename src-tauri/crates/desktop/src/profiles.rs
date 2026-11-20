@@ -67,6 +67,64 @@ pub fn activate(
     Ok(())
 }
 
+/// Supprime un profil. S'il est actif, un autre le remplace d'abord : celui qui s'ouvre
+/// directement de préférence, sinon un protégé (qui reste verrouillé jusqu'à son mot de
+/// passe). Le profil par défaut, seul, repart vide et se rouvre aussitôt.
+pub fn delete_profile(
+    app: &AppHandle,
+    sender: &str,
+    id: &ProfileId,
+    password: Option<&str>,
+) -> AppResult<()> {
+    let services = &desktop(app).services;
+    // Avant de quitter quoi que ce soit : un mot de passe faux ne doit rien changer
+    services.profiles.check_password(id, password)?;
+
+    if services.data.profile() != *id {
+        return services.profiles.delete(id, password);
+    }
+
+    match services.profiles.successor(id) {
+        Some(next) if next.is_protected() => lock_on(app, sender, &next.id),
+        Some(next) => activate(app, sender, &next.id, None)?,
+        None => return delete_only_profile(app, sender, id, password),
+    }
+    services.profiles.delete(id, password)
+}
+
+/// Supprime le seul profil, actif : sa base est fermée avant de partir à la corbeille, puis
+/// rouverte (vide si la suppression a réussi).
+fn delete_only_profile(
+    app: &AppHandle,
+    sender: &str,
+    id: &ProfileId,
+    password: Option<&str>,
+) -> AppResult<()> {
+    let services = &desktop(app).services;
+    drop(services.data.set(id.clone(), None));
+
+    let deleted = services.profiles.delete(id, password);
+    // Après un échec, le profil garde son mot de passe
+    let reopened = activate(
+        app,
+        sender,
+        id,
+        deleted.as_ref().map_or(password, |()| None),
+    );
+
+    deleted.and(reopened)
+}
+
+/// Rend `id` actif sans ouvrir ses données : il demande son mot de passe au rechargement.
+fn lock_on(app: &AppHandle, sender: &str, id: &ProfileId) {
+    let services = &desktop(app).services;
+    drop(services.data.set(id.clone(), None));
+    if let Err(error) = services.profiles.set_last_active(id) {
+        tracing::warn!(%error, "profil actif non retenu pour le prochain lancement");
+    }
+    emit_except(app, sender, PROFILE_CHANGED, ());
+}
+
 /// Ouvre la base d'un profil (créée au besoin, avec son dossier par défaut) et démarre la
 /// surveillance de ses collections.
 pub fn open_data(app: &AppHandle, id: &ProfileId) -> AppResult<DataServices> {

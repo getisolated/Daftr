@@ -340,22 +340,55 @@ fn refuses_an_overlong_password() {
 }
 
 #[test]
-fn never_deletes_the_default_or_the_active_profile() {
+fn deleting_the_default_profile_resets_it_instead_of_removing_it() {
     let fixture = fixture();
-    let work = fixture.service.create(None).unwrap();
+    fixture
+        .service
+        .rename(&default_id(), Some("Perso"))
+        .unwrap();
+    fixture
+        .service
+        .set_password(&default_id(), None, Some("pw"))
+        .unwrap();
 
-    let default = fixture.service.delete(&default_id(), &work.id, None);
-    let active = fixture.service.delete(&work.id, &work.id, None);
+    fixture.service.delete(&default_id(), Some("pw")).unwrap();
 
-    assert!(matches!(
-        default,
-        Err(AppError::Refused(Refusal::DefaultProfile))
-    ));
-    assert!(matches!(
-        active,
-        Err(AppError::Refused(Refusal::ActiveProfile))
-    ));
-    assert_eq!(fixture.service.registry().profiles().len(), 2);
+    assert!(fixture.files.calls().contains(&"trash default".to_owned()));
+    let registry = fixture.service.registry();
+    assert_eq!(registry.profiles(), [Profile::new(default_id())]);
+}
+
+#[test]
+fn picks_an_open_profile_to_replace_a_deleted_one() {
+    let fixture = fixture();
+    let locked = fixture.service.create(Some("Locked")).unwrap();
+    fixture
+        .service
+        .set_password(&locked.id, None, Some("pw"))
+        .unwrap();
+    let open = fixture.service.create(Some("Open")).unwrap();
+
+    let first = fixture.service.successor(&default_id()).unwrap();
+    fixture.service.delete(&open.id, None).unwrap();
+    let only_locked = fixture.service.successor(&default_id()).unwrap();
+
+    assert_eq!(first.id, open.id);
+    assert_eq!(only_locked.id, locked.id);
+    assert!(
+        fixture
+            .service
+            .successor(&locked.id)
+            .unwrap()
+            .id
+            .is_default()
+    );
+}
+
+#[test]
+fn nothing_replaces_the_only_profile() {
+    let fixture = fixture();
+
+    assert!(fixture.service.successor(&default_id()).is_none());
 }
 
 #[test]
@@ -364,10 +397,7 @@ fn deletes_a_profile_by_sending_its_folder_to_the_trash() {
     let work = fixture.service.create(Some("Work")).unwrap();
     fixture.service.set_last_active(&work.id).unwrap();
 
-    fixture
-        .service
-        .delete(&work.id, &default_id(), None)
-        .unwrap();
+    fixture.service.delete(&work.id, None).unwrap();
 
     assert!(
         fixture
@@ -389,16 +419,13 @@ fn deleting_a_protected_profile_requires_its_password() {
         .set_password(&work.id, None, Some("pw"))
         .unwrap();
 
-    let refused = fixture.service.delete(&work.id, &default_id(), Some("no"));
+    let refused = fixture.service.delete(&work.id, Some("no"));
     assert!(matches!(
         refused,
         Err(AppError::Refused(Refusal::WrongPassword))
     ));
 
-    fixture
-        .service
-        .delete(&work.id, &default_id(), Some("pw"))
-        .unwrap();
+    fixture.service.delete(&work.id, Some("pw")).unwrap();
     assert!(fixture.service.get(&work.id).is_err());
 }
 

@@ -5,13 +5,17 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use app::ports::ProfileFiles;
-use app::{AppError, AppResult, Refusal};
+use app::{AppError, AppResult};
 use domain::profile::{IconFormat, ProfileId};
 
 use crate::disk::move_to_trash;
 
 /// Sous-dossier des profils autres que celui par défaut.
 pub const PROFILES_FOLDER: &str = "profiles";
+/// Fichier de la base SQLite d'un profil.
+pub const DATABASE_FILE: &str = "daftr.db";
+/// Fichiers annexes de la base (journal et mémoire partagée de SQLite).
+const DATABASE_SIDE_FILES: [&str; 2] = ["daftr.db-wal", "daftr.db-shm"];
 
 /// Dossiers des profils sous la racine des données.
 pub struct ProfileDirectories {
@@ -35,6 +39,23 @@ impl ProfileDirectories {
 
     fn icon_path(&self, id: &ProfileId, format: IconFormat) -> PathBuf {
         self.directory(id).join(format.file_name())
+    }
+
+    /// Le dossier du profil par défaut est celui de toutes les données (réglages, autres
+    /// profils) : seuls sa base et son icône partent à la corbeille.
+    fn trash_default_data(&self) -> AppResult<()> {
+        let icons = [IconFormat::Png, IconFormat::Webp].map(IconFormat::file_name);
+        let files = std::iter::once(DATABASE_FILE)
+            .chain(DATABASE_SIDE_FILES)
+            .chain(icons);
+
+        for name in files {
+            let path = self.root.join(name);
+            if path.exists() {
+                move_to_trash(&path).map_err(AppError::file_system)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -62,7 +83,7 @@ impl ProfileFiles for ProfileDirectories {
 
     fn trash_directory(&self, id: &ProfileId) -> AppResult<()> {
         if id.is_default() {
-            return Err(Refusal::DefaultProfile.into());
+            return self.trash_default_data();
         }
         let directory = self.directory(id);
         if !directory.exists() {
@@ -128,17 +149,21 @@ mod tests {
     }
 
     #[test]
-    fn never_trashes_the_data_folder_of_the_default_profile() {
+    fn trashing_the_default_profile_keeps_the_data_folder_and_what_is_not_its_own() {
         let root = tempfile::tempdir().unwrap();
         let directories = ProfileDirectories::new(root.path().to_path_buf());
+        let work = id("work");
+        directories.create_directory(&work).unwrap();
+        std::fs::write(root.path().join(DATABASE_FILE), "db").unwrap();
+        std::fs::write(root.path().join("settings.json"), "{}").unwrap();
 
-        let result = directories.trash_directory(&ProfileId::default_profile());
+        directories
+            .trash_directory(&ProfileId::default_profile())
+            .unwrap();
 
-        assert!(matches!(
-            result,
-            Err(AppError::Refused(Refusal::DefaultProfile))
-        ));
-        assert!(root.path().is_dir());
+        assert!(!root.path().join(DATABASE_FILE).exists());
+        assert!(root.path().join("settings.json").is_file());
+        assert!(directories.directory(&work).is_dir());
     }
 
     #[test]
