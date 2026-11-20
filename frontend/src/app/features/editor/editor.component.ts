@@ -39,7 +39,7 @@ import { noteExportMenu } from '../../core/utils/export-menu.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions, slashPlaceholder } from '../../shared/codemirror/slash-commands';
-import { indentListItems, outdentListItems } from '../../shared/codemirror/list-indent';
+import { indentListItems, orderedListRenumbering, outdentListItems } from '../../shared/codemirror/list-indent';
 import { insertLink, wrapRanges } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
 import {
@@ -752,6 +752,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
         base: markdownLanguage,
         codeLanguages: languages,
       }),
+      // Deleting an item of a numbered list renumbers the items below it (Enter already does when inserting one)
+      orderedListRenumbering,
       editorHighlight,
       daftrTheme,
       // Colors follow the CSS variables; only CodeMirror's own light/dark base styles (search panel, tooltips…) need swapping
