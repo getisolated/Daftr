@@ -215,6 +215,8 @@ app-find-panel {
   width: 280px;
   margin-left: 8px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--daftr-scrollbar) transparent;
   padding: 56px 12px 32px 0; // clears the view-mode buttons above
   display: flex;
   flex-direction: column;
@@ -223,6 +225,9 @@ app-find-panel {
 
 .toc-item {
   display: block;
+  // Its `overflow: hidden` (ellipsis) drops its automatic minimum height to 0: without this,
+  // a long outline squeezes its items into the column instead of scrolling
+  flex-shrink: 0;
   width: 100%;
   background: none;
   border: none;
