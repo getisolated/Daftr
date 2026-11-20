@@ -17,6 +17,8 @@ export interface OutlineHeading {
   text: string;
   /** Document position of the start of the heading line. */
   from: number;
+  /** Its line (1-based), as the preview numbers its blocks. */
+  line: number;
 }
 
 /** Headings found so far, and whether the document was parsed to its end (when not, a new call continues the parse). */
@@ -40,25 +42,13 @@ export function extractHeadings(state: EditorState, budgetMs = PARSE_SLICE_MS): 
       const line = state.doc.lineAt(node.from);
       const text = line.text.replace(/^\s*#{1,3}\s+/, '').replace(/\s+#+\s*$/, '').trim();
       if (text) {
-        headings.push({ level, text, from: line.from });
+        headings.push({ level, text, from: line.from, line: line.number });
       }
       return false;
     },
   });
 
   return { headings, complete: fullTree !== null };
-}
-
-/** Index of the heading the reader is currently in: the last one whose top went past `offset` px from the viewport top. */
-export function findActiveHeading(tops: readonly number[], scrollTop: number, atBottom: boolean, offset = 40): number {
-  if (!tops.length) return -1;
-  if (atBottom) return tops.length - 1;
-
-  let active = 0;
-  for (let i = 0; i < tops.length; i++) {
-    if (tops[i]! <= scrollTop + offset) active = i;
-  }
-  return active;
 }
 
 /** Start of the heading (any level) a link fragment designates, named as in the preview; `null` when none matches. */
