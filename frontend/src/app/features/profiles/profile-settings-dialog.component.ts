@@ -31,6 +31,8 @@ export class ProfileSettingsDialogComponent implements OnDestroy {
   readonly profile = input<Profile | null>(null);
   readonly currentIconUrl = input<string | null>(null);
   readonly closed = output<void>();
+  /** Asked to delete the edited profile; the owner runs the confirmation. */
+  readonly deleteRequested = output<void>();
 
   /** Starts from the edited profile, then follows what the user types. */
   protected readonly name = linkedSignal(() => this.profile()?.name ?? '');
@@ -40,6 +42,7 @@ export class ProfileSettingsDialogComponent implements OnDestroy {
   protected readonly newPassword = signal('');
   protected readonly confirmPassword = signal('');
   protected readonly removePassword = signal(false);
+  protected readonly passwordOpen = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
 

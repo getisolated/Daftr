@@ -58,6 +58,13 @@ export class ProfileSwitcherComponent implements OnDestroy {
     this.hover.cancel();
   }
 
+  /** Message of a deletion; the active profile also tells what takes its place. */
+  protected deleteMessage(profile: Profile, key: 'profiles.delete.message' | 'profiles.delete.protectedMessage'): string {
+    const message = this.i18n.t(key);
+
+    return profile.id === this.profiles.activeId() ? `${message} ${this.i18n.t('profiles.delete.activeNote')}` : message;
+  }
+
   protected label(profile: Profile): string {
     return profileDisplayName(profile, this.i18n.t);
   }

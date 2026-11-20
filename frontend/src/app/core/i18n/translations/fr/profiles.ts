@@ -12,7 +12,6 @@ export const FR_PROFILES: Record<keyof typeof EN_PROFILES, string> = {
   'profiles.menu.protected': 'Protégé par un mot de passe',
   'profiles.menu.new': 'Nouveau profil',
   'profiles.menu.settings': 'Paramétrer le profil…',
-  'profiles.menu.delete': 'Supprimer le profil {name}',
 
   // Dialogue de paramétrage
   'profiles.settings.title': 'Paramètres du profil',
@@ -21,18 +20,16 @@ export const FR_PROFILES: Record<keyof typeof EN_PROFILES, string> = {
   'profiles.settings.icon': 'Icône',
   'profiles.settings.chooseIcon': 'Choisir une image…',
   'profiles.settings.removeIcon': 'Retirer',
-  'profiles.settings.iconHint': 'Recadrée en carré (centre) et réduite à 256 px.',
+  'profiles.settings.delete': 'Supprimer le profil',
   'profiles.settings.iconError': 'Cette image ne peut pas être lue.',
-  'profiles.settings.password': 'Mot de passe maître',
-  'profiles.settings.passwordOff': 'Aucun mot de passe : le profil s’ouvre directement.',
-  'profiles.settings.passwordOn': 'Le profil demande son mot de passe à l’ouverture.',
+  'profiles.settings.passwordSet': 'Définir un mot de passe maître',
+  'profiles.settings.passwordChange': 'Changer le mot de passe maître',
   'profiles.settings.currentPassword': 'Mot de passe actuel',
   'profiles.settings.newPassword': 'Nouveau mot de passe',
   'profiles.settings.confirmPassword': 'Confirmer le mot de passe',
   'profiles.settings.removePassword': 'Retirer le mot de passe',
   'profiles.settings.passwordMismatch': 'Les deux mots de passe diffèrent.',
   'profiles.settings.currentRequired': 'Saisissez le mot de passe actuel pour le changer ou le retirer.',
-  'profiles.settings.notEncrypted': 'Le mot de passe verrouille seulement le profil dans Daftr : ses notes ne sont pas chiffrées sur le disque.',
   'profiles.settings.create': 'Créer et ouvrir',
   'profiles.settings.save': 'Enregistrer',
 
@@ -44,6 +41,7 @@ export const FR_PROFILES: Record<keyof typeof EN_PROFILES, string> = {
   'profiles.delete.title': 'Supprimer {name} ?',
   'profiles.delete.message': 'Ses notes, dossiers et sa liste de collections partent à la corbeille avec son dossier. Les fichiers de ses collections restent sur le disque.',
   'profiles.delete.protectedMessage': 'Saisissez son mot de passe pour le supprimer. Ses notes, dossiers et sa liste de collections partent à la corbeille avec son dossier.',
+  'profiles.delete.activeNote': 'Ce profil est ouvert : un autre profil s’ouvre à sa place (un profil par défaut vide s’il n’en reste aucun).',
   'profiles.delete.confirm': 'Supprimer',
 
   // Écran de verrouillage au lancement

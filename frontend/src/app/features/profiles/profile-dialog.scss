@@ -108,6 +108,12 @@
     cursor: default;
   }
 
+  &.with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   &.danger {
     border-color: #a1260d;
     background: #a1260d;

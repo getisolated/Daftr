@@ -10,7 +10,6 @@ export const EN_PROFILES = {
   'profiles.menu.protected': 'Protected by a password',
   'profiles.menu.new': 'New Profile',
   'profiles.menu.settings': 'Profile Settings…',
-  'profiles.menu.delete': 'Delete the profile {name}',
 
   // Settings dialog
   'profiles.settings.title': 'Profile settings',
@@ -19,18 +18,16 @@ export const EN_PROFILES = {
   'profiles.settings.icon': 'Icon',
   'profiles.settings.chooseIcon': 'Choose an image…',
   'profiles.settings.removeIcon': 'Remove',
-  'profiles.settings.iconHint': 'Cropped to a centred square and resized to 256 px.',
+  'profiles.settings.delete': 'Delete the profile',
   'profiles.settings.iconError': 'This image cannot be read.',
-  'profiles.settings.password': 'Master password',
-  'profiles.settings.passwordOff': 'No password: the profile opens directly.',
-  'profiles.settings.passwordOn': 'The profile asks for its password when it opens.',
+  'profiles.settings.passwordSet': 'Set a master password',
+  'profiles.settings.passwordChange': 'Change the master password',
   'profiles.settings.currentPassword': 'Current password',
   'profiles.settings.newPassword': 'New password',
   'profiles.settings.confirmPassword': 'Confirm the password',
   'profiles.settings.removePassword': 'Remove the password',
   'profiles.settings.passwordMismatch': 'The two passwords differ.',
   'profiles.settings.currentRequired': 'Enter the current password to change or remove it.',
-  'profiles.settings.notEncrypted': 'The password only locks the profile in Daftr: its notes are not encrypted on the disk.',
   'profiles.settings.create': 'Create and Open',
   'profiles.settings.save': 'Save',
 
@@ -42,6 +39,7 @@ export const EN_PROFILES = {
   'profiles.delete.title': 'Delete {name}?',
   'profiles.delete.message': 'Its notes, folders and list of collections go to the trash with its folder. The files of its collections stay on the disk.',
   'profiles.delete.protectedMessage': 'Enter its password to delete it. Its notes, folders and list of collections go to the trash with its folder.',
+  'profiles.delete.activeNote': 'This profile is open: another one opens in its place (an empty default profile if none is left).',
   'profiles.delete.confirm': 'Delete',
 
   // Lock screen at launch

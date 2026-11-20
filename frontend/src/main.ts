@@ -22,6 +22,9 @@ if (isOverlay) {
   document.documentElement.classList.add('overlay-mode');
 }
 
+// The native menu of the webview never shows; the app draws its own, and their handlers still run (capture does not stop the event)
+document.addEventListener('contextmenu', (event) => event.preventDefault(), { capture: true });
+
 /** The active profile, read before any service: its session keys depend on it. `null` when it cannot be read. */
 async function readProfiles(): Promise<ProfilesState | null> {
   try {

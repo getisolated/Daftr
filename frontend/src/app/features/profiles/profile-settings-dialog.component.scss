@@ -1,7 +1,15 @@
-.icon-row {
+.identity {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+}
+
+.identity-fields {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .icon-actions {
@@ -26,35 +34,57 @@
   inset: 0;
   opacity: 0;
   cursor: pointer;
+
+  // The native button of the field has its own cursor, which showed through on part of the surface
+  &::file-selector-button {
+    cursor: pointer;
+  }
 }
 
 .password {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0;
-  padding: 10px 12px 12px;
-  border: 1px solid var(--daftr-border-soft);
-  border-radius: 6px;
 }
 
-.field-title {
-  padding: 0 4px;
-  font-size: 12px;
+.expander {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px 2px;
+  border: none;
+  border-top: 1px solid var(--daftr-border-soft);
+  background: transparent;
   color: var(--daftr-text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--daftr-text-bright);
+  }
+
+  &[aria-expanded='true'] .chevron {
+    transform: rotate(90deg);
+  }
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--daftr-text-soft);
+  transition: transform 0.1s;
+}
+
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.delete-btn {
+  margin-right: auto;
 }
 
 app-checkbox {
   font-size: 12px;
-}
-
-.note {
-  margin: 0;
-  padding: 6px 8px;
-  border-left: 2px solid var(--daftr-accent);
-  border-radius: 2px;
-  background: rgba(var(--daftr-hover-rgb), 0.04);
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--daftr-text-soft);
 }

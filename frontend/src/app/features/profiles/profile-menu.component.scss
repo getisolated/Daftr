@@ -37,14 +37,8 @@
 }
 
 .profile-row {
-  position: relative;
   display: flex;
   align-items: center;
-
-  &:hover .delete,
-  .delete:focus-visible {
-    opacity: 1;
-  }
 }
 
 .menu-item {
@@ -72,10 +66,6 @@
   &.current {
     font-weight: 600;
   }
-
-  &.profile {
-    padding-right: 34px;
-  }
 }
 
 .item-label {
@@ -100,28 +90,6 @@
 
 .check {
   color: var(--daftr-accent-text);
-}
-
-.delete {
-  position: absolute;
-  right: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--daftr-text-dimmed);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.1s;
-
-  &:hover {
-    color: var(--daftr-danger);
-    background: rgba(241, 76, 76, 0.15);
-  }
 }
 
 .divider {
