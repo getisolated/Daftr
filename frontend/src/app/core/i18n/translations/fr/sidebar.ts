@@ -10,6 +10,7 @@ export const FR_SIDEBAR: Record<keyof typeof EN_SIDEBAR, string> = {
   // Arborescence
   'sidebar.tree.allNotes': 'Toutes les notes',
   'sidebar.tree.folderNoteCount': 'Notes de ce dossier et de ses sous-dossiers',
+  'sidebar.tree.newNoteInFolder': 'Nouvelle note dans ce dossier',
 
   // Dossiers système
   'sidebar.folder.inbox': 'Boîte de réception',
@@ -88,6 +89,7 @@ export const FR_SIDEBAR: Record<keyof typeof EN_SIDEBAR, string> = {
   'sidebar.collections.trash.confirm.mac': 'Déplacer vers la Corbeille',
   'sidebar.collections.menu.locate': 'Localiser sur le disque…',
   'sidebar.collections.menu.newFile': 'Nouveau fichier',
+  'sidebar.collections.newFileInFolder': 'Nouveau fichier dans ce dossier',
   'sidebar.collections.menu.copyTo': 'Copier dans…',
   'sidebar.collections.menu.copyItems': 'Copier {count} éléments dans…',
   'sidebar.collections.menu.renameCollection': 'Renommer la collection',

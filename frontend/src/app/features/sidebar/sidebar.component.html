@@ -110,6 +110,7 @@
         } @else {
           <span class="row-label">{{ folderLabel(row.node.folder) }}</span>
           <span class="count" [title]="i18n.t('sidebar.tree.folderNoteCount')">{{ row.node.noteCount }}</span>
+          <app-row-add-button [label]="i18n.t('sidebar.tree.newNoteInFolder')" (pressed)="newNote(row.node.folder.id)" />
         }
       </div>
     } @else {
