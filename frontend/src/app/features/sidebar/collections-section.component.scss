@@ -166,6 +166,14 @@
   to { transform: rotate(360deg); }
 }
 
+// Hovering or focusing a folder swaps its status for the "+" creating a file inside it
+.row.can-add:hover,
+.row.can-add:focus-within {
+  .status,
+  .spinner { display: none; }
+  app-row-add-button { display: flex; }
+}
+
 .inline-input {
   flex: 1;
   min-width: 0;

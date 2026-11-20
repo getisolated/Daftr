@@ -52,16 +52,18 @@ Daftr checks for updates at startup and every hour, and offers them in a popup. 
 
 Your data stays on your machine: notes live in a SQLite database and settings in a JSON file, both under `%APPDATA%\daftr` on Windows, `~/Library/Application Support/daftr` on macOS and `~/.local/share/daftr` on Linux.
 
+Each [profile](#profiles) has its own database in that folder: the default profile keeps `daftr.db` at its root (the data of before the profiles, untouched), the others live in `profiles/<id>/` (database and icon). `profiles.json` lists them, with the last one opened. The settings (`settings.json`) are shared by every profile.
+
 ## Features
 
-- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. `Tab` / `Shift+Tab` on a list item nests it under the previous item or brings it back up, numbered lists being renumbered at both levels. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables (`Ctrl+Shift+V` pastes the text as is). Multiple cursors like VS Code: `Alt+click` adds a cursor, `Shift+Alt+drag` selects a column, `Ctrl+D` adds the next occurrence to the selection, `Ctrl+Shift+L` selects them all (accents compared exactly, Match Case / Match Whole Word toggles shown above the selection), `Esc` goes back to a single cursor.
+- **Markdown editor** — CodeMirror 6 with live decorations: headings, bold, italic, code blocks, task lists. `Tab` / `Shift+Tab` on a list item nests it under the previous item or brings it back up, numbered lists being renumbered at both levels. Deleting a numbered item (`Backspace` / `Delete`, line deletion, cut) renumbers the items below it, keeping the number the list starts at, and `Enter` does the same when inserting one; a single undo brings back the item and the former numbers. GFM tables render as real tables and become editable when the caret enters them (`Tab` / `Shift+Tab` between cells, `/table` to insert one, right-click to add / delete rows and columns). Spreadsheet pastes become tables (`Ctrl+Shift+V` pastes the text as is). Multiple cursors like VS Code: `Alt+click` adds a cursor, `Shift+Alt+drag` selects a column, `Ctrl+D` adds the next occurrence to the selection, `Ctrl+Shift+L` selects them all (accents compared exactly, Match Case / Match Whole Word toggles shown above the selection), `Esc` goes back to a single cursor.
 - **Preview** — GitHub-like rendering (tables, task lists, footnotes, `> [!NOTE]` alerts, syntax-colored code, Mermaid diagrams). *Source*, *side by side* with synchronized scrolling, or *Preview*; notes can open rendered by default.
 - **Full-text search** — instant search across every note (SQLite FTS5), from the command palette (`Ctrl+Shift+F`). Find & replace inside a note (`Ctrl+F` / `Ctrl+H`) with match case, whole word and regular expressions, and the list of matches.
 - **Command palette** — `F1` to search notes, commands and tags.
-- **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. Double-click the empty area of the tree for a new note. New notes land in `Inbox`.
+- **Folders** — a VS Code-like tree: create, rename, delete, drag & drop notes and folders, multi-select (`Ctrl+click` / `Shift+click`), *Move To…*, *Empty*, a color per folder. Hover a folder for its **+** button: a new note right in that folder. Double-click the empty area of the tree for a new note. New notes land in `Inbox`.
 - **Tags** — organize notes with tags and filter from the sidebar.
 - **Backlinks & graph** — link notes with `[label](Folder/Note title)` (autocompleted) or `note://ID`. A panel under the editor lists the notes linking to the active one; the home page draws an Obsidian-like graph of all links (zoom, pan, drag, click to open, colored by folder). `Ctrl+click` follows a link.
-- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. Right-click a file, a folder or a multi-selection (`Ctrl+click` / `Shift+click`) and *Copy To…* to copy them into your notes, folder structure included: each note is titled after its file, and the links between the copied files keep working. Links to a chapter (`#heading`, `guide.md#heading`) scroll to it, in the source (`Ctrl+click`) as in the preview. `.md` files open with Daftr from the Explorer or the Finder.
+- **Collections** — open folders of markdown files from your disk (a repository's docs, for instance) next to your notes. Hover a folder (or the collection itself) for its **+** button: a new `.md` file right in it. Files open in tabs, save to disk, reload when changed by another program, and are found by the palette search. Right-click a file, a folder or a multi-selection (`Ctrl+click` / `Shift+click`) and *Copy To…* to copy them into your notes, folder structure included: each note is titled after its file, and the links between the copied files keep working. Links to a chapter (`#heading`, `guide.md#heading`) scroll to it, in the source (`Ctrl+click`) as in the preview. `.md` files open with Daftr from the Explorer or the Finder.
 - **Tabs** — drag & drop reordering, pinning, session restore.
 - **Zen mode** — `Ctrl+K` `Z` hides the tabs, the outline and the sidebar. The sidebar then floats tucked away on the left edge and slides in when the pointer reaches it (or with `Ctrl+Shift+E`). With **Settings → Zen Mode Always on Top**, the window stays above the other applications while in zen mode.
 - **Formatting bar** — a Word-like toolbar reflecting the formatting under the caret. `Alt+T` toggles it; size, style and position are settings.
@@ -71,6 +73,7 @@ Your data stays on your machine: notes live in a SQLite database and settings in
 - **Settings** — a VS Code-like settings editor (`Ctrl+,`) with search, categories and reset to default. Every shortcut can be rebound there.
 - **System tray / menu bar** — closing the window keeps Daftr running in the tray; optional launch at Windows startup. On macOS it stays in the Dock and the menu bar (`⇧⌘W` closes the window the same way), `⌘Q` quits, and *Launch at login* is optional; the menu bar icon can be turned off in Settings (Daftr keeps running in the Dock).
 - **Languages** — English and French; the first launch follows the OS locale.
+- **Profiles** — separate sets of notes, folders and collections (work, personal…), each with an optional name, a round icon (any image, cropped and resized) and an optional master password asked when it opens. Hover the profile item above **Settings** in the sidebar to switch, create or configure a profile. Right-click a note, a folder, a multi-selection or a collection and *Transfer to Profile* to move them to another profile. Settings, themes and shortcuts are shared. See [Profiles](#profiles).
 - **MCP server (AI access)** — an optional local [MCP](https://modelcontextprotocol.io) server lets AI assistants (Claude Code, Claude Desktop, Cursor…) list, search, read, create and edit your notes. It only listens on `127.0.0.1`, requires an access token, and cannot delete notes; notes written by an AI show up in the app at once. See [Connect an AI (MCP)](#connect-an-ai-mcp).
 
 ## Keyboard shortcuts
@@ -110,6 +113,17 @@ On macOS, `⌘` replaces `Ctrl` and `⌥` replaces `Alt`, with two exceptions: t
 On macOS the global shortcut is bound to the physical key position. Until it has been recorded once, Daftr assumes an AZERTY keyboard: the default `⌥⌘Q` is the key labelled Q on an AZERTY layout, which is `⌥⌘A` on a QWERTY one. Recording the shortcut again in **Settings** binds the right key for any layout.
 
 In the overlay: `Enter` sends (`Shift+Enter` = new line) — or, if configured, `Enter` = new line and `Ctrl+Enter` (`⌘↩` on macOS) sends. `Esc` or a click outside hides it; the draft is kept.
+
+## Profiles
+
+Daftr starts on the last profile used. The first one, the *default profile*, holds the notes of before the profiles: nothing is moved on update.
+
+- **Switch** — hover (or click) the profile item at the bottom of the sidebar: the menu lists the profiles, the current one checked. Picking another one saves the edits in progress and reloads the window on its notes, tabs and sidebar state (each profile remembers its own).
+- **New profile** — opens its settings; once saved, the new profile (an empty `Inbox`) opens.
+- **Profile settings** — name, icon (an image cropped to its centred square and resized to 256 px), master password (set, change or remove it; the current one is asked to change or remove it). The settings dialog also deletes the profile (its data goes to the trash). Deleting the open one opens another profile in its place; the default profile cannot disappear: it starts again empty.
+- **Master password** — a protected profile shows a lock screen at launch, before any of its data is read; another profile can be opened from there. The password is never stored, only its salted Argon2id hash. **The notes are not encrypted**: the password locks the profile in Daftr, not the files on the disk.
+- **Transfer** — *Transfer to Profile* moves notes, folders (with their sub-folders) and collections to another profile. The items are first copied into the other profile, then deleted here: if the copy fails, nothing is lost. Single notes land in its *Inbox*, folders at its root; a collection only moves its entry (its files stay where they are). Transferring to a protected profile does not ask its password.
+- **AI access (MCP)** and the **quick-note overlay** always work on the current profile; while it is locked, the AI gets an error and the quick-note shortcut shows the lock screen.
 
 ## Connect an AI (MCP)
 
@@ -190,10 +204,11 @@ npm run build
 src-tauri/                   # Rust workspace
   crates/
     platform/                # Generic base: logging, poison-tolerant locks, canonical paths
-    domain/                  # Pure rules (std only): settings validation, overlay geometry, collection links/graph/search, export names, i18n
-    app/                     # Use cases (notes, folders, collections, settings, export) and their ports (traits)
-    adapter-sqlite/          # SQLite store: schema, idempotent migrations, FTS5 triggers, queries
-    adapter-fs/              # settings.json, collection files, Recycle Bin, ZIP export, scan/watch/search thread
+    domain/                  # Pure rules (std only): settings validation, overlay geometry, collection links/graph/search, export names, i18n, profile registry, transfer plan
+    app/                     # Use cases (notes, folders, collections, settings, export, profiles, transfer) and their ports (traits)
+    adapter-sqlite/          # SQLite store: schema, idempotent migrations, FTS5 triggers, queries, transfer import
+    adapter-fs/              # settings.json, profiles.json and profile folders, collection files, Recycle Bin, ZIP export, scan/watch/search thread
+    adapter-password/        # Master passwords of the profiles: salted Argon2id hashes
     adapter-mcp/             # Local MCP server (rmcp, Streamable HTTP on 127.0.0.1, bearer token): the AI tools on notes
     adapter-print/           # PDF export: a hidden window prints the page natively (WKWebView / WebView2), the only `unsafe` code
     presentation/            # DTOs exported to TypeScript (ts-rs), IPC errors, event names
@@ -211,11 +226,11 @@ frontend/src/app/
     services/                # Notes, folders, tabs, backlinks, palette, shortcuts, theme, sidebar state
     models/                  # TypeScript interfaces (Note, Folder, Tab, PaletteItem, shortcuts, themes)
     utils/                   # Pure helpers (folder tree, note links, storage migration)
-  features/                  # editor, preview, find, backlinks, graph, sidebar, home, tabs, palette, overlay, settings, formatting-bar
+  features/                  # editor, preview, find, backlinks, graph, sidebar, home, tabs, palette, overlay, settings, formatting-bar, profiles
   shared/
     codemirror/              # Highlight style, markdown decorations, widgets, link navigation
     context-menu/            # Reusable context menu component
-    ui/                      # Themed checkbox, select, confirm dialog, focus-select directive
+    ui/                      # Themed checkbox, select, confirm dialog, row "+" button, focus-select directive
 ```
 
 ### Releases

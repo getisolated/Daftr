@@ -3,11 +3,13 @@ import { CollectionFileRef } from '../models/collection.model';
 import { QUICK_NOTES_TAB_ID, QUICK_NOTES_TITLE, Tab } from '../models/note.model';
 import { FileDocsService } from './file-docs.service';
 import { SettingsService } from './settings.service';
-import { closeTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
+import { closeTabsWhere, dropTabsWhere, TabsAfterClosing } from '../utils/tabs-closing.util';
 import { EditorViewMode } from '../models/editor.model';
 import { isEditorViewMode } from '../utils/tab-view-mode.util';
 import { keepTabs, openTab } from '../utils/tabs-opening.util';
+import { sessionStorageKey } from './profile-session';
 
+/** Saved per profile (see sessionStorageKey). */
 const SESSION_KEY = 'daftr-session';
 
 @Injectable({ providedIn: 'root' })
@@ -53,7 +55,7 @@ export class TabsService {
 
   restoreSession(validNoteIds: Set<number>): void {
     try {
-      const raw = localStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(sessionStorageKey(SESSION_KEY));
       if (raw) {
         const parsed = JSON.parse(raw) as { tabs: Tab[]; activeIndex: number };
         const validTabs = parsed.tabs
@@ -81,7 +83,7 @@ export class TabsService {
 
   private persist(): void {
     if (!this._initialized) return;
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
+    localStorage.setItem(sessionStorageKey(SESSION_KEY), JSON.stringify({
       tabs: this._tabs(),
       activeIndex: this._activeIndex(),
     }));
@@ -172,6 +174,11 @@ export class TabsService {
     const kept = this._tabs()[index];
     if (!kept) return;
     this.applyClosing(closeTabsWhere(this._tabs(), this.activeNoteId(), t => t.noteId !== kept.noteId, kept.noteId));
+  }
+
+  /** Removes the tabs of these documents, pinned ones included: they are no longer in this profile. */
+  dropNotes(noteIds: ReadonlySet<number>): void {
+    this.applyClosing(dropTabsWhere(this._tabs(), this.activeNoteId(), tab => noteIds.has(tab.noteId)));
   }
 
   /** Closes every tab except the pinned ones. */

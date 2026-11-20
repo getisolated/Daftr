@@ -3,70 +3,67 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use adapter_fs::{CollectionsWatcher, DiskExportWriter, DiskFiles, SettingsFile};
+use adapter_fs::{DiskExportWriter, ProfileDirectories, ProfileRegistryFile, SettingsFile};
 use adapter_mcp::RandomSecrets;
+use adapter_password::Argon2Hasher;
 use adapter_print::WebviewPdfRenderer;
-use adapter_sqlite::SqliteStore;
 use anyhow::Context;
-use app::collections::{CollectionPorts, CollectionsService};
 use app::export::ExportService;
-use app::folders::FoldersService;
-use app::notes::NotesService;
+use app::profiles::{ProfilePorts, ProfilesService};
 use app::settings::SettingsService;
 use presentation::Services;
+use presentation::data::ActiveData;
 use tauri::{App, AppHandle, Manager};
 
-use crate::events::WindowSink;
 use crate::state::{DesktopState, desktop};
 use crate::windows::{main_window, overlay};
-use crate::{data_dir, mcp, shortcut, startup, tray, updater};
+use crate::{data_dir, mcp, profiles, shortcut, startup, tray, updater};
+
+/// Registre des profils, à la racine des données.
+const PROFILES_FILE: &str = "profiles.json";
 
 /// Prépare l'application ; une erreur ici empêche le lancement (base illisible…).
 pub fn run(app: &mut App) -> anyhow::Result<()> {
     let handle = app.handle().clone();
-    let services = build_services(&handle, &data_dir::resolve(&handle)?)?;
+    let directory = data_dir::resolve(&handle)?;
+    let services = build_services(&handle, &directory);
 
-    services
-        .folders
-        .ensure_default()
-        .context("dossier par défaut")?;
-    app.manage(DesktopState::new(services));
+    app.manage(DesktopState::new(
+        services,
+        ProfileDirectories::new(directory),
+    ));
+    profiles::open_last_active(&handle).context("ouverture du profil")?;
 
     start_windows(&handle)?;
     start_background(&handle);
     Ok(())
 }
 
-fn build_services(app: &AppHandle, directory: &Path) -> anyhow::Result<Services> {
-    let store = Arc::new(
-        SqliteStore::open(&directory.join(data_dir::DATABASE_FILE))
-            .context("ouverture de la base")?,
-    );
+/// Services communs à tous les profils ; les données du profil actif sont ouvertes ensuite.
+fn build_services(app: &AppHandle, directory: &Path) -> Services {
     let settings = SettingsService::new(
         Arc::new(SettingsFile::new(directory.join("settings.json"))),
         Arc::new(RandomSecrets),
     );
-    let loaded = settings.load(sys_locale::get_locale().as_deref());
+    settings.load(sys_locale::get_locale().as_deref());
 
-    let sink = Arc::new(WindowSink::new(app.clone()));
-    let watcher = CollectionsWatcher::start(sink, loaded.collections_exclude)
-        .context("surveillance des collections")?;
-    let collections = CollectionsService::new(CollectionPorts {
-        store: store.clone(),
-        files: Arc::new(DiskFiles),
-        watcher: Arc::new(watcher),
+    let profiles = ProfilesService::new(ProfilePorts {
+        registry: Arc::new(ProfileRegistryFile::new(directory.join(PROFILES_FILE))),
+        files: Arc::new(ProfileDirectories::new(directory.to_path_buf())),
+        hasher: Arc::new(Argon2Hasher),
+        secrets: Arc::new(RandomSecrets),
     });
+    profiles.load();
 
-    Ok(Services {
-        notes: Arc::new(NotesService::new(store.clone(), store.clone())),
-        folders: Arc::new(FoldersService::new(store)),
-        collections,
+    Services {
+        data: ActiveData::default(),
+        profiles,
         settings,
         export: ExportService::new(
             Arc::new(DiskExportWriter),
             Arc::new(WebviewPdfRenderer::new(app.clone())),
         ),
-    })
+    }
 }
 
 fn start_windows(app: &AppHandle) -> anyhow::Result<()> {

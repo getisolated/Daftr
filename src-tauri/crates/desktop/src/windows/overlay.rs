@@ -20,7 +20,7 @@ use tauri::{
 };
 use window_vibrancy::{NSVisualEffectMaterial, NSVisualEffectState};
 
-use super::main_window::MAIN;
+use super::main_window::{self, MAIN};
 use super::{acrylic, geometry};
 use crate::events::emit_to;
 use crate::state::desktop;
@@ -175,8 +175,14 @@ pub fn prepare_in_background(app: &AppHandle) {
     });
 }
 
-/// Montre l'overlay à sa place, en arrière-plan (création et sonde peuvent attendre).
+/// Montre l'overlay à sa place, en arrière-plan (création et sonde peuvent attendre). Tant
+/// que le profil actif est verrouillé, c'est la fenêtre principale qui vient, pour le
+/// déverrouiller.
 pub fn show(app: &AppHandle) {
+    if desktop(app).services.data.is_locked() {
+        main_window::show(app);
+        return;
+    }
     let app = app.clone();
     spawn("overlay-show", move || {
         if let Err(error) = show_now(&app) {

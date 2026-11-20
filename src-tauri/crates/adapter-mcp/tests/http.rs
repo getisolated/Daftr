@@ -13,7 +13,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use adapter_mcp::{MCP_PATH, McpConfig, McpServer, McpServerHandle, McpServices, McpStartError};
+use adapter_mcp::{
+    MCP_PATH, McpConfig, McpServer, McpServerHandle, McpServices, McpServicesSource, McpStartError,
+};
 use adapter_sqlite::SqliteStore;
 use app::folders::FoldersService;
 use app::notes::NotesService;
@@ -56,7 +58,9 @@ async fn start_on(port: u16, services: McpServices) -> (McpServerHandle, Arc<Ato
         counter.fetch_add(1, Ordering::SeqCst);
     });
 
-    let handle = McpServer::start(config, services, on_change).await.unwrap();
+    let handle = McpServer::start(config, Arc::new(services), on_change)
+        .await
+        .unwrap();
     (handle, changes)
 }
 
@@ -391,7 +395,7 @@ async fn frees_its_port_when_stopped_and_reports_a_busy_port() {
         port,
         token: TOKEN.to_owned(),
     };
-    let busy = McpServer::start(config, services.clone(), Arc::new(|| {})).await;
+    let busy = McpServer::start(config, Arc::new(services.clone()), Arc::new(|| {})).await;
     assert!(matches!(busy, Err(McpStartError::PortInUse(p)) if p == port));
 
     first.stop().await;
@@ -410,7 +414,35 @@ async fn never_starts_without_a_token() {
         token: String::new(),
     };
 
-    let started = McpServer::start(config, services(&directory), Arc::new(|| {})).await;
+    let started = McpServer::start(config, Arc::new(services(&directory)), Arc::new(|| {})).await;
 
     assert!(matches!(started, Err(McpStartError::MissingToken)));
+}
+
+/// Profil actif verrouillé : aucun service.
+struct Locked;
+
+impl McpServicesSource for Locked {
+    fn current(&self) -> Option<McpServices> {
+        None
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn answers_with_an_error_while_the_active_profile_is_locked() {
+    let config = McpConfig {
+        port: 0,
+        token: TOKEN.to_owned(),
+    };
+    let handle = McpServer::start(config, Arc::new(Locked), Arc::new(|| {}))
+        .await
+        .unwrap();
+    let mut client = Client::new(handle.port());
+    client.initialize().await;
+
+    let (text, is_error) = client.tool(2, "list_folders", json!({})).await;
+
+    assert!(is_error);
+    assert!(text.contains("locked"), "{text}");
+    handle.stop().await;
 }
