@@ -1,3 +1,5 @@
+import { Note } from './note.model';
+
 /** How a note is shown: its markdown source, its rendering (read-only), or both side by side. */
 export type EditorViewMode = 'source' | 'preview' | 'split';
 
@@ -14,4 +16,19 @@ export interface NoteViewState {
   editorTop: { pos: number; offset: number } | null;
   /** Scroll of the preview shown alone; null otherwise (side by side, it follows the editor). */
   previewTop: number | null;
+}
+
+/** A replacement in a text: `[from, to)` of the old text becomes `insert` (UTF-16 offsets, as CodeMirror counts). */
+export interface TextChange {
+  from: number;
+  to: number;
+  insert: string;
+}
+
+/** The open note was deleted on another device: shown read-only until restored. */
+export interface RemoteDeletion {
+  /** The note as it was last shown, to show it again when its tab comes back. */
+  note: Note;
+  /** Name of the device it was deleted on, `null` when unknown. */
+  deviceName: string | null;
 }

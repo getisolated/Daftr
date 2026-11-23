@@ -108,6 +108,13 @@ export class DesktopBridgeService {
     return call<boolean>('notes_delete', { id });
   }
 
+  /** Brings back a deleted note (e.g. deleted on another device); `null` when it does not exist. */
+  async restoreNote(id: number): Promise<Note | null> {
+    if (!this.available) return null;
+    const row = await call<NoteDto | null>('notes_restore', { id });
+    return row ? mapRow(row) : null;
+  }
+
   /** Moves the note to `folderId` at the position described by `orderedIds` (the folder content, in order). */
   async placeNote(id: number, folderId: number | null, orderedIds: number[]): Promise<Note | null> {
     if (!this.available) return null;
