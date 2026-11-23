@@ -102,6 +102,13 @@ pub trait SyncDoc: sealed::Inner {
     fn has_missing_updates(&self) -> bool {
         has_missing_updates(self.inner())
     }
+
+    /// Horloge de cet appareil dans le document : elle n'avance qu'avec ses propres écritures.
+    /// Une update reçue qui la fait avancer trahit une base revenue en arrière (sauvegarde
+    /// restaurée) : ses prochaines écritures réutiliseraient des horloges déjà employées.
+    fn own_clock(&self) -> u32 {
+        own_clock(self.inner())
+    }
 }
 
 pub(crate) mod sealed {
@@ -153,6 +160,12 @@ pub(crate) fn apply_update(doc: &Doc, update: &Update) -> SyncResult<()> {
 /// reçu : il faut lui envoyer un diff complet depuis son state vector.
 pub(crate) fn has_missing_updates(doc: &Doc) -> bool {
     doc.transact().has_missing_updates()
+}
+
+/// Horloge de l'identifiant client du document.
+pub(crate) fn own_clock(doc: &Doc) -> u32 {
+    let client = doc.client_id();
+    doc.transact().state_vector().get(&client)
 }
 
 fn decode_state_vector(bytes: &[u8]) -> SyncResult<yrs::StateVector> {
@@ -270,5 +283,20 @@ mod tests {
             diff(&doc, &StateVector::empty()).unwrap().as_bytes().len(),
             encode(&doc).as_bytes().len()
         );
+    }
+
+    #[test]
+    fn own_clock_moves_only_with_own_writes_or_a_replay_of_them() {
+        let mine = doc_with(1, "abc");
+        let other = doc_with(2, "xy");
+        let before = own_clock(&mine);
+
+        apply_update(&mine, &encode(&other)).unwrap();
+        assert_eq!(own_clock(&mine), before);
+
+        let restored = new_doc(&DeviceKey::from_bytes([1; 32]));
+        assert_eq!(own_clock(&restored), 0);
+        apply_update(&restored, &encode(&mine)).unwrap();
+        assert_eq!(own_clock(&restored), before);
     }
 }
