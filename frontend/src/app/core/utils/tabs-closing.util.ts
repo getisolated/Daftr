@@ -25,3 +25,16 @@ export function closeTabsWhere(
     activeIndex: remaining.findIndex(tab => tab.noteId === nextActiveId),
   };
 }
+
+/**
+ * Removes every tab for which `shouldDrop` is true, pinned ones included: their document left the profile (transferred
+ * to another one). The active tab is followed when it survives; otherwise the app goes back home (-1).
+ */
+export function dropTabsWhere(tabs: Tab[], activeNoteId: number | null, shouldDrop: (tab: Tab) => boolean): TabsAfterClosing {
+  const remaining = tabs.filter(tab => !shouldDrop(tab));
+
+  return {
+    tabs: remaining,
+    activeIndex: remaining.findIndex(tab => tab.noteId === activeNoteId),
+  };
+}

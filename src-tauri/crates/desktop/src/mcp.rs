@@ -3,7 +3,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use adapter_mcp::{McpConfig, McpServer, McpServerHandle, McpServices, McpStartError};
+use adapter_mcp::{
+    McpConfig, McpServer, McpServerHandle, McpServices, McpServicesSource, McpStartError,
+};
 use domain::settings::DEFAULT_MCP_PORT;
 use platform::sync::lock;
 use presentation::dto::McpStatusDto;
@@ -88,11 +90,21 @@ async fn reconcile(app: &AppHandle) {
     emit_to(app, MAIN, MCP_STATUS, status);
 }
 
-fn services(app: &AppHandle) -> McpServices {
-    let services = &desktop(app).services;
-    McpServices {
-        notes: services.notes.clone(),
-        folders: services.folders.clone(),
+fn services(app: &AppHandle) -> Arc<dyn McpServicesSource> {
+    Arc::new(ActiveProfile(app.clone()))
+}
+
+/// Les IA lisent et écrivent dans le profil actif, relu à chaque appel : changer de profil ne
+/// redémarre pas le serveur (les sessions des IA restent ouvertes).
+struct ActiveProfile(AppHandle);
+
+impl McpServicesSource for ActiveProfile {
+    fn current(&self) -> Option<McpServices> {
+        let data = desktop(&self.0).services.data.current()?;
+        Some(McpServices {
+            notes: data.notes.clone(),
+            folders: data.folders.clone(),
+        })
     }
 }
 

@@ -31,6 +31,15 @@ export async function call<T>(command: string, args?: Record<string, unknown>): 
   }
 }
 
+/** Calls a command with a binary body (no JSON: the bytes travel as they are) and string headers. */
+export async function callWithBytes<T>(command: string, bytes: Uint8Array, headers: Record<string, string>): Promise<T> {
+  try {
+    return await invoke<T>(command, bytes, { headers });
+  } catch (error) {
+    throw new Error(isIpcError(error) ? error.message : String(error));
+  }
+}
+
 /**
  * Listens to an event pushed by the main process to this window. Returns an unsubscribe function usable right away,
  * even before the listener is registered.

@@ -27,11 +27,13 @@ app = { path = "crates/app" }
 adapter-sqlite = { path = "crates/adapter-sqlite" }
 adapter-fs = { path = "crates/adapter-fs" }
 adapter-mcp = { path = "crates/adapter-mcp" }
+adapter-password = { path = "crates/adapter-password" }
 adapter-print = { path = "crates/adapter-print" }
 adapter-sync = { path = "crates/adapter-sync" }
 presentation = { path = "crates/presentation" }
 
 anyhow = "1"
+argon2 = "0.6"
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 getrandom = "0.3"
 hmac = "0.12"
@@ -80,6 +82,14 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
+
+# Argon2 non optimisé met plusieurs secondes à hacher un mot de passe : en développement
+# (tests, `tauri dev`), ses crates sont compilés optimisés.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
 
 [profile.release]
 codegen-units = 1

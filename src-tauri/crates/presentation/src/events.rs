@@ -24,3 +24,5 @@ pub const MCP_STATUS: &str = "mcp:status";
 pub const UPDATE_DOWNLOAD_FAILED: &str = "update:download-failed";
 /// Avancement d'un export en PDF (charge utile : `ExportProgressDto`).
 pub const EXPORT_PROGRESS: &str = "export:progress";
+/// Le profil actif a changé (ou vient d'être déverrouillé) : la fenêtre se recharge.
+pub const PROFILE_CHANGED: &str = "profiles:changed";

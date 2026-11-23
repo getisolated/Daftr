@@ -1,5 +1,7 @@
 //! Le serveur MCP vu par le protocole : la liste des outils et leur exécution.
 
+use std::sync::Arc;
+
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
@@ -8,8 +10,11 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use crate::server::ChangeListener;
 use crate::tools::{
     self, AppendToNoteArgs, CreateNoteArgs, GetNoteArgs, ListNotesArgs, McpServices,
-    SearchNotesArgs, ToolResult, UpdateNoteArgs,
+    McpServicesSource, SearchNotesArgs, ToolResult, UpdateNoteArgs,
 };
+
+/// Réponse à une IA tant que le profil actif attend son mot de passe.
+const LOCKED: &str = "Daftr is locked: the user must unlock the active profile in the app.";
 
 /// Consignes données aux IA à la connexion.
 const INSTRUCTIONS: &str = "Daftr is the user's markdown note-taking app. Notes live in \
@@ -20,14 +25,14 @@ update_note or append_to_note to write. Notes cannot be deleted from here. Dates
 /// Une connexion d'IA : chaque session MCP a la sienne, toutes partagent les services.
 #[derive(Clone)]
 pub(crate) struct DaftrTools {
-    services: McpServices,
+    services: Arc<dyn McpServicesSource>,
     on_change: ChangeListener,
     tool_router: ToolRouter<Self>,
 }
 
 impl DaftrTools {
     /// Outils branchés sur les services ; `on_change` est appelé après chaque écriture.
-    pub(crate) fn new(services: McpServices, on_change: ChangeListener) -> Self {
+    pub(crate) fn new(services: Arc<dyn McpServicesSource>, on_change: ChangeListener) -> Self {
         Self {
             services,
             on_change,
@@ -40,7 +45,7 @@ impl DaftrTools {
         &self,
         tool: impl FnOnce(&McpServices) -> ToolResult + Send + 'static,
     ) -> Result<String, String> {
-        let services = self.services.clone();
+        let services = self.services.current().ok_or_else(|| LOCKED.to_owned())?;
         let value = tokio::task::spawn_blocking(move || tool(&services))
             .await
             .map_err(|error| format!("Internal error: {error}"))??;

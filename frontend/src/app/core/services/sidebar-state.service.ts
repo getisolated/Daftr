@@ -1,6 +1,8 @@
 import { Injectable, signal } from '@angular/core';
 import { clampSidebarWidth, SIDEBAR_DEFAULT_WIDTH } from '../utils/folder-tree.util';
+import { sessionStorageKey } from './profile-session';
 
+/** Saved per profile (see sessionStorageKey). */
 const STORAGE_KEY = 'daftr-sidebar';
 
 interface PersistedSidebarState {
@@ -133,7 +135,7 @@ export class SidebarStateService {
     };
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(sessionStorageKey(STORAGE_KEY), JSON.stringify(state));
     } catch { /* storage full or unavailable: the sidebar just starts from defaults next time */ }
   }
 
@@ -147,7 +149,7 @@ export class SidebarStateService {
     };
 
     try {
-      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<PersistedSidebarState> | null;
+      const raw = JSON.parse(localStorage.getItem(sessionStorageKey(STORAGE_KEY)) ?? 'null') as Partial<PersistedSidebarState> | null;
 
       if (!raw) {
         return fallback;

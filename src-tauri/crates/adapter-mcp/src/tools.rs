@@ -36,6 +36,20 @@ pub struct McpServices {
     pub folders: Arc<FoldersService>,
 }
 
+/// D'où viennent les services à chaque appel d'outil : ceux du profil actif, qui change
+/// sans redémarrer le serveur (les IA connectées gardent leur session).
+pub trait McpServicesSource: Send + Sync {
+    /// Services du profil actif, `None` tant qu'il est verrouillé.
+    fn current(&self) -> Option<McpServices>;
+}
+
+/// Des services fixes (une seule base).
+impl McpServicesSource for McpServices {
+    fn current(&self) -> Option<McpServices> {
+        Some(self.clone())
+    }
+}
+
 /// Résultat d'un outil : le JSON à renvoyer, ou un message d'erreur pour l'IA.
 pub(crate) type ToolResult = Result<Value, String>;
 

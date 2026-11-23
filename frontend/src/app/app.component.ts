@@ -25,6 +25,7 @@ import { FormattingBarService } from './core/services/formatting-bar.service';
 import { FileDocsService } from './core/services/file-docs.service';
 import { CollectionsService } from './core/services/collections.service';
 import { ThemeService } from './core/services/theme.service';
+import { ProfilesService } from './core/services/profiles.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
 import { QUICK_NOTES_TAB_ID } from './core/models/note.model';
 import { I18nService } from './core/i18n/i18n.service';
@@ -153,6 +154,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private formattingBar = inject(FormattingBarService);
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
+  private readonly profiles = inject(ProfilesService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
@@ -212,6 +214,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.tabsService.restoreSession(noteIds);
       // In the background: the folders of the disk never delay the notes
       this.collections.start();
+      void this.profiles.load();
     } catch (err) {
       console.error('[App] Failed to load notes:', err);
     }
