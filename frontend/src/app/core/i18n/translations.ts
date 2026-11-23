@@ -3,6 +3,7 @@ import { EN_EDITOR } from './translations/en/editor';
 import { EN_PROFILES } from './translations/en/profiles';
 import { EN_SETTINGS } from './translations/en/settings';
 import { EN_SIDEBAR } from './translations/en/sidebar';
+import { EN_SYNC } from './translations/en/sync';
 import { EN_UI } from './translations/en/ui';
 import { EN_WORKSPACE } from './translations/en/workspace';
 import { FR_COMMON } from './translations/fr/common';
@@ -10,6 +11,7 @@ import { FR_EDITOR } from './translations/fr/editor';
 import { FR_PROFILES } from './translations/fr/profiles';
 import { FR_SETTINGS } from './translations/fr/settings';
 import { FR_SIDEBAR } from './translations/fr/sidebar';
+import { FR_SYNC } from './translations/fr/sync';
 import { FR_UI } from './translations/fr/ui';
 import { FR_WORKSPACE } from './translations/fr/workspace';
 import { Language } from './language.model';
@@ -23,6 +25,7 @@ export const EN = {
   ...EN_EDITOR,
   ...EN_WORKSPACE,
   ...EN_PROFILES,
+  ...EN_SYNC,
 } as const;
 
 export type TranslationKey = keyof typeof EN;
@@ -38,6 +41,7 @@ const FR: Record<TranslationKey, string> = {
   ...FR_EDITOR,
   ...FR_WORKSPACE,
   ...FR_PROFILES,
+  ...FR_SYNC,
 };
 
 export const TRANSLATIONS: Record<Language, Record<TranslationKey, string>> = { en: EN, fr: FR };
