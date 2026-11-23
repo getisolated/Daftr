@@ -1,10 +1,10 @@
 # Conception : synchronisation entre appareils d'un même utilisateur
 
-> Spec de référence de la synchronisation LAN (2026-11-19). L'avancement des lots et les API livrées sont dans [avancement.md](avancement.md), les mesures du spike dans [mesures-spike.md](mesures-spike.md). Le lot 6 consolidera ces documents dans [plan.md](plan.md).
+> Spec d'origine de la synchronisation LAN (2026-11-19), gardée telle qu'écrite avant l'implémentation. La feature livrée (architecture, protocole, API, écarts assumés, limites) est décrite dans [plan.md](plan.md), les mesures du spike dans [mesures-spike.md](mesures-spike.md).
 
 ## 0. Contexte et décisions
 
-- **Remplace [plan.md](plan.md)** (serveur OVH, OAuth). On garde l'idée de sa phase 1 (modèle de données CRDT), adaptée au §3. Les phases serveur, compte et exploitation sont abandonnées.
+- **Remplace l'ancien plan** (serveur OVH, OAuth). On garde l'idée de sa phase 1 (modèle de données CRDT), adaptée au §3. Les phases serveur, compte et exploitation sont abandonnées.
 - **Réseau local uniquement.** Aucun trafic Internet, ni direct ni via une infrastructure tierce. L'application refuse toute connexion de synchronisation vers ou depuis une adresse qui n'est pas locale. Deux appareils ne se synchronisent que lorsqu'ils sont allumés en même temps sur le même réseau local.
 - **Deux notions distinctes** :
   - **la confiance entre appareils**, établie une fois par appairage (QR code ou code à 6 chiffres) ;
