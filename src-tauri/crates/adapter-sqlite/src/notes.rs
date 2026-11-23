@@ -46,6 +46,9 @@ const SET_POSITION: &str = "UPDATE notes SET sort_order = ? \
                             WHERE id = ? AND folder_id IS ? AND deleted_at IS NULL";
 const DELETE: &str = "UPDATE notes SET deleted_at = datetime('now') \
                       WHERE id = ? AND deleted_at IS NULL";
+/// La suppression est levée sans toucher `updated_at` : le document de la note efface sa
+/// marque de suppression (voir `sync::local::reconcile`).
+const RESTORE: &str = "UPDATE notes SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL";
 const TAG_COLUMNS: &str = "SELECT tags FROM notes WHERE deleted_at IS NULL";
 
 impl NoteStore for SqliteStore {
@@ -116,6 +119,16 @@ impl NoteStore for SqliteStore {
 
     fn delete(&self, id: i64) -> AppResult<()> {
         self.write_notes(&[id], |transaction| transaction.execute(DELETE, [id]))
+    }
+
+    fn restore(&self, id: i64) -> AppResult<bool> {
+        self.write(|transaction, local| {
+            let restored = transaction.execute(RESTORE, [id]).map_err(storage)? > 0;
+            if restored {
+                local.notes_written(transaction, &[id])?;
+            }
+            Ok(restored)
+        })
     }
 
     fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {

@@ -177,6 +177,9 @@ pub(crate) fn reconcile(doc: &NoteDoc, note: &NoteRow) -> bool {
     changed |= note_doc::apply_color(doc, fields.color.as_deref());
     if let Some(deleted_at) = &note.deleted_at {
         changed |= note_doc::apply_delete(doc, deleted_at);
+    } else {
+        // Note visible (rétablie) : le document ne doit plus la dire supprimée
+        changed |= note_doc::apply_restore(doc);
     }
     changed
 }

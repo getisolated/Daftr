@@ -27,6 +27,7 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         notes::notes_move,
         notes::notes_place,
         notes::notes_delete,
+        notes::notes_restore,
         notes::notes_set_color,
         notes::notes_search,
         notes::notes_by_tag,

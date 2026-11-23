@@ -151,6 +151,33 @@ fn deletions_become_tombstones_in_the_documents() {
     );
 }
 
+#[test]
+fn a_restored_note_comes_back_and_clears_its_tombstone() {
+    let (store, _) = synced_on(1);
+    let id = add(
+        &store,
+        "# Revenante
+corps",
+        None,
+    );
+    assert!(!NoteStore::restore(&store, id).unwrap());
+
+    NoteStore::delete(&store, id).unwrap();
+    assert!(NoteStore::restore(&store, id).unwrap());
+
+    assert_eq!(
+        NoteStore::by_id(&store, id).unwrap().unwrap().content,
+        "# Revenante
+corps"
+    );
+    assert_eq!(
+        NoteStore::search(&store, "\"revenante\"*").unwrap().len(),
+        1
+    );
+    assert_eq!(projected(&store, uuid(&store, id)).deleted_at, None);
+    assert!(!NoteStore::restore(&store, id).unwrap());
+}
+
 fn uuid_of_deleted(store: &SqliteStore, id: i64) -> Uuid {
     Uuid::parse(&note_column(store, id, "uuid").unwrap()).unwrap()
 }

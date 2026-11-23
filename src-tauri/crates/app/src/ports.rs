@@ -38,6 +38,9 @@ pub trait NoteStore: Send + Sync {
     fn set_positions(&self, folder_id: Option<i64>, ordered_ids: &[i64]) -> AppResult<()>;
     /// Supprime une note.
     fn delete(&self, id: i64) -> AppResult<()>;
+    /// Rétablit une note supprimée (ici ou sur un autre appareil) ; rend `false` si elle ne
+    /// l'était pas.
+    fn restore(&self, id: i64) -> AppResult<bool>;
     /// Colore des notes sans toucher `updated_at`.
     fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()>;
     /// Recherche plein texte (requête FTS5 déjà assainie), par pertinence.

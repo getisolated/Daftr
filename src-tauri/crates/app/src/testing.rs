@@ -225,6 +225,11 @@ impl NoteStore for MemoryNotes {
         Ok(())
     }
 
+    fn restore(&self, id: i64) -> AppResult<bool> {
+        self.record(format!("restore {id}"));
+        Ok(false)
+    }
+
     fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {
         self.record(format!("set_color {ids:?} {color:?}"));
         Ok(())
