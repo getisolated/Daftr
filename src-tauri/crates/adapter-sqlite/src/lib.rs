@@ -12,7 +12,7 @@ mod rows;
 mod schema;
 mod sync;
 
-pub use sync::ChangeListener;
+pub use sync::{ChangeListener, StoredSync, read_stored_sync};
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
