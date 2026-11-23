@@ -7,11 +7,12 @@ mod mdns;
 #[cfg(any(test, feature = "testing"))]
 mod memory;
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use domain::sync::DeviceName;
 use tokio::sync::mpsc::UnboundedReceiver;
 
+use crate::addr::AddrPolicy;
 use crate::error::Result;
 use crate::keys::Fingerprint;
 
@@ -20,6 +21,12 @@ pub use mdns::MdnsDiscovery;
 pub use memory::{MemoryDiscovery, MemoryNetwork};
 
 pub(crate) use interfaces::lan_addresses;
+
+/// Adresses de cet appareil sur le réseau local (interfaces physiques, sans IPv6 lien-local) :
+/// leur changement signale un changement de réseau ([`crate::Engine::network_changed`]).
+pub fn local_addresses() -> Vec<IpAddr> {
+    lan_addresses(AddrPolicy::Lan)
+}
 
 /// Type de service mDNS.
 pub const SERVICE_TYPE: &str = "_daftr-sync._tcp.local.";

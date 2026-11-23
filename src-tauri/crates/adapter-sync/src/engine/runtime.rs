@@ -67,7 +67,8 @@ pub(crate) fn request_refresh<P: ProfileKey>(shared: &Arc<Shared<P>>) {
 
 /// Démarre l'écoute, l'annonce et la recherche.
 async fn start<P: ProfileKey>(shared: &Arc<Shared<P>>) -> Result<()> {
-    let (listeners, port) = match net::listen(&shared.config.bind, shared.config.port).await {
+    let requested = shared.state().port;
+    let (listeners, port) = match net::listen(&shared.config.bind, requested).await {
         Ok(listening) => listening,
         Err(error) => {
             shared.state().error = Some(error.status_reason());
@@ -355,6 +356,23 @@ pub(super) async fn network_changed<P: ProfileKey>(shared: &Arc<Shared<P>>) -> R
         });
     }
     Ok(())
+}
+
+/// Change le port d'écoute : l'écoute en cours (s'il y en a une) se rouvre sur le nouveau port
+/// et l'annonce suit ; les sessions ouvertes restent en place.
+pub(super) async fn set_port<P: ProfileKey>(shared: &Arc<Shared<P>>, port: u16) -> Result<()> {
+    let running = {
+        let mut state = shared.state();
+        if state.port == port {
+            return Ok(());
+        }
+        state.port = port;
+        state.runtime.is_some()
+    };
+    if running {
+        stop(shared, false).await;
+    }
+    refresh(shared).await
 }
 
 /// Change le nom annoncé.

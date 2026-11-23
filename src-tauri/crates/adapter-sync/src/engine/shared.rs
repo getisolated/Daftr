@@ -87,6 +87,8 @@ pub(crate) struct Retry {
 /// État mutable du moteur.
 pub(crate) struct State<P> {
     pub paused: bool,
+    /// Port d'écoute demandé (0 : choisi par le système).
+    pub port: u16,
     pub device_name: DeviceName,
     pub runtime: Option<Runtime>,
     /// Recherche temporaire (appairage par code sans écoute en cours).
@@ -136,6 +138,7 @@ impl<P: ProfileKey> Shared<P> {
     ) -> Arc<Self> {
         let state = State {
             paused: false,
+            port: config.port,
             device_name: config.device_name.clone(),
             runtime: None,
             search: None,

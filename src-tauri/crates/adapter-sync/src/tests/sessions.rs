@@ -167,6 +167,32 @@ async fn an_offer_to_an_absent_device_is_sent_when_it_appears() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_new_port_reopens_the_listener_and_keeps_syncing() {
+    let network = MemoryNetwork::new();
+    let (a, b) = (device(&network, "A"), device(&network, "B"));
+    let shared = a.create_space("p", space(1));
+    share(&a, "p", &b, "p");
+    link(&a, &b);
+    a.engine.refresh().await.unwrap();
+    b.engine.refresh().await.unwrap();
+    let free = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = free.local_addr().unwrap().port();
+    drop(free);
+
+    a.engine.set_port(port).await.unwrap();
+
+    assert_eq!(a.engine.listening_port(), Some(port));
+    assert_eq!(a.discovery.announcement().unwrap().port, port);
+    b.engine.sync_now().await.unwrap();
+    write_note(&shared, "après le changement de port");
+    a.engine.local_change(&"p".to_owned());
+    eventually("modification reçue", || {
+        contents(&b.store("p")) == ["après le changement de port"]
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn nothing_runs_without_a_synchronized_profile() {
     let network = MemoryNetwork::new();
     let a = device(&network, "A");

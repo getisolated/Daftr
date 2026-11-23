@@ -25,7 +25,9 @@ mod wire;
 pub use addr::AddrPolicy;
 pub use backoff::BackoffPolicy;
 pub use clock::{Clock, SystemClock};
-pub use discovery::{Announcement, Discovery, MdnsDiscovery, SERVICE_TYPE, Sighting};
+pub use discovery::{
+    Announcement, Discovery, MdnsDiscovery, SERVICE_TYPE, Sighting, local_addresses,
+};
 #[cfg(any(test, feature = "testing"))]
 pub use discovery::{MemoryDiscovery, MemoryNetwork};
 pub use engine::{DEFAULT_PORT, Engine, EngineConfig, EngineDeps, OfferChoice, Timings};

@@ -252,6 +252,11 @@ impl<P: ProfileKey> Engine<P> {
         runtime::set_device_name(&self.shared, name).await
     }
 
+    /// Change le port d'écoute (réglage) : l'écoute en cours se rouvre sur ce port.
+    pub async fn set_port(&self, port: u16) -> Result<()> {
+        runtime::set_port(&self.shared, port).await
+    }
+
     /// État courant de la barre d'état.
     pub fn status(&self) -> SyncStatus {
         self.shared.status()
