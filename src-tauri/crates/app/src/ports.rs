@@ -4,6 +4,7 @@
 
 mod profiles;
 pub mod sync;
+pub mod trust;
 
 pub use profiles::{NoteImporter, PasswordHasher, ProfileFiles, ProfileRegistryStore};
 
@@ -18,6 +19,7 @@ use crate::AppResult;
 use crate::collections::CollectionEvent;
 
 pub use sync::{SyncEvents, SyncProfiles, SyncStore};
+pub use trust::TrustStore;
 
 /// Stockage des notes.
 pub trait NoteStore: Send + Sync {

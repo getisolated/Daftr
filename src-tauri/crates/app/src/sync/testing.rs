@@ -1,10 +1,12 @@
-//! Doublures en mémoire des ports de la synchronisation, pour les tests de ce crate et des
-//! autres (feature `testing`) : un profil = un [`MemorySyncStore`], qui tient ses documents
-//! en blobs comme l'adaptateur SQLite et projette à la lecture.
+//! Doublures en mémoire des ports de la synchronisation et de la confiance, pour les tests de
+//! ce crate et des autres (feature `testing`) : un profil = un [`MemorySyncStore`], qui tient
+//! ses documents en blobs comme l'adaptateur SQLite et projette à la lecture.
 
 mod store;
+mod trust;
 
 pub use store::MemorySyncStore;
+pub use trust::MemoryTrust;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
