@@ -117,7 +117,8 @@ fn migrate(transaction: &Transaction<'_>) -> rusqlite::Result<()> {
     assign_uuids(transaction, "folders")?;
     transaction.execute_batch(INDEXES)?;
     transaction.execute(
-        "UPDATE notes SET folder_uuid = (SELECT uuid FROM folders WHERE folders.id = notes.folder_id) \
+        "UPDATE notes SET folder_uuid = \
+         (SELECT uuid FROM folders WHERE folders.id = notes.folder_id) \
          WHERE folder_uuid IS NULL AND folder_id IS NOT NULL",
         [],
     )?;
@@ -210,13 +211,13 @@ fn backup_before_migration(connection: &Connection, path: &Path) -> AppResult<()
 }
 
 /// `<base><suffix>` à côté de la base.
-fn backup_path(path: &Path, suffix: &str) -> Option<std::path::PathBuf> {
+pub(crate) fn backup_path(path: &Path, suffix: &str) -> Option<std::path::PathBuf> {
     let name = path.file_name()?.to_str()?;
     Some(path.with_file_name(format!("{name}{suffix}")))
 }
 
 /// Copie cohérente de la base dans un nouveau fichier.
-fn vacuum_into(connection: &Connection, target: &Path) -> AppResult<()> {
+pub(crate) fn vacuum_into(connection: &Connection, target: &Path) -> AppResult<()> {
     let target_text = target
         .to_str()
         .ok_or_else(|| AppError::storage("backup path is not valid UTF-8"))?;

@@ -1,4 +1,5 @@
-//! Stockage SQLite des notes, dossiers et collections (`daftr.db`, une base par profil).
+//! Stockage SQLite des notes, dossiers et collections (`daftr.db`, une base par profil), et
+//! des documents CRDT de la synchronisation.
 //!
 //! Même schéma que la version Electron : une base existante est reprise telle quelle, ses
 //! migrations sont idempotentes.
@@ -9,17 +10,30 @@ mod import;
 mod notes;
 mod rows;
 mod schema;
+mod sync;
 
-use std::path::Path;
+pub use sync::ChangeListener;
+
+use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Mutex, MutexGuard};
 
 use app::{AppError, AppResult};
+use domain::sync::DeviceKey;
 use domain::uuid::Uuid;
 use rusqlite::Connection;
 
 /// Base SQLite partagée entre threads (une connexion, accès sérialisés).
 pub struct SqliteStore {
     connection: Mutex<Connection>,
+    /// Chemin de la base (sauvegardes), `None` en mémoire.
+    path: Option<PathBuf>,
+    /// Clé de cet appareil, indispensable aux écritures d'un profil synchronisé.
+    device: Option<DeviceKey>,
+    /// Prévenu des écritures locales d'un profil synchronisé.
+    change_listener: Option<ChangeListener>,
+    /// La génération de l'identifiant client a été renouvelée pour cette session.
+    session_started: AtomicBool,
 }
 
 impl SqliteStore {
@@ -38,8 +52,13 @@ impl SqliteStore {
     fn prepare(mut connection: Connection, path: Option<&Path>) -> AppResult<Self> {
         schema::configure(&connection).map_err(AppError::storage)?;
         schema::migrate(&mut connection, path)?;
+        sync::purge_deleted(&connection).map_err(AppError::storage)?;
         Ok(Self {
             connection: Mutex::new(connection),
+            path: path.map(Path::to_path_buf),
+            device: None,
+            change_listener: None,
+            session_started: AtomicBool::new(false),
         })
     }
 

@@ -68,6 +68,8 @@ pub(crate) fn configure(connection: &Connection) -> rusqlite::Result<()> {
     connection.pragma_update(None, "foreign_keys", "ON")
 }
 
+pub(crate) use sync_columns::{backup_path, vacuum_into};
+
 /// Crée le schéma et applique les migrations, toutes idempotentes. `path` est celui de la
 /// base, `None` en mémoire.
 pub(crate) fn migrate(connection: &mut Connection, path: Option<&Path>) -> AppResult<()> {

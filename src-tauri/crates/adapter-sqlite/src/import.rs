@@ -30,11 +30,11 @@ const INSERT_NOTE: &str = "INSERT INTO notes (uuid, title, content, tags, folder
 impl NoteImporter for SqliteStore {
     fn import(&self, bundle: &TransferBundle) -> AppResult<()> {
         let note_uuids = new_uuids(&bundle.notes)?;
-        let mut connection = self.connection();
-        let transaction = connection.transaction().map_err(storage)?;
-
-        import_bundle(&transaction, bundle, &note_uuids)?;
-        transaction.commit().map_err(storage)
+        self.write(|transaction, local| {
+            let (folders, notes) = import_bundle(transaction, bundle, &note_uuids)?;
+            local.folders_written(transaction, &folders)?;
+            local.notes_written(transaction, &notes)
+        })
     }
 }
 
@@ -52,13 +52,14 @@ fn import_bundle(
     transaction: &Transaction<'_>,
     bundle: &TransferBundle,
     note_uuids: &HashMap<Uuid, Uuid>,
-) -> AppResult<()> {
+) -> AppResult<(Vec<i64>, Vec<i64>)> {
     let mut new_ids: HashMap<i64, i64> = HashMap::with_capacity(bundle.folders.len());
 
     for folder in &bundle.folders {
         let parent = folder.parent_key.and_then(|key| new_ids.get(&key).copied());
         new_ids.insert(folder.key, insert_folder(transaction, folder, parent)?);
     }
+    let mut notes = Vec::with_capacity(bundle.notes.len());
     let loose_folder = if bundle.notes.iter().any(|note| note.folder_key.is_none()) {
         Some(default_folder(transaction)?)
     } else {
@@ -69,9 +70,11 @@ fn import_bundle(
             Some(key) => new_ids.get(&key).copied(),
             None => loose_folder,
         };
-        insert_note(transaction, note, folder, note_uuids)?;
+        notes.push(insert_note(transaction, note, folder, note_uuids)?);
     }
-    Ok(())
+    let mut folders: Vec<i64> = new_ids.into_values().collect();
+    folders.extend(loose_folder);
+    Ok((folders, notes))
 }
 
 fn insert_folder(
@@ -98,7 +101,7 @@ fn insert_note(
     note: &NoteCopy,
     folder: Option<i64>,
     note_uuids: &HashMap<Uuid, Uuid>,
-) -> AppResult<()> {
+) -> AppResult<i64> {
     let uuid = note_uuids.get(&note.uuid).copied().unwrap_or(note.uuid);
     let new_uuid = |old: Uuid| note_uuids.get(&old).copied();
     let content =
@@ -117,7 +120,7 @@ fn insert_note(
         note.updated_at
     ];
     transaction.execute(INSERT_NOTE, values).map_err(storage)?;
-    Ok(())
+    Ok(transaction.last_insert_rowid())
 }
 
 /// Le dossier par défaut de la base cible, créé s'il manque (profil jamais ouvert).

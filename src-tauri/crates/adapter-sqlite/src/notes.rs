@@ -8,7 +8,7 @@ use app::ports::NoteStore;
 use app::{AppError, AppResult};
 use domain::note::{NewNote, Note, NoteChanges};
 use rusqlite::types::Value;
-use rusqlite::{OptionalExtension, params, params_from_iter};
+use rusqlite::{OptionalExtension, Transaction, params, params_from_iter};
 
 use crate::{SqliteStore, placeholders, random_uuid, rows, storage};
 
@@ -64,8 +64,7 @@ impl NoteStore for SqliteStore {
 
     fn insert(&self, note: &NewNote) -> AppResult<Note> {
         let uuid = random_uuid()?;
-        let id = {
-            let connection = self.connection();
+        let id = self.write(|transaction, local| {
             let encoded = tags::encode(&note.tags);
             let values = params![
                 uuid.to_string(),
@@ -74,9 +73,11 @@ impl NoteStore for SqliteStore {
                 encoded,
                 note.folder_id
             ];
-            connection.execute(INSERT, values).map_err(storage)?;
-            connection.last_insert_rowid()
-        };
+            transaction.execute(INSERT, values).map_err(storage)?;
+            let id = transaction.last_insert_rowid();
+            local.notes_written(transaction, &[id])?;
+            Ok(id)
+        })?;
         self.by_id(id)?
             .ok_or_else(|| AppError::storage("note not saved"))
     }
@@ -92,37 +93,29 @@ impl NoteStore for SqliteStore {
         );
         values.push(Value::Integer(id));
 
-        let connection = self.connection();
-        connection
-            .execute(&sql, params_from_iter(values))
-            .map_err(storage)?;
-        Ok(())
+        self.write_notes(&[id], |transaction| {
+            transaction.execute(&sql, params_from_iter(values))
+        })
     }
 
     fn set_folder(&self, id: i64, folder_id: Option<i64>) -> AppResult<()> {
-        let connection = self.connection();
-        connection
-            .execute(SET_FOLDER, params![folder_id, id])
-            .map_err(storage)?;
-        Ok(())
+        self.write_notes(&[id], |transaction| {
+            transaction.execute(SET_FOLDER, params![folder_id, id])
+        })
     }
 
     fn set_positions(&self, folder_id: Option<i64>, ordered_ids: &[i64]) -> AppResult<()> {
-        let mut connection = self.connection();
-        let transaction = connection.transaction().map_err(storage)?;
-
-        for (position, id) in (1_i64..).zip(ordered_ids) {
-            transaction
-                .execute(SET_POSITION, params![position, id, folder_id])
-                .map_err(storage)?;
-        }
-        transaction.commit().map_err(storage)
+        self.write_notes(ordered_ids, |transaction| {
+            let mut statement = transaction.prepare_cached(SET_POSITION)?;
+            for (position, id) in (1_i64..).zip(ordered_ids) {
+                statement.execute(params![position, id, folder_id])?;
+            }
+            Ok(ordered_ids.len())
+        })
     }
 
     fn delete(&self, id: i64) -> AppResult<()> {
-        let connection = self.connection();
-        connection.execute(DELETE, [id]).map_err(storage)?;
-        Ok(())
+        self.write_notes(&[id], |transaction| transaction.execute(DELETE, [id]))
     }
 
     fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {
@@ -133,11 +126,9 @@ impl NoteStore for SqliteStore {
         let values = std::iter::once(Value::from(color.map(str::to_owned)))
             .chain(ids.iter().map(|id| Value::Integer(*id)));
 
-        let connection = self.connection();
-        connection
-            .execute(&sql, params_from_iter(values))
-            .map_err(storage)?;
-        Ok(())
+        self.write_notes(ids, |transaction| {
+            transaction.execute(&sql, params_from_iter(values))
+        })
     }
 
     fn search(&self, fts_query: &str) -> AppResult<Vec<Note>> {
@@ -165,8 +156,22 @@ impl SqliteStore {
             .map_err(storage)?;
         notes.collect::<rusqlite::Result<_>>().map_err(storage)
     }
-}
 
+    /// Modifie les notes `ids` par `update` (qui rend le nombre de lignes touchées) et reporte
+    /// les modifications dans leurs documents.
+    fn write_notes(
+        &self,
+        ids: &[i64],
+        update: impl FnOnce(&Transaction<'_>) -> rusqlite::Result<usize>,
+    ) -> AppResult<()> {
+        self.write(|transaction, local| {
+            if update(transaction).map_err(storage)? > 0 {
+                local.notes_written(transaction, ids)?;
+            }
+            Ok(())
+        })
+    }
+}
 /// Colonnes `col = ?` à modifier et leurs valeurs, dans l'ordre.
 fn assignments(changes: &NoteChanges) -> (Vec<&'static str>, Vec<Value>) {
     let fields = [
