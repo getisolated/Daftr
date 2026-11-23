@@ -233,6 +233,7 @@ impl<P: ProfileKey> Session<P> {
             profile: profile.clone(),
             notes: applied.notes,
             folders: true,
+            from: self.remote_name.clone(),
         });
 
         {

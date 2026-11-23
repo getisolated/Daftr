@@ -294,6 +294,8 @@ pub struct NotesSyncedDto {
     pub uuids: Vec<String>,
     /// Les dossiers ont changé.
     pub folders: bool,
+    /// Nom de l'appareil d'où viennent les modifications (« modifié depuis… »), s'il est connu.
+    pub device_name: Option<String>,
 }
 
 /// Avancement de la synchronisation initiale (événement `sync:progress`).

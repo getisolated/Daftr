@@ -145,11 +145,13 @@ impl SyncEventDto {
                 profile,
                 notes,
                 folders,
+                from,
             } => Self::NotesSynced(NotesSyncedDto {
                 profile_id: profile.as_str().to_owned(),
                 active: profile == active,
                 uuids: notes.iter().map(ToString::to_string).collect(),
                 folders: *folders,
+                device_name: from.as_ref().map(|name| name.as_str().to_owned()),
             }),
             SyncEvent::Status(status) => Self::Status(status.into()),
             SyncEvent::Progress {
@@ -265,12 +267,14 @@ mod tests {
             profile: work.clone(),
             notes: vec![uuid],
             folders: true,
+            from: Some(DeviceName::parse("Laptop").unwrap()),
         };
         let SyncEventDto::NotesSynced(dto) = SyncEventDto::from_event(&synced, &work) else {
             panic!("événement inattendu");
         };
         assert!(dto.active && dto.folders);
         assert_eq!(dto.uuids, [uuid.to_string()]);
+        assert_eq!(dto.device_name.as_deref(), Some("Laptop"));
 
         let status = SyncEvent::Status(SyncStatus::Error {
             reason: "listen_failed".to_owned(),

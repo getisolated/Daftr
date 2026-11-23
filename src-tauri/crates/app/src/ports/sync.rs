@@ -180,6 +180,8 @@ pub enum SyncEvent<P> {
         notes: Vec<Uuid>,
         /// Les dossiers ont changé.
         folders: bool,
+        /// Nom de l'appareil d'où viennent les modifications, s'il est connu.
+        from: Option<DeviceName>,
     },
     /// Nouvel état de la barre d'état.
     Status(SyncStatus),

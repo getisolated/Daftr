@@ -320,6 +320,7 @@ impl<P: ProfileKey> Session<P> {
             profile: profile.clone(),
             notes: applied.notes,
             folders: applied.space,
+            from: self.remote_name.clone(),
         });
         self.shared.request_push(profile.clone(), Some(self.id));
         if applied.space {

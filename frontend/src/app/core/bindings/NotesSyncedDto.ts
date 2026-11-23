@@ -19,4 +19,8 @@ uuids: Array<string>,
 /**
  * Les dossiers ont changé.
  */
-folders: boolean, };
+folders: boolean, 
+/**
+ * Nom de l'appareil d'où viennent les modifications (« modifié depuis… »), s'il est connu.
+ */
+deviceName: string | null, };
