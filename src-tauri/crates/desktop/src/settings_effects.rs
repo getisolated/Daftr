@@ -31,10 +31,11 @@ pub fn apply(app: &AppHandle, change: &SettingsChange) {
     if change.mcp_changed() {
         mcp::sync(app);
     }
-    if change.collections_exclude_changed() {
-        desktop(app)
-            .services
-            .collections
+    // Un profil verrouillé n'a pas de surveillance : il prendra les réglages à son ouverture
+    if change.collections_exclude_changed()
+        && let Some(data) = desktop(app).services.data.current()
+    {
+        data.collections
             .set_excludes(&change.after.collections_exclude);
     }
 }

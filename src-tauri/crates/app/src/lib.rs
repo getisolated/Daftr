@@ -9,6 +9,7 @@ pub mod export;
 pub mod folders;
 pub mod notes;
 pub mod ports;
+pub mod profiles;
 pub mod settings;
 pub mod sync;
 

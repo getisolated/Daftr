@@ -8,6 +8,7 @@ export const EN_SIDEBAR = {
   // Tree
   'sidebar.tree.allNotes': 'All notes',
   'sidebar.tree.folderNoteCount': 'Notes in this folder and its sub-folders',
+  'sidebar.tree.newNoteInFolder': 'New note in this folder',
 
   // System folders (their stored name stays the identifier, only the display is translated)
   'sidebar.folder.inbox': 'Inbox',
@@ -86,6 +87,7 @@ export const EN_SIDEBAR = {
   'sidebar.collections.trash.confirm.mac': 'Move to Trash',
   'sidebar.collections.menu.locate': 'Locate on Disk…',
   'sidebar.collections.menu.newFile': 'New File',
+  'sidebar.collections.newFileInFolder': 'New file in this folder',
   'sidebar.collections.menu.copyTo': 'Copy To…',
   'sidebar.collections.menu.copyItems': 'Copy {count} Items To…',
   'sidebar.collections.menu.renameCollection': 'Rename Collection',

@@ -82,7 +82,12 @@ fn open_files(app: &AppHandle, files: &[PathBuf]) {
     if files.is_empty() {
         return;
     }
-    match presentation::collections::open_paths(&desktop(app).services.collections, files) {
+    let opened = desktop(app)
+        .services
+        .data
+        .get()
+        .and_then(|data| presentation::collections::open_paths(&data.collections, files));
+    match opened {
         Ok(refs) => send_open_files(app, refs),
         Err(error) => tracing::warn!(message = %error.message, "fichiers non ouverts"),
     }

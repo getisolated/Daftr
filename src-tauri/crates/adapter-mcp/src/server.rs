@@ -16,7 +16,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::guard;
 use crate::handler::DaftrTools;
-use crate::tools::McpServices;
+use crate::tools::McpServicesSource;
 
 /// Chemin du point d'accès MCP.
 pub const MCP_PATH: &str = "/mcp";
@@ -77,7 +77,7 @@ impl McpServer {
     /// runtime tokio) ; rend la main dès que le port est pris, ou l'erreur.
     pub async fn start(
         config: McpConfig,
-        services: McpServices,
+        services: Arc<dyn McpServicesSource>,
         on_change: ChangeListener,
     ) -> Result<McpServerHandle, McpStartError> {
         if config.token.is_empty() {
@@ -151,7 +151,7 @@ impl Drop for McpServerHandle {
 /// Le point d'accès MCP derrière le contrôle d'accès ; les autres chemins répondent 404.
 fn router(
     token: String,
-    services: McpServices,
+    services: Arc<dyn McpServicesSource>,
     on_change: ChangeListener,
     cancel: CancellationToken,
 ) -> Router {

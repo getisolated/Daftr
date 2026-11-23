@@ -1,0 +1,90 @@
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.identity-fields {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.icon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-btn {
+  position: relative;
+  overflow: hidden;
+
+  // The real file field covers the button: clicked through the label, still reachable from the keyboard
+  &:focus-within {
+    outline: 1px solid var(--daftr-accent);
+    outline-offset: 1px;
+  }
+}
+
+.file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+
+  // The native button of the field has its own cursor, which showed through on part of the surface
+  &::file-selector-button {
+    cursor: pointer;
+  }
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.expander {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px 2px;
+  border: none;
+  border-top: 1px solid var(--daftr-border-soft);
+  background: transparent;
+  color: var(--daftr-text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--daftr-text-bright);
+  }
+
+  &[aria-expanded='true'] .chevron {
+    transform: rotate(90deg);
+  }
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--daftr-text-soft);
+  transition: transform 0.1s;
+}
+
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.delete-btn {
+  margin-right: auto;
+}
+
+app-checkbox {
+  font-size: 12px;
+}

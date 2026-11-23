@@ -2,7 +2,10 @@
 //!
 //! Les implémentations sont synchrones et partagées entre threads (`Send + Sync`).
 
+mod profiles;
 pub mod sync;
+
+pub use profiles::{NoteImporter, PasswordHasher, ProfileFiles, ProfileRegistryStore};
 
 use std::path::Path;
 

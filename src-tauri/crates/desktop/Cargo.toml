@@ -16,6 +16,7 @@ tauri-build.workspace = true
 [dependencies]
 adapter-fs.workspace = true
 adapter-mcp.workspace = true
+adapter-password.workspace = true
 adapter-print.workspace = true
 adapter-sqlite.workspace = true
 app.workspace = true
@@ -37,3 +38,6 @@ tauri-plugin-updater.workspace = true
 serde.workspace = true
 tracing.workspace = true
 window-vibrancy.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -37,11 +37,11 @@ fn respond(app: &AppHandle, path: &str) -> Response<Vec<u8>> {
     let Some((root, relative)) = parse(path) else {
         return status(StatusCode::BAD_REQUEST);
     };
-    match desktop(app)
-        .services
-        .collections
-        .read_image(&root, &relative)
-    {
+    // Profil verrouillé : aucune collection n'est servie
+    let Some(data) = desktop(app).services.data.current() else {
+        return status(StatusCode::FORBIDDEN);
+    };
+    match data.collections.read_image(&root, &relative) {
         Ok((bytes, mime)) => Response::builder()
             .header(header::CONTENT_TYPE, mime)
             .body(bytes)
