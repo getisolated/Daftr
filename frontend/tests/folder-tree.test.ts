@@ -31,7 +31,7 @@ function folder(
   isDefault = false,
   sortOrder: number | null = null,
 ): Folder {
-  return { id, name, parentId, createdAt: '', isDefault, sortOrder };
+  return { id, uuid: `folder-${id}`, name, parentId, createdAt: '', isDefault, sortOrder };
 }
 
 function note(

@@ -12,6 +12,7 @@ pub mod export;
 pub mod folder;
 mod hex;
 pub mod i18n;
+pub mod links;
 pub mod note;
 pub mod overlay;
 pub mod profile;

@@ -9,6 +9,10 @@ export type FolderDto = {
  */
 id: number, 
 /**
+ * Identifiant stable, le même sur tous les appareils.
+ */
+uuid: string, 
+/**
  * Nom.
  */
 name: string, 

@@ -1,10 +1,14 @@
 //! Notes stockées dans la base.
 
+use crate::uuid::Uuid;
+
 /// Une note telle que stockée.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note {
     /// Identifiant attribué par la base.
     pub id: i64,
+    /// Identifiant stable, le même sur tous les appareils (liens `note://<uuid>`).
+    pub uuid: Uuid,
     /// Titre (première ligne, extraite par le renderer).
     pub title: String,
     /// Texte markdown complet.

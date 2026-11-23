@@ -1,5 +1,9 @@
 //! Schéma de la base et migrations.
 
+mod sync_columns;
+
+use std::path::Path;
+
 use app::notes::tags;
 use app::{AppError, AppResult};
 use domain::tags::{LEGACY_QUICK_NOTE_TAG, QUICK_NOTE_TAG, rename_tag};
@@ -64,8 +68,11 @@ pub(crate) fn configure(connection: &Connection) -> rusqlite::Result<()> {
     connection.pragma_update(None, "foreign_keys", "ON")
 }
 
-/// Crée le schéma et applique les migrations, toutes idempotentes.
-pub(crate) fn migrate(connection: &mut Connection) -> AppResult<()> {
+pub(crate) use sync_columns::{backup_path, vacuum_into};
+
+/// Crée le schéma et applique les migrations, toutes idempotentes. `path` est celui de la
+/// base, `None` en mémoire.
+pub(crate) fn migrate(connection: &mut Connection, path: Option<&Path>) -> AppResult<()> {
     connection
         .execute_batch(BASE_SCHEMA)
         .map_err(AppError::storage)?;
@@ -74,7 +81,8 @@ pub(crate) fn migrate(connection: &mut Connection) -> AppResult<()> {
         .execute_batch(COLLECTIONS_TABLE)
         .map_err(AppError::storage)?;
     add_color_columns(connection).map_err(AppError::storage)?;
-    rename_quick_note_tag(connection).map_err(AppError::storage)
+    rename_quick_note_tag(connection).map_err(AppError::storage)?;
+    sync_columns::add_sync_columns(connection, path)
 }
 
 /// Bases créées avant les dossiers : les notes existantes sont à la racine (`folder_id`

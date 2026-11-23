@@ -3,7 +3,10 @@ import { EditorViewMode } from './editor.model';
 import { ThemePickerItem } from './theme.model';
 
 export interface Note {
+  /** Local handle (tabs, IPC): another device gives the same note another id. */
   id: number;
+  /** Stable id, the same on every device: the `note://<uuid>` links point to it. Empty for a pseudo note (quick notes, collection file). */
+  uuid: string;
   title: string;
   content: string;
   tags: string[];

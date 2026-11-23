@@ -12,6 +12,7 @@ import { call, inDesktop, subscribe } from './desktop-api';
 function mapRow(row: NoteDto): Note {
   return {
     id: row.id,
+    uuid: row.uuid,
     title: row.title,
     content: row.content,
     tags: JSON.parse(row.tags) as string[],
@@ -26,6 +27,7 @@ function mapRow(row: NoteDto): Note {
 function mapFolderRow(row: FolderDto): Folder {
   return {
     id: row.id,
+    uuid: row.uuid,
     name: row.name,
     parentId: row.parent_id,
     createdAt: row.created_at,

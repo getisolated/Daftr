@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  PathFolder, PathNote, createLinkResolver, listPathCompletions, needsAngleBrackets, normalizeLinkTarget, notePath,
+  PathFolder, PathNote, createLinkResolver, createNoteUrlResolver, formatNoteUrl, listPathCompletions, needsAngleBrackets,
+  normalizeLinkTarget, notePath, parseNoteUrl,
 } from '../src/app/core/utils/note-paths.util';
 import { TranslationKey } from '../src/app/core/i18n/translations';
 import { TranslationParams, translate } from '../src/app/core/i18n/translate';
@@ -92,6 +93,58 @@ describe('listPathCompletions', () => {
       ['Work/Projects/Roadmap', 'Work/Projects'],
       ['Perso/Roadmap perso', 'Perso'],
     ]);
+  });
+
+  it('carries the uuid of the notes, for the link to be written with it', () => {
+    const withUuid = [{ ...note(12, 'Todo', null), uuid: 'u-12' }];
+
+    expect(listPathCompletions('to', withUuid, FOLDERS).map(c => c.uuid)).toEqual(['u-12']);
+  });
+});
+
+describe('parseNoteUrl', () => {
+  it('reads a uuid, lowercased', () => {
+    expect(parseNoteUrl('note://0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d')).toEqual({ kind: 'uuid', uuid: '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d' });
+    expect(parseNoteUrl(' note://0B1C2D3E-4F50-4A6B-8C7D-9E0F1A2B3C4D ')).toEqual({ kind: 'uuid', uuid: '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d' });
+  });
+
+  it('takes a uuid made of digits only for a uuid, not for an id', () => {
+    expect(parseNoteUrl('note://12345678-1234-1234-1234-123456789012')).toEqual({ kind: 'uuid', uuid: '12345678-1234-1234-1234-123456789012' });
+  });
+
+  it('still reads the local id of an older link', () => {
+    expect(parseNoteUrl('note://42')).toEqual({ kind: 'id', id: 42 });
+  });
+
+  it('refuses any other target', () => {
+    expect(parseNoteUrl('note://abc')).toBeNull();
+    expect(parseNoteUrl('note://0b1c2d3e-4f50')).toBeNull();
+    expect(parseNoteUrl('Work/Todo')).toBeNull();
+    expect(parseNoteUrl('https://x.io')).toBeNull();
+  });
+});
+
+describe('createNoteUrlResolver', () => {
+  const notes = [{ id: 1, uuid: '0B1C2D3E-4F50-4A6B-8C7D-9E0F1A2B3C4D' }, { id: 2 }];
+  const find = createNoteUrlResolver(notes);
+
+  it('finds a note by uuid, whatever the case it was stored in', () => {
+    expect(find(parseNoteUrl('note://0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d')!)).toBe(notes[0]);
+  });
+
+  it('finds a note by local id for an older link, even one without uuid', () => {
+    expect(find({ kind: 'id', id: 2 })).toBe(notes[1]);
+  });
+
+  it('finds nothing for an unknown uuid or id', () => {
+    expect(find({ kind: 'uuid', uuid: 'ffffffff-ffff-4fff-8fff-ffffffffffff' })).toBeNull();
+    expect(find({ kind: 'id', id: 3 })).toBeNull();
+  });
+});
+
+describe('formatNoteUrl', () => {
+  it('writes the uuid in lowercase', () => {
+    expect(formatNoteUrl('0B1C2D3E-4F50-4A6B-8C7D-9E0F1A2B3C4D')).toBe('note://0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d');
   });
 });
 

@@ -11,6 +11,7 @@ use app::AppError;
 use app::folders::FoldersService;
 use app::notes::NotesService;
 use domain::folder::Folder;
+use domain::links::rewrite_note_links;
 use domain::note::{NewNote, Note, NoteChanges, append_text, content_with_title, extract_title};
 use domain::search::snippet;
 use domain::tags::normalize_tags;
@@ -156,6 +157,7 @@ pub(crate) struct AppendToNoteArgs {
 #[derive(Debug, Serialize)]
 struct NoteSummary {
     id: i64,
+    uuid: String,
     title: String,
     folder_id: Option<i64>,
     tags: Vec<String>,
@@ -167,6 +169,7 @@ impl From<&Note> for NoteSummary {
     fn from(note: &Note) -> Self {
         Self {
             id: note.id,
+            uuid: note.uuid.to_string(),
             title: note.title.clone(),
             folder_id: note.folder_id,
             tags: app::notes::tags::decode(&note.tags),
@@ -268,6 +271,7 @@ pub(crate) fn create_note(services: &McpServices, args: CreateNoteArgs) -> ToolR
         Some(title) => content_with_title(title, &args.content),
         None => args.content,
     };
+    let content = with_uuid_links(services, &content).unwrap_or(content);
     let note = NewNote {
         title: extract_title(&content),
         content,
@@ -295,6 +299,7 @@ pub(crate) fn append_to_note(services: &McpServices, args: AppendToNoteArgs) -> 
 }
 
 fn replace_content(services: &McpServices, id: i64, content: String) -> ToolResult {
+    let content = with_uuid_links(services, &content).unwrap_or(content);
     let changes = NoteChanges {
         title: Some(extract_title(&content)),
         content: Some(content),
@@ -303,6 +308,20 @@ fn replace_content(services: &McpServices, id: i64, content: String) -> ToolResu
     let updated = services.notes.update(id, &changes).map_err(failure)?;
     let note = updated.ok_or_else(|| note_not_found(id))?;
     Ok(json!(NoteSummary::from(&note)))
+}
+
+/// Les liens `note://<id>` que l'IA écrit avec les identifiants qu'elle voit, réécrits avec
+/// l'uuid de la note visée : seul l'uuid est le même sur tous les appareils.
+fn with_uuid_links(services: &McpServices, content: &str) -> Option<String> {
+    let uuid_of = |id: i64| {
+        services
+            .notes
+            .by_id(id)
+            .ok()
+            .flatten()
+            .map(|note| note.uuid)
+    };
+    rewrite_note_links(content, uuid_of)
 }
 
 fn with_content(note: &Note) -> Value {

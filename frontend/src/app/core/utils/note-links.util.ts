@@ -1,10 +1,14 @@
 import { Translator } from '../i18n/translate';
 import { noteDisplayTitle } from './note-title.util';
-import { LinkResolver, needsAngleBrackets, normalizeLinkTarget, pathKey } from './note-paths.util';
+import {
+  LinkResolver, NOTE_URL_SOURCE, NoteUrl, createNoteUrlResolver, needsAngleBrackets, normalizeLinkTarget, noteUrlFromMatch, pathKey,
+} from './note-paths.util';
 
 /** Minimal shape of a note needed to analyse its links (a `Note` satisfies it). */
 export interface LinkableNote {
   id: number;
+  /** Target of the `note://<uuid>` links; a note without one is reached by its local id only. */
+  uuid?: string;
   title: string;
   content: string;
   folderId: number | null;
@@ -45,7 +49,7 @@ export interface GraphOptions {
   focusId?: number | null;
   /** Notes without any link stay out of the graph. */
   hideOrphans?: boolean;
-  /** Resolves `[label](path)` links to notes; without it only `note://id` links count. */
+  /** Resolves `[label](path)` links to notes; without it only `note://` links count. */
   resolve?: LinkResolver;
 }
 
@@ -55,7 +59,40 @@ export const GRAPH_LARGE_THRESHOLD = 500;
 export const GRAPH_FOCUS_DEPTH = 2;
 
 const EXCERPT_RADIUS = 60;
-const NOTE_LINK = /note:\/\/(?<id>\d+)/g;
+const NOTE_LINK = new RegExp(NOTE_URL_SOURCE, 'g');
+/**
+ * Graph id of the first `note://<uuid>` target with no note: graph nodes are keyed by number and such a target has no
+ * id, so each missing uuid takes the next one up from here. The lowest safe integers are never a real note (positive),
+ * the quick notes (-1) nor a collection file (counted down from -100), so the missing node is never taken for one of them.
+ */
+const MISSING_UUID_FIRST_ID = Number.MIN_SAFE_INTEGER;
+/** Length of the uuid start naming a missing note in the graph: enough to tell it apart, short enough to read. */
+const MISSING_UUID_LABEL_LENGTH = 8;
+
+/**
+ * Id of the note a `note://` link designates, `null` when the link counts for nothing.
+ * An older `note://<id>` link counts as its id, even when no note has it any more (a missing note).
+ */
+export type NoteIdLookup = (url: NoteUrl) => number | null;
+
+/** Lookup of the notes known only by their local id: `note://<uuid>` links count for nothing. */
+function localIdOnly(url: NoteUrl): number | null {
+  return url.kind === 'id' ? url.id : null;
+}
+
+/** Lookup through the uuids of `notes`; `missing` gives the id of a uuid no note has (`null`: the link is ignored). */
+export function noteIdLookup(notes: readonly LinkableNote[], missing: (uuid: string) => number | null = () => null): NoteIdLookup {
+  const find = createNoteUrlResolver(notes);
+
+  return url => {
+    if (url.kind === 'id') {
+      return url.id;
+    }
+
+    return find(url)?.id ?? missing(url.uuid);
+  };
+}
+
 /** `[label](target)` and `[label](<target with spaces>)`, an optional title after the target; images are left out. */
 export const MARKDOWN_LINK = /(?<!!)\[[^\]\n]*\]\((?<target><[^>\n]*>|[^)\s\n]*)(?:\s+"[^"\n]*")?\)/g;
 
@@ -67,12 +104,17 @@ interface LinkOccurrence {
   length: number;
 }
 
-/** Every link to a note found in `content`, in order of appearance: `note://id`, and `[label](path)` when `resolve` knows the path. */
-function findLinkOccurrences(content: string, resolve?: LinkResolver): LinkOccurrence[] {
+/** Every link to a note found in `content`, in order of appearance: `note://`, and `[label](path)` when `resolve` knows the path. */
+function findLinkOccurrences(content: string, resolve: LinkResolver | undefined, lookup: NoteIdLookup): LinkOccurrence[] {
   const occurrences: LinkOccurrence[] = [];
 
   for (const match of content.matchAll(NOTE_LINK)) {
-    occurrences.push({ noteId: Number(match.groups?.['id']), index: match.index, length: match[0].length });
+    const url = noteUrlFromMatch(match);
+    const noteId = url === null ? null : lookup(url);
+
+    if (noteId !== null) {
+      occurrences.push({ noteId, index: match.index, length: match[0].length });
+    }
   }
 
   if (resolve) {
@@ -121,14 +163,14 @@ export function retargetNoteLinks(content: string, moves: ReadonlyMap<string, st
   return changed ? rewritten : null;
 }
 
-/** Ids of the notes `content` links to, in order of appearance and without duplicates. */
-export function extractNoteLinks(content: string, resolve?: LinkResolver): number[] {
-  return [...new Set(findLinkOccurrences(content, resolve).map(o => o.noteId))];
+/** Ids of the notes `content` links to, in order of appearance and without duplicates; `lookup` finds the `note://<uuid>` ones. */
+export function extractNoteLinks(content: string, resolve?: LinkResolver, lookup: NoteIdLookup = localIdOnly): number[] {
+  return [...new Set(findLinkOccurrences(content, resolve, lookup).map(o => o.noteId))];
 }
 
 /** Text around the first link to `targetId` in `content`, on its line, with an ellipsis where it was cut. */
-export function extractLinkExcerpt(content: string, targetId: number, resolve?: LinkResolver): string {
-  const occurrence = findLinkOccurrences(content, resolve).find(o => o.noteId === targetId);
+export function extractLinkExcerpt(content: string, targetId: number, resolve?: LinkResolver, lookup: NoteIdLookup = localIdOnly): string {
+  const occurrence = findLinkOccurrences(content, resolve, lookup).find(o => o.noteId === targetId);
 
   if (!occurrence) {
     return '';
@@ -149,13 +191,15 @@ export function extractLinkExcerpt(content: string, targetId: number, resolve?: 
 /** Notes linking to `targetId`, sorted by title. A note never backlinks itself. */
 export function findBacklinks(notes: readonly LinkableNote[], targetId: number, t: Translator, resolve?: LinkResolver): Backlink[] {
   const backlinks: Backlink[] = [];
+  const lookup = noteIdLookup(notes);
 
   for (const note of notes) {
-    if (note.id === targetId || !extractNoteLinks(note.content, resolve).includes(targetId)) {
+    if (note.id === targetId || !extractNoteLinks(note.content, resolve, lookup).includes(targetId)) {
       continue;
     }
 
-    backlinks.push({ noteId: note.id, title: noteDisplayTitle(note.title, t), excerpt: extractLinkExcerpt(note.content, targetId, resolve) });
+    const excerpt = extractLinkExcerpt(note.content, targetId, resolve, lookup);
+    backlinks.push({ noteId: note.id, title: noteDisplayTitle(note.title, t), excerpt });
   }
 
   return backlinks.sort((a, b) => a.title.localeCompare(b.title));
@@ -192,7 +236,8 @@ function collectNeighbourhood(links: readonly GraphLink[], focusId: number, dept
 }
 
 /**
- * Graph of the links between notes. A link to a note that does not exist gives a `missing` node.
+ * Graph of the links between notes. A link to a note that does not exist gives a `missing` node: an older `note://<id>`
+ * keeps its id, a `note://<uuid>` takes an id counted from {@link MISSING_UUID_FIRST_ID}, one per uuid.
  * Two notes linking each other keep one link per direction (A→B and B→A), so a cycle stays visible.
  */
 export function buildNoteGraph(notes: readonly LinkableNote[], t: Translator, options: GraphOptions = {}): NoteGraph {
@@ -202,9 +247,25 @@ export function buildNoteGraph(notes: readonly LinkableNote[], t: Translator, op
   const existing = new Set(notes.map(n => n.id));
   const links: GraphLink[] = [];
   const missing = new Set<number>();
+  // Uuid of each missing `note://<uuid>` target, by the id it was given, and the other way round
+  const missingUuids = new Map<number, string>();
+  const idOfMissingUuid = new Map<string, number>();
+  const missingUuidId = (uuid: string): number => {
+    let id = idOfMissingUuid.get(uuid);
+
+    if (id === undefined) {
+      id = MISSING_UUID_FIRST_ID + idOfMissingUuid.size;
+      idOfMissingUuid.set(uuid, id);
+      missingUuids.set(id, uuid);
+    }
+
+    return id;
+  };
+  // Every note (not only the scoped ones) is looked up: one out of the folders is not missing
+  const lookup = noteIdLookup(notes, missingUuidId);
 
   for (const note of scoped) {
-    for (const targetId of extractNoteLinks(note.content, resolve)) {
+    for (const targetId of extractNoteLinks(note.content, resolve, lookup)) {
       if (targetId === note.id) {
         continue;
       }
@@ -243,7 +304,8 @@ export function buildNoteGraph(notes: readonly LinkableNote[], t: Translator, op
 
   for (const id of missing) {
     if (!neighbourhood || neighbourhood.has(id)) {
-      nodes.push({ id, title: t('editor.graph.missingNote', { id }), degree: degrees.get(id) ?? 0, missing: true });
+      const label = missingUuids.get(id)?.slice(0, MISSING_UUID_LABEL_LENGTH) ?? id;
+      nodes.push({ id, title: t('editor.graph.missingNote', { id: label }), degree: degrees.get(id) ?? 0, missing: true });
     }
   }
 

@@ -15,6 +15,7 @@ import { ThemeService } from '../../core/services/theme.service';
 import { PaletteResult } from '../../core/models/note.model';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { noteDisplayTitle } from '../../core/utils/note-title.util';
+import { formatNoteUrl } from '../../core/utils/note-paths.util';
 import { buildThemePickerItems } from '../../core/utils/theme.util';
 
 @Component({
@@ -506,8 +507,15 @@ export class PaletteComponent implements OnDestroy {
     const noteId = this.tabs.activeNoteId();
 
     // Only real notes (positive ids) have a note:// link: not the quick notes, nor the collection files
-    if (noteId !== null && noteId > 0) {
-      await navigator.clipboard.writeText(`note://${noteId}`);
+    if (noteId === null || noteId <= 0) {
+      return;
+    }
+
+    // The uuid, not the local id: the link must lead to the note on the other devices too
+    const uuid = this.notes.notes().find(n => n.id === noteId)?.uuid;
+
+    if (uuid) {
+      await navigator.clipboard.writeText(formatNoteUrl(uuid));
     }
   }
 

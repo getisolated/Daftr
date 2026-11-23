@@ -11,6 +11,8 @@ pub struct FolderDto {
     /// Identifiant.
     #[ts(type = "number")]
     pub id: i64,
+    /// Identifiant stable, le même sur tous les appareils.
+    pub uuid: String,
     /// Nom.
     pub name: String,
     /// Parent, `null` à la racine.
@@ -32,6 +34,7 @@ impl From<Folder> for FolderDto {
     fn from(folder: Folder) -> Self {
         Self {
             id: folder.id,
+            uuid: folder.uuid.to_string(),
             name: folder.name,
             parent_id: folder.parent_id,
             is_default: u8::from(folder.is_default),
