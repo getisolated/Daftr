@@ -11,8 +11,35 @@ Toute la feature vit dans la branche `NF/feat/sync-lan-261123` (une seule PR ver
 | 2 — CRDT pur | Fait | fusionné (ex-#85) |
 | 3 — protocole | Fait | fusionné (ex-#87) |
 | 4 — intégration | Fait | commits directs sur la branche (PR #90) |
-| 5 — front | À faire | — |
+| 5 — front | Fait | commits directs sur la branche (PR #90) |
 | 6 — doc | À faire | — |
+
+## Lot 5 — front (`frontend`, petits ajouts au backend)
+
+**Ce qui est livré**
+- Service : [`SyncBridgeService`](../../frontend/src/app/core/services/sync-bridge.service.ts) (commandes et événements typés) et [`SyncService`](../../frontend/src/app/core/services/sync.service.ts) (état en signals : statut, vue d'ensemble, appareils de confiance, mode appairage, offres en attente, progression des synchros initiales ; notifications ; relecture de `profiles_state` après une réponse à une offre, `sync:offer-received` et `sync:initial-done`). Logique pure dans [`sync.util.ts`](../../frontend/src/app/core/utils/sync.util.ts) : statut → indicateur, clés d'erreur → messages (`en`, `fr`), compte à rebours, code, destinations proposées (fusion seulement vers les profils non synchronisés), libellés.
+- Réglages → **Synchronisation** (catégorie de l'éditeur de réglages) : état et « Synchroniser maintenant », nom de l'appareil (placeholder : nom d'hôte), pause et port (contrôles génériques, `settings_set`), « Lier un appareil » (profils, actif coché ; QR en `<img>` data URL `image/svg+xml`, sans contournement du sanitizer ; code ; compte à rebours ; nouveau code sur `sync:pairing` ; adresses de l'appareil pour la saisie manuelle), « Se lier à un appareil » (code, `IP:port` en repli), appareils de confiance (présent/connecté/absent, profils, dernière synchro, « Retirer » avec confirmation).
+- Dialogue global des **profils proposés** : destination par profil (nouveau / fusionner / ignorer), puis « Synchronisation initiale : 120 / 450 notes » par profil. Ouvert directement après « Se lier à un appareil », sinon par l'action de la notification.
+- **Réglages du profil** : activer/désactiver, « Synchronisé avec : … » et « Arrêter avec X » (confirmation), « Synchroniser avec… » (appareils de confiance qui ne partagent pas encore le profil). Les actions s'appliquent tout de suite, pas à « Enregistrer ».
+- **Indicateur** dans le pied de la barre latérale (pas de barre d'état) : en pause, à jour (N appareils), synchronisation…, aucun appareil sur ce réseau, erreur (cause en tooltip, ex. `listen_failed`). Clic : réglages ouverts sur la catégorie (`SettingsService.openAt`).
+- **Notifications** in-app (nouveau `ToastService` + `app-toast-stack` dans l'UI-kit) : appareil lié, offre reçue (action « Choisir »), synchronisation initiale terminée.
+- **Éditeur (§8)** : la note ouverte reçoit les modifications par une transaction minimale ([`remote-changes.ts`](../../frontend/src/app/shared/codemirror/remote-changes.ts) : diff Myers par lignes affiné aux caractères, [`text-diff.util.ts`](../../frontend/src/app/core/utils/text-diff.util.ts), sans couper un emoji) ; sélections et curseurs mappés ; transaction hors historique (`addToHistory: false`, plus `Transaction.remote`) : Ctrl+Z annule les saisies de l'utilisateur (repositionnées par l'historique), jamais celles de l'autre appareil, qui seraient sinon enregistrées puis propagées comme une suppression. Badge « Modifié depuis <appareil> » 8 s. Même chemin pour les modifications du MCP (remplace `externallyChangedContent`). Aperçu et côte à côte suivent par le rafraîchissement existant. Note ouverte (ou d'un onglet ouvert) supprimée à distance : lecture seule, bandeau « supprimée sur <appareil> » et « Restaurer » ; les saisies non enregistrées sont gardées et enregistrées après la restauration.
+- Backend : commande `notes_restore` (`NoteStore::restore`, la réconciliation du document lève la marque de suppression, test `adapter-sqlite`) ; `NotesSyncedDto.deviceName` (nom de l'appareil d'origine, `SyncEvent::NotesSynced.from`).
+- Tests vitest : diff minimal (contenu, emoji, aléatoire), fusion à trois voies, curseur mappé, historique d'annulation, statuts → indicateur, erreurs traduites, compte à rebours, code, destinations, appareils, notifications.
+
+**Écarts avec la spec**
+- §8 « vider la sauvegarde en attente » : remplacé par une **fusion à trois voies côté front**. Le backend diffe le texte reçu contre le texte courant du CRDT : enregistrer d'abord le texte de l'éditeur (qui n'a pas encore la modification distante) l'effacerait. L'éditeur rebase donc la modification distante sur ses saisies non enregistrées (`ChangeSet.map`), puis enregistre le résultat.
+- L'indicateur est caché quand la synchronisation est désactivée (aucun profil synchronisé) : l'app reste identique à la v1.7.0 ; l'état « désactivée » s'affiche dans les réglages.
+- Le port et la pause passent par `settings_set` (contrôles génériques, bouton « réinitialiser ») plutôt que `sync_set_port` / `sync_set_paused`.
+- Les offres en attente restent en mémoire du front (perdues au rechargement de la fenêtre, comme côté moteur au redémarrage).
+- La progression compte des documents (notes + document `space`) affichés comme « notes ».
+
+**Non vérifié** (l'app n'a pas été lancée) : rendu et ergonomie des écrans (réglages, QR, dialogue des offres, notifications, badge, bandeau), parcours complets entre deux PC, ordre réel des événements `sync:notes-synced` / `notes:changed`, comportement de l'historique d'annulation dans l'app.
+
+**Points d'attention**
+- 🟠 Fenêtre de course restante : un enregistrement parti juste avant l'arrivée d'une modification distante (debounce échu, IPC en vol) est diffé par le backend contre un texte qui contient déjà la modification distante, qui est alors effacée puis réinsérée par l'enregistrement suivant. Correction de fond : enregistrer avec la base connue (diff à trois voies côté backend).
+- 🟠 Une liste de notes relue avant un de nos enregistrements est ignorée si son texte figure parmi les 5 derniers enregistrés ; au-delà (cas extrême), elle pourrait être fusionnée comme une modification.
+- La confirmation « Arrêter avec X » s'ouvre au-dessus du dialogue du profil : Échap ferme les deux.
 
 ## Lot 4 — intégration (`desktop`, `adapter-fs`, `presentation`)
 
