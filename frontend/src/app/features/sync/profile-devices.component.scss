@@ -1,0 +1,173 @@
+// Sub-view of the profile settings dialog, in the look of that dialog (see profiles/profile-dialog.scss)
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--daftr-text-soft);
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(var(--daftr-hover-rgb), 0.06);
+    color: var(--daftr-text-bright);
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--daftr-text-strong);
+}
+
+.pairing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+// White background: the QR code stays readable in the dark themes
+.qr {
+  padding: 10px;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.code {
+  margin-top: 8px;
+  font-family: var(--daftr-font-mono);
+  font-size: 30px;
+  letter-spacing: 0.12em;
+  color: var(--daftr-text-strong);
+  user-select: text;
+}
+
+.countdown {
+  font-size: 11px;
+  color: var(--daftr-text-dimmed);
+}
+
+// Same height as the QR code: the view does not jump when the code arrives
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+}
+
+.hint {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--daftr-text-dimmed);
+}
+
+.error {
+  color: var(--daftr-danger);
+}
+
+.link {
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--daftr-accent-text);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.devices {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--daftr-border-soft);
+}
+
+.label {
+  color: var(--daftr-text);
+}
+
+.device {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.device-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  color: var(--daftr-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.id {
+  margin-top: 1px;
+  font-family: var(--daftr-font-mono);
+  font-size: 11px;
+  color: var(--daftr-text-dimmed);
+  user-select: text;
+}
+
+.targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.btn {
+  padding: 3px 10px;
+  border: 1px solid var(--daftr-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--daftr-text);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--daftr-accent);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &.danger:hover:not(:disabled) {
+    border-color: var(--daftr-danger);
+    color: var(--daftr-danger);
+  }
+}

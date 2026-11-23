@@ -1,0 +1,90 @@
+<div class="header">
+  <button
+    class="back"
+    type="button"
+    [attr.aria-label]="i18n.t('sync.profile.back')"
+    [title]="i18n.t('sync.profile.back')"
+    (click)="back.emit()"
+  >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 6 9 12 15 18"/>
+    </svg>
+  </button>
+  <h2 class="title">{{ i18n.t('sync.profile.devices') }}</h2>
+</div>
+
+@if (joining()) {
+  <app-sync-join-form (joined)="joining.set(false)" (cancelled)="joining.set(false)" />
+} @else {
+  <div class="pairing">
+    @if (liveTicket(); as current) {
+      <img class="qr" [src]="qrUrl()" [alt]="i18n.t('sync.pairing.qrAlt')" width="200" height="200" />
+      <div class="code" aria-live="polite">{{ formattedCode(current.code) }}</div>
+      <div class="countdown">{{ i18n.t('sync.pairing.expiresIn', { time: countdown() }) }}</div>
+      @if (renewed()) {
+        <div class="hint">{{ i18n.t('sync.pairing.renewed') }}</div>
+      }
+      <div class="hint">{{ i18n.t('sync.pairing.instructions') }}</div>
+    } @else if (pairingError(); as message) {
+      <div class="placeholder">
+        <span class="error" role="alert">{{ message }}</span>
+        <button class="btn" type="button" (click)="pairingError.set(null)">{{ i18n.t('sync.profile.retry') }}</button>
+      </div>
+    } @else {
+      <div class="placeholder">
+        <span class="hint">{{ i18n.t('sync.profile.preparing') }}</span>
+      </div>
+    }
+    <button class="link" type="button" (click)="joining.set(true)">{{ i18n.t('sync.profile.enterCode') }}</button>
+  </div>
+}
+
+<div class="devices">
+  <div class="label">{{ shared().length > 0 ? i18n.t('sync.profile.sharedWith') : i18n.t('sync.profile.sharedWithNobody') }}</div>
+  @for (device of shared(); track device.key) {
+    <div class="device">
+      <app-device-icon [kind]="device.kind" />
+      <div class="device-text">
+        <div class="name">{{ nameOf(device) }}</div>
+        <div class="id">{{ idOf(device) }}</div>
+      </div>
+      <button
+        class="btn danger"
+        type="button"
+        [disabled]="busy()"
+        [attr.aria-label]="i18n.t('sync.profile.stopWith', { name: nameOf(device) })"
+        [title]="i18n.t('sync.profile.stopWith', { name: nameOf(device) })"
+        (click)="stopping.set(device)"
+      >
+        {{ i18n.t('sync.profile.stop') }}
+      </button>
+    </div>
+  }
+
+  @if (targets().length > 0) {
+    <button class="link" type="button" [attr.aria-expanded]="offering()" (click)="offering.set(!offering())">{{ i18n.t('sync.profile.offer') }}</button>
+    @if (offering()) {
+      <div class="targets">
+        @for (device of targets(); track device.key) {
+          <button class="btn" type="button" [disabled]="busy()" (click)="offer(device)">{{ device.name }}</button>
+        }
+      </div>
+    }
+  }
+
+  @if (notice(); as message) {
+    <span class="hint">{{ message }}</span>
+  }
+  @if (error(); as message) {
+    <span class="error" role="alert">{{ message }}</span>
+  }
+</div>
+
+@if (stopping(); as device) {
+  <app-confirm-dialog
+    [title]="i18n.t('sync.profile.stopTitle', { name: nameOf(device) })"
+    [message]="i18n.t('sync.profile.stopMessage', { name: nameOf(device) })"
+    [actions]="stopActions()"
+    (chosen)="onStopChosen(device, $event)"
+  />
+}

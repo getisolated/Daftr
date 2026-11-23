@@ -64,10 +64,6 @@ export class SyncBridgeService {
     return this.required(() => call('sync_remove_device', { deviceKey }));
   }
 
-  setProfileEnabled(profileId: string, enabled: boolean): Promise<void> {
-    return this.required(() => call('sync_set_profile_enabled', { profileId, enabled }));
-  }
-
   syncNow(): Promise<void> {
     return this.required(() => call('sync_now'));
   }

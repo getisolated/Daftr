@@ -1,119 +1,131 @@
 <div class="backdrop" (click)="closed.emit()"></div>
-<form
-  class="dialog"
-  role="dialog"
-  aria-modal="true"
-  [attr.aria-label]="creating() ? i18n.t('profiles.settings.titleNew') : i18n.t('profiles.settings.title')"
-  (submit)="save($event)"
->
-  <h2 class="title">{{ creating() ? i18n.t('profiles.settings.titleNew') : i18n.t('profiles.settings.title') }}</h2>
+@if (devicesOpen() && profile(); as edited) {
+  <!-- Outside the form: the code entry of the sub-view is a form of its own, and actions there apply at once -->
+  <div class="dialog" role="dialog" aria-modal="true" [attr.aria-label]="i18n.t('sync.profile.devices')">
+    <app-profile-devices [profileId]="edited.id" (back)="devicesOpen.set(false)" />
+  </div>
+} @else {
+  <form
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="creating() ? i18n.t('profiles.settings.titleNew') : i18n.t('profiles.settings.title')"
+    (submit)="save($event)"
+  >
+    <h2 class="title">{{ creating() ? i18n.t('profiles.settings.titleNew') : i18n.t('profiles.settings.title') }}</h2>
 
-  <div class="identity">
-    <app-profile-avatar [name]="name()" [iconUrl]="shownIconUrl()" [size]="72" />
-    <div class="identity-fields">
-      <label class="field">
-        {{ i18n.t('profiles.settings.name') }}
-        <input
-          class="input"
-          appFocusSelect
-          maxlength="64"
-          spellcheck="false"
-          [placeholder]="profile()?.isDefault ? i18n.t('profiles.defaultName') : i18n.t('profiles.unnamed')"
-          [value]="name()"
-          (input)="name.set($any($event.target).value)"
-        />
-      </label>
-      <div class="icon-actions">
-        <label class="btn secondary file-btn">
-          {{ i18n.t('profiles.settings.chooseIcon') }}
-          <input class="file-input" type="file" accept="image/*" (change)="onIconPicked($event)" />
+    <div class="identity">
+      <app-profile-avatar [name]="name()" [iconUrl]="shownIconUrl()" [size]="72" />
+      <div class="identity-fields">
+        <label class="field">
+          {{ i18n.t('profiles.settings.name') }}
+          <input
+            class="input"
+            appFocusSelect
+            maxlength="64"
+            spellcheck="false"
+            [placeholder]="profile()?.isDefault ? i18n.t('profiles.defaultName') : i18n.t('profiles.unnamed')"
+            [value]="name()"
+            (input)="name.set($any($event.target).value)"
+          />
         </label>
-        @if (shownIconUrl()) {
-          <button class="btn secondary" type="button" (click)="removeIcon()">{{ i18n.t('profiles.settings.removeIcon') }}</button>
-        }
+        <div class="icon-actions">
+          <label class="btn secondary file-btn">
+            {{ i18n.t('profiles.settings.chooseIcon') }}
+            <input class="file-input" type="file" accept="image/*" (change)="onIconPicked($event)" />
+          </label>
+          @if (shownIconUrl()) {
+            <button class="btn secondary" type="button" (click)="removeIcon()">{{ i18n.t('profiles.settings.removeIcon') }}</button>
+          }
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="password">
-    <button
-      class="expander"
-      type="button"
-      [attr.aria-expanded]="passwordOpen()"
-      (click)="passwordOpen.set(!passwordOpen())"
-    >
-      <span>{{ isProtected() ? i18n.t('profiles.settings.passwordChange') : i18n.t('profiles.settings.passwordSet') }}</span>
-      <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="9 6 15 12 9 18"/>
-      </svg>
-    </button>
+    <div class="password">
+      <button
+        class="expander"
+        type="button"
+        [attr.aria-expanded]="passwordOpen()"
+        (click)="passwordOpen.set(!passwordOpen())"
+      >
+        <span>{{ isProtected() ? i18n.t('profiles.settings.passwordChange') : i18n.t('profiles.settings.passwordSet') }}</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 6 15 12 9 18"/>
+        </svg>
+      </button>
 
-    @if (passwordOpen()) {
-      <div class="password-form">
-        @if (isProtected()) {
-          <label class="field">
-            {{ i18n.t('profiles.settings.currentPassword') }}
-            <input
-              class="input"
-              type="password"
-              autocomplete="current-password"
-              [value]="currentPassword()"
-              (input)="currentPassword.set($any($event.target).value)"
-            />
-          </label>
-          <app-checkbox [checked]="removePassword()" (checkedChange)="removePassword.set($event)">
-            {{ i18n.t('profiles.settings.removePassword') }}
-          </app-checkbox>
-        }
-
-        @if (!removePassword()) {
-          <label class="field">
-            {{ i18n.t('profiles.settings.newPassword') }}
-            <input
-              class="input"
-              type="password"
-              autocomplete="new-password"
-              [value]="newPassword()"
-              (input)="newPassword.set($any($event.target).value)"
-            />
-          </label>
-          @if (newPassword()) {
+      @if (passwordOpen()) {
+        <div class="password-form">
+          @if (isProtected()) {
             <label class="field">
-              {{ i18n.t('profiles.settings.confirmPassword') }}
+              {{ i18n.t('profiles.settings.currentPassword') }}
+              <input
+                class="input"
+                type="password"
+                autocomplete="current-password"
+                [value]="currentPassword()"
+                (input)="currentPassword.set($any($event.target).value)"
+              />
+            </label>
+            <app-checkbox [checked]="removePassword()" (checkedChange)="removePassword.set($event)">
+              {{ i18n.t('profiles.settings.removePassword') }}
+            </app-checkbox>
+          }
+
+          @if (!removePassword()) {
+            <label class="field">
+              {{ i18n.t('profiles.settings.newPassword') }}
               <input
                 class="input"
                 type="password"
                 autocomplete="new-password"
-                [value]="confirmPassword()"
-                (input)="confirmPassword.set($any($event.target).value)"
+                [value]="newPassword()"
+                (input)="newPassword.set($any($event.target).value)"
               />
             </label>
+            @if (newPassword()) {
+              <label class="field">
+                {{ i18n.t('profiles.settings.confirmPassword') }}
+                <input
+                  class="input"
+                  type="password"
+                  autocomplete="new-password"
+                  [value]="confirmPassword()"
+                  (input)="confirmPassword.set($any($event.target).value)"
+                />
+              </label>
+            }
           }
-        }
-      </div>
-    }
-  </div>
+        </div>
+      }
+    </div>
 
-  @if (profile(); as edited) {
-    <app-profile-sync [profileId]="edited.id" />
-  }
-
-  @if (error(); as message) {
-    <p class="error" role="alert">{{ message }}</p>
-  }
-
-  <div class="actions">
     @if (!creating()) {
-      <button class="btn danger with-icon delete-btn" type="button" (click)="deleteRequested.emit()">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      <button class="expander" type="button" (click)="devicesOpen.set(true)">
+        <span>{{ i18n.t('sync.profile.devices') }}</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 6 15 12 9 18"/>
         </svg>
-        {{ i18n.t('profiles.settings.delete') }}
       </button>
     }
-    <button class="btn" type="submit" [disabled]="busy()">
-      {{ creating() ? i18n.t('profiles.settings.create') : i18n.t('profiles.settings.save') }}
-    </button>
-    <button class="btn secondary" type="button" (click)="closed.emit()">{{ i18n.t('common.cancel') }}</button>
-  </div>
-</form>
+
+    @if (error(); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
+
+    <div class="actions">
+      @if (!creating()) {
+        <button class="btn danger with-icon delete-btn" type="button" (click)="deleteRequested.emit()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          {{ i18n.t('profiles.settings.delete') }}
+        </button>
+      }
+      <button class="btn" type="submit" [disabled]="busy()">
+        {{ creating() ? i18n.t('profiles.settings.create') : i18n.t('profiles.settings.save') }}
+      </button>
+      <button class="btn secondary" type="button" (click)="closed.emit()">{{ i18n.t('common.cancel') }}</button>
+    </div>
+  </form>
+}

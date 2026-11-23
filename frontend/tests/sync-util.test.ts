@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { Profile } from '../src/app/core/models/profile.model';
-import type { ProfileSync, SyncStatus, TrustedDevice } from '../src/app/core/models/sync.model';
+import type { PairingTicket, ProfileSync, SyncStatus, TrustedDevice } from '../src/app/core/models/sync.model';
 import {
-  formatCountdown, formatPairingCode, initialPairingProfiles, initialSyncLabel, isPairingCode, lastSyncAt, mergeCandidates,
-  normalizePairingCode, offerDestinationOptions, offerTargets, pairingAddresses, parseOfferDestination, remainingMs, remoteChangeLabel,
-  remoteDeletionLabel, sharedDevices, sharedProfileIds, svgDataUrl, syncErrorMessage, syncIndicator, syncReason,
+  deviceIcon, deviceIconLabel, formatCountdown, formatPairingCode, initialPairingProfiles, initialSyncLabel, isPairingCode, lastSyncAt,
+  mergeCandidates, needsNewPairingCode, normalizePairingCode, offerDestinationOptions, offerTargets, pairingAddresses, parseOfferDestination,
+  remainingMs, remoteChangeLabel, remoteDeletionLabel, sharedDevices, sharedProfileIds, shortDeviceId, svgDataUrl, syncErrorMessage,
+  syncIndicator, syncReason,
 } from '../src/app/core/utils/sync.util';
 
 function profile(id: string, name: string | null = id): Profile {
@@ -17,7 +18,7 @@ function status(state: SyncStatus['state'], devices: number | null = null, reaso
 
 function trusted(key: string, overrides: Partial<TrustedDevice> = {}): TrustedDevice {
   return {
-    key, name: key, origin: 'paired', addedAt: '2026-11-20 10:00:00', revokedAt: null, present: false, connected: false, profiles: [],
+    key, fingerprint: 'ab'.repeat(16), name: key, kind: 'unknown', origin: 'paired', addedAt: '2026-11-20 10:00:00', revokedAt: null, present: false, connected: false, profiles: [],
     ...overrides,
   };
 }
@@ -152,11 +153,10 @@ describe('devices of a profile', () => {
   const sync: ProfileSync = {
     profileId: 'work',
     spaceId: 'b'.repeat(64),
-    enabled: true,
     devices: [
-      { key: 'self', name: 'Desktop', isSelf: true, revoked: false },
-      { key: 'laptop', name: 'Laptop', isSelf: false, revoked: false },
-      { key: 'old', name: 'Old PC', isSelf: false, revoked: true },
+      { key: 'self', fingerprint: '1'.repeat(32), name: 'Desktop', kind: 'desktop', isSelf: true, revoked: false },
+      { key: 'laptop', fingerprint: '2'.repeat(32), name: 'Laptop', kind: 'laptop', isSelf: false, revoked: false },
+      { key: 'old', fingerprint: '3'.repeat(32), name: 'Old PC', kind: 'unknown', isSelf: false, revoked: true },
     ],
   };
 
@@ -193,5 +193,46 @@ describe('editor labels', () => {
     expect(remoteChangeLabel(null, 'fr')).toBe('Modifié depuis un autre appareil');
     expect(remoteDeletionLabel('Laptop', 'en')).toBe('This note was deleted on Laptop: it is read-only here.');
     expect(remoteDeletionLabel(null, 'en')).toContain('another device');
+  });
+});
+
+describe('identity of a device', () => {
+  it('shows the start of the fingerprint, in two groups of four', () => {
+    expect(shortDeviceId('4f2a9c1b77e0d3a5c6b8e9f001122334')).toBe('4F2A-9C1B');
+  });
+
+  it('keeps a short fingerprint as it is', () => {
+    expect(shortDeviceId('4f2a')).toBe('4F2A');
+    expect(shortDeviceId('')).toBe('');
+  });
+
+  it('draws each kind of device, the generic device when the kind is unknown', () => {
+    expect(deviceIcon('laptop')).toBe('laptop');
+    expect(deviceIcon('desktop')).toBe('desktop');
+    expect(deviceIcon('unknown')).toBe('device');
+  });
+
+  it('names the icons for screen readers', () => {
+    expect(deviceIconLabel('laptop', 'fr')).toBe('Ordinateur portable');
+    expect(deviceIconLabel('desktop', 'en')).toBe('Desktop computer');
+    expect(deviceIconLabel('device', 'en')).toBe('Device');
+  });
+});
+
+describe('needsNewPairingCode', () => {
+  const ticket: PairingTicket = { code: '123456', uri: 'daftr-pair:1:10.0.0.2:47820:ab:123456', qrSvg: '<svg/>', expiresAt: 300_000 };
+
+  it('asks for a code when none is open or the last one ran out', () => {
+    expect(needsNewPairingCode(null, 0, false)).toBe(true);
+    expect(needsNewPairingCode(ticket, 0, false)).toBe(true);
+  });
+
+  it('keeps a code still valid', () => {
+    expect(needsNewPairingCode(ticket, 1000, false)).toBe(false);
+  });
+
+  it('waits while a code is on its way, after a failure, or while another code is typed', () => {
+    expect(needsNewPairingCode(null, 0, true)).toBe(false);
+    expect(needsNewPairingCode(ticket, 0, true)).toBe(false);
   });
 });

@@ -6,20 +6,21 @@ import { renderProfileIcon } from '../../core/utils/profile-icon.util';
 import { passwordChange, profileErrorMessage } from '../../core/utils/profile.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
-import { ProfileSyncComponent } from '../sync/profile-sync.component';
+import { ProfileDevicesComponent } from '../sync/profile-devices.component';
 import { ProfileAvatarComponent } from './profile-avatar.component';
 
 /**
- * Settings of a profile: name, icon (cropped to a square and resized here), master password. Without `profile` it
- * creates a new one and switches to it once saved.
+ * Settings of a profile: name, icon (cropped to a square and resized here), master password, and its devices in a
+ * sub-view that replaces the content (the typed fields are kept for the way back). Without `profile` it creates a new
+ * one and switches to it once saved.
  */
 @Component({
   selector: 'app-profile-settings-dialog',
   standalone: true,
-  imports: [ProfileAvatarComponent, CheckboxComponent, FocusSelectDirective, ProfileSyncComponent],
+  imports: [ProfileAvatarComponent, CheckboxComponent, FocusSelectDirective, ProfileDevicesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    '(document:keydown.escape)': 'closed.emit()',
+    '(document:keydown.escape)': 'onEscape()',
   },
   templateUrl: './profile-settings-dialog.component.html',
   styleUrls: ['./profile-dialog.scss', './profile-settings-dialog.component.scss'],
@@ -44,6 +45,8 @@ export class ProfileSettingsDialogComponent implements OnDestroy {
   protected readonly confirmPassword = signal('');
   protected readonly removePassword = signal(false);
   protected readonly passwordOpen = signal(false);
+  /** "Devices and sync" replaces the content; its actions apply at once, without Save. */
+  protected readonly devicesOpen = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
 
@@ -61,6 +64,13 @@ export class ProfileSettingsDialogComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.revokePreview();
+  }
+
+  /** The sub-view handles Escape itself (back to this view). */
+  protected onEscape(): void {
+    if (!this.devicesOpen()) {
+      this.closed.emit();
+    }
   }
 
   protected async onIconPicked(event: Event): Promise<void> {

@@ -1,5 +1,5 @@
 //! Ce que font les commandes de la synchronisation, sans Tauri : vue d'ensemble, appareils,
-//! appairage, offres, retraits, activation des profils. Les entrées sont déjà validées par
+//! appairage, offres, retraits. Les entrées sont déjà validées par
 //! `presentation::sync`.
 
 use std::collections::HashMap;
@@ -89,7 +89,6 @@ impl SyncState {
         Ok(ProfileSyncDto {
             profile_id: profile.as_str().to_owned(),
             space_id: space.map(|space| space.space_id.to_string()),
-            enabled: space.is_some_and(|space| space.enabled),
             devices: devices
                 .into_iter()
                 .map(|device| {
@@ -197,24 +196,6 @@ impl SyncState {
     /// « Retirer l'appareil ».
     pub async fn remove_device(&self, device: DeviceKey) -> IpcResult<()> {
         self.engine.remove_device(device).await.map_err(ipc_error)
-    }
-
-    /// Active (espace créé au besoin) ou désactive la synchronisation d'un profil.
-    pub async fn set_profile_enabled(
-        &self,
-        profile: ProfileId,
-        enabled: bool,
-        settings: &AppSettings,
-    ) -> IpcResult<()> {
-        if enabled {
-            return self.ensure_spaces(vec![profile], settings).await;
-        }
-        if self.profiles.space_of(&profile).is_some() {
-            self.on_profiles(move |profiles| profiles.set_enabled(&profile, false))
-                .await?;
-        }
-        self.refresh().await;
-        Ok(())
     }
 
     /// « Synchroniser maintenant ».

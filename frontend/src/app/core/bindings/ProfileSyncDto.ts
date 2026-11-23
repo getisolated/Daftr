@@ -14,10 +14,6 @@ profileId: string,
  */
 spaceId: string | null, 
 /**
- * Sa synchronisation est activée.
- */
-enabled: boolean, 
-/**
  * Membres de l'espace (cet appareil compris).
  */
 devices: Array<SpaceDeviceDto>, };

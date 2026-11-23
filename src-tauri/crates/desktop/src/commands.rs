@@ -87,7 +87,6 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         sync::sync_offer_profile,
         sync::sync_stop_sharing,
         sync::sync_remove_device,
-        sync::sync_set_profile_enabled,
         sync::sync_now,
         sync::sync_set_paused,
         sync::sync_set_device_name,

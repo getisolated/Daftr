@@ -237,8 +237,6 @@ pub struct ProfileSyncDto {
     pub profile_id: String,
     /// Son espace, `null` s'il n'est pas synchronisé.
     pub space_id: Option<String>,
-    /// Sa synchronisation est activée.
-    pub enabled: bool,
     /// Membres de l'espace (cet appareil compris).
     pub devices: Vec<SpaceDeviceDto>,
 }

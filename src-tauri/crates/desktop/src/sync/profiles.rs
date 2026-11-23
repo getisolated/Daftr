@@ -145,7 +145,9 @@ impl DesktopSyncProfiles {
         })
     }
 
-    /// Active ou désactive la synchronisation d'un profil déjà synchronisé.
+    /// Active ou désactive la synchronisation d'un profil déjà synchronisé. L'interface ne
+    /// la désactive plus : un profil est synchronisé dès qu'il est partagé.
+    #[cfg(test)]
     pub fn set_enabled(&self, profile: &ProfileId, enabled: bool) -> AppResult<()> {
         self.with_sqlite(profile, |store| store.set_sync_enabled(enabled))
     }

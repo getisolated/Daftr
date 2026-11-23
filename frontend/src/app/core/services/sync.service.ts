@@ -1,8 +1,8 @@
 import { Injectable, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import { I18nService } from '../i18n/i18n.service';
 import {
-  InitialSyncDone, LinkedDevice, NotesSynced, OfferDestination, OfferReceived, PairingTicket, ProfileSync, SyncOverview, SyncProgress,
-  SyncStatus, TrustedDevice,
+  InitialSyncDone, LinkedDevice, NotesSynced, OfferDestination, OfferReceived, PairingOwner, PairingTicket, ProfileSync, SyncOverview,
+  SyncProgress, SyncStatus, TrustedDevice,
 } from '../models/sync.model';
 import { profileDisplayName } from '../utils/profile.util';
 import { syncErrorMessage, syncIndicator } from '../utils/sync.util';
@@ -36,6 +36,8 @@ export class SyncService implements OnDestroy {
   private readonly _status = signal<SyncStatus | null>(null);
   private readonly _devices = signal<TrustedDevice[]>([]);
   private readonly _pairing = signal<PairingTicket | null>(null);
+  /** Screen that opened the pairing mode last; it stays set when the mode closes by itself. */
+  private readonly _pairingOwner = signal<PairingOwner | null>(null);
   /** The pairing code was renewed after too many wrong attempts. */
   private readonly _pairingRenewed = signal(false);
   private readonly _offers = signal<OfferReceived[]>([]);
@@ -63,6 +65,7 @@ export class SyncService implements OnDestroy {
   /** Trusted devices not removed. */
   readonly trustedDevices = computed(() => this._devices().filter(device => device.revokedAt === null));
   readonly pairing = this._pairing.asReadonly();
+  readonly pairingOwner = this._pairingOwner.asReadonly();
   readonly pairingRenewed = this._pairingRenewed.asReadonly();
   /** Proposals waiting for an answer, oldest first. */
   readonly offers = this._offers.asReadonly();
@@ -142,16 +145,36 @@ export class SyncService implements OnDestroy {
     await this.settings.load();
   }
 
-  /** "Link a device": opens the pairing mode for these profiles. */
-  async startPairing(profileIds: string[]): Promise<void> {
+  /**
+   * "Link a device": opens the pairing mode for these profiles, on behalf of `owner`. It replaces a mode opened by
+   * another screen, which then stops showing its code.
+   */
+  async startPairing(profileIds: string[], owner: PairingOwner): Promise<void> {
+    this._pairingOwner.set(owner);
     const ticket = await this.bridge.startPairing(profileIds);
+
+    // Stopped while opening (the screen closed): the mode must not stay open with its code shown nowhere
+    if (this._pairingOwner() !== owner) {
+      if (this._pairingOwner() === null) {
+        await this.bridge.stopPairing();
+      }
+
+      return;
+    }
+
     this._pairingRenewed.set(false);
     this._pairing.set(ticket);
     // The checked profiles got their space
     await this.refresh();
   }
 
-  async stopPairing(): Promise<void> {
+  /** Closes the pairing mode, unless another screen than `owner` opened it since. */
+  async stopPairing(owner: PairingOwner): Promise<void> {
+    if (this._pairingOwner() !== owner) {
+      return;
+    }
+
+    this._pairingOwner.set(null);
     this._pairing.set(null);
     await this.bridge.stopPairing();
   }
@@ -208,11 +231,6 @@ export class SyncService implements OnDestroy {
   async removeDevice(deviceKey: string): Promise<void> {
     await this.bridge.removeDevice(deviceKey);
     await this.reloadDevices();
-  }
-
-  async setProfileEnabled(profileId: string, enabled: boolean): Promise<void> {
-    await this.bridge.setProfileEnabled(profileId, enabled);
-    await this.refresh();
   }
 
   /** Forgets the initial syncs shown by the destination dialog once it closes. */

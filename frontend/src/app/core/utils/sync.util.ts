@@ -3,12 +3,21 @@ import { translate, translatePlural } from '../i18n/translate';
 import { TranslationKey } from '../i18n/translations';
 import { Profile } from '../models/profile.model';
 import {
-  OfferDestination, OfferDestinationOption, ProfileOffer, ProfileSync, SpaceDevice, SyncIndicator, SyncProgress, SyncStatus,
-  TrustedDevice,
+  DeviceIcon, DeviceKind, OfferDestination, OfferDestinationOption, PairingTicket, ProfileOffer, ProfileSync, SpaceDevice, SyncIndicator,
+  SyncProgress, SyncStatus, TrustedDevice,
 } from '../models/sync.model';
 
 /** Number of digits of a pairing code. */
 export const PAIRING_CODE_LENGTH = 6;
+/** Hexadecimal digits of the fingerprint shown under a device name. */
+const SHORT_DEVICE_ID_LENGTH = 8;
+
+/** Accessible names of the device icons. */
+const DEVICE_ICON_LABELS: Readonly<Record<DeviceIcon, TranslationKey>> = {
+  laptop: 'sync.device.laptop',
+  desktop: 'sync.device.desktop',
+  device: 'sync.device.unknown',
+};
 
 /**
  * Messages of the failed sync commands: the stable keys of the engine (`IpcError` of code `sync`, see the Rust module
@@ -125,6 +134,43 @@ export function pairingAddresses(uri: string): string {
  */
 export function svgDataUrl(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * A new pairing code is needed to keep one on screen: the mode closed (linking, expiry) or its countdown ran out, and no
+ * new code is on its way (`waiting`: starting, failed, or the user is typing the code of another device).
+ */
+export function needsNewPairingCode(ticket: PairingTicket | null, remaining: number, waiting: boolean): boolean {
+  return !waiting && (ticket === null || remaining <= 0);
+}
+
+/**
+ * "4F2A-9C1B": the start of the fingerprint of a device key (the one of the mDNS announcement and the QR code), enough
+ * to tell apart two devices with the same name. The MAC address is not used: the protocol does not know it, and it
+ * changes per Wi-Fi network and per network card.
+ */
+export function shortDeviceId(fingerprint: string): string {
+  const start = fingerprint.slice(0, SHORT_DEVICE_ID_LENGTH).toUpperCase();
+  const half = SHORT_DEVICE_ID_LENGTH / 2;
+
+  return start.length === SHORT_DEVICE_ID_LENGTH ? `${start.slice(0, half)}-${start.slice(half)}` : start;
+}
+
+/** Icon of a device: the generic one when its kind is unknown (detection failed, device of an older version). */
+export function deviceIcon(kind: DeviceKind): DeviceIcon {
+  switch (kind) {
+    case 'laptop':
+      return 'laptop';
+    case 'desktop':
+      return 'desktop';
+    case 'unknown':
+      return 'device';
+  }
+}
+
+/** Accessible name of a device icon ("Laptop"). */
+export function deviceIconLabel(icon: DeviceIcon, language: Language): string {
+  return translate(language, DEVICE_ICON_LABELS[icon]);
 }
 
 /** Profiles checked when "Link a device" opens: the active one. */

@@ -104,14 +104,21 @@ export const EN_SYNC = {
   'sync.devices.removeTitle': 'Remove {name}?',
   'sync.devices.removeMessage': '{name} will no longer sync with this computer, for any profile. This is final: linking it again takes a new code. The notes already copied to {name} stay there.',
 
+  // Kinds of device (icon next to the name)
+  'sync.device.laptop': 'Laptop',
+  'sync.device.desktop': 'Desktop computer',
+  'sync.device.unknown': 'Device',
+
   // Profile settings
-  'sync.profile.title': 'Sync',
-  'sync.profile.enabled': 'Sync this profile with my other devices',
+  'sync.profile.devices': 'Devices and Sync',
+  'sync.profile.back': 'Back',
+  'sync.profile.preparing': 'Preparing a code…',
+  'sync.profile.retry': 'Try Again',
+  'sync.profile.enterCode': 'Enter the code of another device',
   'sync.profile.sharedWith': 'Synchronized with:',
   'sync.profile.sharedWithNobody': 'Not shared with any device yet.',
   'sync.profile.offer': 'Sync with…',
   'sync.profile.offerSent': 'Proposed to {name}: it will be asked as soon as it is on the network.',
-  'sync.profile.noDevice': 'Link a device first, in Settings → Sync.',
   'sync.profile.stopWith': 'Stop with {name}',
   'sync.profile.stopTitle': 'Stop syncing with {name}?',
   'sync.profile.stopMessage': '{name} will no longer receive this profile. The notes already copied to {name} stay there.',

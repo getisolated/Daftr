@@ -106,14 +106,21 @@ export const FR_SYNC: Record<keyof typeof EN_SYNC, string> = {
   'sync.devices.removeTitle': 'Retirer {name} ?',
   'sync.devices.removeMessage': '{name} ne se synchronisera plus avec cet ordinateur, pour aucun profil. C’est définitif : le lier à nouveau demandera un nouveau code. Les notes déjà copiées sur {name} y restent.',
 
+  // Types d’appareil (icône à côté du nom)
+  'sync.device.laptop': 'Ordinateur portable',
+  'sync.device.desktop': 'Ordinateur fixe',
+  'sync.device.unknown': 'Appareil',
+
   // Réglages du profil
-  'sync.profile.title': 'Synchronisation',
-  'sync.profile.enabled': 'Synchroniser ce profil avec mes autres appareils',
+  'sync.profile.devices': 'Appareils et synchronisations',
+  'sync.profile.back': 'Retour',
+  'sync.profile.preparing': 'Préparation du code…',
+  'sync.profile.retry': 'Réessayer',
+  'sync.profile.enterCode': 'Saisir le code d’un autre appareil',
   'sync.profile.sharedWith': 'Synchronisé avec :',
   'sync.profile.sharedWithNobody': 'Partagé avec aucun appareil pour l’instant.',
   'sync.profile.offer': 'Synchroniser avec…',
   'sync.profile.offerSent': 'Proposé à {name} : la question lui sera posée dès qu’il sera sur le réseau.',
-  'sync.profile.noDevice': 'Liez d’abord un appareil, dans Paramètres → Synchronisation.',
   'sync.profile.stopWith': 'Arrêter avec {name}',
   'sync.profile.stopTitle': 'Arrêter la synchronisation avec {name} ?',
   'sync.profile.stopMessage': '{name} ne recevra plus ce profil. Les notes déjà copiées sur {name} y restent.',

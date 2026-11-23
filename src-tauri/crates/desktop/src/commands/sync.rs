@@ -121,22 +121,6 @@ pub async fn sync_remove_device(app: AppHandle, device_key: String) -> IpcResult
     desktop(&app).sync.remove_device(device).await
 }
 
-/// Active ou désactive la synchronisation d'un profil.
-#[tauri::command]
-pub async fn sync_set_profile_enabled(
-    app: AppHandle,
-    profile_id: String,
-    enabled: bool,
-) -> IpcResult<()> {
-    let profile = parse_id(&profile_id)?;
-    let state = desktop(&app);
-    let settings = state.services.settings.current();
-    state
-        .sync
-        .set_profile_enabled(profile, enabled, &settings)
-        .await
-}
-
 /// « Synchroniser maintenant ».
 #[tauri::command]
 pub async fn sync_now(app: AppHandle) -> IpcResult<()> {
