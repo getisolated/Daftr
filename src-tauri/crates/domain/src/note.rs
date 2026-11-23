@@ -49,6 +49,11 @@ pub struct NoteChanges {
     pub content: Option<String>,
     /// Nouveaux tags, déjà encodés en tableau JSON.
     pub tags: Option<String>,
+    /// Le contenu sur lequel `content` a été construit (dernier contenu lu ou enregistré par
+    /// l'éditeur). Dans un profil synchronisé, ce qui a changé depuis cette base (modification
+    /// d'un autre appareil) est gardé : `content` est rejoué par-dessus. `None` : `content`
+    /// remplace le contenu actuel.
+    pub base: Option<String>,
 }
 
 impl NoteChanges {

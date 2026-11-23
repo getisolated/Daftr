@@ -10,7 +10,9 @@ use std::cell::Cell;
 use app::sync::SyncDoc;
 use app::sync::note_doc::{self, NoteDoc, NoteEdit};
 use app::sync::space_doc::{self, FolderRemoval, SpaceDoc};
+use app::sync::text_merge;
 use app::{AppError, AppResult};
+use domain::note::{NoteChanges, extract_title};
 use domain::sync::{DeviceKey, SpaceId};
 use rusqlite::Connection;
 
@@ -68,6 +70,35 @@ impl LocalWrites {
     /// Un blob a été écrit : les autres appareils ont quelque chose de nouveau.
     pub(crate) fn wrote_blobs(&self) -> bool {
         self.wrote.get()
+    }
+
+    /// Le contenu reçu, construit sur `changes.base`, rejoué sur le contenu actuel de la note
+    /// `id` (fusion à trois voies) pour ne pas effacer une modification d'un autre appareil
+    /// appliquée entre-temps. `None` quand il n'y a rien à rejouer : profil non synchronisé
+    /// (comportement inchangé), pas de base, ou base à jour.
+    pub(crate) fn rebased(
+        &self,
+        connection: &Connection,
+        id: i64,
+        changes: &NoteChanges,
+    ) -> AppResult<Option<NoteChanges>> {
+        let (Some(_), Some(base), Some(received)) = (&self.synced, &changes.base, &changes.content)
+        else {
+            return Ok(None);
+        };
+        let Some(current) = rows::live_content(connection, id).map_err(storage)? else {
+            return Ok(None);
+        };
+        if current == *base {
+            return Ok(None);
+        }
+        let content = text_merge::merge(base, &current, received);
+        Ok(Some(NoteChanges {
+            title: changes.title.as_ref().map(|_| extract_title(&content)),
+            content: Some(content),
+            tags: changes.tags.clone(),
+            base: None,
+        }))
     }
 
     /// Reporte les notes écrites dans leurs documents.

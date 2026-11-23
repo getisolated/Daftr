@@ -4,6 +4,7 @@
 mod exchange;
 mod local;
 mod merge;
+mod rebase;
 mod restore;
 
 use app::ports::sync::{RemoteSnapshot, RemoteUpdate, SyncStore};

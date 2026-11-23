@@ -3,6 +3,7 @@ use std::sync::Arc;
 use adapter_sqlite::SqliteStore;
 use app::folders::FoldersService;
 use app::notes::NotesService;
+use domain::sync::{DeviceKey, DeviceName};
 
 use super::*;
 
@@ -72,7 +73,7 @@ fn puts_an_explicit_title_on_the_first_line() {
     let id = create_note(&services, args).unwrap()["id"]
         .as_i64()
         .unwrap();
-    let note = get_note(&services, GetNoteArgs { id }).unwrap();
+    let note = get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap();
 
     assert_eq!(note["title"], "Groceries");
     assert_eq!(note["content"], "# Groceries\n\n- bread");
@@ -101,8 +102,13 @@ fn reads_a_whole_note_or_explains_it_is_missing() {
     let services = services();
     let id = create(&services, "Title\nbody", &["a"]);
 
-    let note = get_note(&services, GetNoteArgs { id }).unwrap();
-    let missing = get_note(&services, GetNoteArgs { id: 999 }).unwrap_err();
+    let note = get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap();
+    let missing = get_note(
+        &services,
+        &KnownContents::default(),
+        GetNoteArgs { id: 999 },
+    )
+    .unwrap_err();
 
     assert_eq!(note["content"], "Title\nbody");
     assert_eq!(note["tags"], json!(["a"]));
@@ -119,18 +125,18 @@ fn replaces_the_content_and_the_title() {
         content: "# New\nother".to_owned(),
     };
 
-    let updated = update_note(&services, args).unwrap();
+    let updated = update_note(&services, &KnownContents::default(), args).unwrap();
 
     assert_eq!(updated["title"], "New");
     assert_eq!(
-        get_note(&services, GetNoteArgs { id }).unwrap()["content"],
+        get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap()["content"],
         "# New\nother"
     );
     let missing = UpdateNoteArgs {
         id: 999,
         content: String::new(),
     };
-    assert!(update_note(&services, missing).is_err());
+    assert!(update_note(&services, &KnownContents::default(), missing).is_err());
 }
 
 #[test]
@@ -142,17 +148,110 @@ fn appends_after_a_blank_line() {
         text: "- two".to_owned(),
     };
 
-    append_to_note(&services, args).unwrap();
+    append_to_note(&services, &KnownContents::default(), args).unwrap();
 
     assert_eq!(
-        get_note(&services, GetNoteArgs { id }).unwrap()["content"],
+        get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap()["content"],
         "Log\n- one\n\n- two"
     );
     let blank = AppendToNoteArgs {
         id,
         text: "  ".to_owned(),
     };
-    assert!(append_to_note(&services, blank).is_err());
+    assert!(append_to_note(&services, &KnownContents::default(), blank).is_err());
+}
+
+/// Profil synchronisé : le contenu écrit par l'IA est rejoué sur la version qu'elle a lue.
+fn synced_services() -> McpServices {
+    let store = SqliteStore::open_in_memory()
+        .unwrap()
+        .with_device(DeviceKey::from_bytes([1; 32]));
+    let store = Arc::new(store);
+    let folders = Arc::new(FoldersService::new(store.clone()));
+    folders.ensure_default().unwrap();
+    let device = DeviceName::parse("Bureau").unwrap();
+    store.create_space("Travail", &device).unwrap();
+
+    McpServices {
+        notes: Arc::new(NotesService::new(store.clone(), store)),
+        folders,
+    }
+}
+
+fn edit_elsewhere(services: &McpServices, id: i64, content: &str) {
+    let changes = NoteChanges {
+        content: Some(content.to_owned()),
+        ..NoteChanges::default()
+    };
+    services.notes.update(id, &changes).unwrap();
+}
+
+#[test]
+fn an_update_keeps_what_changed_since_the_ai_read_the_note() {
+    let services = synced_services();
+    let known = KnownContents::default();
+    let id = create(
+        &services,
+        "# Plan
+un
+deux",
+        &[],
+    );
+    get_note(&services, &known, GetNoteArgs { id }).unwrap();
+    edit_elsewhere(
+        &services,
+        id,
+        "# Plan
+un
+deux
+trois",
+    );
+
+    let args = UpdateNoteArgs {
+        id,
+        content: "# Plan revu
+un
+deux"
+            .to_owned(),
+    };
+    update_note(&services, &known, args).unwrap();
+
+    let stored = get_note(&services, &known, GetNoteArgs { id }).unwrap();
+    assert_eq!(
+        stored["content"],
+        "# Plan revu
+un
+deux
+trois"
+    );
+    assert_eq!(stored["title"], "Plan revu");
+}
+
+#[test]
+fn an_update_of_a_note_never_read_replaces_it() {
+    let services = synced_services();
+    let id = create(
+        &services,
+        "# Plan
+un",
+        &[],
+    );
+    edit_elsewhere(
+        &services,
+        id,
+        "# Plan
+un
+deux",
+    );
+
+    let args = UpdateNoteArgs {
+        id,
+        content: "# Autre".to_owned(),
+    };
+    update_note(&services, &KnownContents::default(), args).unwrap();
+
+    let stored = get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap();
+    assert_eq!(stored["content"], "# Autre");
 }
 
 #[test]
@@ -278,7 +377,12 @@ fn bounds_the_limits() {
 fn writes_links_to_notes_with_their_uuid() {
     let services = services();
     let target = create(&services, "Target", &[]);
-    let uuid = get_note(&services, GetNoteArgs { id: target }).unwrap()["uuid"]
+    let uuid = get_note(
+        &services,
+        &KnownContents::default(),
+        GetNoteArgs { id: target },
+    )
+    .unwrap()["uuid"]
         .as_str()
         .unwrap()
         .to_owned();
@@ -288,10 +392,15 @@ fn writes_links_to_notes_with_their_uuid() {
         id: source,
         text: format!("again note://{target} and note://999"),
     };
-    append_to_note(&services, appended).unwrap();
+    append_to_note(&services, &KnownContents::default(), appended).unwrap();
 
     assert_eq!(
-        get_note(&services, GetNoteArgs { id: source }).unwrap()["content"],
+        get_note(
+            &services,
+            &KnownContents::default(),
+            GetNoteArgs { id: source }
+        )
+        .unwrap()["content"],
         format!("Source\n[t](note://{uuid})\n\nagain note://{uuid} and note://999")
     );
 }

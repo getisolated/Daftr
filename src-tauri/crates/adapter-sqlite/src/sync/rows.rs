@@ -48,6 +48,14 @@ pub(crate) fn note(connection: &Connection, id: i64) -> rusqlite::Result<Option<
         .optional()
 }
 
+/// Le contenu de la note vivante `id`.
+pub(crate) fn live_content(connection: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
+    connection
+        .prepare_cached("SELECT content FROM notes WHERE id = ? AND deleted_at IS NULL")?
+        .query_row([id], |row| row.get(0))
+        .optional()
+}
+
 /// Les notes vivantes.
 pub(crate) fn live_notes(connection: &Connection) -> rusqlite::Result<Vec<NoteRow>> {
     let mut statement = connection.prepare(&format!("{NOTE} WHERE deleted_at IS NULL"))?;

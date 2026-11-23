@@ -15,4 +15,9 @@ content?: string,
 /**
  * Nouveaux tags, tableau JSON encodé.
  */
-tags?: string, };
+tags?: string, 
+/**
+ * Contenu sur lequel `content` a été construit (dernier lu ou enregistré) : ce qui a
+ * changé depuis, sur un autre appareil, est gardé.
+ */
+base?: string, };

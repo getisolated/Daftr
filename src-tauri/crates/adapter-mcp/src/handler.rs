@@ -9,7 +9,7 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use crate::server::ChangeListener;
 use crate::tools::{
-    self, AppendToNoteArgs, CreateNoteArgs, GetNoteArgs, ListNotesArgs, McpServices,
+    self, AppendToNoteArgs, CreateNoteArgs, GetNoteArgs, KnownContents, ListNotesArgs, McpServices,
     McpServicesSource, SearchNotesArgs, ToolResult, UpdateNoteArgs,
 };
 
@@ -28,6 +28,8 @@ using its uuid. Notes cannot be deleted from here. Dates are UTC.";
 pub(crate) struct DaftrTools {
     services: Arc<dyn McpServicesSource>,
     on_change: ChangeListener,
+    /// Contenus des notes lus ou écrits par cette IA : base de ses `update_note`.
+    known: KnownContents,
     tool_router: ToolRouter<Self>,
 }
 
@@ -37,6 +39,7 @@ impl DaftrTools {
         Self {
             services,
             on_change,
+            known: KnownContents::default(),
             tool_router: Self::tool_router(),
         }
     }
@@ -104,7 +107,8 @@ impl DaftrTools {
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn get_note(&self, Parameters(args): Parameters<GetNoteArgs>) -> Result<String, String> {
-        self.read(move |services| tools::get_note(services, args))
+        let known = self.known.clone();
+        self.read(move |services| tools::get_note(services, &known, args))
             .await
     }
 
@@ -146,7 +150,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<UpdateNoteArgs>,
     ) -> Result<String, String> {
-        self.write(move |services| tools::update_note(services, args))
+        let known = self.known.clone();
+        self.write(move |services| tools::update_note(services, &known, args))
             .await
     }
 
@@ -163,7 +168,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<AppendToNoteArgs>,
     ) -> Result<String, String> {
-        self.write(move |services| tools::append_to_note(services, args))
+        let known = self.known.clone();
+        self.write(move |services| tools::append_to_note(services, &known, args))
             .await
     }
 }

@@ -85,19 +85,29 @@ impl NoteStore for SqliteStore {
             .ok_or_else(|| AppError::storage("note not saved"))
     }
 
+    /// Avec une base, le contenu est rejoué sur le contenu actuel dans la même transaction
+    /// (profil synchronisé seulement, voir [`NoteChanges::base`]).
     fn update(&self, id: i64, changes: &NoteChanges) -> AppResult<()> {
-        let (assignments, mut values) = assignments(changes);
-        if assignments.is_empty() {
+        if changes.is_empty() {
             return Ok(());
         }
-        let sql = format!(
-            "UPDATE notes SET {}, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
-            assignments.join(", ")
-        );
-        values.push(Value::Integer(id));
+        self.write(|transaction, local| {
+            let rebased = local.rebased(transaction, id, changes)?;
+            let (assignments, mut values) = assignments(rebased.as_ref().unwrap_or(changes));
+            let sql = format!(
+                "UPDATE notes SET {}, updated_at = datetime('now')                  WHERE id = ? AND deleted_at IS NULL",
+                assignments.join(", ")
+            );
+            values.push(Value::Integer(id));
 
-        self.write_notes(&[id], |transaction| {
-            transaction.execute(&sql, params_from_iter(values))
+            if transaction
+                .execute(&sql, params_from_iter(values))
+                .map_err(storage)?
+                > 0
+            {
+                local.notes_written(transaction, &[id])?;
+            }
+            Ok(())
         })
     }
 

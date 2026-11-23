@@ -16,6 +16,7 @@ pub mod testing;
 #[cfg(test)]
 mod tests;
 mod text_diff;
+pub mod text_merge;
 mod values;
 
 pub use crate::error::{SyncError, SyncResult};

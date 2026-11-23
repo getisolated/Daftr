@@ -24,13 +24,18 @@ pub(crate) fn apply_text_diff(
     let old_chars: Vec<char> = old.chars().collect();
     let new_chars: Vec<char> = new.chars().collect();
     let offsets = utf16_offsets(&old_chars);
-    let deadline = Instant::now().checked_add(DIFF_TIME_BUDGET);
-    let ops = capture_diff_slices_deadline(Algorithm::Myers, &old_chars, &new_chars, deadline);
+    let ops = char_diff(&old_chars, &new_chars);
 
     // De la fin vers le début : les positions de l'ancien texte restent valables
     for op in ops.iter().rev() {
         apply_op(text, transaction, op, &offsets, &new_chars);
     }
+}
+
+/// Diff caractère par caractère de `old` vers `new`, borné dans le temps.
+pub(crate) fn char_diff(old: &[char], new: &[char]) -> Vec<DiffOp> {
+    let deadline = Instant::now().checked_add(DIFF_TIME_BUDGET);
+    capture_diff_slices_deadline(Algorithm::Myers, old, new, deadline)
 }
 
 fn apply_op(

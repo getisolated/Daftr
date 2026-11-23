@@ -4,6 +4,8 @@
 //! ou un message d'erreur lisible par l'IA. Les paramètres sont décrits en anglais : ces
 //! descriptions forment le schéma JSON montré aux IA.
 
+mod reads;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -18,6 +20,8 @@ use domain::tags::normalize_tags;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+
+pub(crate) use reads::KnownContents;
 
 /// Nombre de notes rendues par `list_notes` sans limite demandée.
 const DEFAULT_LIST_LIMIT: usize = 50;
@@ -251,9 +255,16 @@ pub(crate) fn search_notes(services: &McpServices, args: SearchNotesArgs) -> Too
 }
 
 /// Une note complète.
-pub(crate) fn get_note(services: &McpServices, args: GetNoteArgs) -> ToolResult {
+/// Lit une note ; son contenu devient la base du prochain `update_note` de l'IA.
+pub(crate) fn get_note(
+    services: &McpServices,
+    known: &KnownContents,
+    args: GetNoteArgs,
+) -> ToolResult {
     let note = existing_note(services, args.id)?;
-    Ok(with_content(&note))
+    let value = with_content(&note);
+    known.remember(note.uuid, note.content);
+    Ok(value)
 }
 
 /// Tous les tags utilisés.
@@ -283,31 +294,54 @@ pub(crate) fn create_note(services: &McpServices, args: CreateNoteArgs) -> ToolR
     Ok(json!(NoteSummary::from(&created)))
 }
 
-/// Remplace le contenu d'une note (et donc son titre, sa première ligne).
-pub(crate) fn update_note(services: &McpServices, args: UpdateNoteArgs) -> ToolResult {
-    existing_note(services, args.id)?;
-    replace_content(services, args.id, args.content)
+/// Remplace le contenu d'une note (et donc son titre, sa première ligne). Le contenu est
+/// rejoué sur la version lue par l'IA : ce qui a changé depuis ailleurs est gardé.
+pub(crate) fn update_note(
+    services: &McpServices,
+    known: &KnownContents,
+    args: UpdateNoteArgs,
+) -> ToolResult {
+    let note = existing_note(services, args.id)?;
+    let content = with_uuid_links(services, &args.content).unwrap_or(args.content);
+    let base = known.of(&note.uuid);
+    // Le contenu envoyé est aussi ce que l'IA connaît désormais de la note
+    let updated = replace_content(services, args.id, content.clone(), base)?;
+    known.remember(note.uuid, content);
+    Ok(json!(NoteSummary::from(&updated)))
 }
 
 /// Ajoute du texte à la fin d'une note, après une ligne vide.
-pub(crate) fn append_to_note(services: &McpServices, args: AppendToNoteArgs) -> ToolResult {
+pub(crate) fn append_to_note(
+    services: &McpServices,
+    known: &KnownContents,
+    args: AppendToNoteArgs,
+) -> ToolResult {
     if args.text.trim().is_empty() {
         return Err("The text to append must not be empty.".to_owned());
     }
     let note = existing_note(services, args.id)?;
-    replace_content(services, args.id, append_text(&note.content, &args.text))
+    let appended = append_text(&note.content, &args.text);
+    let content = with_uuid_links(services, &appended).unwrap_or(appended);
+    let updated = replace_content(services, args.id, content.clone(), Some(note.content))?;
+    known.remember(note.uuid, content);
+    Ok(json!(NoteSummary::from(&updated)))
 }
 
-fn replace_content(services: &McpServices, id: i64, content: String) -> ToolResult {
-    let content = with_uuid_links(services, &content).unwrap_or(content);
+/// Écrit le contenu (déjà en liens `note://<uuid>`) construit sur `base`.
+fn replace_content(
+    services: &McpServices,
+    id: i64,
+    content: String,
+    base: Option<String>,
+) -> Result<Note, String> {
     let changes = NoteChanges {
         title: Some(extract_title(&content)),
         content: Some(content),
         tags: None,
+        base,
     };
     let updated = services.notes.update(id, &changes).map_err(failure)?;
-    let note = updated.ok_or_else(|| note_not_found(id))?;
-    Ok(json!(NoteSummary::from(&note)))
+    updated.ok_or_else(|| note_not_found(id))
 }
 
 /// Les liens `note://<id>` que l'IA écrit avec les identifiants qu'elle voit, réécrits avec

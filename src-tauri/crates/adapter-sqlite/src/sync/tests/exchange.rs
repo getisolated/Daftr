@@ -48,6 +48,7 @@ fn remote_edits_converge_and_get_a_new_seq_for_the_next_devices() {
         content: Some("# Modifiée sur B".into()),
         title: Some("Modifiée sur B".into()),
         tags: None,
+        base: None,
     };
     NoteStore::update(&b, edited, &changes).unwrap();
 
