@@ -17,12 +17,12 @@ pub(crate) fn digest(parts: &[&[u8]]) -> [u8; 20] {
     let message: Vec<u8> = parts.concat();
     let mut state = INITIAL_STATE;
 
-    for block in padded(&message).chunks_exact(BLOCK_LENGTH) {
+    for block in padded(&message).as_chunks::<BLOCK_LENGTH>().0.iter() {
         compress(&mut state, block);
     }
 
     let mut output = [0_u8; 20];
-    for (chunk, word) in output.chunks_exact_mut(4).zip(state) {
+    for (chunk, word) in output.as_chunks_mut::<4>().0.iter_mut().zip(state) {
         chunk.copy_from_slice(&word.to_be_bytes());
     }
     output
@@ -72,8 +72,8 @@ fn compress(state: &mut [u32; 5], block: &[u8]) {
 fn message_schedule(block: &[u8]) -> [u32; 80] {
     let mut words = [0_u32; 80];
 
-    for (word, bytes) in words.iter_mut().zip(block.chunks_exact(4)) {
-        *word = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    for (word, bytes) in words.iter_mut().zip(block.as_chunks::<4>().0.iter()) {
+        *word = u32::from_be_bytes(*bytes);
     }
     for index in 16..80 {
         let mixed = words[index - 3] ^ words[index - 8] ^ words[index - 14] ^ words[index - 16];
