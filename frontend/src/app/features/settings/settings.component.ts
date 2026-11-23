@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { APP_SHORTCUTS, defaultAcceleratorFor, findShortcutConflict, shortcutLabel } from '../../core/models/app-shortcuts.model';
@@ -11,6 +11,9 @@ import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
 import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
 import { McpSettingsComponent } from './mcp-settings.component';
+import { SyncDevicesComponent } from '../sync/sync-devices.component';
+import { SyncPairingComponent } from '../sync/sync-pairing.component';
+import { SyncSettingsComponent } from '../sync/sync-settings.component';
 import {
   SETTING_DEFINITIONS, SettingDefinition, definitionsForPlatform, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
 } from './settings-definitions';
@@ -18,7 +21,7 @@ import {
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CheckboxComponent, SelectComponent, DaftrLogotypeComponent, McpSettingsComponent],
+  imports: [CheckboxComponent, SelectComponent, DaftrLogotypeComponent, McpSettingsComponent, SyncSettingsComponent, SyncPairingComponent, SyncDevicesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isOpen()) {
@@ -128,6 +131,22 @@ import {
                           <div class="description">{{ descriptionOf(def) }}</div>
                           <app-mcp-settings part="connection" />
                         }
+                        @case ('syncStatus') {
+                          <div class="description">{{ descriptionOf(def) }}</div>
+                          <app-sync-settings part="status" />
+                        }
+                        @case ('syncDeviceName') {
+                          <div class="description">{{ descriptionOf(def) }}</div>
+                          <app-sync-settings part="deviceName" />
+                        }
+                        @case ('syncPairing') {
+                          <div class="description">{{ descriptionOf(def) }}</div>
+                          <app-sync-pairing />
+                        }
+                        @case ('syncDevices') {
+                          <div class="description">{{ descriptionOf(def) }}</div>
+                          <app-sync-devices />
+                        }
                       }
                     </div>
                   }
@@ -185,7 +204,11 @@ export class SettingsComponent {
       this.query.set('');
       this.scrolledCategory.set(null);
       this.shortcutError.set(null);
-      setTimeout(() => this.searchRef?.nativeElement.focus());
+      const category = untracked(() => this.settingsService.openedCategory());
+      setTimeout(() => {
+        this.searchRef?.nativeElement.focus();
+        if (category) this.scrollToCategory(category, 'auto');
+      });
     });
   }
 
@@ -240,9 +263,9 @@ export class SettingsComponent {
     await this.save(def, (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[def.key]);
   }
 
-  scrollToCategory(category: string): void {
+  scrollToCategory(category: string, behavior: ScrollBehavior = 'smooth'): void {
     const section = this.listRef?.nativeElement.querySelector(`[data-category="${CSS.escape(category)}"]`);
-    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    section?.scrollIntoView({ behavior, block: 'start' });
     this.scrolledCategory.set(category);
   }
 

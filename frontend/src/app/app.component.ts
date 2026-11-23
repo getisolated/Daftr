@@ -27,6 +27,10 @@ import { CollectionsService } from './core/services/collections.service';
 import { ThemeService } from './core/services/theme.service';
 import { ProfilesService } from './core/services/profiles.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
+import { ToastStackComponent } from './shared/ui/toast-stack.component';
+import { SyncOfferDialogComponent } from './features/sync/sync-offer-dialog.component';
+import { SyncService } from './core/services/sync.service';
+import { ToastService } from './core/services/toast.service';
 import { QUICK_NOTES_TAB_ID } from './core/models/note.model';
 import { I18nService } from './core/i18n/i18n.service';
 import { SAMPLE_NOTES, SAMPLE_NOTES_FR, getSampleNotes } from './core/data/sample-notes';
@@ -35,7 +39,10 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, ZenSidebarComponent, FormattingBarComponent, BacklinksPanelComponent, ConfirmDialogComponent],
+  imports: [
+    TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, ZenSidebarComponent, FormattingBarComponent,
+    BacklinksPanelComponent, ConfirmDialogComponent, ToastStackComponent, SyncOfferDialogComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
   },
@@ -81,6 +88,15 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
           (chosen)="onUpdateChoice($event)"
         />
       }
+      @if (offerDialogOpen()) {
+        <app-sync-offer-dialog />
+      }
+      <app-toast-stack
+        [toasts]="toasts.toasts()"
+        [closeLabel]="i18n.t('sync.toast.dismiss')"
+        (acted)="toasts.act($event)"
+        (dismissed)="toasts.dismiss($event)"
+      />
     </div>
   `,
   styles: [`
@@ -155,6 +171,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
   private readonly profiles = inject(ProfilesService);
+  // Injected eagerly: it follows the sync events from the start (indicator, notifications, proposed profiles)
+  private readonly sync = inject(SyncService);
+  protected readonly toasts = inject(ToastService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
   readonly wideMode = this.layoutService.wideMode;
@@ -164,6 +183,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly formattingBarShown = computed(() =>
     this.formattingBar.visible() && this.activeNoteId() !== null && !this.formattingBar.previewOnly());
   readonly formattingBarPosition = this.formattingBar.position;
+  readonly offerDialogOpen = this.sync.offerDialogOpen;
 
   /** The read-only quick notes document has no identity of its own to be linked to. */
   readonly backlinksShown = computed(() => {
