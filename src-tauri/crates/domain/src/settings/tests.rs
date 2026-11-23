@@ -66,6 +66,22 @@ fn falls_back_on_invalid_formatting_bar_preferences() {
 }
 
 #[test]
+fn keeps_a_valid_line_breaks_strategy_and_falls_back_on_the_current_one() {
+    let with = |value: &str| {
+        sanitize(RawSettings {
+            line_breaks: text(value),
+            ..RawSettings::default()
+        })
+        .line_breaks
+    };
+
+    assert_eq!(AppSettings::default().line_breaks, LineBreaks::Markdown);
+    assert_eq!(with("text"), LineBreaks::Text);
+    assert_eq!(with("markdown"), LineBreaks::Markdown);
+    assert_eq!(with("auto"), LineBreaks::Markdown);
+}
+
+#[test]
 fn keeps_a_valid_theme_and_falls_back_to_the_current_one() {
     let theme = |value: &str, base: &AppSettings| {
         let raw = RawSettings {

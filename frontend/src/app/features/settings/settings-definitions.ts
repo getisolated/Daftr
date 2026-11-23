@@ -159,6 +159,17 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
+    key: 'lineBreaks',
+    categoryKey: 'settings.category.editor',
+    titleKey: 'settings.lineBreaks.title',
+    descriptionKey: 'settings.lineBreaks.description',
+    control: 'select',
+    options: [
+      { value: 'markdown', labelKey: 'settings.option.lineBreaksMarkdown' },
+      { value: 'text', labelKey: 'settings.option.lineBreaksText' },
+    ],
+  },
+  {
     key: 'showOutline',
     categoryKey: 'settings.category.editor',
     titleKey: 'settings.showOutline.title',

@@ -1,7 +1,7 @@
 //! Validation des réglages non fiables.
 
 use super::{
-    AppSettings, FormattingBarMode, FormattingBarPosition, FormattingBarStyle, MCP_MAX_PORT,
+    AppSettings, FormattingBarMode, FormattingBarPosition, FormattingBarStyle, LineBreaks, MCP_MAX_PORT,
     MCP_MIN_PORT, OVERLAY_MAX_HEIGHT, OVERLAY_MAX_WIDTH, OVERLAY_MIN_HEIGHT, OVERLAY_MIN_WIDTH,
     RawPosition, RawSettings, ShortcutMode, ThemeId, ThemeKind, ThemePreference, is_mcp_token,
 };
@@ -110,6 +110,7 @@ fn apply_editor(raw: &RawSettings, settings: &mut AppSettings) {
     settings.show_line_numbers = raw.show_line_numbers.unwrap_or(settings.show_line_numbers);
     settings.word_wrap = raw.word_wrap.unwrap_or(settings.word_wrap);
     settings.trailing_line = raw.trailing_line.unwrap_or(settings.trailing_line);
+    settings.line_breaks = parsed(&raw.line_breaks, LineBreaks::parse, settings.line_breaks);
     settings.show_outline = raw.show_outline.unwrap_or(settings.show_outline);
     settings.show_breadcrumbs = raw.show_breadcrumbs.unwrap_or(settings.show_breadcrumbs);
     settings.hide_scrollbar = raw.hide_scrollbar.unwrap_or(settings.hide_scrollbar);

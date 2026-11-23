@@ -4,8 +4,9 @@ import { translate } from '../src/app/core/i18n/translate';
 import { LinkStatus } from '../src/app/core/utils/note-paths.util';
 
 const statuses: Record<string, LinkStatus> = { 'Folder/Here': 'note', 'Gone': 'broken', 'https://x.dev': 'external' };
-const md = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 'note', t: (key, params) => translate('en', key, params) });
-const mdFr = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 'note', t: (key, params) => translate('fr', key, params) });
+const md = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 'note', t: (key, params) => translate('en', key, params), lineBreaks: 'markdown' });
+const mdText = createMarkdownRenderer({ linkStatus: () => 'note', t: (key, params) => translate('en', key, params), lineBreaks: 'text' });
+const mdFr = createMarkdownRenderer({ linkStatus: target => statuses[target] ?? 'note', t: (key, params) => translate('fr', key, params), lineBreaks: 'markdown' });
 const render = (source: string): string => md.render(source);
 
 describe('createMarkdownRenderer', () => {
@@ -21,6 +22,18 @@ describe('createMarkdownRenderer', () => {
     expect(html).toContain('<h1 data-line="1" id="title" data-anchor="title">');
     expect(html).toContain('<p data-line="3">');
     expect(html).toContain('<ul data-line="5">');
+  });
+
+  it('joins a single line break in markdown mode, and keeps the two-spaces hard break', () => {
+    expect(render('one\ntwo')).not.toContain('<br');
+    expect(render('one  \ntwo')).toContain('<br');
+    expect(render('one\n\ntwo').match(/<p /g)).toHaveLength(2);
+  });
+
+  it('turns every line break into a <br> in text mode', () => {
+    const html = mdText.render('one\ntwo\nthree');
+    expect(html.match(/<br/g)).toHaveLength(2);
+    expect(mdText.render('one\n\ntwo').match(/<p /g)).toHaveLength(2);
   });
 
   it('renders GFM tables and strikethrough', () => {

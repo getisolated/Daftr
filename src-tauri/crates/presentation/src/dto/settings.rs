@@ -72,6 +72,9 @@ pub struct SettingsDto {
     pub word_wrap: bool,
     /// Ligne vide finale.
     pub trailing_line: bool,
+    /// Retours à la ligne de l'aperçu.
+    #[ts(type = "'markdown' | 'text'")]
+    pub line_breaks: &'static str,
     /// Plan de la note.
     pub show_outline: bool,
     /// Fil d'Ariane en haut de la note.
@@ -121,6 +124,7 @@ impl From<&AppSettings> for SettingsDto {
             show_line_numbers: settings.show_line_numbers,
             word_wrap: settings.word_wrap,
             trailing_line: settings.trailing_line,
+            line_breaks: settings.line_breaks.as_str(),
             show_outline: settings.show_outline,
             show_breadcrumbs: settings.show_breadcrumbs,
             hide_scrollbar: settings.hide_scrollbar,

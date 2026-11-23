@@ -8,7 +8,9 @@ mod raw;
 mod sanitize;
 mod theme;
 
-pub use options::{FormattingBarMode, FormattingBarPosition, FormattingBarStyle, ShortcutMode};
+pub use options::{
+    FormattingBarMode, FormattingBarPosition, FormattingBarStyle, LineBreaks, ShortcutMode,
+};
 pub use raw::{RawPosition, RawSettings};
 pub use sanitize::sanitize_settings;
 pub use theme::{ThemeId, ThemeKind, ThemePreference};
@@ -83,6 +85,8 @@ pub struct AppSettings {
     pub word_wrap: bool,
     /// La note finit toujours par une ligne vide.
     pub trailing_line: bool,
+    /// Retours à la ligne de l'aperçu : norme markdown ou texte brut.
+    pub line_breaks: LineBreaks,
     /// Plan h1/h2/h3 à droite de la note.
     pub show_outline: bool,
     /// Fil d'Ariane (collection ou notes, dossiers, fichier) en haut de la note.
@@ -153,6 +157,7 @@ impl Default for AppSettings {
             show_line_numbers: false,
             word_wrap: true,
             trailing_line: false,
+            line_breaks: LineBreaks::Markdown,
             show_outline: false,
             show_breadcrumbs: true,
             hide_scrollbar: false,
