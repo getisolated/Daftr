@@ -273,3 +273,25 @@ fn bounds_the_limits() {
     assert_eq!(limit(Some(0), 50), 1);
     assert_eq!(limit(Some(10_000), 50), MAX_LIMIT);
 }
+
+#[test]
+fn writes_links_to_notes_with_their_uuid() {
+    let services = services();
+    let target = create(&services, "Target", &[]);
+    let uuid = get_note(&services, GetNoteArgs { id: target }).unwrap()["uuid"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let source = create(&services, &format!("Source\n[t](note://{target})"), &[]);
+    let appended = AppendToNoteArgs {
+        id: source,
+        text: format!("again note://{target} and note://999"),
+    };
+    append_to_note(&services, appended).unwrap();
+
+    assert_eq!(
+        get_note(&services, GetNoteArgs { id: source }).unwrap()["content"],
+        format!("Source\n[t](note://{uuid})\n\nagain note://{uuid} and note://999")
+    );
+}
