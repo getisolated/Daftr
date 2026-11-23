@@ -6,6 +6,7 @@
 use app::ports::sync::{ProfileOffer, SyncStatus};
 use app::ports::trust::{TrustOrigin, TrustedDevice};
 use domain::profile::ProfileId;
+use domain::sync::DeviceKind;
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -119,6 +120,29 @@ impl From<TrustOrigin> for TrustOriginDto {
     }
 }
 
+/// Type d'un appareil, pour son icône.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum DeviceKindDto {
+    /// Inconnu (détection en échec, ou appareil d'une version qui ne l'annonce pas).
+    Unknown,
+    /// Ordinateur portable.
+    Laptop,
+    /// Ordinateur fixe.
+    Desktop,
+}
+
+impl From<DeviceKind> for DeviceKindDto {
+    fn from(kind: DeviceKind) -> Self {
+        match kind {
+            DeviceKind::Unknown => Self::Unknown,
+            DeviceKind::Laptop => Self::Laptop,
+            DeviceKind::Desktop => Self::Desktop,
+        }
+    }
+}
+
 /// Un profil partagé avec un appareil de confiance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -139,8 +163,13 @@ pub struct SharedProfileDto {
 pub struct TrustedDeviceDto {
     /// Clé publique.
     pub key: String,
+    /// Empreinte de la clé publique (32 chiffres hexadécimaux, celle de l'annonce mDNS et du
+    /// QR code) : son début identifie l'appareil à l'écran.
+    pub fingerprint: String,
     /// Nom.
     pub name: String,
+    /// Type.
+    pub kind: DeviceKindDto,
     /// Comment il est devenu de confiance.
     pub origin: TrustOriginDto,
     /// Date d'ajout (UTC).
@@ -156,16 +185,19 @@ pub struct TrustedDeviceDto {
 }
 
 impl TrustedDeviceDto {
-    /// L'appareil, avec sa présence et ses profils partagés.
+    /// L'appareil, avec son empreinte, sa présence et ses profils partagés.
     pub fn new(
         device: &TrustedDevice,
+        fingerprint: String,
         presence: (bool, bool),
         profiles: Vec<SharedProfileDto>,
     ) -> Self {
         let (present, connected) = presence;
         Self {
             key: device.key.to_string(),
+            fingerprint,
             name: device.name.as_str().to_owned(),
+            kind: device.kind.into(),
             origin: device.origin.into(),
             added_at: device.added_at.clone(),
             revoked_at: device.revoked_at.clone(),
@@ -183,8 +215,13 @@ impl TrustedDeviceDto {
 pub struct SpaceDeviceDto {
     /// Clé publique.
     pub key: String,
+    /// Empreinte de la clé publique (voir [`TrustedDeviceDto::fingerprint`]).
+    pub fingerprint: String,
     /// Nom.
     pub name: String,
+    /// Type : le sien pour cet appareil, sinon celui de l'appareil de confiance (inconnu tant
+    /// qu'il ne s'est pas connecté).
+    pub kind: DeviceKindDto,
     /// C'est cet appareil.
     pub is_self: bool,
     /// Retiré de l'espace.

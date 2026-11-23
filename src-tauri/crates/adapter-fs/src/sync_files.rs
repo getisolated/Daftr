@@ -15,7 +15,7 @@ use std::sync::Mutex;
 use app::ports::trust::{DeviceSecret, TrustStore, TrustedDevice};
 use app::{AppError, AppResult};
 use domain::profile::ProfileId;
-use domain::sync::SpaceId;
+use domain::sync::{DeviceKey, DeviceKind, SpaceId};
 use platform::sync::lock;
 
 use crate::profile_directories::write_atomically;
@@ -66,6 +66,12 @@ impl TrustFiles {
         }
         Ok(devices.unwrap_or_default())
     }
+
+    fn write_devices(&self, devices: &[TrustedDevice]) -> AppResult<()> {
+        self.create_directory()?;
+        let text = devices_json::to_text(devices)?;
+        write_atomically(&self.path(DEVICES_FILE), text.as_bytes())
+    }
 }
 
 impl TrustStore for TrustFiles {
@@ -109,10 +115,21 @@ impl TrustStore for TrustFiles {
             Some(known) => *known = device.clone(),
             None => devices.push(device.clone()),
         }
+        self.write_devices(&devices)
+    }
 
-        self.create_directory()?;
-        let text = devices_json::to_text(&devices)?;
-        write_atomically(&self.path(DEVICES_FILE), text.as_bytes())
+    fn set_device_kind(&self, key: &DeviceKey, kind: DeviceKind) -> AppResult<bool> {
+        let _guard = lock(&self.devices);
+        let mut devices = self.read_devices()?;
+        let Some(known) = devices.iter_mut().find(|known| known.key == *key) else {
+            return Ok(false);
+        };
+        if known.kind == kind {
+            return Ok(false);
+        }
+        known.kind = kind;
+        self.write_devices(&devices)?;
+        Ok(true)
     }
 }
 

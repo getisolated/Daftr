@@ -36,7 +36,7 @@ use app::settings::SettingsService;
 use app::{AppError, AppResult};
 use domain::profile::ProfileId;
 use domain::settings::AppSettings;
-use domain::sync::{DeviceKey, DeviceName};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName};
 use tokio::runtime::Handle;
 
 use self::network::NetworkWatch;
@@ -74,6 +74,8 @@ pub struct SyncState {
     pub engine: Engine<ProfileId>,
     trust: Arc<TrustFiles>,
     host_name: DeviceName,
+    /// Type de cet appareil, détecté au démarrage.
+    device_kind: DeviceKind,
     runtime: Handle,
     /// Sérialise l'application des réglages (la dernière tâche applique l'état courant).
     applied: tokio::sync::Mutex<Applied>,
@@ -90,6 +92,7 @@ impl SyncState {
             identity.key(),
             setup.profiles,
         ));
+        let device_kind = setup.config.device_kind;
         let applied = Applied {
             name: setup.config.device_name.clone(),
             port: setup.config.port,
@@ -112,6 +115,7 @@ impl SyncState {
             engine,
             trust,
             host_name: setup.host_name,
+            device_kind,
             runtime: setup.runtime,
             applied: tokio::sync::Mutex::new(applied),
             network: NetworkWatch::default(),

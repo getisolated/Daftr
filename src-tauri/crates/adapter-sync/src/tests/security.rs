@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 
 use app::ports::sync::{SyncStatus, SyncStore};
 use app::ports::trust::{TrustOrigin, TrustStore, TrustedDevice};
-use domain::sync::{DeviceName, PairingCode, SpaceId};
+use domain::sync::{DeviceKind, DeviceName, PairingCode, SpaceId};
 use tokio::net::TcpStream;
 
 use super::support::{
@@ -38,6 +38,7 @@ fn admit(device: &Device, identity: &DeviceIdentity, profile: Option<&str>) {
         .put_device(&TrustedDevice {
             key: identity.key(),
             name: name.clone(),
+            kind: DeviceKind::Unknown,
             origin: TrustOrigin::Paired,
             added_at: NOW.to_owned(),
             revoked_at: None,

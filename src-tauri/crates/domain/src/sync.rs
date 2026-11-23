@@ -5,10 +5,12 @@
 
 mod device;
 mod ids;
+mod kind;
 mod purge;
 
 pub use device::{DeviceName, MAX_DEVICE_NAME_LENGTH, PAIRING_CODE_DIGITS, PairingCode};
 pub use ids::{DeviceKey, DocId, SpaceId};
+pub use kind::DeviceKind;
 pub use purge::{PURGE_AFTER_DAYS, is_purgeable, is_timestamp, purge_cutoff, timestamp_from_unix};
 
 use crate::uuid::Uuid;

@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use domain::sync::{DeviceKey, DeviceName};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName};
 
 use crate::AppResult;
 
@@ -47,6 +47,8 @@ pub struct TrustedDevice {
     pub key: DeviceKey,
     /// Son nom.
     pub name: DeviceName,
+    /// Son type, tel qu'il l'a annoncé à la dernière session.
+    pub kind: DeviceKind,
     /// Comment il est devenu de confiance.
     pub origin: TrustOrigin,
     /// Date d'ajout (format SQLite, UTC).
@@ -72,6 +74,10 @@ pub trait TrustStore: Send + Sync {
     fn devices(&self) -> AppResult<Vec<TrustedDevice>>;
     /// Ajoute l'appareil ou remplace l'entrée de même clé.
     fn put_device(&self, device: &TrustedDevice) -> AppResult<()>;
+    /// Change le type d'un appareil connu, en une lecture-écriture indivisible (une
+    /// révocation écrite entre-temps n'est jamais perdue). Sans effet pour un appareil
+    /// inconnu ; rend `true` si l'entrée a changé.
+    fn set_device_kind(&self, key: &DeviceKey, kind: DeviceKind) -> AppResult<bool>;
 }
 
 #[cfg(test)]

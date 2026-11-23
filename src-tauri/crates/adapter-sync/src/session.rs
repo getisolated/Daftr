@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use app::ports::sync::{Applied, SyncEvent};
 use app::ports::trust::{TrustOrigin, TrustedDevice};
-use domain::sync::{DeviceKey, DeviceName, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName, SpaceId};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
@@ -205,6 +205,7 @@ impl<P: ProfileKey> Session<P> {
             protocol: PROTOCOL_VERSION,
             name: self.shared.state().device_name.as_str().to_owned(),
             spaces: spaces.keys().map(|space| *space.as_bytes()).collect(),
+            kind: self.shared.config.device_kind,
         };
         self.send(&Message::Hello(hello)).await?;
 
@@ -226,8 +227,9 @@ impl<P: ProfileKey> Session<P> {
         self.remote_spaces = hello.spaces.into_iter().map(SpaceId::from_bytes).collect();
 
         if first {
-            self.link().await?;
+            self.link(hello.kind).await?;
         }
+        self.remember_kind(hello.kind).await;
         self.spaces_changed(&before).await?;
         if first {
             self.send_offers().await?;
@@ -236,13 +238,14 @@ impl<P: ProfileKey> Session<P> {
     }
 
     /// Conclut un appairage : l'appareil devient de confiance (origine « appairé »).
-    async fn link(&mut self) -> Result<()> {
+    async fn link(&mut self, kind: DeviceKind) -> Result<()> {
         let (Some(linking), Some(name)) = (self.linking.take(), self.remote_name.clone()) else {
             return Ok(());
         };
         let device = TrustedDevice {
             key: self.remote,
             name: name.clone(),
+            kind,
             origin: TrustOrigin::Paired,
             added_at: self.shared.clock.timestamp(),
             revoked_at: None,
@@ -266,6 +269,19 @@ impl<P: ProfileKey> Session<P> {
             None => crate::engine::request_refresh(&self.shared),
         }
         Ok(())
+    }
+
+    /// Garde le type annoncé avec l'appareil de confiance. Un échec d'écriture n'interrompt
+    /// pas la session : le type n'est qu'une icône, il sera réécrit au prochain `Hello`.
+    async fn remember_kind(&self, kind: DeviceKind) {
+        let remote = self.remote;
+        let saved = self
+            .shared
+            .with_trust(move |trust| trust.set_device_kind(&remote, kind))
+            .await;
+        if let Err(error) = saved {
+            tracing::warn!(remote = %self.remote, %error, "type d'appareil non enregistré");
+        }
     }
 
     /// Les espaces échangés : annoncés des deux côtés.

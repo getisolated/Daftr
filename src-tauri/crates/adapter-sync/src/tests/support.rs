@@ -10,7 +10,7 @@ use app::ports::sync::{RemoteSnapshot, SyncEvent, SyncStore};
 use app::ports::trust::{TrustOrigin, TrustStore, TrustedDevice};
 use app::sync::testing::{MemoryProfiles, MemorySyncStore, MemoryTrust, RecordedEvents};
 use app::sync::{NoteFields, StateVector};
-use domain::sync::{DeviceKey, DeviceName, DocId, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName, DocId, SpaceId};
 use domain::uuid::Uuid;
 use platform::sync::lock;
 
@@ -82,6 +82,20 @@ pub(crate) fn test_timings() -> Timings {
 
 /// Un appareil sur `network`, avec la politique d'adresses `policy`.
 pub(crate) fn device_with(network: &Arc<MemoryNetwork>, name: &str, policy: AddrPolicy) -> Device {
+    build_device(network, name, policy, DeviceKind::Unknown)
+}
+
+/// Un appareil de type `kind`.
+pub(crate) fn device_of_kind(network: &Arc<MemoryNetwork>, name: &str, kind: DeviceKind) -> Device {
+    build_device(network, name, AddrPolicy::LanAndLoopback, kind)
+}
+
+fn build_device(
+    network: &Arc<MemoryNetwork>,
+    name: &str,
+    policy: AddrPolicy,
+    device_kind: DeviceKind,
+) -> Device {
     let identity = DeviceIdentity::generate().unwrap();
     let name = DeviceName::parse(name).unwrap();
     let profiles = Arc::new(MemoryProfiles::new(identity.key()));
@@ -96,6 +110,7 @@ pub(crate) fn device_with(network: &Arc<MemoryNetwork>, name: &str, policy: Addr
         bind: vec![IpAddr::V4(Ipv4Addr::LOCALHOST)],
         policy,
         timings: test_timings(),
+        device_kind,
         ..EngineConfig::new(name.clone())
     };
     let deps = EngineDeps {
@@ -162,6 +177,7 @@ impl Device {
             .put_device(&TrustedDevice {
                 key: other.key(),
                 name: other.name.clone(),
+                kind: DeviceKind::Unknown,
                 origin: TrustOrigin::Paired,
                 added_at: NOW.to_owned(),
                 revoked_at: None,

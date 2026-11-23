@@ -2,7 +2,7 @@
 
 use std::sync::Mutex;
 
-use domain::sync::DeviceKey;
+use domain::sync::{DeviceKey, DeviceKind};
 use platform::sync::lock;
 
 use crate::AppResult;
@@ -44,5 +44,15 @@ impl TrustStore for MemoryTrust {
         devices.retain(|known| known.key != device.key);
         devices.push(device.clone());
         Ok(())
+    }
+
+    fn set_device_kind(&self, key: &DeviceKey, kind: DeviceKind) -> AppResult<bool> {
+        let mut devices = lock(&self.devices);
+        let Some(device) = devices.iter_mut().find(|device| device.key == *key) else {
+            return Ok(false);
+        };
+        let changed = device.kind != kind;
+        device.kind = kind;
+        Ok(changed)
     }
 }

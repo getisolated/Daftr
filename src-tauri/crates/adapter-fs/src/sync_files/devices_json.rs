@@ -1,9 +1,10 @@
 //! Forme JSON des appareils de confiance : `{ "version": 1, "devices": [{ "key", "name",
-//! "origin": "paired" | "space", "addedAt", "revokedAt" }] }`.
+//! "kind": "laptop" | "desktop" | "unknown", "origin": "paired" | "space", "addedAt",
+//! "revokedAt" }] }`. `kind` est absent des fichiers écrits avant son ajout : `unknown`.
 
 use app::AppResult;
 use app::ports::trust::{TrustOrigin, TrustedDevice};
-use domain::sync::{DeviceKey, DeviceName};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName};
 use serde_json::{Map, Value, json};
 
 /// Version du format, pour une évolution future.
@@ -22,6 +23,7 @@ fn device_to_json(device: &TrustedDevice) -> Value {
     json!({
         "key": device.key.to_string(),
         "name": device.name.as_str(),
+        "kind": device.kind.as_str(),
         "origin": match device.origin {
             TrustOrigin::Paired => PAIRED,
             TrustOrigin::Space => SPACE,
@@ -55,6 +57,7 @@ fn device_from_json(value: &Value) -> Option<TrustedDevice> {
     Some(TrustedDevice {
         key,
         name,
+        kind: text(object, "kind").map_or(DeviceKind::Unknown, DeviceKind::parse),
         origin,
         added_at: text(object, "addedAt").unwrap_or_default().to_owned(),
         revoked_at: text(object, "revokedAt").map(str::to_owned),

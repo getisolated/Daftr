@@ -7,14 +7,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use adapter_sync::{LinkedDevice, OfferChoice, PairingState, PairingTicket};
+use adapter_sync::{Fingerprint, LinkedDevice, OfferChoice, PairingState, PairingTicket};
 use app::ports::sync::{SyncProfiles, SyncStore};
-use app::ports::trust::TrustStore;
+use app::ports::trust::{TrustStore, TrustedDevice};
 use app::{AppResult, SyncError};
 use domain::i18n::{MessageKey, message};
 use domain::profile::ProfileId;
 use domain::settings::AppSettings;
-use domain::sync::{DeviceKey, PairingCode, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, PairingCode, SpaceId};
 use presentation::IpcResult;
 use presentation::dto::{
     LinkedDeviceDto, PairingStateDto, PairingTicketDto, ProfileSyncDto, SharedProfileDto,
@@ -66,14 +66,13 @@ impl SyncState {
                     connected.contains(&device.key),
                 );
                 let profiles = shared.remove(&device.key).unwrap_or_default();
-                TrustedDeviceDto::new(device, presence, profiles)
+                TrustedDeviceDto::new(device, fingerprint(&device.key), presence, profiles)
             })
             .collect())
     }
 
-    /// La synchronisation d'un profil : son espace et ses membres.
+    /// La synchronisation d'un profil : son espace et ses membres, avec leur type.
     pub async fn profile_sync(&self, profile: ProfileId) -> IpcResult<ProfileSyncDto> {
-        let own = self.device_key();
         self.profiles.profile_name(&profile)?;
         let space = self.profiles.space_of(&profile);
         let id = profile.clone();
@@ -84,17 +83,25 @@ impl SyncState {
             }
             None => Vec::new(),
         };
+        let trust = Arc::clone(&self.trust);
+        let trusted = blocking(move || trust.devices()).await?;
+        let own = (self.device_key(), self.device_kind);
         Ok(ProfileSyncDto {
             profile_id: profile.as_str().to_owned(),
             space_id: space.map(|space| space.space_id.to_string()),
             enabled: space.is_some_and(|space| space.enabled),
             devices: devices
                 .into_iter()
-                .map(|device| SpaceDeviceDto {
-                    key: device.key.to_string(),
-                    name: device.name.map(|name| name.to_string()).unwrap_or_default(),
-                    is_self: device.key == own,
-                    revoked: device.revoked_at.is_some(),
+                .map(|device| {
+                    let kind = kind_of(&device.key, own, &trusted);
+                    SpaceDeviceDto {
+                        key: device.key.to_string(),
+                        fingerprint: fingerprint(&device.key),
+                        name: device.name.map(|name| name.to_string()).unwrap_or_default(),
+                        kind: kind.into(),
+                        is_self: device.key == own.0,
+                        revoked: device.revoked_at.is_some(),
+                    }
                 })
                 .collect(),
         })
@@ -261,6 +268,23 @@ where
         Ok(result) => Ok(result?),
         Err(_) => Err(ipc_error(adapter_sync::Error::Stopped)),
     }
+}
+
+/// L'empreinte de `key`, en hexadécimal.
+fn fingerprint(key: &DeviceKey) -> String {
+    Fingerprint::of(key).to_string()
+}
+
+/// Le type d'un membre d'espace : le sien pour cet appareil (`own`), sinon celui de
+/// l'appareil de confiance.
+fn kind_of(key: &DeviceKey, own: (DeviceKey, DeviceKind), trusted: &[TrustedDevice]) -> DeviceKind {
+    if *key == own.0 {
+        return own.1;
+    }
+    trusted
+        .iter()
+        .find(|device| device.key == *key)
+        .map_or(DeviceKind::Unknown, |device| device.kind)
 }
 
 /// Les profils partagés avec chaque appareil (membres de l'espace, révoqués compris).

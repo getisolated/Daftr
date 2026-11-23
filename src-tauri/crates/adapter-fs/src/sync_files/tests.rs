@@ -1,6 +1,6 @@
 use app::ports::trust::{DeviceSecret, TrustOrigin, TrustStore, TrustedDevice};
 use domain::profile::ProfileId;
-use domain::sync::{DeviceKey, DeviceName, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName, SpaceId};
 
 use super::*;
 
@@ -8,6 +8,7 @@ fn device(n: u8, name: &str) -> TrustedDevice {
     TrustedDevice {
         key: DeviceKey::from_bytes([n; 32]),
         name: DeviceName::parse(name).unwrap(),
+        kind: DeviceKind::Laptop,
         origin: TrustOrigin::Paired,
         added_at: "2026-11-23 10:00:00".to_owned(),
         revoked_at: None,
@@ -141,6 +142,68 @@ fn unreadable_entries_are_skipped_and_revocations_kept() {
     assert_eq!(devices[0].name.as_str(), "PC");
     assert_eq!(devices[0].origin, TrustOrigin::Space);
     assert!(!devices[0].is_trusted());
+}
+
+/// Un fichier écrit avant l'ajout du type d'appareil se lit toujours ; un type inconnu
+/// (version ultérieure) aussi.
+#[test]
+fn devices_without_a_known_kind_load_as_unknown() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    let (old, newer) = (
+        DeviceKey::from_bytes([5; 32]),
+        DeviceKey::from_bytes([6; 32]),
+    );
+    let text = format!(
+        r#"{{ "version": 1, "devices": [
+            {{ "key": "{old}", "name": "Ancien", "origin": "paired",
+               "addedAt": "2026-11-23 10:00:00", "revokedAt": null }},
+            {{ "key": "{newer}", "name": "Futur", "kind": "phone", "origin": "paired",
+               "addedAt": "2026-11-23 10:00:00", "revokedAt": null }}
+        ] }}"#
+    );
+    std::fs::write(folder.join(DEVICES_FILE), text).unwrap();
+
+    let devices = files(&directory).devices().unwrap();
+
+    assert_eq!(devices.len(), 2);
+    assert!(
+        devices
+            .iter()
+            .all(|device| device.kind == DeviceKind::Unknown)
+    );
+    assert!(devices.iter().all(TrustedDevice::is_trusted));
+}
+
+#[test]
+fn the_device_kind_is_saved_and_reloaded() {
+    let directory = tempfile::tempdir().unwrap();
+    let trust = files(&directory);
+    let mut desktop = device(7, "Bureau");
+    desktop.kind = DeviceKind::Desktop;
+
+    trust.put_device(&desktop).unwrap();
+    assert_eq!(trust.devices().unwrap()[0].kind, DeviceKind::Desktop);
+
+    assert!(
+        trust
+            .set_device_kind(&desktop.key, DeviceKind::Laptop)
+            .unwrap()
+    );
+    assert!(
+        !trust
+            .set_device_kind(&desktop.key, DeviceKind::Laptop)
+            .unwrap()
+    );
+    assert!(
+        !trust
+            .set_device_kind(&DeviceKey::from_bytes([8; 32]), DeviceKind::Laptop)
+            .unwrap()
+    );
+    let reloaded = trust.devices().unwrap();
+    assert_eq!(reloaded.len(), 1);
+    assert_eq!(reloaded[0].kind, DeviceKind::Laptop);
 }
 
 #[test]

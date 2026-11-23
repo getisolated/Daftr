@@ -12,7 +12,7 @@ use anyhow::Context;
 use app::export::ExportService;
 use app::profiles::{ProfilePorts, ProfilesService};
 use app::settings::SettingsService;
-use domain::sync::DeviceName;
+use domain::sync::{DeviceKind, DeviceName};
 use presentation::Services;
 use presentation::data::ActiveData;
 use tauri::{App, AppHandle, Manager, async_runtime};
@@ -76,6 +76,7 @@ fn build_sync(app: &AppHandle, directory: &Path, services: &Services) -> anyhow:
         DeviceName::parse(&settings.sync_device_name).unwrap_or_else(|| host_name.clone());
     let config = EngineConfig {
         port: settings.sync_port,
+        device_kind: DeviceKind::from_battery(platform::power::battery_presence()),
         ..EngineConfig::new(device_name)
     };
 

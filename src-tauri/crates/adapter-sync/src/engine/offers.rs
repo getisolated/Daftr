@@ -6,7 +6,7 @@ use std::sync::Arc;
 use app::SyncError;
 use app::ports::sync::ProfileOffer;
 use app::ports::trust::{TrustOrigin, TrustedDevice};
-use domain::sync::{DeviceKey, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, SpaceId};
 
 use super::links::{self, fallback_name, is_trusted};
 use super::{Command, OfferChoice, Shared, runtime};
@@ -195,12 +195,14 @@ async fn revoke_trust<P: ProfileKey>(
             else {
                 return Ok(());
             };
-            let (origin, added_at) = known.map_or((TrustOrigin::Paired, now.clone()), |known| {
-                (known.origin, known.added_at)
-            });
+            let (origin, added_at, kind) = known.map_or(
+                (TrustOrigin::Paired, now.clone(), DeviceKind::Unknown),
+                |known| (known.origin, known.added_at, known.kind),
+            );
             trust.put_device(&TrustedDevice {
                 key: device,
                 name,
+                kind,
                 origin,
                 added_at,
                 revoked_at: Some(now),

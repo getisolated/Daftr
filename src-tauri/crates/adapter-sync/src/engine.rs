@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use app::ports::sync::{SyncEvents, SyncStatus};
 use app::ports::trust::TrustStore;
-use domain::sync::{DeviceKey, DeviceName, PairingCode, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName, PairingCode, SpaceId};
 use tokio::runtime::Handle;
 use tokio::sync::watch;
 
@@ -77,6 +77,8 @@ impl Default for Timings {
 pub struct EngineConfig {
     /// Nom de cet appareil (réglage, nom d'hôte par défaut).
     pub device_name: DeviceName,
+    /// Type de cet appareil, annoncé dans `Hello`.
+    pub device_kind: DeviceKind,
     /// Port d'écoute (0 : choisi par le système, pour les tests).
     pub port: u16,
     /// Adresses d'écoute : toutes les interfaces par défaut.
@@ -88,10 +90,12 @@ pub struct EngineConfig {
 }
 
 impl EngineConfig {
-    /// La configuration de l'application : port 47820, toutes interfaces, réseau local seul.
+    /// La configuration de l'application : port 47820, toutes interfaces, réseau local seul,
+    /// type d'appareil inconnu.
     pub fn new(device_name: DeviceName) -> Self {
         Self {
             device_name,
+            device_kind: DeviceKind::Unknown,
             port: DEFAULT_PORT,
             bind: vec![
                 IpAddr::V6(Ipv6Addr::UNSPECIFIED),

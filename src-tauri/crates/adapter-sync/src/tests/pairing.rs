@@ -4,9 +4,9 @@
 use std::time::Duration;
 
 use app::ports::sync::SyncEvent;
-use domain::sync::{DeviceKey, PairingCode};
+use domain::sync::{DeviceKey, DeviceKind, PairingCode};
 
-use super::support::{contents, device, eventually, space, write_note};
+use super::support::{contents, device, device_of_kind, eventually, space, write_note};
 use crate::{
     Error, Fingerprint, MAX_FAILURES, MemoryNetwork, OfferChoice, PairingState, PairingUri,
 };
@@ -14,6 +14,34 @@ use crate::{
 fn wrong(code: &PairingCode) -> PairingCode {
     let number: u32 = code.as_str().parse().unwrap();
     PairingCode::from_number((number + 1) % 1_000_000).unwrap()
+}
+
+/// Chaque appareil garde le type annoncé par l'autre dans `Hello`, dès l'appairage.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn linked_devices_remember_the_kind_of_each_other() {
+    let network = MemoryNetwork::new();
+    let a = device_of_kind(&network, "Bureau", DeviceKind::Desktop);
+    let b = device_of_kind(&network, "Portable", DeviceKind::Laptop);
+    a.create_space("travail", space(1));
+
+    let ticket = a
+        .engine
+        .start_pairing(vec!["travail".to_owned()])
+        .await
+        .unwrap();
+    b.engine.pair_with_code(ticket.code, None).await.unwrap();
+
+    let kind_of = |device: &super::support::Device, other: DeviceKey| {
+        device.trust.device(&other).map(|trusted| trusted.kind)
+    };
+    eventually("type de B connu de A", || {
+        kind_of(&a, b.key()) == Some(DeviceKind::Laptop)
+    })
+    .await;
+    eventually("type de A connu de B", || {
+        kind_of(&b, a.key()) == Some(DeviceKind::Desktop)
+    })
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

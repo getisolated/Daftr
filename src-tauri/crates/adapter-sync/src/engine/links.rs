@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use app::ports::trust::{TrustOrigin, TrustedDevice};
-use domain::sync::{DeviceKey, DeviceName};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName};
 use tokio::net::TcpStream;
 
 use super::Shared;
@@ -326,6 +326,8 @@ pub(super) async fn reconcile_trust<P: ProfileKey>(shared: &Shared<P>) -> Result
                 trust.put_device(&TrustedDevice {
                     key: member.key,
                     name,
+                    // Connu par un profil commun : son type arrivera avec son premier `Hello`
+                    kind: DeviceKind::Unknown,
                     origin: TrustOrigin::Space,
                     added_at: now.clone(),
                     revoked_at: None,
