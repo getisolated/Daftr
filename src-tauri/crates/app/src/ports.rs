@@ -3,6 +3,7 @@
 //! Les implémentations sont synchrones et partagées entre threads (`Send + Sync`).
 
 mod profiles;
+pub mod sync;
 
 pub use profiles::{NoteImporter, PasswordHasher, ProfileFiles, ProfileRegistryStore};
 
@@ -15,6 +16,8 @@ use domain::settings::{AppSettings, RawSettings};
 
 use crate::AppResult;
 use crate::collections::CollectionEvent;
+
+pub use sync::{SyncEvents, SyncProfiles, SyncStore};
 
 /// Stockage des notes.
 pub trait NoteStore: Send + Sync {
