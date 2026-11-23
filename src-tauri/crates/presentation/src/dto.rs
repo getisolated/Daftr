@@ -10,6 +10,7 @@ mod mcp;
 mod note;
 mod profile;
 mod settings;
+mod sync;
 mod update;
 
 pub use collection::{
@@ -21,4 +22,10 @@ pub use mcp::{McpErrorKind, McpState, McpStatusDto};
 pub use note::{ExportProgressDto, ExportedNoteDto, NoteChangesDto, NoteDto};
 pub use profile::{ProfileDto, ProfilesStateDto, TransferResultDto};
 pub use settings::{OverlayPositionDto, SettingsDto, SettingsUpdateResultDto};
+pub use sync::{
+    InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, OfferReceivedDto, PairingStateDto,
+    PairingTicketDto, ProfileOfferDto, ProfileSyncDto, SharedProfileDto, SpaceDeviceDto,
+    SyncProgressDto, SyncStateDto, SyncStatusDto, SyncStatusKind, SyncedProfileDto, TrustOriginDto,
+    TrustedDeviceDto,
+};
 pub use update::{UpdateInfoDto, UpdateProgressDto};

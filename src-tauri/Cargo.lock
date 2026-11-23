@@ -1181,6 +1181,7 @@ dependencies = [
  "adapter-password",
  "adapter-print",
  "adapter-sqlite",
+ "adapter-sync",
  "anyhow",
  "app",
  "domain",
@@ -1199,6 +1200,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tempfile",
+ "tokio",
  "tracing",
  "window-vibrancy",
 ]

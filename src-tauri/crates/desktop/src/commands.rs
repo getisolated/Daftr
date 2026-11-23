@@ -12,6 +12,7 @@ mod notes;
 mod profiles;
 mod settings;
 mod shell;
+mod sync;
 mod updates;
 
 use tauri::ipc::Invoke;
@@ -75,5 +76,20 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         updates::update_apply,
         shell::shell_open_external,
         clipboard::clipboard_read_text,
+        sync::sync_state,
+        sync::sync_devices,
+        sync::sync_profile,
+        sync::sync_start_pairing,
+        sync::sync_stop_pairing,
+        sync::sync_pair,
+        sync::sync_answer_offer,
+        sync::sync_offer_profile,
+        sync::sync_stop_sharing,
+        sync::sync_remove_device,
+        sync::sync_set_profile_enabled,
+        sync::sync_now,
+        sync::sync_set_paused,
+        sync::sync_set_device_name,
+        sync::sync_set_port,
     ]
 }

@@ -26,3 +26,17 @@ pub const UPDATE_DOWNLOAD_FAILED: &str = "update:download-failed";
 pub const EXPORT_PROGRESS: &str = "export:progress";
 /// Le profil actif a changé (ou vient d'être déverrouillé) : la fenêtre se recharge.
 pub const PROFILE_CHANGED: &str = "profiles:changed";
+/// Notes modifiées par un autre appareil (charge utile : `NotesSyncedDto`).
+pub const SYNC_NOTES_SYNCED: &str = "sync:notes-synced";
+/// État de la synchronisation (charge utile : `SyncStatusDto`).
+pub const SYNC_STATUS: &str = "sync:status";
+/// Avancement de la synchronisation initiale (charge utile : `SyncProgressDto`).
+pub const SYNC_PROGRESS: &str = "sync:progress";
+/// Synchronisation initiale terminée (charge utile : `InitialSyncDoneDto`).
+pub const SYNC_INITIAL_DONE: &str = "sync:initial-done";
+/// Appareil lié (charge utile : `LinkedDeviceDto`).
+pub const SYNC_DEVICE_LINKED: &str = "sync:device-linked";
+/// Offre de profils reçue (charge utile : `OfferReceivedDto`).
+pub const SYNC_OFFER_RECEIVED: &str = "sync:offer-received";
+/// Mode appairage : nouveau code ou fin (charge utile : `PairingStateDto`).
+pub const SYNC_PAIRING: &str = "sync:pairing";
