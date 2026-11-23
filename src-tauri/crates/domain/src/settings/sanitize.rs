@@ -1,9 +1,10 @@
 //! Validation des réglages non fiables.
 
 use super::{
-    AppSettings, FormattingBarMode, FormattingBarPosition, FormattingBarStyle, LineBreaks, MCP_MAX_PORT,
-    MCP_MIN_PORT, OVERLAY_MAX_HEIGHT, OVERLAY_MAX_WIDTH, OVERLAY_MIN_HEIGHT, OVERLAY_MIN_WIDTH,
-    RawPosition, RawSettings, ShortcutMode, ThemeId, ThemeKind, ThemePreference, is_mcp_token,
+    AppSettings, FormattingBarMode, FormattingBarPosition, FormattingBarStyle, LineBreaks,
+    MCP_MAX_PORT, MCP_MIN_PORT, OVERLAY_MAX_HEIGHT, OVERLAY_MAX_WIDTH, OVERLAY_MIN_HEIGHT,
+    OVERLAY_MIN_WIDTH, RawPosition, RawSettings, ShortcutMode, ThemeId, ThemeKind, ThemePreference,
+    is_mcp_token,
 };
 use crate::i18n::Language;
 use crate::overlay::Position;
