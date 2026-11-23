@@ -3,10 +3,12 @@
 use super::{
     AppSettings, FormattingBarMode, FormattingBarPosition, FormattingBarStyle, MCP_MAX_PORT,
     MCP_MIN_PORT, OVERLAY_MAX_HEIGHT, OVERLAY_MAX_WIDTH, OVERLAY_MIN_HEIGHT, OVERLAY_MIN_WIDTH,
-    RawPosition, RawSettings, ShortcutMode, ThemeId, ThemeKind, ThemePreference, is_mcp_token,
+    RawPosition, RawSettings, SYNC_MAX_PORT, SYNC_MIN_PORT, ShortcutMode, ThemeId, ThemeKind,
+    ThemePreference, is_mcp_token,
 };
 use crate::i18n::Language;
 use crate::overlay::Position;
+use crate::sync::DeviceName;
 use crate::text::round_half_up;
 
 const MAX_EXCLUDES: usize = 100;
@@ -25,6 +27,7 @@ pub fn sanitize_settings(raw: &RawSettings, base: &AppSettings) -> AppSettings {
     apply_appearance(raw, &mut settings);
     apply_editor(raw, &mut settings);
     apply_mcp(raw, &mut settings);
+    apply_sync(raw, &mut settings);
     settings
 }
 
@@ -128,6 +131,23 @@ fn apply_mcp(raw: &RawSettings, settings: &mut AppSettings) {
     if let Some(token) = raw.mcp_token.as_deref().filter(|token| is_mcp_token(token)) {
         settings.mcp_token = token.to_owned();
     }
+}
+
+/// Nom vide : le nom d'hôte ; sinon un nom d'appareil valide, ou la valeur actuelle.
+fn apply_sync(raw: &RawSettings, settings: &mut AppSettings) {
+    let (min, max) = (u32::from(SYNC_MIN_PORT), u32::from(SYNC_MAX_PORT));
+
+    if let Some(name) = raw.sync_device_name.as_deref() {
+        if name.trim().is_empty() {
+            settings.sync_device_name = String::new();
+        } else if let Some(valid) = DeviceName::parse(name) {
+            settings.sync_device_name = valid.as_str().to_owned();
+        }
+    }
+    // Borné à [SYNC_MIN_PORT, SYNC_MAX_PORT] : la conversion en u16 ne peut pas échouer
+    let port = clamp_size(raw.sync_port, min, max, u32::from(settings.sync_port));
+    settings.sync_port = u16::try_from(port).unwrap_or(settings.sync_port);
+    settings.sync_paused = raw.sync_paused.unwrap_or(settings.sync_paused);
 }
 
 fn parsed<T: Copy>(value: &Option<String>, parse: impl Fn(&str) -> Option<T>, fallback: T) -> T {

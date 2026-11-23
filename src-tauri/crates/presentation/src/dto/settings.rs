@@ -95,6 +95,12 @@ pub struct SettingsDto {
     /// Jeton du serveur MCP (généré par le processus principal), vide s'il n'a jamais été
     /// activé.
     pub mcp_token: String,
+    /// Nom de cet appareil pour la synchronisation, vide pour le nom d'hôte.
+    pub sync_device_name: String,
+    /// Port d'écoute de la synchronisation.
+    pub sync_port: u16,
+    /// Synchronisation en pause.
+    pub sync_paused: bool,
 }
 
 impl From<&AppSettings> for SettingsDto {
@@ -134,6 +140,9 @@ impl From<&AppSettings> for SettingsDto {
             mcp_enabled: settings.mcp_enabled,
             mcp_port: settings.mcp_port,
             mcp_token: settings.mcp_token.clone(),
+            sync_device_name: settings.sync_device_name.clone(),
+            sync_port: settings.sync_port,
+            sync_paused: settings.sync_paused,
         }
     }
 }

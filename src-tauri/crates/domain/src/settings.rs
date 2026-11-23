@@ -33,6 +33,12 @@ pub const MCP_MIN_PORT: u16 = 1024;
 pub const MCP_MAX_PORT: u16 = 65535;
 /// Longueur du jeton du serveur MCP : 32 octets aléatoires en hexadécimal minuscule.
 pub const MCP_TOKEN_LENGTH: usize = 64;
+/// Port par défaut de la synchronisation entre appareils.
+pub const DEFAULT_SYNC_PORT: u16 = 47_820;
+/// Plus petit port accepté pour la synchronisation (hors des ports réservés au système).
+pub const SYNC_MIN_PORT: u16 = 1024;
+/// Plus grand port accepté pour la synchronisation.
+pub const SYNC_MAX_PORT: u16 = 65535;
 
 /// Réglages complets et valides.
 #[derive(Debug, Clone, PartialEq)]
@@ -106,6 +112,13 @@ pub struct AppSettings {
     /// Jeton exigé par le serveur MCP (`Authorization: Bearer …`) ; vide tant que le
     /// serveur n'a jamais été activé. Seul le processus principal le génère.
     pub mcp_token: String,
+    /// Nom de cet appareil pour la synchronisation ; vide : le nom d'hôte (résolu au lancement,
+    /// hors du domaine). Sinon un [`crate::sync::DeviceName`] valide.
+    pub sync_device_name: String,
+    /// Port d'écoute TCP de la synchronisation, toutes interfaces du réseau local.
+    pub sync_port: u16,
+    /// Pause globale de la synchronisation : ni écoute, ni annonce, ni connexion.
+    pub sync_paused: bool,
 }
 
 impl AppSettings {
@@ -164,6 +177,9 @@ impl Default for AppSettings {
             mcp_enabled: false,
             mcp_port: DEFAULT_MCP_PORT,
             mcp_token: String::new(),
+            sync_device_name: String::new(),
+            sync_port: DEFAULT_SYNC_PORT,
+            sync_paused: false,
         }
     }
 }
