@@ -10,7 +10,7 @@
 Daftr synchronise les notes d'un même utilisateur entre ses appareils, **en réseau local uniquement** : aucun serveur, aucun trafic Internet. Deux appareils échangent quand ils sont allumés en même temps sur le même réseau.
 
 - **Confiance** : établie une fois par **appairage** (code à 6 chiffres, QR code, `IP:port` en repli). Elle est transitive au sein d'un profil partagé : un appareil ajouté par un membre se synchronise avec tous les autres.
-- **Profils synchronisés** : choisis profil par profil et appareil par appareil. Tous les profils synchronisés tournent, actifs ou non, verrouillés compris (la base n'est pas chiffrée).
+- **Profils synchronisés** : choisis profil par profil et appareil par appareil, sans interrupteur : un profil est synchronisé dès qu'il est partagé avec un appareil. Tous les profils synchronisés tournent, actifs ou non, verrouillés compris (la base n'est pas chiffrée).
 - **Automatique et en temps réel**, avec pause globale et « Synchroniser maintenant ». Synchronisation complète dès l'appairage ou l'acceptation d'un profil.
 - **Pas de dialogue de conflit** : chaque note est un document CRDT (`yrs`, format Yjs), fusionné caractère par caractère. La note ouverte reçoit les modifications sans perdre la saisie en cours.
 - **Coût nul sans profil synchronisé** : ni écoute, ni annonce, ni thread ; seule trace, `sync/device.key`.
@@ -20,7 +20,8 @@ Daftr synchronise les notes d'un même utilisateur entre ses appareils, **en ré
 
 | Crate | Rôle dans la synchronisation | Fichiers clés |
 |---|---|---|
-| `domain` | Types purs : `SpaceId`, `DeviceKey`, `DeviceName`, `PairingCode`, `DocId`, `Uuid` (v4/v5 maison), dossier par défaut dérivé, purge à 30 jours, réglages `syncDeviceName` / `syncPort` / `syncPaused`, `NoteChanges::base` | [`domain/src/sync.rs`](../../src-tauri/crates/domain/src/sync.rs), [`domain/src/note.rs`](../../src-tauri/crates/domain/src/note.rs) |
+| `platform` | Présence d'une batterie système (`power`), pour le type de l'appareil | [`platform/src/power.rs`](../../src-tauri/crates/platform/src/power.rs) |
+| `domain` | Types purs : `SpaceId`, `DeviceKey`, `DeviceName`, `DeviceKind`, `PairingCode`, `DocId`, `Uuid` (v4/v5 maison), dossier par défaut dérivé, purge à 30 jours, réglages `syncDeviceName` / `syncPort` / `syncPaused`, `NoteChanges::base` | [`domain/src/sync.rs`](../../src-tauri/crates/domain/src/sync.rs), [`domain/src/note.rs`](../../src-tauri/crates/domain/src/note.rs) |
 | `app::sync` | CRDT pur, sans I/O : documents de note et d'espace, projection déterministe, fusion d'un profil existant, diff texte → opérations, fusion à trois voies d'un texte | [`app/src/sync/`](../../src-tauri/crates/app/src/sync/) |
 | `app::ports` | Ports `SyncStore`, `SyncProfiles`, `SyncEvents`, `TrustStore` ; doublures en mémoire (feature `testing`) | [`app/src/ports/sync.rs`](../../src-tauri/crates/app/src/ports/sync.rs), [`app/src/ports/trust.rs`](../../src-tauri/crates/app/src/ports/trust.rs) |
 | `adapter-sqlite` | Migration, blobs CRDT tenus à jour par chaque écriture, `seq`, curseurs, `apply_remote` et projection en transaction, `adopt_space`, rebase des enregistrements | [`adapter-sqlite/src/sync/`](../../src-tauri/crates/adapter-sqlite/src/sync/) |
@@ -40,7 +41,7 @@ Pile : `yrs` 0.28 (`OffsetKind::Utf16`), `similar` (diff), `snow` (`Noise_XX_255
 | Fichier | Contenu |
 |---|---|
 | `device.key` | Clé statique x25519 (32 octets bruts). L'identifiant de l'appareil est sa clé publique. `0600` sous Unix, ACL « utilisateur seul » (`icacls`) sous Windows. Créée au premier lancement, même sans synchronisation |
-| `devices.json` | Appareils de confiance : clé, nom, origine (`paired` / `space`), ajout, `revoked_at` |
+| `devices.json` | Appareils de confiance : clé, nom, type (`laptop` / `desktop` / `unknown`, absent des fichiers plus anciens : `unknown`), origine (`paired` / `space`), ajout, `revoked_at` |
 | `index.json` | Cache `space_id → profil`, reconstruit au démarrage depuis les bases |
 
 Écriture atomique (fichier voisin puis renommage). Lecture tolérante : JSON illisible → liste vide et copie `.corrupted` ; clé illisible mise de côté, nouvelle identité ; une révocation n'est jamais perdue.
@@ -99,7 +100,7 @@ Bases utilisées :
 
 - Une écoute TCP par installation, port `syncPort` (47820 par défaut), toutes interfaces.
 - **Toute IP source non privée est refusée avant le handshake** (RFC 1918, `169.254/16`, `fc00::/7`, `fe80::/10`, loopback pour les tests). Le moteur ne compose jamais une adresse non privée, même saisie.
-- Noise `XX_25519_ChaChaPoly_BLAKE2s`, messages `postcard` découpés en trames Noise, 16 Mio maximum vérifiés avant allocation. Premier message : `Open(Pair | Sync)`. Version de protocole 1.
+- Noise `XX_25519_ChaChaPoly_BLAKE2s`, messages `postcard` découpés en trames Noise, 16 Mio maximum vérifiés avant allocation. Premier message : `Open(Pair | Sync)`. Version de protocole 1 (inchangée par l'ajout du type d'appareil, voir plus bas).
 - Découverte mDNS `_daftr-sync._tcp.local.` : TXT avec empreinte de la clé publique et version ; `pairing=1` et nom pendant un appairage. **Jamais de code ni de `space_id`.** Détection périodique d'IP de `mdns-sd` coupée ; annonce refaite sur changement de réseau.
 
 ### Appairage
@@ -115,11 +116,21 @@ Offre ultérieure (« Synchroniser avec… » dans les réglages du profil) : en
 ### Session `Sync`
 
 - **Une connexion par paire d'appareils**, pour tous leurs profils communs. Clé distante connue et non révoquée exigée. En cas de collision, l'appareil à la plus petite clé initie.
-- `Hello` : chaque côté n'annonce que les espaces où l'autre est membre non révoqué ; on synchronise l'intersection, moins les profils désactivés.
+- `Hello` : version, nom, espaces et **type d'appareil**. Chaque côté n'annonce que les espaces où l'autre est membre non révoqué ; on synchronise l'intersection, moins les profils désactivés (drapeau `enabled` gardé côté moteur, sans interrupteur dans l'interface).
 - **Rattrapage** par espace, dans chaque sens : `Changed` (documents avec `seq > acked_seq`, `space` en premier) → `Diffs` → `Updates` → `Done {seq}` → `Ack {seq}`. Application par lots de 200 documents (4 Mio) par transaction, événements regroupés. Premier contact : tout est échangé.
 - **Temps réel** : chaque écriture locale (éditeur, MCP, overlay) appelle `local_change` ; après 1 s de regroupement, un rattrapage ciblé part vers les appareils connectés. Après `apply_remote`, la session relaie aux autres sessions (A→B→C), sauf à celle d'origine.
 - **Déclencheurs**, sans polling réseau : fin d'appairage ou offre acceptée, apparition mDNS d'un appareil de confiance, changement de réseau (adresses locales relues toutes les 30 s quand la synchronisation tourne), écriture locale, « Synchroniser maintenant ». Échec : backoff de 30 s à 10 min vers `last_addr`.
 - **Pause** : connexions fermées, écoute et annonce arrêtées ; les modifications partent à la reprise.
+
+### Type d'appareil
+
+- `Hello` porte en dernier champ le type de l'émetteur, un octet : 0 inconnu, 1 portable, 2 fixe (téléphone, tablette : codes suivants).
+- **Pas de changement de `PROTOCOL_VERSION`** : une version antérieure ignore l'octet en trop (postcard ne vérifie pas la fin du message), et un `Hello` sans cet octet, ou avec un code inconnu, se lit « inconnu ». Les deux versions continuent de se synchroniser ; la changer aurait coupé la synchronisation entre versions pour une simple icône.
+- Détection locale au démarrage (`platform::power`), d'après la présence d'une batterie système : portable avec, fixe sans, inconnu si la détection échoue.
+  - Windows : `GetSystemPowerStatus` (`BatteryFlag` 128 : pas de batterie ; 255 : inconnu). Seul `unsafe` du crate, documenté.
+  - Linux : une entrée `BAT*` ou de type `Battery` dans `/sys/class/power_supply`, hors périphériques (`scope` = `Device`) ; dossier illisible : inconnu.
+  - macOS : `InternalBattery` dans `/usr/bin/pmset -g batt` (`hw.model` ne distingue pas les Mac Apple Silicon portables).
+- Le type reçu est gardé avec l'appareil de confiance (`devices.json`) à chaque `Hello`, par une lecture-écriture indivisible (`TrustStore::set_device_kind`) : une révocation écrite entre-temps n'est jamais perdue. Un appareil connu par un profil commun reste « inconnu » jusqu'à son premier `Hello`.
 
 ### Révocations
 
@@ -134,14 +145,13 @@ Offre ultérieure (« Synchroniser avec… » dans les réglages du profil) : en
 | Commande | Paramètres | Rend |
 |---|---|---|
 | `sync_state` | — | `SyncStateDto` (statut, clé et nom de l'appareil, port, port d'écoute, pause, profils synchronisés) |
-| `sync_devices` | — | `TrustedDeviceDto[]` (présent, connecté, profils partagés avec `lastSyncAt`) |
-| `sync_profile` | `profileId` | `ProfileSyncDto` (espace, activation, membres) |
+| `sync_devices` | — | `TrustedDeviceDto[]` (type, empreinte, présent, connecté, profils partagés avec `lastSyncAt`) |
+| `sync_profile` | `profileId` | `ProfileSyncDto` (espace, membres avec type et empreinte) |
 | `sync_start_pairing` / `sync_stop_pairing` | `profileIds[]` / — | `PairingTicketDto` (code, uri, `qrSvg`, `expiresAt`) / — |
 | `sync_pair` | `code`, `address?` (`IP:port`, `[IPv6]:port`, IP seule) | `LinkedDeviceDto` |
 | `sync_answer_offer` | `deviceKey`, `spaceId`, `choice` (`new` / `merge` / `ignore`), `profileId?` | — |
 | `sync_offer_profile`, `sync_stop_sharing` | `profileId`, `deviceKey` | — |
 | `sync_remove_device` | `deviceKey` | — |
-| `sync_set_profile_enabled` | `profileId`, `enabled` | — |
 | `sync_now` | — | — |
 | `sync_set_paused`, `sync_set_device_name`, `sync_set_port` | valeur | `SyncStateDto` |
 | `notes_restore` | `id` | la note rétablie (note supprimée sur un autre appareil) |
@@ -156,7 +166,11 @@ Réglages de l'appareil (`settings.json`, appliqués à chaud) : `syncDeviceName
 
 - **Réglages → Synchronisation** : état et « Synchroniser maintenant », nom de l'appareil, port, pause ; « Lier un appareil » (profils, QR, code, compte à rebours, adresses pour la saisie manuelle) ; « Se lier à un appareil » (code, `IP:port`) ; appareils de confiance (présent / connecté / absent, profils, dernière synchro, « Retirer »).
 - **Dialogue des profils proposés** : destination par profil, puis « Synchronisation initiale : 120 / 450 notes ».
-- **Réglages du profil** : activer, « Synchronisé avec : … », « Synchroniser avec… », « Arrêter avec X ». Appliqués tout de suite.
+- **Réglages du profil** : une ligne « Appareils et synchronisations » (même présentation que « Définir un mot de passe maître », cachée à la création d'un profil) remplace le contenu du dialogue par une sous-vue, avec un retour (bouton ou Échap) qui garde les champs saisis. Pas d'Enregistrer / Supprimer / Annuler dans la sous-vue : tout s'applique tout de suite.
+  - En haut, un QR code centré et grand, le code à 6 chiffres dessous, puis le compte à rebours en petit. Ouvrir la sous-vue ouvre le mode appairage pour ce profil (`startPairing([profil])`, qui lui crée un espace au besoin) ; après une liaison ou à l'expiration, un nouveau code est demandé tout seul. Quitter la sous-vue (retour, Échap, fermeture du dialogue) ferme le mode. Chargement et erreur (avec « Réessayer ») à la place du code.
+  - Un seul écran ouvre le mode à la fois : le service retient qui l'a ouvert (`settings` / `profile`), chaque écran n'affiche et ne ferme que le sien, et seule la sous-vue renouvelle le code.
+  - « Saisir le code d'un autre appareil » remplace le code par la saisie (code, adresse facultative), le composant partagé avec Réglages → Synchronisation ; le mode appairage de cet appareil est fermé pendant la saisie.
+  - Dessous, les appareils avec lesquels le profil est synchronisé : icône du type (portable, écran, appareil générique), nom, et dessous un identifiant court, les 8 premiers chiffres de l'empreinte de la clé (`4F2A-9C1B`) ; « Arrêter » (confirmation) ne retire l'appareil que de ce profil. « Synchroniser avec… » propose le profil à un appareil déjà lié.
 - **Indicateur** dans le pied de la barre latérale (en pause, à jour, synchronisation…, aucun appareil sur ce réseau, erreur avec la cause en tooltip). Caché sans profil synchronisé.
 - **Notifications** in-app : appareil lié, offre reçue (« Choisir »), synchronisation initiale terminée.
 - **Éditeur** : la note ouverte reçoit les modifications par une transaction minimale (curseurs et sélections mappés, hors historique d'annulation), rebasées sur la saisie non enregistrée ; badge « Modifié depuis <appareil> » 8 s. Même chemin pour le MCP. Note ouverte supprimée ailleurs : lecture seule, bandeau et « Restaurer » (la saisie non enregistrée est gardée).
@@ -212,6 +226,8 @@ Intégration et interface :
 - Port et pause par les contrôles génériques des réglages (`settings_set`).
 - Progression en documents (notes + document `space`) affichée comme « notes ».
 - Pas de notification système : notifications dans l'interface.
+- Pas d'activation par profil : un profil est synchronisé dès qu'il est partagé (commande `sync_set_profile_enabled` retirée). Le drapeau `enabled` reste dans la base et le moteur ; l'appairage et les offres le remettent à vrai.
+- L'identifiant affiché sous le nom d'un appareil est le début de l'empreinte de sa clé, pas l'adresse MAC : le protocole ne la connaît pas, et elle change selon le réseau Wi-Fi (adresse aléatoire) et la carte réseau.
 
 ## 10. Limites connues et points d'attention
 
@@ -222,19 +238,23 @@ Intégration et interface :
 - Profil non synchronisé : pas de fusion côté backend (comportement v1.7.0) ; l'éditeur fusionne toujours ce que le MCP écrit, sauf si l'écriture tombe pendant un enregistrement en vol.
 - Une modification distante arrivée pendant un enregistrement s'affiche à la réponse de celui-ci (au plus le temps d'un enregistrement).
 - Backoff limité à `last_addr` ; interfaces virtuelles (Hyper-V, WSL, VPN) écartées par heuristique de noms.
-- La confirmation « Arrêter avec X » s'ouvre au-dessus du dialogue du profil : Échap ferme les deux.
+- Ouvrir « Appareils et synchronisations » crée l'espace du profil (comme « Lier un appareil ») : le moteur démarre et l'indicateur apparaît même si aucun appareil ne rejoint.
+- Un profil désactivé avec l'ancienne case à cocher le reste jusqu'à l'ouverture de sa sous-vue ou à une offre (plus d'interrupteur pour le réactiver).
+- Le type d'un appareil n'est détecté qu'au démarrage, et seulement d'après la batterie : un fixe avec un onduleur vu comme batterie système passerait pour un portable.
 - `NSLocalNetworkUsageDescription` en anglais seulement.
 
-Non vérifié (à faire en recette sur deux PC réels) : critères d'acceptation 1 à 7 de la spec, invite et règles du pare-feu Windows (le hook est seulement compilé), autorisation « réseau local » de macOS, rendu des écrans, ordre réel des événements `sync:notes-synced` / `notes:changed`, historique d'annulation dans l'app, taille du binaire final.
+Non vérifié (à faire en recette sur deux PC réels) : critères d'acceptation 1 à 7 de la spec, invite et règles du pare-feu Windows (le hook est seulement compilé), autorisation « réseau local » de macOS, rendu des écrans (dont la sous-vue « Appareils et synchronisations » : QR code, renouvellement du code, retour, Échap), détection du type sous Linux et macOS, ordre réel des événements `sync:notes-synced` / `notes:changed`, historique d'annulation dans l'app, taille du binaire final.
 
 ## 11. Tests
 
 - **Données** (`adapter-sqlite`) : migration sur fixture, soft delete et FTS, blobs tenus à jour, échanges entre bases (mêmes lignes), fusion d'un profil existant, base restaurée, enregistrement en vol rejoué sur la modification distante, profil non synchronisé inchangé.
 - **CRDT** (`app`) : convergence (propriété, N appareils, ordre aléatoire, doublons), contenu exact (UTF-16, emojis, CRLF), suppression contre modification, dossiers et cycles, fusion à trois voies (propriété : éditions disjointes toutes gardées ; base = courant → texte reçu ; idempotence).
-- **Protocole** (`adapter-sync`) : appairage (bon et mauvais code, appairages simultanés, 10 échecs, expiration, QR d'une autre empreinte), sessions multi-espaces A/B/C, propagation transitive, offres différées, refus d'IP non privée et de clé révoquée, message trop gros, pause et reprise.
+- **Protocole** (`adapter-sync`) : `Hello` avec type (aller-retour, `Hello` sans type ou de code inconnu lu « inconnu », lu par une version antérieure), type gardé par les deux appareils après l'appairage, appairage (bon et mauvais code, appairages simultanés, 10 échecs, expiration, QR d'une autre empreinte), sessions multi-espaces A/B/C, propagation transitive, offres différées, refus d'IP non privée et de clé révoquée, message trop gros, pause et reprise.
+- **Fichiers** (`adapter-fs`) : `devices.json` sans type (ancien) ou de type inconnu, type enregistré et mis à jour.
+- **Plateforme** (`platform`) : lecture de `BatteryFlag`, de `sysfs` (dossier temporaire) et de `pmset` ; repli « inconnu ».
 - **Intégration** (`desktop`) : fichiers `sync/`, `SyncProfiles`, démarrage sans rien qui tourne, et bout en bout à trois installations sur loopback.
 - **MCP** : `update_note` garde ce qui a changé depuis la lecture de l'IA.
-- **Front** (vitest) : diff minimal, fusion à trois voies dans l'éditeur, curseur mappé, historique, statuts, erreurs traduites, compte à rebours, destinations, notifications.
+- **Front** (vitest) : diff minimal, fusion à trois voies dans l'éditeur, curseur mappé, historique, statuts, erreurs traduites, compte à rebours, destinations, notifications, identifiant court, icône par type, renouvellement du code.
 
 ## 12. Phases ultérieures
 
