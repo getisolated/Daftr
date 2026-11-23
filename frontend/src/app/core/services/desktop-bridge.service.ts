@@ -4,7 +4,7 @@ import type { FolderDto } from '../bindings/FolderDto';
 import type { McpStatusDto } from '../bindings/McpStatusDto';
 import type { NoteDto } from '../bindings/NoteDto';
 import { Folder, FolderDeleteMode } from '../models/folder.model';
-import { Note } from '../models/note.model';
+import { Note, NoteUpdate } from '../models/note.model';
 import { UpdateInfo, UpdateProgress } from '../models/update.model';
 import { AppSettings, SettingsPatch, SettingsUpdateResult } from '../models/settings.model';
 import { call, inDesktop, subscribe } from './desktop-api';
@@ -96,7 +96,7 @@ export class DesktopBridgeService {
     return row ? mapRow(row) : null;
   }
 
-  async updateNote(id: number, data: { title?: string; content?: string; tags?: string[] }): Promise<Note | null> {
+  async updateNote(id: number, data: NoteUpdate): Promise<Note | null> {
     if (!this.available) return null;
     const changes = { ...data, tags: data.tags !== undefined ? JSON.stringify(data.tags) : undefined };
     const row = await call<NoteDto | null>('notes_update', { id, data: changes });

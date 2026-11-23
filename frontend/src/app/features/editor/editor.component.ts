@@ -102,9 +102,6 @@ const SAVE_DEBOUNCE_MS = 1000;
 /** How long "Changed on <device>" stays after the open note received changes from another device. */
 const REMOTE_CHANGE_BADGE_MS = 8000;
 
-/** Texts this editor saved last: a list read before one of these saves landed must not be merged back as news. */
-const RECENT_SAVES = 5;
-
 @Component({
   selector: 'app-editor',
   standalone: true,
@@ -280,8 +277,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
   /** Notes of the open tabs deleted on another device, shown again (read-only) when their tab comes back. */
   private readonly remoteDeletions = new Map<number, RemoteDeletion>();
   private readonly unsubscribeNotesSynced = this.sync.onNotesSynced(event => { void this.onNotesSynced(event); });
-  /** Texts of the open note saved last, newest last (see RECENT_SAVES). */
-  private recentSaves: string[] = [];
+  /** Saves started so far: a read overtaken by a save is left to the save's answer, which is newer. */
+  private saveCount = 0;
+  private savesInFlight = 0;
+  /** The writes, one at a time and in order: each save is built on the previous one. */
+  private writeQueue: Promise<unknown> = Promise.resolve();
+  /** The open note changed while a save was in flight: read again once the saves are answered. */
+  private refreshPending = false;
   /** A profile switch reloads the window: the edit still waiting for its debounce is written first. */
   private readonly unregisterPendingSave = inject(PendingSavesService).register(() => this.flushPendingSave());
 
@@ -585,7 +587,6 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.hideRemoteChange();
       this.remoteDeletion.set(deletion);
       this.restoreError.set(null);
-      this.recentSaves = [];
       let note: Note | null;
 
       if (id === QUICK_NOTES_TAB_ID) {
@@ -1011,7 +1012,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   private quickNoteHandlers(): QuickNoteHandlers {
     return {
-      save: (id, text) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text) }); },
+      save: (id, text, base) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text), base }); },
       remove: id => { void this.notes.delete(id); },
       copy: text => { void navigator.clipboard.writeText(text); },
       convert: id => this.convertQuickNote(id),
@@ -1303,11 +1304,18 @@ export class EditorComponent implements OnDestroy, OnChanges {
       return;
     }
 
+    const title = this.notes.extractTitle(content);
+    const previousTitle = this.notes.notes().find(n => n.id === id)?.title;
+    const open = this.activeNote();
+    // Built on the text loaded, saved or merged last: the backend keeps what changed since (another device's edit)
+    const base = open?.id === id ? open.content : undefined;
+    const save = ++this.saveCount;
+    // The next save is built on this one
+    this.activeNote.update(n => (n?.id === id ? { ...n, title, content } : n));
+    this.savesInFlight++;
+
     try {
-      const title = this.notes.extractTitle(content);
-      const previousTitle = this.notes.notes().find(n => n.id === id)?.title;
-      this.recentSaves = [...this.recentSaves.slice(1 - RECENT_SAVES), content];
-      await this.notes.update(id, { content, title });
+      const stored = await this.queueWrite(() => this.notes.update(id, { content, title, base }));
 
       if (previousTitle !== undefined && previousTitle !== title) {
         this.linkRename.notifyTitleChanged(id, previousTitle);
@@ -1315,10 +1323,28 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
       this.tabs.markDirty(id, false);
       this.tabs.updateTitle(id, title);
-      this.activeNote.update(n => n ? { ...n, title, content } : n);
+
+      // The stored text has the changes made elsewhere meanwhile; after a newer save, its answer brings them
+      if (stored && save === this.saveCount) {
+        this.mergeStoredNote(stored);
+      }
     } catch (err) {
       console.error('[Editor] Failed to save note:', err);
+
+      // Not written: the next save is built on the text stored before
+      if (save === this.saveCount && base !== undefined) {
+        this.activeNote.update(n => (n?.id === id && n.content === content ? { ...n, content: base } : n));
+      }
+    } finally {
+      this.savesInFlight--;
+      this.refreshAfterSaves();
     }
+  }
+
+  private queueWrite<T>(write: () => Promise<T>): Promise<T> {
+    const written = this.writeQueue.then(write);
+    this.writeQueue = written.catch(() => undefined);
+    return written;
   }
 
   /** A collection file shown as a note; unreadable (moved, deleted), it opens empty with a banner. */
@@ -1358,8 +1384,45 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     const stored = notes.find(n => n.id === open.id);
 
-    if (stored) {
+    // The list may have been read before one of our saves landed: the note is read again rather than trusted
+    if (stored && stored.content !== open.content) {
+      void this.refreshOpenNote();
+    }
+  }
+
+  /** Reads the open note again and merges it; while a save is in flight, once it is answered. */
+  private async refreshOpenNote(): Promise<void> {
+    const open = this.activeNote();
+
+    if (!open || open.id === QUICK_NOTES_TAB_ID || this.fileDocs.isFileDoc(open.id)) {
+      return;
+    }
+
+    const save = this.saveCount;
+    const busy = this.savesInFlight > 0;
+    const stored = busy ? null : await this.bridge.getNoteById(open.id);
+    this.mergeReadNote(stored, save, busy);
+  }
+
+  /**
+   * Merges the open note read when `save` saves had started (`busy`: one was in flight). A read that a save may have
+   * overtaken is dropped: a save started during the read answers with a newer text, and one in flight before it may
+   * have been written before the change, hence a new read once the saves are answered.
+   */
+  private mergeReadNote(stored: Note | null, save: number, busy: boolean): void {
+    if (busy) {
+      this.refreshPending = true;
+      this.refreshAfterSaves();
+    }
+    else if (stored && save === this.saveCount) {
       this.mergeStoredNote(stored);
+    }
+  }
+
+  private refreshAfterSaves(): void {
+    if (this.savesInFlight === 0 && this.refreshPending) {
+      this.refreshPending = false;
+      void this.refreshOpenNote();
     }
   }
 
@@ -1371,8 +1434,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const open = this.activeNote();
     const view = this.editorView;
 
-    // Nothing new since loaded or saved, or a list read before one of our saves landed (merging it would undo the save)
-    if (!open || !view || open.id !== stored.id || stored.content === open.content || this.recentSaves.includes(stored.content)) {
+    // Nothing new since loaded, saved or merged
+    if (!open || !view || open.id !== stored.id || stored.content === open.content) {
       return;
     }
 
@@ -1432,6 +1495,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
     const touched = this.notes.notes().filter(note => changed.has(note.uuid) && this.tabs.isOpen(note.id));
 
     for (const known of touched) {
+      const save = this.saveCount;
+      const busy = this.savesInFlight > 0;
       const stored = await this.bridge.getNoteById(known.id);
       const isOpen = this.activeNote()?.id === known.id;
 
@@ -1439,7 +1504,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         this.markRemotelyDeleted(isOpen ? this.shownNote() ?? known : known, event.deviceName);
       }
       else if (isOpen) {
-        this.mergeStoredNote(stored);
+        this.mergeReadNote(stored, save, busy);
         this.showRemoteChange(event.deviceName);
       }
       else {

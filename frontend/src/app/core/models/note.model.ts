@@ -20,6 +20,15 @@ export interface Note {
   updatedAt: string;
 }
 
+/** Fields of a note to change (absent: unchanged). */
+export interface NoteUpdate {
+  title?: string;
+  content?: string;
+  tags?: string[];
+  /** The text `content` was built on (last loaded or saved): in a synced profile, what changed since elsewhere is kept. */
+  base?: string;
+}
+
 export interface NotePreview {
   id: number;
   title: string;
