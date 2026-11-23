@@ -17,6 +17,15 @@ pub const NOTE_LINK_PREFIX: &str = "note://";
 /// Longueur de la forme canonique d'un uuid.
 const UUID_LENGTH: usize = 36;
 
+/// Cible d'un lien `note://…`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoteLinkTarget {
+    /// Identifiant local (ancien format, propre à une base).
+    Id(i64),
+    /// Uuid de la note.
+    Uuid(Uuid),
+}
+
 /// `content` dont chaque lien `note://<entier>` vers une note connue de `uuid_of` devient
 /// `note://<uuid>` ; `None` si rien n'a changé. Idempotente : les liens déjà en uuid et ceux
 /// vers une note inconnue restent tels quels.
@@ -32,6 +41,31 @@ const UUID_LENGTH: usize = 36;
 /// assert_eq!(rewrite_note_links(&rewritten, uuid_of), None);
 /// ```
 pub fn rewrite_note_links(content: &str, uuid_of: impl Fn(i64) -> Option<Uuid>) -> Option<String> {
+    replace_note_links(content, |target| match target {
+        NoteLinkTarget::Id(id) => uuid_of(id),
+        NoteLinkTarget::Uuid(_) => None,
+    })
+}
+
+/// `content` dont chaque lien `note://<uuid>` connu de `new_uuid` pointe vers le nouvel uuid
+/// (notes copiées ailleurs avec un nouvel uuid) ; `None` si rien n'a changé. Mêmes règles que
+/// [`rewrite_note_links`] pour le code.
+pub fn retarget_note_links(
+    content: &str,
+    new_uuid: impl Fn(Uuid) -> Option<Uuid>,
+) -> Option<String> {
+    replace_note_links(content, |target| match target {
+        NoteLinkTarget::Uuid(uuid) => new_uuid(uuid).filter(|new| *new != uuid),
+        NoteLinkTarget::Id(_) => None,
+    })
+}
+
+/// Remplace la cible de chaque lien hors code par l'uuid que rend `replace` (`None` : lien
+/// gardé tel quel).
+fn replace_note_links(
+    content: &str,
+    replace: impl Fn(NoteLinkTarget) -> Option<Uuid>,
+) -> Option<String> {
     let mut rewritten = String::with_capacity(content.len());
     let mut fence: Option<Fence> = None;
     let mut changed = false;
@@ -48,7 +82,7 @@ pub fn rewrite_note_links(content: &str, uuid_of: impl Fn(i64) -> Option<Uuid>) 
                 fence = Some(opening);
                 rewritten.push_str(line);
             }
-            (None, None) => changed |= rewrite_line(line, &uuid_of, &mut rewritten),
+            (None, None) => changed |= rewrite_line(line, &replace, &mut rewritten),
         }
     }
     changed.then_some(rewritten)
@@ -92,13 +126,17 @@ fn indented_at_most_three(line: &str) -> Option<&str> {
 
 /// Réécrit les liens d'une ligne hors bloc de code, en sautant le code en ligne. Rend `true`
 /// si un lien a changé.
-fn rewrite_line(line: &str, uuid_of: &impl Fn(i64) -> Option<Uuid>, out: &mut String) -> bool {
+fn rewrite_line(
+    line: &str,
+    replace: &impl Fn(NoteLinkTarget) -> Option<Uuid>,
+    out: &mut String,
+) -> bool {
     let mut changed = false;
     let mut rest = line;
 
     while !rest.is_empty() {
         let code = rest.find('`').unwrap_or(rest.len());
-        changed |= rewrite_text(&rest[..code], uuid_of, out);
+        changed |= rewrite_text(&rest[..code], replace, out);
         rest = &rest[code..];
 
         let span = inline_code_length(rest);
@@ -129,7 +167,11 @@ fn inline_code_length(text: &str) -> usize {
 }
 
 /// Réécrit les liens d'un texte sans code. Rend `true` si un lien a changé.
-fn rewrite_text(text: &str, uuid_of: &impl Fn(i64) -> Option<Uuid>, out: &mut String) -> bool {
+fn rewrite_text(
+    text: &str,
+    replace: &impl Fn(NoteLinkTarget) -> Option<Uuid>,
+    out: &mut String,
+) -> bool {
     let mut changed = false;
     let mut rest = text;
 
@@ -138,7 +180,8 @@ fn rewrite_text(text: &str, uuid_of: &impl Fn(i64) -> Option<Uuid>, out: &mut St
         out.push_str(&rest[..target_start]);
         rest = &rest[target_start..];
 
-        let (consumed, replacement) = link_target(rest, uuid_of);
+        let (consumed, target) = link_target(rest);
+        let replacement = target.and_then(replace);
         match replacement {
             Some(uuid) => {
                 out.push_str(&uuid.to_string());
@@ -152,14 +195,13 @@ fn rewrite_text(text: &str, uuid_of: &impl Fn(i64) -> Option<Uuid>, out: &mut St
     changed
 }
 
-/// La cible qui suit `note://` : longueur à consommer et uuid de remplacement, `None` pour
-/// une cible déjà en uuid, inconnue ou absente.
-fn link_target(target: &str, uuid_of: &impl Fn(i64) -> Option<Uuid>) -> (usize, Option<Uuid>) {
-    if target.get(..UUID_LENGTH).and_then(Uuid::parse).is_some() {
-        return (UUID_LENGTH, None);
+/// La cible qui suit `note://` et la longueur à consommer ; `None` sans cible lisible.
+fn link_target(text: &str) -> (usize, Option<NoteLinkTarget>) {
+    if let Some(uuid) = text.get(..UUID_LENGTH).and_then(Uuid::parse) {
+        return (UUID_LENGTH, Some(NoteLinkTarget::Uuid(uuid)));
     }
-    let digits = target.bytes().take_while(u8::is_ascii_digit).count();
-    let uuid = target[..digits].parse().ok().and_then(uuid_of);
+    let digits = text.bytes().take_while(u8::is_ascii_digit).count();
+    let id = text[..digits].parse().ok().map(NoteLinkTarget::Id);
 
-    (digits, uuid)
+    (digits, id)
 }

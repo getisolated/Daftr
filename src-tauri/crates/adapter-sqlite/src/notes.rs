@@ -1,4 +1,7 @@
 //! Requêtes sur les notes.
+//!
+//! Une note supprimée reste en base (suppression douce, `deleted_at`) : elle disparaît de
+//! toutes les lectures et de la recherche plein texte, et ne se modifie plus.
 
 use app::notes::tags;
 use app::ports::NoteStore;
@@ -7,19 +10,43 @@ use domain::note::{NewNote, Note, NoteChanges};
 use rusqlite::types::Value;
 use rusqlite::{OptionalExtension, params, params_from_iter};
 
-use crate::{SqliteStore, placeholders, rows, storage};
+use crate::{SqliteStore, placeholders, random_uuid, rows, storage};
 
-const ALL: &str = "SELECT * FROM notes ORDER BY updated_at DESC";
-const BY_ID: &str = "SELECT * FROM notes WHERE id = ?";
-const INSERT: &str = "INSERT INTO notes (title, content, tags, folder_id) VALUES (?, ?, ?, ?)";
-const SEARCH: &str = "SELECT notes.* FROM notes JOIN notes_fts ON notes.id = notes_fts.rowid \
-                      WHERE notes_fts MATCH ? ORDER BY rank";
-const BY_TAG: &str = "SELECT * FROM notes WHERE tags LIKE ? ESCAPE '\\' ORDER BY updated_at DESC";
+/// `SELECT` des colonnes lues par [`rows::note`] (jamais le blob CRDT, coûteux), suivi de
+/// `$rest`.
+macro_rules! select_notes {
+    ($rest:literal) => {
+        concat!(
+            "SELECT notes.id, notes.uuid, notes.title, notes.content, notes.tags, ",
+            "notes.folder_id, notes.sort_order, notes.color, notes.created_at, notes.updated_at ",
+            "FROM notes ",
+            $rest
+        )
+    };
+}
+
+const ALL: &str = select_notes!("WHERE notes.deleted_at IS NULL ORDER BY notes.updated_at DESC");
+const BY_ID: &str = select_notes!("WHERE notes.id = ? AND notes.deleted_at IS NULL");
+const SEARCH: &str = select_notes!(
+    "JOIN notes_fts ON notes.id = notes_fts.rowid \
+     WHERE notes_fts MATCH ? AND notes.deleted_at IS NULL ORDER BY rank"
+);
+const BY_TAG: &str = select_notes!(
+    "WHERE notes.tags LIKE ? ESCAPE '\\' AND notes.deleted_at IS NULL \
+     ORDER BY notes.updated_at DESC"
+);
+const INSERT: &str = "INSERT INTO notes (uuid, title, content, tags, folder_id, folder_uuid) \
+                      VALUES (?1, ?2, ?3, ?4, ?5, (SELECT uuid FROM folders WHERE id = ?5))";
 /// Une note qui change de dossier perd sa position : elle est listée après les positionnées.
 const SET_FOLDER: &str = "UPDATE notes SET folder_id = ?1, \
+                          folder_uuid = (SELECT uuid FROM folders WHERE id = ?1), \
                           sort_order = CASE WHEN folder_id IS ?1 THEN sort_order ELSE NULL END \
-                          WHERE id = ?2";
-const SET_POSITION: &str = "UPDATE notes SET sort_order = ? WHERE id = ? AND folder_id IS ?";
+                          WHERE id = ?2 AND deleted_at IS NULL";
+const SET_POSITION: &str = "UPDATE notes SET sort_order = ? \
+                            WHERE id = ? AND folder_id IS ? AND deleted_at IS NULL";
+const DELETE: &str = "UPDATE notes SET deleted_at = datetime('now') \
+                      WHERE id = ? AND deleted_at IS NULL";
+const TAG_COLUMNS: &str = "SELECT tags FROM notes WHERE deleted_at IS NULL";
 
 impl NoteStore for SqliteStore {
     fn all(&self) -> AppResult<Vec<Note>> {
@@ -36,10 +63,17 @@ impl NoteStore for SqliteStore {
     }
 
     fn insert(&self, note: &NewNote) -> AppResult<Note> {
+        let uuid = random_uuid()?;
         let id = {
             let connection = self.connection();
             let encoded = tags::encode(&note.tags);
-            let values = params![note.title, note.content, encoded, note.folder_id];
+            let values = params![
+                uuid.to_string(),
+                note.title,
+                note.content,
+                encoded,
+                note.folder_id
+            ];
             connection.execute(INSERT, values).map_err(storage)?;
             connection.last_insert_rowid()
         };
@@ -53,7 +87,7 @@ impl NoteStore for SqliteStore {
             return Ok(());
         }
         let sql = format!(
-            "UPDATE notes SET {}, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE notes SET {}, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
             assignments.join(", ")
         );
         values.push(Value::Integer(id));
@@ -87,15 +121,13 @@ impl NoteStore for SqliteStore {
 
     fn delete(&self, id: i64) -> AppResult<()> {
         let connection = self.connection();
-        connection
-            .execute("DELETE FROM notes WHERE id = ?", [id])
-            .map_err(storage)?;
+        connection.execute(DELETE, [id]).map_err(storage)?;
         Ok(())
     }
 
     fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {
         let sql = format!(
-            "UPDATE notes SET color = ? WHERE id IN ({})",
+            "UPDATE notes SET color = ? WHERE id IN ({}) AND deleted_at IS NULL",
             placeholders(ids.len())
         );
         let values = std::iter::once(Value::from(color.map(str::to_owned)))
@@ -118,9 +150,7 @@ impl NoteStore for SqliteStore {
 
     fn tag_columns(&self) -> AppResult<Vec<String>> {
         let connection = self.connection();
-        let mut statement = connection
-            .prepare_cached("SELECT tags FROM notes")
-            .map_err(storage)?;
+        let mut statement = connection.prepare_cached(TAG_COLUMNS).map_err(storage)?;
         let columns = statement.query_map([], |row| row.get(0)).map_err(storage)?;
         columns.collect::<rusqlite::Result<_>>().map_err(storage)
     }

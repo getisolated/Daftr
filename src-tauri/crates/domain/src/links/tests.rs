@@ -90,3 +90,13 @@ fn keeps_line_endings_and_non_ascii_text() {
     let expected = format!("é note://{}\r\n😀 note://{}", uuid(1), uuid(2));
     assert_eq!(rewrite(content), expected);
 }
+
+#[test]
+fn retargets_uuid_links_to_copied_notes() {
+    let content = format!("[A](note://{}) [B](note://{}) note://1", uuid(1), uuid(2));
+    let moved = |old: Uuid| (old == uuid(1)).then_some(uuid(5));
+    let expected = format!("[A](note://{}) [B](note://{}) note://1", uuid(5), uuid(2));
+
+    assert_eq!(retarget_note_links(&content, moved), Some(expected));
+    assert_eq!(retarget_note_links("note://1", moved), None);
+}

@@ -12,6 +12,8 @@ workspace = true
 [dependencies]
 app.workspace = true
 domain.workspace = true
+# Déjà tiré par adapter-mcp et adapter-sync : uuid des notes et des dossiers
+getrandom.workspace = true
 platform.workspace = true
 rusqlite.workspace = true
 tracing.workspace = true

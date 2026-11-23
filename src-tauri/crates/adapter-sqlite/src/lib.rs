@@ -1,4 +1,4 @@
-//! Stockage SQLite des notes, dossiers et collections (`evnote.db`).
+//! Stockage SQLite des notes, dossiers et collections (`daftr.db`, une base par profil).
 //!
 //! Même schéma que la version Electron : une base existante est reprise telle quelle, ses
 //! migrations sont idempotentes.
@@ -14,6 +14,7 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
 use app::{AppError, AppResult};
+use domain::uuid::Uuid;
 use rusqlite::Connection;
 
 /// Base SQLite partagée entre threads (une connexion, accès sérialisés).
@@ -25,18 +26,18 @@ impl SqliteStore {
     /// Ouvre (ou crée) la base au chemin donné et met son schéma à jour.
     pub fn open(path: &Path) -> AppResult<Self> {
         let connection = Connection::open(path).map_err(AppError::storage)?;
-        Self::prepare(connection)
+        Self::prepare(connection, Some(path))
     }
 
     /// Base en mémoire, pour les tests.
     pub fn open_in_memory() -> AppResult<Self> {
         let connection = Connection::open_in_memory().map_err(AppError::storage)?;
-        Self::prepare(connection)
+        Self::prepare(connection, None)
     }
 
-    fn prepare(mut connection: Connection) -> AppResult<Self> {
+    fn prepare(mut connection: Connection, path: Option<&Path>) -> AppResult<Self> {
         schema::configure(&connection).map_err(AppError::storage)?;
-        schema::migrate(&mut connection)?;
+        schema::migrate(&mut connection, path)?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -50,6 +51,13 @@ impl SqliteStore {
 /// Convertit une erreur SQLite en erreur de stockage.
 fn storage(error: rusqlite::Error) -> AppError {
     AppError::storage(error)
+}
+
+/// Un uuid version 4, tiré de l'aléa du système.
+fn random_uuid() -> AppResult<Uuid> {
+    let mut bytes = [0_u8; 16];
+    getrandom::fill(&mut bytes).map_err(AppError::storage)?;
+    Ok(Uuid::from_random(bytes))
 }
 
 /// `?, ?, ?` pour une clause `IN (…)` de `count` valeurs.

@@ -12,6 +12,8 @@ pub struct NoteDto {
     /// Identifiant.
     #[ts(type = "number")]
     pub id: i64,
+    /// Identifiant stable, le même sur tous les appareils (liens `note://<uuid>`).
+    pub uuid: String,
     /// Titre.
     pub title: String,
     /// Texte markdown.
@@ -36,6 +38,7 @@ impl From<Note> for NoteDto {
     fn from(note: Note) -> Self {
         Self {
             id: note.id,
+            uuid: note.uuid.to_string(),
             title: note.title,
             content: note.content,
             tags: note.tags,

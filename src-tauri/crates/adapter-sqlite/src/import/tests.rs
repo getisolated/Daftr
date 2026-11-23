@@ -2,12 +2,14 @@ use app::ports::{FolderStore, NoteImporter, NoteStore};
 use domain::folder::Folder;
 use domain::note::Note;
 use domain::transfer::plan_transfer;
+use domain::uuid::Uuid;
 
 use crate::SqliteStore;
 
 fn folder(id: i64, parent_id: Option<i64>) -> Folder {
     Folder {
         id,
+        uuid: Uuid::from_random([u8::try_from(id).unwrap(); 16]),
         name: format!("Dossier {id}"),
         parent_id,
         is_default: false,
@@ -20,6 +22,7 @@ fn folder(id: i64, parent_id: Option<i64>) -> Folder {
 fn note(id: i64, folder_id: Option<i64>) -> Note {
     Note {
         id,
+        uuid: Uuid::from_random([u8::try_from(id).unwrap(); 16]),
         title: format!("Note {id}"),
         content: format!("# Note {id}\nmot{id}"),
         tags: "[\"projet\"]".to_owned(),
@@ -222,5 +225,34 @@ fn moves_items_between_two_real_databases() {
     assert_eq!(
         CollectionStore::all(&destination).unwrap()[0].display_name,
         "Docs"
+    );
+}
+
+#[test]
+fn copies_get_new_uuids_and_their_links_follow() {
+    let store = target();
+    let mut first = note(1, None);
+    let second = note(2, None);
+    first.content = format!(
+        "# Note 1\n[2](note://{}) [ailleurs](note://{})",
+        second.uuid,
+        Uuid::from_random([9; 16])
+    );
+    let plan = plan_transfer(&[], &[first.clone(), second.clone()], &[], &[1, 2]);
+
+    store.import(&plan.bundle).unwrap();
+
+    let copies = NoteStore::all(&store).unwrap();
+    let copy_of = |title: &str| copies.iter().find(|n| n.title == title).unwrap();
+    let (copy_1, copy_2) = (copy_of("Note 1"), copy_of("Note 2"));
+    assert_ne!(copy_1.uuid, first.uuid);
+    assert_ne!(copy_2.uuid, second.uuid);
+    assert_eq!(
+        copy_1.content,
+        format!(
+            "# Note 1\n[2](note://{}) [ailleurs](note://{})",
+            copy_2.uuid,
+            Uuid::from_random([9; 16])
+        )
     );
 }
