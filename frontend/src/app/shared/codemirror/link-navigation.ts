@@ -3,9 +3,10 @@ import { EditorState, Extension } from '@codemirror/state';
 import { EditorView, hoverTooltip } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
 import { detectPlatform } from '../../core/services/platform.service';
+import { NOTE_URL_SOURCE } from '../../core/utils/note-paths.util';
 import { translatorOf } from './translator';
 
-const NOTE_URL = /note:\/\/\d+/g;
+const NOTE_URL = new RegExp(NOTE_URL_SOURCE, 'g');
 const CTRL_HELD_CLASS = 'cm-ctrl-held';
 
 interface LinkHit {
@@ -14,7 +15,7 @@ interface LinkHit {
   target: string;
 }
 
-/** Link under `pos` (`[label](target)`, a bare URL or a `note://id`) with the range to hover; `null` when there is none. */
+/** Link under `pos` (`[label](target)`, a bare URL or a `note://<uuid>`/`note://<id>`) with the range to hover; `null` when there is none. */
 export function linkAt(state: EditorState, pos: number): LinkHit | null {
   for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1); node; node = node.parent) {
     if (node.name === 'URL') {
@@ -27,7 +28,7 @@ export function linkAt(state: EditorState, pos: number): LinkHit | null {
     }
   }
 
-  // A `note://id` written as plain text is no markdown node
+  // A `note://` link written as plain text is no markdown node
   const line = state.doc.lineAt(pos);
 
   for (const match of line.text.matchAll(NOTE_URL)) {

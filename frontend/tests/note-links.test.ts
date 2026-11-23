@@ -8,6 +8,7 @@ import {
   findBacklinks,
   GRAPH_LARGE_THRESHOLD,
   LinkableNote,
+  noteIdLookup,
   replaceLinkTarget,
   retargetNoteLinks,
 } from '../src/app/core/utils/note-links.util';
@@ -18,6 +19,21 @@ const tFr = (key: TranslationKey, params?: TranslationParams): string => transla
 function note(id: number, content = '', folderId: number | null = null): LinkableNote {
   return { id, title: `Note ${id}`, content, folderId };
 }
+
+/** Uuid of the note `id` in these tests: its hex digits are mixed case on purpose, links are lowercase. */
+function uuidOf(id: number): string {
+  return `0000000${id}-AAAA-4BBB-8CCC-DDDDDDDDDDDD`.slice(-36);
+}
+
+function synced(id: number, content = '', folderId: number | null = null): LinkableNote {
+  return { ...note(id, content, folderId), uuid: uuidOf(id) };
+}
+
+function link(id: number): string {
+  return `note://${uuidOf(id).toLowerCase()}`;
+}
+
+const UNKNOWN_UUID = 'abcdef12-0000-4000-8000-000000000000';
 
 describe('retargetNoteLinks', () => {
   const moves = new Map([['work/plan', 'Archive/Work/Plan'], ['ideas', 'Work/My ideas']]);
@@ -51,6 +67,24 @@ describe('extractNoteLinks', () => {
 
   it('ignores other links and text', () => {
     expect(extractNoteLinks('https://x.io note://abc note:// plain')).toEqual([]);
+  });
+
+  it('finds the notes of the uuid links, whatever their case, next to the older id links', () => {
+    const lookup = noteIdLookup([synced(1), synced(2)]);
+
+    expect(extractNoteLinks(`${link(2)} note://5 note://${uuidOf(1)} ${link(2).toUpperCase().replace('NOTE', 'note')}`, undefined, lookup))
+      .toEqual([2, 5, 1]);
+  });
+
+  it('takes a uuid made of digits only for a uuid, not for the id of its first group', () => {
+    const digits = { ...note(7), uuid: '12345678-1234-4234-8234-123456789012' };
+
+    expect(extractNoteLinks(`note://${digits.uuid}`, undefined, noteIdLookup([digits]))).toEqual([7]);
+  });
+
+  it('ignores the uuid links without a lookup, or to no known note', () => {
+    expect(extractNoteLinks(link(1))).toEqual([]);
+    expect(extractNoteLinks(`note://${UNKNOWN_UUID}`, undefined, noteIdLookup([synced(1)]))).toEqual([]);
   });
 });
 
@@ -89,6 +123,15 @@ describe('findBacklinks', () => {
 
     expect(findBacklinks(notes, 1, t)).toEqual([]);
   });
+
+  it('follows the uuid links, and the older id links still', () => {
+    const notes = [synced(1, `self ${link(1)}`), synced(2, `see ${link(1)}`), synced(3, 'old note://1'), synced(4, `note://${UNKNOWN_UUID}`)];
+
+    expect(findBacklinks(notes, 1, t)).toEqual([
+      { noteId: 2, title: 'Note 2', excerpt: `see ${link(1)}` },
+      { noteId: 3, title: 'Note 3', excerpt: 'old note://1' },
+    ]);
+  });
 });
 
 describe('titles without a name', () => {
@@ -118,6 +161,28 @@ describe('buildNoteGraph', () => {
 
     expect(graph.nodes.find(n => n.id === 99)).toMatchObject({ missing: true, degree: 1 });
     expect(graph.links).toEqual([{ source: 1, target: 99 }]);
+  });
+
+  it('links the uuid targets to their notes', () => {
+    const graph = buildNoteGraph([synced(1, `${link(2)} note://3`), synced(2), synced(3)], t);
+
+    expect(graph.links).toEqual([{ source: 1, target: 2 }, { source: 1, target: 3 }]);
+    expect(graph.nodes.some(n => n.missing)).toBe(false);
+  });
+
+  it('draws one missing node per unknown uuid, named after its start, under an id no note nor tab can have', () => {
+    const graph = buildNoteGraph([synced(1, `note://${UNKNOWN_UUID}`), synced(2, `note://${UNKNOWN_UUID.toUpperCase()}`)], t);
+    const missing = graph.nodes.filter(n => n.missing);
+
+    expect(missing).toEqual([{ id: Number.MIN_SAFE_INTEGER, title: 'Missing note abcdef12', degree: 2, missing: true }]);
+    expect(graph.links).toEqual([{ source: 1, target: Number.MIN_SAFE_INTEGER }, { source: 2, target: Number.MIN_SAFE_INTEGER }]);
+  });
+
+  it('does not take a uuid note out of the folders for a missing one', () => {
+    const graph = buildNoteGraph([synced(1, link(2), 10), synced(2, '', 20)], t, { folderIds: new Set([10]) });
+
+    expect(graph.nodes.map(n => n.id)).toEqual([1]);
+    expect(graph.links).toEqual([]);
   });
 
   it('filters by folders without turning outside notes into missing ones', () => {

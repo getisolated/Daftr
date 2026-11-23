@@ -8,9 +8,23 @@ export interface PathFolder {
 /** Note as far as paths are concerned (a `Note` satisfies it). */
 export interface PathNote {
   id: number;
+  /** Stable id shared by every device, written in the `note://` links; unset for what is no stored note. */
+  uuid?: string;
   title: string;
   folderId: number | null;
 }
+
+/** Note as far as `note://` links are concerned (a `Note` satisfies it); one without uuid is reached by its local id only. */
+export interface NoteUrlTarget {
+  id: number;
+  uuid?: string;
+}
+
+/** Note a `note://` link designates: its uuid (lowercase), or the local id an older version wrote. */
+export type NoteUrl = { kind: 'uuid'; uuid: string } | { kind: 'id'; id: number };
+
+/** Note designated by a `note://` link, `null` when there is none. */
+export type NoteUrlResolver<T extends NoteUrlTarget> = (url: NoteUrl) => T | null;
 
 /** Id of the note a markdown link target designates, `null` when it designates none. */
 export type LinkResolver = (target: string) => number | null;
@@ -23,24 +37,71 @@ export interface PathCompletion {
   path: string;
   /** Folder holding a note found out of the typed directory. */
   detail?: string;
+  /** Uuid of a note: the link is then written `note://<uuid>`, which survives renames, moves and other devices. */
+  uuid?: string;
 }
 
 const EXTERNAL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const UNSAFE_IN_SEGMENT = /[\\/<>]/g;
 const NEEDS_ANGLE_BRACKETS = /[\s()]/;
 
-/** What a link target points to; a local target (note path, `note://id`) that points to nothing is `broken`. */
+/** What a link target points to; a local target (note path, `note://`) that points to nothing is `broken`. */
 export type LinkStatus = 'note' | 'external' | 'anchor' | 'broken';
 
-const NOTE_URL = /^note:\/\/(?<id>\d+)$/;
+/**
+ * Target of a `note://` link: a uuid, tried first so that one made of digits only is not cut to its first group (its hex
+ * digits in any case), else the local id an older version wrote (`note://12`), still followed.
+ */
+const NOTE_URL_TARGET = String.raw`(?:(?<uuid>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})|(?<id>\d+))`;
+/** Source of a regex matching a `note://` link within a text, with the groups read by {@link noteUrlFromMatch}. */
+export const NOTE_URL_SOURCE = `note://${NOTE_URL_TARGET}`;
+const NOTE_URL = new RegExp(`^${NOTE_URL_SOURCE}$`);
 
-/** Status of a link target, `noteExists` telling whether a `note://id` note is still there. */
-export function linkStatus(rawTarget: string, resolve: LinkResolver, noteExists: (id: number) => boolean): LinkStatus {
+/** Note designated by a match of {@link NOTE_URL_SOURCE}; the uuid is lowercased, the form it is indexed under. */
+export function noteUrlFromMatch(match: RegExpMatchArray | null): NoteUrl | null {
+  const uuid = match?.groups?.['uuid'];
+  const id = match?.groups?.['id'];
+
+  if (uuid !== undefined) {
+    return { kind: 'uuid', uuid: uuid.toLowerCase() };
+  }
+
+  return id === undefined ? null : { kind: 'id', id: Number(id) };
+}
+
+/** Note designated by a whole link target (`note://<uuid>` or `note://<id>`), `null` for any other target. */
+export function parseNoteUrl(target: string): NoteUrl | null {
+  return noteUrlFromMatch(NOTE_URL.exec(target.trim()));
+}
+
+/** Link to write towards the note of `uuid`. */
+export function formatNoteUrl(uuid: string): string {
+  return `note://${uuid.toLowerCase()}`;
+}
+
+/** Finds the notes of `note://` links: by uuid (whatever its case) through a map, or by local id for the older links. */
+export function createNoteUrlResolver<T extends NoteUrlTarget>(notes: readonly T[]): NoteUrlResolver<T> {
+  const byUuid = new Map<string, T>();
+  const byId = new Map<number, T>();
+
+  for (const note of notes) {
+    byId.set(note.id, note);
+
+    if (note.uuid) {
+      byUuid.set(note.uuid.toLowerCase(), note);
+    }
+  }
+
+  return url => (url.kind === 'uuid' ? byUuid.get(url.uuid) : byId.get(url.id)) ?? null;
+}
+
+/** Status of a link target, `noteExists` telling whether the note of a `note://` link is still there. */
+export function linkStatus(rawTarget: string, resolve: LinkResolver, noteExists: (url: NoteUrl) => boolean): LinkStatus {
   const target = rawTarget.trim();
-  const noteUrl = NOTE_URL.exec(target);
+  const noteUrl = parseNoteUrl(target);
 
-  if (noteUrl?.groups) {
-    return noteExists(Number(noteUrl.groups['id'])) ? 'note' : 'broken';
+  if (noteUrl !== null) {
+    return noteExists(noteUrl) ? 'note' : 'broken';
   }
 
   if (EXTERNAL_SCHEME.test(target)) {
@@ -183,7 +244,7 @@ export function listPathCompletions(typed: string, notes: readonly PathNote[], f
 
   for (const note of inDirectory) {
     const segment = toPathSegment(note.title);
-    completions.push({ kind: 'note', label: segment, path: `${base}${segment}` });
+    completions.push({ kind: 'note', label: segment, path: `${base}${segment}`, uuid: note.uuid });
   }
 
   if (directory.length === 0 && filter !== '') {
@@ -197,6 +258,7 @@ export function listPathCompletions(typed: string, notes: readonly PathNote[], f
         label: toPathSegment(note.title),
         path: notePath(note, folders),
         detail: folderSegments(note.folderId, byId).join('/'),
+        uuid: note.uuid,
       });
     }
   }

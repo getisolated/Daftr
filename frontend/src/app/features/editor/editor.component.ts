@@ -29,7 +29,7 @@ import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
-import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
+import { LinkStatus, createLinkResolver, createNoteUrlResolver, linkStatus, parseNoteUrl } from '../../core/utils/note-paths.util';
 import { externallyChangedContent } from '../../core/utils/external-change.util';
 import { EditorViewMode, NoteViewState, PreviewScrollRequest } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
@@ -337,8 +337,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     const notes = this.notes.notes();
     const resolve = createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders());
-    const ids = new Set(notes.map(n => n.id));
-    return target => linkStatus(target, resolve, id => ids.has(id));
+    const findNote = createNoteUrlResolver(notes);
+    return target => linkStatus(target, resolve, url => findNote(url) !== null);
   });
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
 
@@ -943,7 +943,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private buildQuickNotesDocument(): Note {
     const now = new Date().toISOString();
     return {
-      id: QUICK_NOTES_TAB_ID, title: QUICK_NOTES_TITLE, content: this.notes.quickNotesDocument(),
+      id: QUICK_NOTES_TAB_ID, uuid: '', title: QUICK_NOTES_TITLE, content: this.notes.quickNotesDocument(),
       tags: [], folderId: null, sortOrder: null, color: null, createdAt: now, updatedAt: now,
     };
   }
@@ -1072,7 +1072,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return settings.hideScrollbar ? hiddenScrollbar : [];
   }
 
-  /** Ctrl+click on a link (or a click in the preview): a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
+  /** Ctrl+click on a link (or a click in the preview): a note (by `note://` or by path) opens in a tab, a web address in the browser. */
   protected followLink(target: string): void {
     const anchor = linkAnchor(target);
 
@@ -1101,18 +1101,23 @@ export class EditorComponent implements OnDestroy, OnChanges {
       return;
     }
 
-    const noteUrl = /^note:\/\/(?<id>\d+)$/.exec(target.trim());
+    const noteUrl = parseNoteUrl(target);
     const notes = this.notes.notes();
-    let noteId: number | null = noteUrl?.groups?.['id'] ? Number(noteUrl.groups['id']) : null;
 
-    if (noteId === null && /^https?:\/\//i.test(target.trim())) {
+    if (noteUrl === null && /^https?:\/\//i.test(target.trim())) {
       void this.bridge.openExternal(target.trim());
       return;
     }
 
-    noteId ??= createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders())(target);
+    let note: Note | null | undefined;
 
-    const note = notes.find(n => n.id === noteId);
+    if (noteUrl === null) {
+      const noteId = createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders())(target);
+      note = notes.find(n => n.id === noteId);
+    }
+    else {
+      note = createNoteUrlResolver(notes)(noteUrl);
+    }
 
     if (note) {
       this.tabs.openNote(note.id, note.title);
@@ -1279,7 +1284,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.fileBanner.set({ kind: 'unreadable', path: file.path, error: '' });
     }
 
-    return { id, title: baseName(file.path), content, tags: [], folderId: null, sortOrder: null, color: null, createdAt: '', updatedAt: '' };
+    return { id, uuid: '', title: baseName(file.path), content, tags: [], folderId: null, sortOrder: null, color: null, createdAt: '', updatedAt: '' };
   }
 
   private async saveFile(id: number, file: CollectionFileRef, content: string): Promise<void> {
