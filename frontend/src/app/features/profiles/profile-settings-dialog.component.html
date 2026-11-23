@@ -94,6 +94,10 @@
     }
   </div>
 
+  @if (profile(); as edited) {
+    <app-profile-sync [profileId]="edited.id" />
+  }
+
   @if (error(); as message) {
     <p class="error" role="alert">{{ message }}</p>
   }

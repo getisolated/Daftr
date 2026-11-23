@@ -6,6 +6,7 @@ import { renderProfileIcon } from '../../core/utils/profile-icon.util';
 import { passwordChange, profileErrorMessage } from '../../core/utils/profile.util';
 import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
+import { ProfileSyncComponent } from '../sync/profile-sync.component';
 import { ProfileAvatarComponent } from './profile-avatar.component';
 
 /**
@@ -15,7 +16,7 @@ import { ProfileAvatarComponent } from './profile-avatar.component';
 @Component({
   selector: 'app-profile-settings-dialog',
   standalone: true,
-  imports: [ProfileAvatarComponent, CheckboxComponent, FocusSelectDirective],
+  imports: [ProfileAvatarComponent, CheckboxComponent, FocusSelectDirective, ProfileSyncComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '(document:keydown.escape)': 'closed.emit()',
