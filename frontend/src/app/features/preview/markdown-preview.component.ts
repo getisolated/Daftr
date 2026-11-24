@@ -54,7 +54,7 @@ export class MarkdownPreviewComponent {
   /** Source lines of the outline headings whose chapter is followed while reading; empty: not followed. */
   readonly headingLines = input<readonly number[]>([]);
 
-  /** A link was clicked: a note path, `note://id` or web address, to open. */
+  /** A link was clicked: a note path, `note://` link or web address, to open. */
   readonly linkClicked = output<string>();
   /** The user scrolled the preview: first source line now at the top (1-based, fractional). */
   readonly scrolledToLine = output<number>();

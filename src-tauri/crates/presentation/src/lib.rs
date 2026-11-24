@@ -3,6 +3,7 @@
 //!
 //! Le crate `desktop` branche chaque commande IPC sur une fonction de ce crate.
 
+pub mod collection_sync;
 pub mod collections;
 pub mod data;
 pub mod dto;
@@ -14,8 +15,11 @@ pub mod notes;
 pub mod profiles;
 pub mod settings;
 pub mod shell;
+pub mod sync;
 
 pub use error::{IpcError, IpcResult};
+
+use std::sync::Arc;
 
 use app::export::ExportService;
 use app::profiles::ProfilesService;
@@ -29,8 +33,8 @@ use crate::data::ActiveData;
 pub struct Services {
     /// Profil actif et ses données.
     pub data: ActiveData,
-    /// Profils.
-    pub profiles: ProfilesService,
+    /// Profils (partagés avec la synchronisation, qui en crée à la réception d'une offre).
+    pub profiles: Arc<ProfilesService>,
     /// Réglages.
     pub settings: SettingsService,
     /// Exports.

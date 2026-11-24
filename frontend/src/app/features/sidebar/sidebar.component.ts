@@ -50,6 +50,7 @@ import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/con
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { SectionSplitterComponent } from '../../shared/ui/section-splitter.component';
 import { ProfileSwitcherComponent } from '../profiles/profile-switcher.component';
+import { SyncIndicatorComponent } from '../sync/sync-indicator.component';
 import { CollectionsSectionComponent } from './collections-section.component';
 import { RowAddButtonComponent } from '../../shared/ui/row-add-button.component';
 import { MoveToDialogComponent } from './move-to-dialog.component';
@@ -67,7 +68,7 @@ const ICON_EMPTY = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9
   standalone: true,
   imports: [
     ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, ColorPickerComponent, MoveToDialogComponent,
-    CollectionsSectionComponent, SectionSplitterComponent, ProfileSwitcherComponent, RowAddButtonComponent,
+    CollectionsSectionComponent, SectionSplitterComponent, ProfileSwitcherComponent, SyncIndicatorComponent, RowAddButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {

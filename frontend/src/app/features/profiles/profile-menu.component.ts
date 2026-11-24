@@ -1,11 +1,12 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, inject, input, output } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Profile } from '../../core/models/profile.model';
+import { CollectionSyncService } from '../../core/services/collection-sync.service';
 import { ProfilesService } from '../../core/services/profiles.service';
 import { profileDisplayName } from '../../core/utils/profile.util';
 import { ProfileAvatarComponent } from './profile-avatar.component';
 
-/** Menu of the profiles, opened on the right of the sidebar item: switch, create, configure. */
+/** Menu of the profiles, opened on the right of the sidebar item: switch, create, configure, open the sync screen. */
 @Component({
   selector: 'app-profile-menu',
   standalone: true,
@@ -23,6 +24,7 @@ import { ProfileAvatarComponent } from './profile-avatar.component';
 export class ProfileMenuComponent implements AfterViewInit {
   protected readonly i18n = inject(I18nService);
   protected readonly profiles = inject(ProfilesService);
+  protected readonly collectionSync = inject(CollectionSyncService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** Opened from the keyboard: the first entry takes the focus. */
@@ -30,6 +32,7 @@ export class ProfileMenuComponent implements AfterViewInit {
   readonly picked = output<Profile>();
   readonly created = output<void>();
   readonly configured = output<void>();
+  readonly synced = output<void>();
 
   ngAfterViewInit(): void {
     if (this.focusFirst()) {

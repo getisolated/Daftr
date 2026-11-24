@@ -11,7 +11,7 @@ use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, WebviewWindow};
 
 use crate::events::emit_except;
-use crate::profiles::{activate, delete_profile, open_store};
+use crate::profiles::{activate, delete_profile};
 use crate::state::desktop;
 
 /// En-tête portant le profil d'une icône envoyée en octets bruts.
@@ -64,7 +64,7 @@ pub async fn profiles_create(app: AppHandle, name: Option<String>) -> IpcResult<
     let state = desktop(&app);
     let created = profiles::create(&state.services.profiles, name.as_deref())?;
 
-    let store = open_store(&state.directories, &parse_id(&created.id)?)?;
+    let store = state.sync.profiles.open_store(&parse_id(&created.id)?)?;
     FoldersService::new(store).ensure_default()?;
     Ok(created)
 }
@@ -172,7 +172,7 @@ pub async fn profiles_transfer(
     state.services.profiles.get(&target)?;
 
     let active = state.services.data.get()?;
-    let store = open_store(&state.directories, &target)?;
+    let store = state.sync.profiles.open_store(&target)?;
     let destination = TransferDestination {
         importer: store.as_ref(),
         collections: store.as_ref(),

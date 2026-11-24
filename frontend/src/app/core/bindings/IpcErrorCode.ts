@@ -3,4 +3,4 @@
 /**
  * Nature d'une erreur.
  */
-export type IpcErrorCode = "refused" | "storage" | "fileSystem" | "invalidInput";
+export type IpcErrorCode = "refused" | "storage" | "fileSystem" | "invalidInput" | "sync";

@@ -4,7 +4,7 @@ import {
 import { Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import {
-  PathCompletion, PathFolder, PathNote, listPathCompletions, needsAngleBrackets,
+  PathCompletion, PathFolder, PathNote, formatNoteUrl, listPathCompletions, needsAngleBrackets,
 } from '../../core/utils/note-paths.util';
 import { isInCodeBlock } from './slash-commands';
 
@@ -18,21 +18,39 @@ export interface NoteLinkSource {
 const LINK_TARGET = /\]\((?<open><?)(?<path>[^)>\n]*)$/;
 const EXTERNAL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
+/**
+ * Text replacing the typed target (its `<` included) once `entry` is picked: a folder extends the path, a note ends the
+ * link with its `)`. A note with a uuid is linked as `note://<uuid>`, which survives renames, moves and the other
+ * devices; one without (none in the notes list today) keeps its path.
+ */
+export function completedLinkTarget(entry: PathCompletion, angleOpen: boolean): string {
+  if (entry.kind === 'note' && entry.uuid) {
+    return `${formatNoteUrl(entry.uuid)})`;
+  }
+
+  const angle = angleOpen || needsAngleBrackets(entry.path);
+  const typed = angle ? `<${entry.path}` : entry.path;
+
+  if (entry.kind === 'folder') {
+    return typed;
+  }
+
+  return `${typed}${angle ? '>' : ''})`;
+}
+
 /** Completion applied: a folder extends the path and reopens the list, a note closes the link. */
 function applyEntry(entry: PathCompletion, angleOpen: boolean): Completion['apply'] {
   return (view, _completion, from, to) => {
-    const angle = angleOpen || needsAngleBrackets(entry.path);
-    const typed = angle ? `<${entry.path}` : entry.path;
+    const insert = completedLinkTarget(entry, angleOpen);
 
     if (entry.kind === 'folder') {
-      view.dispatch({ changes: { from, to, insert: typed }, selection: { anchor: from + typed.length } });
+      view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length } });
       startCompletion(view);
       return;
     }
 
     // The auto-closed bracket is already there: step over it instead of doubling it
     const hasCloser = view.state.sliceDoc(to, to + 1) === ')';
-    const insert = `${typed}${angle ? '>' : ''})`;
 
     view.dispatch({
       changes: { from, to: hasCloser ? to + 1 : to, insert },

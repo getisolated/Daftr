@@ -1,0 +1,86 @@
+// Controls of the sync settings, in the look of the settings editor (see mcp-settings.component.ts)
+:host {
+  display: block;
+  max-width: 640px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn {
+  flex: none;
+  padding: 4px 10px;
+  background: var(--daftr-bg-input);
+  border: 1px solid var(--daftr-border-soft);
+  border-radius: 2px;
+  color: var(--daftr-text);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { border-color: var(--daftr-accent); }
+  &:disabled { opacity: 0.5; cursor: default; }
+
+  &.primary {
+    background: var(--daftr-accent-strong);
+    border-color: var(--daftr-accent-strong);
+    color: #fff;
+
+    &:hover:not(:disabled) { background: var(--daftr-accent-hover); }
+  }
+
+  &.danger:hover:not(:disabled) { border-color: var(--daftr-danger); color: var(--daftr-danger); }
+}
+
+.field {
+  min-width: 0;
+  padding: 4px 8px;
+  background: var(--daftr-bg-input);
+  border: 1px solid var(--daftr-border-soft);
+  border-radius: 2px;
+  color: var(--daftr-text);
+  font: inherit;
+  outline: none;
+  user-select: text;
+
+  &:focus { border-color: var(--daftr-accent); }
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--daftr-text-soft);
+  user-select: text;
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--daftr-text-faint);
+
+  &.ok { background: var(--daftr-syntax-comment); }
+  &.busy { background: var(--daftr-accent); }
+  &.warning { background: var(--daftr-text-dimmed); }
+  &.error { background: var(--daftr-danger); }
+}
+
+.hint {
+  margin-top: 6px;
+  color: var(--daftr-text-dimmed);
+  font-size: 12px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+.error {
+  margin-top: 6px;
+  color: var(--daftr-danger);
+  font-size: 12px;
+  user-select: text;
+}

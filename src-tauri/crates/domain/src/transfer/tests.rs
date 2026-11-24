@@ -1,8 +1,13 @@
 use super::*;
 
+fn test_uuid(id: i64) -> Uuid {
+    Uuid::from_random([u8::try_from(id).unwrap(); 16])
+}
+
 fn folder(id: i64, parent_id: Option<i64>) -> Folder {
     Folder {
         id,
+        uuid: test_uuid(id),
         name: format!("folder {id}"),
         parent_id,
         is_default: false,
@@ -15,6 +20,7 @@ fn folder(id: i64, parent_id: Option<i64>) -> Folder {
 fn note(id: i64, folder_id: Option<i64>) -> Note {
     Note {
         id,
+        uuid: test_uuid(id),
         title: format!("note {id}"),
         content: format!("# note {id}"),
         tags: "[\"a\"]".to_owned(),

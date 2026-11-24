@@ -42,3 +42,46 @@
     DeleteRegKey HKCU "${LEGACY_TAURI_UNINSTKEY}"
   ${EndIf}
 !macroend
+
+; Synchronisation entre appareils (réseau local) : règles entrantes du pare-feu Windows pour
+; l'écoute TCP (port par défaut 47820) et le mDNS (UDP 5353), profil « Privé » seulement et
+; limitées à l'exécutable. Sans elles, la première écoute ouvre l'invite du pare-feu, qui
+; propose le profil « Public ».
+;
+; L'installation est par utilisateur (sans droits d'administrateur) : netsh est lancé élevé
+; (une invite UAC), une seule fois. Refusée, l'invite n'est pas reproposée aux mises à jour
+; (marqueur dans HKCU) et Windows posera sa propre question à la première écoute. Un port
+; changé dans les réglages n'est pas couvert par la règle TCP.
+
+!define SYNC_RULE_TCP "Daftr - synchronisation LAN (TCP)"
+!define SYNC_RULE_MDNS "Daftr - synchronisation LAN (mDNS)"
+!define SYNC_PORT "47820"
+!define SYNC_MARKER_KEY "Software\Daftr\Sync"
+!define SYNC_MARKER_VALUE "FirewallRulesAsked"
+
+!macro NSIS_HOOK_POSTINSTALL
+  ; Code de sortie 0 : la règle existe déjà (installation précédente)
+  nsExec::ExecToStack 'netsh advfirewall firewall show rule name="${SYNC_RULE_TCP}"'
+  Pop $R0
+  Pop $R1
+  ReadRegStr $R2 HKCU "${SYNC_MARKER_KEY}" "${SYNC_MARKER_VALUE}"
+  ${If} $R0 != 0
+  ${AndIf} $R2 != "1"
+    WriteRegStr HKCU "${SYNC_MARKER_KEY}" "${SYNC_MARKER_VALUE}" "1"
+    DetailPrint "Adding the firewall rules of the LAN sync..."
+    ExecShellWait "runas" "$SYSDIR\cmd.exe" '/c netsh advfirewall firewall add rule name="${SYNC_RULE_TCP}" dir=in action=allow protocol=TCP localport=${SYNC_PORT} profile=private program="$INSTDIR\${MAINBINARYNAME}.exe" & netsh advfirewall firewall add rule name="${SYNC_RULE_MDNS}" dir=in action=allow protocol=UDP localport=5353 profile=private program="$INSTDIR\${MAINBINARYNAME}.exe"' SW_HIDE
+  ${EndIf}
+!macroend
+
+!macro NSIS_HOOK_POSTUNINSTALL
+  ; Une mise à jour désinstalle l'ancienne version (/UPDATE) : les règles restent
+  ${If} $UpdateMode <> 1
+    nsExec::ExecToStack 'netsh advfirewall firewall show rule name="${SYNC_RULE_TCP}"'
+    Pop $R0
+    Pop $R1
+    ${If} $R0 == 0
+      ExecShellWait "runas" "$SYSDIR\cmd.exe" '/c netsh advfirewall firewall delete rule name="${SYNC_RULE_TCP}" & netsh advfirewall firewall delete rule name="${SYNC_RULE_MDNS}"' SW_HIDE
+    ${EndIf}
+    DeleteRegKey HKCU "${SYNC_MARKER_KEY}"
+  ${EndIf}
+!macroend

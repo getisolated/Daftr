@@ -13,5 +13,15 @@ workspace = true
 domain.workspace = true
 platform.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+similar.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+yrs.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[features]
+# Doublures en mémoire des ports de la synchronisation, pour les tests des autres crates
+testing = []

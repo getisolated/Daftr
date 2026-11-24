@@ -19,6 +19,7 @@ mod setup;
 mod shortcut;
 mod startup;
 mod state;
+mod sync;
 mod tray;
 mod updater;
 mod windows;
