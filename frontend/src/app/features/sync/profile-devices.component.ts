@@ -1,7 +1,11 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { CollectionOffer, CollectionShare } from '../../core/models/collection-sync.model';
 import { ProfileSync, SpaceDevice, TrustedDevice } from '../../core/models/sync.model';
+import { CollectionSyncService } from '../../core/services/collection-sync.service';
+import { ProfilesService } from '../../core/services/profiles.service';
 import { SyncService } from '../../core/services/sync.service';
+import { offersOfProfile, shareBadge, sharesOfProfile } from '../../core/utils/collection-sync.util';
 import {
   formatPairingCode, needsNewPairingCode, offerTargets, sharedDevices, shortDeviceId, svgDataUrl,
 } from '../../core/utils/sync.util';
@@ -29,6 +33,8 @@ import { SyncJoinFormComponent } from './sync-join-form.component';
 export class ProfileDevicesComponent implements OnDestroy {
   protected readonly i18n = inject(I18nService);
   private readonly sync = inject(SyncService);
+  private readonly collectionSync = inject(CollectionSyncService);
+  private readonly profiles = inject(ProfilesService);
 
   readonly profileId = input.required<string>();
   /** Back to the main view of the dialog (button or Escape). */
@@ -59,6 +65,15 @@ export class ProfileDevicesComponent implements OnDestroy {
   protected readonly targets = computed(() => offerTargets(this.sync.trustedDevices(), this.profileSync()));
   protected readonly stopActions = computed<ConfirmDialogAction[]>(() => [
     { id: 'stop', label: this.i18n.t('sync.profile.stop'), danger: true },
+  ]);
+  protected readonly stoppingShare = signal<CollectionShare | null>(null);
+  protected readonly shares = computed(() => sharesOfProfile(this.collectionSync.shares(), this.profileId()));
+  /** Proposals not answered yet, "Later" ones included. */
+  protected readonly proposed = computed(() => offersOfProfile(this.collectionSync.offers(), this.profileId()));
+  /** A collection is shared from the active profile only: the assistant reads its collections. */
+  protected readonly canAddCollection = computed(() => this.profileId() === this.profiles.activeId());
+  protected readonly stopShareActions = computed<ConfirmDialogAction[]>(() => [
+    { id: 'stop', label: this.i18n.t('csync.profile.stop'), danger: true },
   ]);
 
   constructor() {
@@ -106,7 +121,7 @@ export class ProfileDevicesComponent implements OnDestroy {
 
   /** Escape closes the form first, then leaves the sub-view; with the confirmation open, only the confirmation closes. */
   protected onEscape(): void {
-    if (this.stopping()) {
+    if (this.stopping() || this.stoppingShare() || this.collectionSync.assistant() || this.collectionSync.offerInDialog()) {
       return;
     }
 
@@ -124,6 +139,35 @@ export class ProfileDevicesComponent implements OnDestroy {
     if (offered) {
       this.offering.set(false);
       this.notice.set(this.i18n.t('sync.profile.offerSent', { name: device.name }));
+    }
+  }
+
+  /** State of a shared collection, as its badge tooltip says it ("Waiting for PC", "Folder not found"…). */
+  protected shareState(share: CollectionShare): string {
+    return shareBadge(share, Date.now(), this.i18n.language()).tooltip;
+  }
+
+  protected shareDevices(share: CollectionShare): string {
+    return share.devices.map(device => device.name).join(', ');
+  }
+
+  protected addCollection(): void {
+    this.collectionSync.openAssistant(null, 'devices');
+  }
+
+  protected answerProposal(offer: CollectionOffer): void {
+    this.collectionSync.openOffer(offer);
+  }
+
+  protected async relink(share: CollectionShare): Promise<void> {
+    await this.run(() => this.collectionSync.relink(share.root));
+  }
+
+  protected async onStopShareChosen(share: CollectionShare, choice: string | null): Promise<void> {
+    this.stoppingShare.set(null);
+
+    if (choice === 'stop') {
+      await this.run(() => this.collectionSync.stop(share));
     }
   }
 

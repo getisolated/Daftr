@@ -11,6 +11,7 @@ import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent } from '../../shared/ui/select.component';
 import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
 import { McpSettingsComponent } from './mcp-settings.component';
+import { CollectionFolderSettingComponent } from '../sync/collection-folder-setting.component';
 import { SyncDevicesComponent } from '../sync/sync-devices.component';
 import { SyncPairingComponent } from '../sync/sync-pairing.component';
 import { SyncSettingsComponent } from '../sync/sync-settings.component';
@@ -21,7 +22,7 @@ import {
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CheckboxComponent, SelectComponent, DaftrLogotypeComponent, McpSettingsComponent, SyncSettingsComponent, SyncPairingComponent, SyncDevicesComponent],
+  imports: [CheckboxComponent, SelectComponent, DaftrLogotypeComponent, McpSettingsComponent, SyncSettingsComponent, SyncPairingComponent, SyncDevicesComponent, CollectionFolderSettingComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isOpen()) {
@@ -146,6 +147,10 @@ import {
                         @case ('syncDevices') {
                           <div class="description">{{ descriptionOf(def) }}</div>
                           <app-sync-devices />
+                        }
+                        @case ('receivedFolder') {
+                          <div class="description">{{ descriptionOf(def) }}</div>
+                          <app-collection-folder-setting />
                         }
                       }
                     </div>

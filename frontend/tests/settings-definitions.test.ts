@@ -35,7 +35,7 @@ describe('groupByCategory', () => {
     const sections = groupByCategory(SETTING_DEFINITIONS, en);
     expect(sections.map(s => s.category)).toEqual(['General', 'Appearance', 'Editor', 'Formatting Bar', 'Collections', 'Global Shortcut', 'Quick Note Overlay', 'AI (MCP)', 'Sync', 'Keyboard Shortcuts']);
     expect(sections[6]?.settings.map(d => d.key)).toEqual(['overlayWidth', 'overlayHeight', 'enterToSend']);
-    expect(sections[8]?.settings.map(d => d.key)).toEqual(['syncStatus', 'syncDeviceName', 'syncPaused', 'syncPairing', 'syncDevices', 'syncPort']);
+    expect(sections[8]?.settings.map(d => d.key)).toEqual(['syncStatus', 'syncDeviceName', 'syncPaused', 'syncPairing', 'syncDevices', 'receivedCollectionsFolder', 'syncPort']);
   });
 
   it('groups on the translated category names', () => {

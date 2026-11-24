@@ -80,6 +80,61 @@
   }
 </div>
 
+<div class="collections">
+  <div class="label">{{ i18n.t('csync.profile.title') }}</div>
+  @for (share of shares(); track share.syncId) {
+    <div class="collection">
+      <div class="device-text">
+        <div class="name" [title]="share.root">{{ share.name }}</div>
+        <div class="state" [class.error]="share.status === 'missingFolder'" [class.warning]="share.status === 'conflicts'">{{ shareState(share) }}</div>
+        @if (share.devices.length > 0) {
+          <div class="state">{{ i18n.t('csync.profile.with', { devices: shareDevices(share) }) }}</div>
+        }
+      </div>
+      @if (share.status === 'missingFolder') {
+        <button class="btn" type="button" [disabled]="busy()" (click)="relink(share)">{{ i18n.t('csync.profile.relink') }}</button>
+      }
+      <button
+        class="btn danger"
+        type="button"
+        [disabled]="busy()"
+        [attr.aria-label]="i18n.t('csync.profile.stopTitle', { name: share.name })"
+        [title]="i18n.t('csync.profile.stopTitle', { name: share.name })"
+        (click)="stoppingShare.set(share)"
+      >
+        {{ i18n.t('csync.profile.stop') }}
+      </button>
+    </div>
+  } @empty {
+    <span class="hint">{{ i18n.t('csync.profile.empty') }}</span>
+  }
+
+  @if (proposed().length > 0) {
+    <div class="label sub">{{ i18n.t('csync.profile.proposed') }}</div>
+    @for (offer of proposed(); track offer.device.key + offer.syncId) {
+      <div class="collection">
+        <div class="device-text">
+          <div class="name">{{ i18n.t('csync.profile.proposedBy', { name: offer.name, device: offer.device.name }) }}</div>
+        </div>
+        <button class="btn" type="button" (click)="answerProposal(offer)">{{ i18n.t('csync.pending.open') }}</button>
+      </div>
+    }
+  }
+
+  @if (canAddCollection()) {
+    <button class="link" type="button" (click)="addCollection()">{{ i18n.t('csync.profile.add') }}</button>
+  }
+</div>
+
+@if (stoppingShare(); as share) {
+  <app-confirm-dialog
+    [title]="i18n.t('csync.profile.stopTitle', { name: share.name })"
+    [message]="i18n.t('csync.profile.stopMessage')"
+    [actions]="stopShareActions()"
+    (chosen)="onStopShareChosen(share, $event)"
+  />
+}
+
 @if (stopping(); as device) {
   <app-confirm-dialog
     [title]="i18n.t('sync.profile.stopTitle', { name: nameOf(device) })"

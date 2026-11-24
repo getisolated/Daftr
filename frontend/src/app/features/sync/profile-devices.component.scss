@@ -142,6 +142,36 @@
   user-select: text;
 }
 
+.collections {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--daftr-border-soft);
+}
+
+.collection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.state {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--daftr-text-dimmed);
+
+  &.error { color: var(--daftr-danger); }
+  &.warning { color: var(--daftr-text); }
+}
+
+.sub {
+  margin-top: 4px;
+}
+
 .targets {
   display: flex;
   flex-wrap: wrap;
