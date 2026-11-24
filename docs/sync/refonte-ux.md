@@ -78,8 +78,8 @@ Remplace le bloc de droite, sans listes autour.
 |-----|---------|------|
 | R0 | Backend : appairage sans profil, partage de profil par appareil, acceptation automatique et clonage, événement « profil reçu ». | ☑ |
 | R1 | Backend : collections liées à l'appareil, offres « à configurer », activation avec profil cible. | ☑ |
-| R2 | Front : écran « Synchronisation » (partage, appareils, partages en attente mêlés, lier un appareil), retrait de l'ancienne sous-vue, toast « Basculer ». | ☐ |
-| R3 | Front : saisie du code (OTP, coller / couper) et formulaire d'adresse. | ☐ |
+| R2 | Front : écran « Synchronisation » (partage, appareils, partages en attente mêlés, lier un appareil), retrait de l'ancienne sous-vue, toast « Basculer ». | ☑ |
+| R3 | Front : saisie du code (OTP, coller / couper) et formulaire d'adresse. | ☑ |
 | R4 | Documentation (plan.md, README) et nouvelle recette sur deux PC. | ☐ |
 
 Tout va dans la branche `NF/feat/sync-lan-261123`, PR #90 vers `recipe`.
