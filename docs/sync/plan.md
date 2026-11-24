@@ -14,7 +14,7 @@ Daftr synchronise les notes d'un même utilisateur entre ses appareils, **en ré
 - **Automatique et en temps réel**, avec pause globale et « Synchroniser maintenant ». Synchronisation complète dès l'appairage ou l'acceptation d'un profil.
 - **Pas de dialogue de conflit** : chaque note est un document CRDT (`yrs`, format Yjs), fusionné caractère par caractère. La note ouverte reçoit les modifications sans perdre la saisie en cours.
 - **Coût nul sans profil synchronisé** : ni écoute, ni annonce, ni thread ; seule trace, `sync/device.key`.
-- **Hors périmètre** : partage avec d'autres personnes, réglages, collections, mobile, historique des versions.
+- **Hors périmètre** : partage avec d'autres personnes, réglages, mobile, historique des versions. Les collections (dossiers de fichiers `.md`) ont leur propre plan, [collections.md](collections.md), et leur section ici (§12).
 
 ## 2. Architecture
 
@@ -256,6 +256,131 @@ Non vérifié (à faire en recette sur deux PC réels) : critères d'acceptation
 - **MCP** : `update_note` garde ce qui a changé depuis la lecture de l'IA.
 - **Front** (vitest) : diff minimal, fusion à trois voies dans l'éditeur, curseur mappé, historique, statuts, erreurs traduites, compte à rebours, destinations, notifications, identifiant court, icône par type, renouvellement du code.
 
-## 12. Phases ultérieures
+## 12. Collections partagées
+
+Backend livré (lots 0 à 3 de [collections.md](collections.md), qui garde les décisions et le parcours utilisateur). Les collections sont des dossiers de fichiers `.md` du disque : on ne synchronise pas du contenu en base mais des **fichiers**, par-dessus les canaux existants (session chiffrée, appareils de confiance, espace du profil). Le front (lots 4 et 5) n'est pas livré.
+
+### 12.1 Modèle de données
+
+| Élément | Contenu |
+|---|---|
+| Réglage `receivedCollectionsFolder` (`settings.json`, `SettingsDto`) | Dossier des collections reçues, **par appareil, jamais synchronisé**. Vide : `Documents/Daftr` (dossier Documents résolu par Tauri, repli : dossier des données). Sinon un chemin absolu (refusé sinon, valeur précédente gardée). |
+| `collection_shares` (base du profil) | `sync_id` (uuid, identifiant commun aux appareils) ↔ `path` de la collection (clé étrangère `ON UPDATE CASCADE ON DELETE CASCADE` : le partage suit un dossier déplacé et disparaît avec sa collection). |
+| `collection_share_peers` | Appareil, état `offered` / `active`, dernier échange complet. |
+| `collection_files` | Index des fichiers locaux : chemin, empreinte, taille, date. Évite de relire un fichier qui n'a pas bougé (un fichier modifié depuis moins de 2 s est toujours relu : certains systèmes datent à la seconde). |
+| `collection_bases` | **Dernière version échangée avec chaque appareil**, par fichier : empreinte (SHA-256) et texte (UTF-8, 256 Kio au plus) pour la fusion à trois voies. |
+
+Migration : quatre `CREATE TABLE IF NOT EXISTS` à l'ouverture de la base (idempotent, sans sauvegarde : aucune table existante n'est touchée). Tests : base 1.7.0 migrée deux fois, partage / appareils / bases / index, cascades.
+
+### 12.2 Décision par fichier (`app::collection_sync`, pur)
+
+Trois empreintes par chemin : locale `L`, distante `R`, base `B`. La base effective est celle que les deux côtés annoncent à l'identique ; si un accusé s'est perdu, celle qu'un côté annonce et que l'autre a exactement dans son fichier ; sinon aucune.
+
+| `L` / `R` / `B` | Décision |
+|---|---|
+| `L = R` | rien (la base est retenue ; absent des deux côtés : oubliée) |
+| un seul côté a le fichier, sans base | l'autre le reçoit |
+| les deux ont le fichier, sans base | conflit |
+| `L = B`, `R` absent | suppression (corbeille) |
+| `L = B`, `R ≠ B` | je reçois |
+| `L ≠ B`, `R = B` | l'autre reçoit (ou supprime) |
+| `L` absent, `R ≠ B` / `L ≠ B`, `R` absent | **la modification gagne sur la suppression** |
+| `L ≠ B`, `R ≠ B`, `L ≠ R` | conflit |
+
+La décision est symétrique : chaque côté la calcule seul à partir des deux manifestes, ce que l'un reçoit l'autre l'envoie.
+
+**Conflit.** Le plus petit identifiant d'appareil est l'**arbitre**, ce qui donne la même issue aux deux côtés sans échange :
+- base connue et trois textes UTF-8 : fusion à trois voies par `text_merge::merge`, avec l'ordre « arbitre d'abord » (le résultat est identique des deux côtés), écrit par les deux ;
+- sinon (premier échange, binaire, base trop grosse) : l'arbitre garde sa version à la place d'origine, le **suiveur** met la sienne dans `nom (conflit <son appareil>).md` (numéroté si le nom est pris) puis prend celle de l'arbitre. Rien n'est perdu ; la copie se synchronise ensuite comme un fichier nouveau.
+
+**Chemins** (`SyncPath`) : relatifs, séparateurs `/`, refus de `..`, `.`, segments vides, chemin absolu, `\`, lecteur et flux (`:`), caractères de contrôle et `* ? " < > |`, noms réservés Windows (`CON`, `PRN`, `AUX`, `NUL`, `COM0-9`, `LPT0-9`, avec ou sans extension), nom finissant par un point ou une espace, plus de 255 octets par nom ou 1 024 au total, dossiers exclus ou cachés, profondeur au-delà de `MAX_SCAN_DEPTH`, fichier non `.md`. Deux fichiers qui ne diffèrent que par la casse sont **écartés tous les deux** et signalés (`caseCollision`) ; un fichier de plus de 10 Mio l'est aussi (`tooLarge`). Les fichiers qui ne sont pas des `.md` ne sont jamais copiés, modifiés ni supprimés.
+
+Tests : tables de décision, chemins, noms de copies, fusion identique des deux côtés, et `proptest` sur deux copies simulées (accusés perdus, ordres d'application différents) : convergence toujours, aucun contenu non encore échangé perdu (fichiers binaires, jamais fusionnés).
+
+### 12.3 Protocole
+
+**Compatibilité.** `PROTOCOL_VERSION` reste à 1. postcard encode l'indice de variante en varint et **décode un indice inconnu comme une erreur** : une version antérieure fermerait la session à la réception d'un message de collection. Deux protections :
+- `Hello` porte, après le type d'appareil, un octet `features` (bit 0 : collections). Une version antérieure ignore les octets en trop (comme pour le type) ; un `Hello` sans cet octet se lit « aucune fonctionnalité ». **Les messages de collections ne partent qu'à un appareil qui annonce le bit** : entre une ancienne et une nouvelle version, la synchronisation des notes continue à l'identique.
+- `Message::decode` rend `Error::UnknownMessage` pour tout indice au-delà de la dernière variante connue, et la session **l'ignore** (elle continue) : une future version pourra ajouter des messages.
+
+Messages ajoutés en fin d'énumération (indices figés 14 à 21) :
+
+| # | Message | Rôle |
+|---|---|---|
+| 14 | `CollectionOffer(Vec<OfferedCollection>)` | Propose des collections : espace, partage, nom, nombre de fichiers, volume. |
+| 15 | `CollectionReply { share, accepted }` | Réponse de l'utilisateur. |
+| 16 | `Manifest { share, entries, last }` | Manifeste en parties de 500 lignes : chemin, empreinte (absente = suppression), taille, base. |
+| 17 | `FileRequest { share, path, hash }` | Demande d'une version d'un fichier. |
+| 18 | `FileChunk { share, path, hash, total, offset, data }` | Morceaux de 256 Kio, dans l'ordre. |
+| 19 | `FileUnavailable { share, path, hash }` | La version demandée n'existe plus. |
+| 20 | `FileAck { share, path, hash? }` | « J'ai maintenant cette version » (ou plus de fichier) : l'émetteur retient sa base. |
+| 21 | `ShareStop { share }` | Arrêt du partage. |
+
+**Déroulement.** Un partage ne concerne que les appareils qui **partagent déjà le profil** (espace commun) : l'offre voyage dans la session de ce profil, et la décision 7 est vérifiée par le moteur (appareils membres non révoqués) avant la création du partage. L'état d'un appareil pour un partage est `offered` puis `active` (côté qui propose : à la réponse ; côté qui reçoit : à l'acceptation).
+1. Chaque côté envoie son manifeste au démarrage de la session (parcours complet, hachage seulement des fichiers modifiés), puis après chaque changement de ses fichiers (surveillance, regroupée 1 s) ou de ses transferts, **seulement s'il a changé** (anti-boucle).
+2. À la réception d'un manifeste complet, chaque côté compare à ses fichiers (§12.2), retient les versions identiques, puis demande un par un les fichiers à recevoir ; un manifeste reçu pendant un échange est évalué après.
+3. Chaque fichier reçu est vérifié (empreinte annoncée) ; une version demandée en même temps qu'elle est remplacée est servie depuis l'historique de la session (16 Mio, 64 versions), ce qui évite un faux conflit quand les deux côtés fusionnent ensemble.
+
+### 12.4 Moteur (`adapter-sync::files`, sans réseau)
+
+- **Écriture atomique** (`ShareDisk`, `adapter-fs`) : fichier temporaire voisin `.daftr-sync-*.tmp`, `sync_all`, renommage ; le temporaire disparaît en cas d'échec. Un `.tmp` n'est jamais un `.md`, donc jamais synchronisé.
+- **Rien n'est écrasé sans l'avoir vu** : avant d'écrire, de supprimer ou de fusionner, le fichier local est relu et doit avoir l'empreinte que le plan a vue ; sinon la décision est abandonnée (le prochain manifeste la relance). Un échec sur un fichier (disque plein, droits, fichier ouvert) ne ferme pas la session.
+- **Suppressions** : `trash` (corbeille du système, déjà utilisée par `adapter-fs`), sans confirmation.
+- **Anti-boucle** : après chaque écriture, l'index et la base sont mis à jour avec l'empreinte écrite ; le parcours déclenché par la surveillance retrouve les mêmes empreintes et n'envoie rien.
+- **Reprise après coupure** : au fichier près. Un fichier à moitié reçu est abandonné (rien n'est écrit) ; à la reconnexion, les manifestes sont échangés et les fichiers déjà écrits sont à jour. Pas de reprise à l'octet (10 Mio au plus par fichier).
+- **Sécurité** : chemins distants validés (`SyncPath`) puis résolus par `resolve_inside` ; aucun lien symbolique suivi (lecture, écriture, descente dans un dossier) ; tailles bornées (morceaux, fichier, manifeste 40 000 lignes, offre 64 collections) ; noms de collection reçus assainis ; **rien n'est écrit avant l'acceptation** d'une collection proposée.
+- **Fusion avec un dossier existant** : acceptée avec `merge`, sans base commune : identiques ignorés, absents copiés (dans les deux sens), différents gardés en double. Sans `merge`, un dossier non vide est refusé.
+
+### 12.5 Intégration (`desktop`)
+
+- **Surveillance** (`ShareWatcher`, `adapter-fs`) : un thread unique, **démarré avec le premier dossier partagé** (aucun thread sans partage), récursif, regroupe les rafales (400 ms) ; ignore les fichiers qui ne sont pas des `.md` et les temporaires de la synchronisation. Indépendante du profil actif et des collections dépliées.
+- **Parcours complet** au démarrage (tous les profils synchronisés, actifs ou non), à la connexion d'un appareil, et à chaque partage créé ou accepté.
+- Retirer une collection de la liste, ou changer son dossier, passe par le partage : `collections_remove` arrête d'abord la synchronisation ; `collections_relocate` et `collection_sync_relink` **oublient l'historique des échanges** du partage (sinon un dossier relié sur un autre contenu serait lu comme une suppression de masse).
+
+Commandes (paramètres en camelCase côté renderer) :
+
+| Commande | Paramètres | Rend |
+|---|---|---|
+| `collection_sync_state` | — | `CollectionSyncStateDto` (partages de tous les profils synchronisés, propositions en attente, `receivedFolder` résolu) |
+| `collection_sync_summary` | `root` (collection du profil actif) | `FolderSummaryDto` (nombre et volume des `.md`, `hasGit`, fichiers écartés, `truncated`) |
+| `collection_sync_inspect_folder` | `path` (absolu) | `FolderSummaryDto` (`exists`, `empty`, `mdFiles` : « ce dossier existe déjà (87 .md) ») |
+| `collection_sync_share` | `root`, `deviceKeys[]` | `CollectionShareDto` ; les appareils doivent partager le profil actif |
+| `collection_sync_stop` | `profileId`, `syncId` | — |
+| `collection_sync_answer_offer` | `deviceKey`, `syncId`, `destination?`, `mode` : `receive` / `merge` / `decline` | — ; ensuite relire `collections_list` |
+| `collection_sync_relink` | `root`, `folder?` (dialogue s'il est absent) | `CollectionDto?` (`null` : aucun dossier choisi) |
+| `collection_conflict_resolve` | `root`, `path` (la copie), `keep` : `mine` / `other` | — ; la version gardée prend la place de l'original, la copie part à la corbeille |
+
+Erreurs : refus `Collection already shared`, `Destination folder is not empty`, `Unknown collection share`, `Unknown collection` ; clés du moteur (`unknown_offer`, `untrusted`…) comme les commandes `sync_*`.
+
+Événements :
+
+| Événement | Charge utile | Quand |
+|---|---|---|
+| `sync:collection-offer` | `CollectionOffersDto` | Un appareil propose des collections (aussi relisibles par `collection_sync_state`) |
+| `sync:collection-progress` | `CollectionProgressDto` (`done` / `total` par appareil) | Un échange de fichiers avance |
+| `sync:collection-state` | `CollectionStateEventDto` (`share` absent : le partage n'existe plus) | État d'un partage changé : pastille, appareils, conflits, fichiers écartés |
+| `sync:collection-conflicts` | `CollectionConflictsDto` | Les copies de conflit d'un partage ont changé (liste vide : tout est résolu) |
+
+La pastille (`CollectionShareStatusKind`) est calculée côté backend, dans l'ordre : `missingFolder`, `syncing`, `conflicts`, `waiting` (aucun appareil actif connecté), `offered` (personne n'a encore accepté), `upToDate`. Une copie de conflit (`CollectionConflictDto`) donne son original, le nom de l'appareil dont elle garde la version, et `mine`.
+
+### 12.6 Écarts par rapport à [collections.md](collections.md)
+
+- **Un watcher dédié** (`ShareWatcher`) et non « le watcher existant des collections » : celui-ci ne surveille que les collections dépliées du profil actif et pousse des arbres vers l'interface ; le partage doit suivre tous les dossiers partagés de tous les profils.
+- **Aucune table de « conflits »** : une copie de conflit est reconnue à son nom (`nom (conflit X).md` à côté de `nom.md`) ; le résumé du partage les liste.
+- **Le suiveur fait la copie, l'arbitre ne fait rien** : la copie porte le nom de l'appareil qui l'a créée (le suiveur), pas celui de « l'autre » vu de chaque côté.
+- **Une proposition refusée n'est pas mémorisée** : si l'appareil qui propose est connecté, son partage se retire ; sinon il reproposera à la prochaine connexion. Les propositions en attente sont gardées en mémoire (perdues au redémarrage), mais le proposant les renvoie tant qu'elles n'ont pas de réponse.
+- **Reprise au fichier, pas à l'octet.**
+- **Texte de la base limité à 256 Kio** : au-delà, deux versions différentes sont gardées en double plutôt que fusionnées.
+- Les réponses « Plus tard » ne passent pas par le backend (la proposition reste dans `collection_sync_state`).
+- Arrêter ou retirer un appareil du profil (`sync_stop_sharing`, `sync_remove_device`) retire l'appareil de ses collections partagées (un partage sans appareil disparaît) ; aucun événement `sync:collection-state` n'est émis dans ce cas : le renderer relit l'état.
+
+### 12.7 Limites et points non vérifiés
+
+- Un dossier vidé d'un coup (disque ou partage réseau démonté, dossier de montage vide) est lu comme des suppressions et part à la corbeille chez l'autre appareil (récupérable). Un dossier qui n'existe plus n'envoie rien et ne supprime rien (`missingFolder`).
+- Une base ou un accusé perdu n'a jamais d'effet destructeur : au pire une copie de conflit en trop.
+- Les fichiers ouverts en écriture exclusive par un autre programme (renommage refusé) sont repris au prochain manifeste.
+- **Non vérifié** : deux PC réels, la corbeille de Windows et de macOS par `ShareDisk::trash` (testée par le moteur sur un disque en mémoire seulement), la surveillance du système sur de gros dépôts (checkout git, 20 000 fichiers), les liens symboliques sous Windows (testés sous Unix seulement), les dossiers réseau et OneDrive, l'interface (aucun écran n'est livré).
+
+## 13. Phases ultérieures
 
 Client mobile (scan du QR code, même format), scan du QR par webcam sur desktop, export / import d'un paquet de modifications par fichier pour les appareils jamais présents ensemble, historique des versions, `y-codemirror.next` (Yjs dans l'éditeur, ce qui rendrait la fusion à trois voies inutile), offres persistées, mDNS allégé pour revenir sous 1 Mo, keepalive.

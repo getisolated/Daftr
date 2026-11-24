@@ -6,12 +6,12 @@ Statut : **plan validé**. Prolonge la synchronisation LAN des notes ([plan.md](
 
 | # | Sujet | Décision |
 |---|-------|----------|
-| 1 | Sens | Toujours miroir : les deux PC lisent et écrivent. |
-| 2 | Fichiers | **Seulement les `.md`.** Jamais les autres fichiers du dossier, ni pour les copier ni pour les supprimer. Mêmes exclusions que l'app (`node_modules`, `bin`, `obj`, `build`, `dist`, `target`…, voir `DEFAULT_COLLECTION_EXCLUDES`). |
-| 3 | Suppressions | Propagées, mais le fichier part à la **corbeille du système** sur l'autre PC (récupérable), sans confirmation. |
-| 4 | Destination | Réglage « Dossier des collections reçues » (par PC, non synchronisé, défaut `Documents/Daftr/`), `<racine>/<nom de la collection>` pré-rempli, modifiable à chaque réception. |
-| 5 | Dossier existant | « Fusionner » possible : identiques ignorés, absents copiés, différents gardés en double (pas d'historique commun au premier échange). |
-| 6 | Dossier avec `.git` | Simple avertissement, pas d'interdiction. |
+| 1 | Sens | Toujours miroir : les deux PC lisent et écrivent. | ✅ |
+| 2 | Fichiers | **Seulement les `.md`.** Jamais les autres fichiers du dossier, ni pour les copier ni pour les supprimer. Mêmes exclusions que l'app (`node_modules`, `bin`, `obj`, `build`, `dist`, `target`…, voir `DEFAULT_COLLECTION_EXCLUDES`). | ✅ |
+| 3 | Suppressions | Propagées, mais le fichier part à la **corbeille du système** sur l'autre PC (récupérable), sans confirmation. | ✅ |
+| 4 | Destination | Réglage « Dossier des collections reçues » (par PC, non synchronisé, défaut `Documents/Daftr/`), `<racine>/<nom de la collection>` pré-rempli, modifiable à chaque réception. | ☐ |
+| 5 | Dossier existant | « Fusionner » possible : identiques ignorés, absents copiés, différents gardés en double (pas d'historique commun au premier échange). | ☐ |
+| 6 | Dossier avec `.git` | Simple avertissement, pas d'interdiction. | ☐ |
 
 | 7 | Appareils | Une collection ne se partage qu'avec les appareils qui **partagent déjà le profil** (la liste des collections fait partie des données du profil). |
 | 8 | Taille | 10 Mio maximum par fichier ; un fichier plus gros est ignoré avec un message. |
@@ -114,15 +114,15 @@ Paramètres → Synchronisation → **« Dossier des collections reçues »** : 
 
 ## 4. Lots
 
-| Lot | Contenu | Livrable testable |
-|-----|---------|-------------------|
-| 0 | Données : `sync_id` des collections, table d'état des fichiers (hash, base), réglage « Dossier des collections reçues ». | Tests de migration et de stockage. |
-| 1 | Cœur pur (domain/app) : calcul de diff entre manifestes, décision envoyer / recevoir / conflit / suppression, noms de copies de conflit, validation des chemins. | Tests unitaires et `proptest` (convergence, jamais de perte). |
-| 2 | Protocole et moteur : messages, transfert par morceaux, écriture atomique, corbeille, anti-boucle, reprise après coupure. | Tests d'intégration deux moteurs en mémoire. |
-| 3 | Intégration desktop : watcher → moteur, offres de collection, commandes IPC, événements de progression. | Tests de commandes ; recette sur deux dossiers locaux. |
-| 4 | Interface : menu contextuel, assistant, fenêtre de proposition, pastilles, section dans le popup profil, réglage de la racine. | Tests vitest des utilitaires ; recette visuelle. |
-| 5 | Conflits : badge, bandeau d'actions, « Comparer », états « introuvable » / « en attente ». | Tests vitest ; recette. |
-| 6 | Documentation (plan.md, README) et recette sur deux PC réels. | — |
+| Lot | Contenu | Livrable testable | Fait |
+|-----|---------|-------------------|------|
+| 0 | Données : `sync_id` des collections, table d'état des fichiers (hash, base), réglage « Dossier des collections reçues ». | Tests de migration et de stockage. | ✅ |
+| 1 | Cœur pur (domain/app) : calcul de diff entre manifestes, décision envoyer / recevoir / conflit / suppression, noms de copies de conflit, validation des chemins. | Tests unitaires et `proptest` (convergence, jamais de perte). | ✅ |
+| 2 | Protocole et moteur : messages, transfert par morceaux, écriture atomique, corbeille, anti-boucle, reprise après coupure. | Tests d'intégration deux moteurs en mémoire. | ✅ |
+| 3 | Intégration desktop : watcher → moteur, offres de collection, commandes IPC, événements de progression. | Tests de commandes ; recette sur deux dossiers locaux. | ✅ |
+| 4 | Interface : menu contextuel, assistant, fenêtre de proposition, pastilles, section dans le popup profil, réglage de la racine. | Tests vitest des utilitaires ; recette visuelle. | ☐ |
+| 5 | Conflits : badge, bandeau d'actions, « Comparer », états « introuvable » / « en attente ». | Tests vitest ; recette. | ☐ |
+| 6 | Documentation (plan.md, README) et recette sur deux PC réels. | — | ☐ |
 
 Tout va dans la branche `NF/feat/sync-lan-261123`, PR #90 vers `recipe`.
 
