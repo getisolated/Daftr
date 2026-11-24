@@ -146,4 +146,8 @@ syncPort: number,
 /**
  * Synchronisation en pause.
  */
-syncPaused: boolean, };
+syncPaused: boolean, 
+/**
+ * Dossier des collections reçues, vide pour `Documents/Daftr`.
+ */
+receivedCollectionsFolder: string, };

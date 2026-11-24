@@ -33,6 +33,8 @@ pub const MCP_MIN_PORT: u16 = 1024;
 pub const MCP_MAX_PORT: u16 = 65535;
 /// Longueur du jeton du serveur MCP : 32 octets aléatoires en hexadécimal minuscule.
 pub const MCP_TOKEN_LENGTH: usize = 64;
+/// Longueur maximale (en octets) du dossier des collections reçues.
+pub const MAX_RECEIVED_FOLDER_BYTES: usize = 1024;
 /// Port par défaut de la synchronisation entre appareils.
 pub const DEFAULT_SYNC_PORT: u16 = 47_820;
 /// Plus petit port accepté pour la synchronisation (hors des ports réservés au système).
@@ -119,6 +121,9 @@ pub struct AppSettings {
     pub sync_port: u16,
     /// Pause globale de la synchronisation : ni écoute, ni annonce, ni connexion.
     pub sync_paused: bool,
+    /// Dossier où arrivent les collections reçues d'un autre appareil (par appareil, jamais
+    /// synchronisé) ; vide : `Documents/Daftr`, résolu hors du domaine. Sinon un chemin absolu.
+    pub received_collections_folder: String,
 }
 
 impl AppSettings {
@@ -180,6 +185,7 @@ impl Default for AppSettings {
             sync_device_name: String::new(),
             sync_port: DEFAULT_SYNC_PORT,
             sync_paused: false,
+            received_collections_folder: String::new(),
         }
     }
 }

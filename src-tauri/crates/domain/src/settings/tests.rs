@@ -541,3 +541,36 @@ fn bounds_the_sync_port_and_reads_the_pause() {
     assert_eq!(sync(f64::NAN).sync_port, DEFAULT_SYNC_PORT);
     assert!(sync(48000.0).sync_paused);
 }
+
+#[test]
+fn keeps_an_absolute_received_folder_only() {
+    let base = AppSettings {
+        received_collections_folder: absolute("keep"),
+        ..AppSettings::default()
+    };
+    let folder = |value: &str| {
+        let raw = RawSettings {
+            received_collections_folder: Some(value.to_owned()),
+            ..RawSettings::default()
+        };
+        sanitize_settings(&raw, &base).received_collections_folder
+    };
+
+    assert_eq!(folder(&absolute("new")), absolute("new"));
+    assert_eq!(folder("  "), "");
+    assert_eq!(folder("relative/folder"), absolute("keep"));
+    assert_eq!(folder(&format!("{} ", absolute("nul"))), absolute("keep"));
+    assert_eq!(folder(&absolute(&"x".repeat(2000))), absolute("keep"));
+    assert!(
+        AppSettings::default()
+            .received_collections_folder
+            .is_empty()
+    );
+}
+
+fn absolute(name: &str) -> String {
+    std::env::temp_dir()
+        .join(name)
+        .to_string_lossy()
+        .into_owned()
+}

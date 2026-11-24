@@ -53,6 +53,7 @@ pub fn raw_from_json(value: &Value) -> RawSettings {
         sync_device_name: text("syncDeviceName"),
         sync_port: number("syncPort"),
         sync_paused: flag("syncPaused"),
+        received_collections_folder: text("receivedCollectionsFolder"),
     }
 }
 
@@ -123,6 +124,7 @@ pub fn settings_to_json(settings: &AppSettings) -> Value {
         "syncDeviceName": settings.sync_device_name,
         "syncPort": settings.sync_port,
         "syncPaused": settings.sync_paused,
+        "receivedCollectionsFolder": settings.received_collections_folder,
     })
 }
 
@@ -153,6 +155,7 @@ mod tests {
             sync_device_name: "Laptop".to_owned(),
             sync_port: 48000,
             sync_paused: true,
+            received_collections_folder: std::env::temp_dir().to_string_lossy().into_owned(),
             ..AppSettings::default()
         };
 

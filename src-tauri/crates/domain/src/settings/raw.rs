@@ -95,6 +95,8 @@ pub struct RawSettings {
     pub sync_port: Option<f64>,
     /// Voir [`AppSettings::sync_paused`].
     pub sync_paused: Option<bool>,
+    /// Voir [`AppSettings::received_collections_folder`].
+    pub received_collections_folder: Option<String>,
 }
 
 impl RawSettings {
@@ -143,6 +145,7 @@ impl RawSettings {
             sync_device_name: Some(settings.sync_device_name.clone()),
             sync_port: Some(f64::from(settings.sync_port)),
             sync_paused: Some(settings.sync_paused),
+            received_collections_folder: Some(settings.received_collections_folder.clone()),
         }
     }
 
@@ -196,6 +199,9 @@ impl RawSettings {
             sync_device_name: patch.sync_device_name.or(self.sync_device_name),
             sync_port: patch.sync_port.or(self.sync_port),
             sync_paused: patch.sync_paused.or(self.sync_paused),
+            received_collections_folder: patch
+                .received_collections_folder
+                .or(self.received_collections_folder),
         }
     }
 }

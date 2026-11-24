@@ -101,6 +101,8 @@ pub struct SettingsDto {
     pub sync_port: u16,
     /// Synchronisation en pause.
     pub sync_paused: bool,
+    /// Dossier des collections reçues, vide pour `Documents/Daftr`.
+    pub received_collections_folder: String,
 }
 
 impl From<&AppSettings> for SettingsDto {
@@ -143,6 +145,7 @@ impl From<&AppSettings> for SettingsDto {
             sync_device_name: settings.sync_device_name.clone(),
             sync_port: settings.sync_port,
             sync_paused: settings.sync_paused,
+            received_collections_folder: settings.received_collections_folder.clone(),
         }
     }
 }
