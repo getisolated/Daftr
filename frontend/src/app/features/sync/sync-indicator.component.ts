@@ -4,7 +4,7 @@ import { SyncService } from '../../core/services/sync.service';
 
 /**
  * Problem of the sync in the sidebar footer (the app has no status bar); a click opens the sync screen. Shown only for an
- * error or a warning: nothing is shown while the sync is fine, off, syncing or paused, so a problem cannot go unseen
+ * error: nothing is shown while the sync is fine, off, syncing or paused, so a problem cannot go unseen
  * without the footer being busier the rest of the time.
  */
 @Component({
@@ -51,7 +51,7 @@ export class SyncIndicatorComponent {
 
   protected readonly shown = computed(() => {
     const indicator = this.sync.indicator();
-    return indicator && (indicator.tone === 'error' || indicator.tone === 'warning') ? indicator : null;
+    return indicator && indicator.tone === 'error' ? indicator : null;
   });
 
   /** The state, the cause of an error, and what a click does. */
