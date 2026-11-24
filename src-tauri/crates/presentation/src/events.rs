@@ -26,3 +26,30 @@ pub const UPDATE_DOWNLOAD_FAILED: &str = "update:download-failed";
 pub const EXPORT_PROGRESS: &str = "export:progress";
 /// Le profil actif a changé (ou vient d'être déverrouillé) : la fenêtre se recharge.
 pub const PROFILE_CHANGED: &str = "profiles:changed";
+/// Notes modifiées par un autre appareil (charge utile : `NotesSyncedDto`).
+pub const SYNC_NOTES_SYNCED: &str = "sync:notes-synced";
+/// État de la synchronisation (charge utile : `SyncStatusDto`).
+pub const SYNC_STATUS: &str = "sync:status";
+/// Avancement de la synchronisation initiale (charge utile : `SyncProgressDto`).
+pub const SYNC_PROGRESS: &str = "sync:progress";
+/// Synchronisation initiale terminée (charge utile : `InitialSyncDoneDto`).
+pub const SYNC_INITIAL_DONE: &str = "sync:initial-done";
+/// Appareil lié (charge utile : `LinkedDeviceDto`).
+pub const SYNC_DEVICE_LINKED: &str = "sync:device-linked";
+/// Un appareil nous a retirés de ses appareils : le lien est coupé de notre côté aussi
+/// (charge utile : `DeviceRemovedDto`).
+pub const SYNC_DEVICE_REMOVED: &str = "sync:device-removed";
+/// Profil partagé par un appareil, accepté d'office : un clone est créé (charge utile :
+/// `ProfileReceivedDto`).
+pub const SYNC_PROFILE_RECEIVED: &str = "sync:profile-received";
+/// Collections reçues « à configurer » nouvelles ou retirées (charge utile :
+/// `CollectionOffersDto`).
+pub const SYNC_COLLECTION_OFFER: &str = "sync:collection-offer";
+/// Avancement d'un échange de fichiers (charge utile : `CollectionProgressDto`).
+pub const SYNC_COLLECTION_PROGRESS: &str = "sync:collection-progress";
+/// État d'un partage changé (charge utile : `CollectionStateEventDto`).
+pub const SYNC_COLLECTION_STATE: &str = "sync:collection-state";
+/// Copies de conflit d'un partage changées (charge utile : `CollectionConflictsDto`).
+pub const SYNC_COLLECTION_CONFLICTS: &str = "sync:collection-conflicts";
+/// Mode appairage : nouveau code ou fin (charge utile : `PairingStateDto`).
+pub const SYNC_PAIRING: &str = "sync:pairing";

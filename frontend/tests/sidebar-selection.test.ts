@@ -3,7 +3,7 @@ import { Folder } from '../src/app/core/models/folder.model';
 import { itemKey, parseItemKey, rangeBetween, topLevelItems } from '../src/app/core/utils/sidebar-selection.util';
 
 const folder = (id: number, parentId: number | null): Folder =>
-  ({ id, name: `F${id}`, parentId, createdAt: '', isDefault: false, sortOrder: null, color: null });
+  ({ id, uuid: `folder-${id}`, name: `F${id}`, parentId, createdAt: '', isDefault: false, sortOrder: null, color: null });
 
 const folders = [folder(1, null), folder(2, 1), folder(3, null)];
 const notes = [

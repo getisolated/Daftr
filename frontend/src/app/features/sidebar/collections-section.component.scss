@@ -151,6 +151,69 @@
   }
 }
 
+.share-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--daftr-text-dimmed);
+
+  &[data-tone='ok'] { color: var(--daftr-syntax-comment); }
+  &[data-tone='busy'] { color: var(--daftr-accent); }
+  &[data-tone='busy'] svg { animation: spin 1.2s linear infinite; }
+  &[data-tone='warning'] { color: #d9a13b; }
+  &[data-tone='error'] { color: var(--daftr-danger); }
+
+  // The status after it ("N", spinner) sits next to it instead of sharing the free space
+  & + .status,
+  & + .spinner { margin-left: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .share-badge[data-tone='busy'] svg { animation: none; }
+}
+
+.status.conflict {
+  margin-left: 4px;
+  padding: 0 3px;
+  background: transparent;
+  color: #d9a13b;
+  font-size: 11px;
+}
+
+// Between the header and the rows: proposals waiting for an answer
+.pending-offers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  margin: 2px 8px;
+  padding: 0 8px;
+  border: 1px solid var(--daftr-border-soft);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--daftr-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover { border-color: var(--daftr-accent); }
+}
+
+.pending-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pending-action { color: var(--daftr-accent-text); }
+
 .spinner {
   flex-shrink: 0;
   width: 11px;
@@ -170,6 +233,7 @@
 .row.can-add:hover,
 .row.can-add:focus-within {
   .status,
+  .share-badge,
   .spinner { display: none; }
   app-row-add-button { display: flex; }
 }

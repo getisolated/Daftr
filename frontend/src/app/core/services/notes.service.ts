@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { Note, NotePreview } from '../models/note.model';
+import { Note, NotePreview, NoteUpdate } from '../models/note.model';
 import { QUICK_NOTE_TAG } from '../models/settings.model';
 import { joinBlocks, TimestampedBlock } from '../../shared/codemirror/note-timestamps';
 import { extractNoteTitle } from '../utils/note-title.util';
@@ -115,7 +115,8 @@ export class NotesService {
     }
   }
 
-  async update(id: number, data: { title?: string; content?: string; tags?: string[] }): Promise<Note | null> {
+  /** `base`: the text `content` was built on; in a synced profile, what changed since elsewhere is kept. */
+  async update(id: number, data: NoteUpdate): Promise<Note | null> {
     const updated = await this.bridge.updateNote(id, data);
     if (updated) {
       this._notes.update(list => list.map(n => n.id === id ? updated : n));

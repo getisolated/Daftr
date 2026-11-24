@@ -16,7 +16,7 @@ const INBOX_ID = 7;
 
 function note(overrides: Partial<Note>): Note {
   return {
-    id: 1, title: 'old', content: '', tags: [], folderId: null, sortOrder: 0, color: null,
+    id: 1, uuid: '00000000-0000-4000-8000-000000000001', title: 'old', content: '', tags: [], folderId: null, sortOrder: 0, color: null,
     createdAt: '2026-01-01T10:00:00Z', updatedAt: '2026-01-01T10:00:00Z', ...overrides,
   } as Note;
 }

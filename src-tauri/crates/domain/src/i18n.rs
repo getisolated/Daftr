@@ -88,6 +88,13 @@ pub enum MessageKey {
     MenuZoom,
     /// Menu Fenêtre : fermer la fenêtre.
     MenuCloseWindow,
+    /// Synchronisation : nom de cet appareil quand le nom d'hôte est introuvable.
+    SyncDefaultDeviceName,
+    /// Synchronisation : nom proposé pour un profil sans nom.
+    SyncDefaultSpaceName,
+    /// Synchronisation : nom d'un profil cloné dont l'original n'a pas de nom (le profil par
+    /// défaut), comme l'interface l'affiche.
+    SyncDefaultProfileName,
 }
 
 /// Le texte `key` dans `language`.
@@ -132,6 +139,9 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::MenuMinimize => "Minimize",
         MessageKey::MenuZoom => "Zoom",
         MessageKey::MenuCloseWindow => "Close Window",
+        MessageKey::SyncDefaultDeviceName => "Computer",
+        MessageKey::SyncDefaultSpaceName => "My notes",
+        MessageKey::SyncDefaultProfileName => "Default profile",
     }
 }
 
@@ -165,6 +175,9 @@ fn french(key: MessageKey) -> &'static str {
         MessageKey::MenuMinimize => "Placer dans le Dock",
         MessageKey::MenuZoom => "Réduire/agrandir",
         MessageKey::MenuCloseWindow => "Fermer la fenêtre",
+        MessageKey::SyncDefaultDeviceName => "Ordinateur",
+        MessageKey::SyncDefaultSpaceName => "Mes notes",
+        MessageKey::SyncDefaultProfileName => "Profil par défaut",
     }
 }
 

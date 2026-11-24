@@ -3,7 +3,7 @@ import { Folder } from '../src/app/core/models/folder.model';
 import { folderArchiveEntries, selectionArchiveEntries } from '../src/app/core/utils/export-archive.util';
 
 const folder = (id: number, name: string, parentId: number | null): Folder =>
-  ({ id, name, parentId, createdAt: '', isDefault: false, sortOrder: null, color: null });
+  ({ id, uuid: `folder-${id}`, name, parentId, createdAt: '', isDefault: false, sortOrder: null, color: null });
 
 // Projet / Specs / Archive, and Perso at the root
 const folders = [folder(1, 'Projet', null), folder(2, 'Specs', 1), folder(3, 'Archive', 2), folder(4, 'Perso', null)];

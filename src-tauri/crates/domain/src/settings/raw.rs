@@ -91,6 +91,14 @@ pub struct RawSettings {
     pub mcp_port: Option<f64>,
     /// Voir [`AppSettings::mcp_token`].
     pub mcp_token: Option<String>,
+    /// Voir [`AppSettings::sync_device_name`].
+    pub sync_device_name: Option<String>,
+    /// Voir [`AppSettings::sync_port`].
+    pub sync_port: Option<f64>,
+    /// Voir [`AppSettings::sync_paused`].
+    pub sync_paused: Option<bool>,
+    /// Voir [`AppSettings::received_collections_folder`].
+    pub received_collections_folder: Option<String>,
 }
 
 impl RawSettings {
@@ -137,6 +145,10 @@ impl RawSettings {
             mcp_enabled: Some(settings.mcp_enabled),
             mcp_port: Some(f64::from(settings.mcp_port)),
             mcp_token: Some(settings.mcp_token.clone()),
+            sync_device_name: Some(settings.sync_device_name.clone()),
+            sync_port: Some(f64::from(settings.sync_port)),
+            sync_paused: Some(settings.sync_paused),
+            received_collections_folder: Some(settings.received_collections_folder.clone()),
         }
     }
 
@@ -188,6 +200,12 @@ impl RawSettings {
             mcp_enabled: patch.mcp_enabled.or(self.mcp_enabled),
             mcp_port: patch.mcp_port.or(self.mcp_port),
             mcp_token: patch.mcp_token.or(self.mcp_token),
+            sync_device_name: patch.sync_device_name.or(self.sync_device_name),
+            sync_port: patch.sync_port.or(self.sync_port),
+            sync_paused: patch.sync_paused.or(self.sync_paused),
+            received_collections_folder: patch
+                .received_collections_folder
+                .or(self.received_collections_folder),
         }
     }
 }

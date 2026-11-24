@@ -1,23 +1,31 @@
-//! Démarrage : stockages, services, fenêtres, tray, raccourci, mises à jour.
+//! Démarrage : stockages, services, synchronisation, fenêtres, tray, raccourci, mises à jour.
 
 use std::path::Path;
 use std::sync::Arc;
 
-use adapter_fs::{DiskExportWriter, ProfileDirectories, ProfileRegistryFile, SettingsFile};
+use adapter_fs::{
+    DiskExportWriter, ProfileDirectories, ProfileRegistryFile, SettingsFile, ShareDisk,
+};
 use adapter_mcp::RandomSecrets;
 use adapter_password::Argon2Hasher;
 use adapter_print::WebviewPdfRenderer;
+use adapter_sync::{AddrPolicy, EngineConfig, MdnsDiscovery};
 use anyhow::Context;
 use app::export::ExportService;
 use app::profiles::{ProfilePorts, ProfilesService};
 use app::settings::SettingsService;
+use domain::sync::{DeviceKind, DeviceName};
 use presentation::Services;
 use presentation::data::ActiveData;
-use tauri::{App, AppHandle, Manager};
+use tauri::{App, AppHandle, Manager, async_runtime};
 
 use crate::state::{DesktopState, desktop};
+use crate::sync::{SyncSetup, SyncState, WindowSyncEvents, default_device_name};
 use crate::windows::{main_window, overlay};
 use crate::{data_dir, mcp, profiles, shortcut, startup, tray, updater};
+
+/// Sous-dossier des Documents où arrivent par défaut les collections reçues.
+const RECEIVED_FOLDER_NAME: &str = "Daftr";
 
 /// Registre des profils, à la racine des données.
 const PROFILES_FILE: &str = "profiles.json";
@@ -27,11 +35,9 @@ pub fn run(app: &mut App) -> anyhow::Result<()> {
     let handle = app.handle().clone();
     let directory = data_dir::resolve(&handle)?;
     let services = build_services(&handle, &directory);
+    let sync = build_sync(&handle, &directory, &services)?;
 
-    app.manage(DesktopState::new(
-        services,
-        ProfileDirectories::new(directory),
-    ));
+    app.manage(DesktopState::new(services, sync));
     profiles::open_last_active(&handle).context("ouverture du profil")?;
 
     start_windows(&handle)?;
@@ -57,13 +63,47 @@ fn build_services(app: &AppHandle, directory: &Path) -> Services {
 
     Services {
         data: ActiveData::default(),
-        profiles,
+        profiles: Arc::new(profiles),
         settings,
         export: ExportService::new(
             Arc::new(DiskExportWriter),
             Arc::new(WebviewPdfRenderer::new(app.clone())),
         ),
     }
+}
+
+/// Le moteur de synchronisation, arrêté : l'identité de l'appareil est chargée (créée au
+/// premier lancement) car toute base de profil s'ouvre avec sa clé.
+fn build_sync(app: &AppHandle, directory: &Path, services: &Services) -> anyhow::Result<SyncState> {
+    let settings = services.settings.current();
+    let host_name = default_device_name(settings.language).context("nom de l'appareil")?;
+    let device_name =
+        DeviceName::parse(&settings.sync_device_name).unwrap_or_else(|| host_name.clone());
+    let config = EngineConfig {
+        port: settings.sync_port,
+        device_kind: DeviceKind::from_battery(platform::power::battery_presence()),
+        ..EngineConfig::new(device_name)
+    };
+
+    let setup = SyncSetup {
+        root: directory.to_path_buf(),
+        profiles: Arc::clone(&services.profiles),
+        events: Arc::new(WindowSyncEvents::new(app.clone())),
+        discovery: Arc::new(MdnsDiscovery::new(AddrPolicy::Lan)),
+        files: Arc::new(ShareDisk::new(settings.collections_exclude.clone())),
+        default_received_folder: documents_folder(app, directory).join(RECEIVED_FOLDER_NAME),
+        config,
+        host_name,
+        runtime: async_runtime::handle().inner().clone(),
+    };
+    SyncState::new(setup).context("synchronisation")
+}
+
+/// Le dossier Documents de l'utilisateur ; à défaut, le dossier des données.
+fn documents_folder(app: &AppHandle, fallback: &Path) -> std::path::PathBuf {
+    app.path()
+        .document_dir()
+        .unwrap_or_else(|_| fallback.to_path_buf())
 }
 
 fn start_windows(app: &AppHandle) -> anyhow::Result<()> {
@@ -90,4 +130,5 @@ fn start_background(app: &AppHandle) {
     }
     updater::start(app);
     mcp::sync(app);
+    crate::sync::start(app);
 }

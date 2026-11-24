@@ -5,7 +5,9 @@ import { APP_SHORTCUTS } from '../../core/models/app-shortcuts.model';
 import { THEMES, ThemeKind } from '../../core/models/theme.model';
 import type { Platform } from '../../core/services/platform.service';
 
-export type SettingControl = 'checkbox' | 'number' | 'select' | 'shortcut' | 'list' | 'mcpToken' | 'mcpConnection';
+export type SettingControl =
+  | 'checkbox' | 'number' | 'select' | 'shortcut' | 'list' | 'mcpToken' | 'mcpConnection'
+  | 'syncStatus' | 'syncDeviceName' | 'syncScreen' | 'receivedFolder';
 
 /** Option of a select setting: a translated `labelKey`, or a literal `label` that is never translated (a language named in itself). */
 export interface SettingOption {
@@ -331,6 +333,55 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'mcpConnection',
     fixed: true,
     panel: true,
+  },
+  {
+    key: 'syncStatus',
+    categoryKey: 'sync.settings.category',
+    titleKey: 'sync.settings.status.title',
+    descriptionKey: 'sync.settings.status.description',
+    control: 'syncStatus',
+    fixed: true,
+    panel: true,
+  },
+  {
+    key: 'syncDeviceName',
+    categoryKey: 'sync.settings.category',
+    titleKey: 'sync.settings.deviceName.title',
+    descriptionKey: 'sync.settings.deviceName.description',
+    control: 'syncDeviceName',
+  },
+  {
+    key: 'syncPaused',
+    categoryKey: 'sync.settings.category',
+    titleKey: 'sync.settings.paused.title',
+    descriptionKey: 'sync.settings.paused.description',
+    control: 'checkbox',
+  },
+  {
+    key: 'syncScreen',
+    categoryKey: 'sync.settings.category',
+    titleKey: 'sync.settings.screen.title',
+    descriptionKey: 'sync.settings.screen.description',
+    control: 'syncScreen',
+    fixed: true,
+    panel: true,
+  },
+  {
+    key: 'receivedCollectionsFolder',
+    categoryKey: 'sync.settings.category',
+    titleKey: 'csync.settings.receivedFolder.title',
+    descriptionKey: 'csync.settings.receivedFolder.description',
+    control: 'receivedFolder',
+  },
+  {
+    key: 'syncPort',
+    categoryKey: 'sync.settings.category',
+    titleKey: 'sync.settings.port.title',
+    descriptionKey: 'sync.settings.port.description',
+    control: 'number',
+    min: 1024,
+    max: 65535,
+    step: 1,
   },
   ...APP_SHORTCUT_DEFINITIONS,
 ];

@@ -82,6 +82,12 @@ impl NotesService {
         self.notes.delete(id)
     }
 
+    /// Rétablit une note supprimée et la rend, `None` si elle n'existe pas.
+    pub fn restore(&self, id: i64) -> AppResult<Option<Note>> {
+        self.notes.restore(id)?;
+        self.notes.by_id(id)
+    }
+
     /// Colore des notes ; une couleur invalide les décolore.
     pub fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {
         if ids.is_empty() {

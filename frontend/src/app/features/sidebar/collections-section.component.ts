@@ -5,10 +5,14 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslationKey } from '../../core/i18n/translations';
 import { CollectionEditing, CollectionRow } from '../../core/models/collection-tree.model';
 import { CollectionFileRef, CollectionNode, CollectionState } from '../../core/models/collection.model';
+import { CollectionShare, CollectionShareBadge } from '../../core/models/collection-sync.model';
+import { CollectionSyncService } from '../../core/services/collection-sync.service';
+import { SyncService } from '../../core/services/sync.service';
 import { CollectionsService } from '../../core/services/collections.service';
 import { CollectionCopyService } from '../../core/services/collection-copy.service';
 import { FoldersService } from '../../core/services/folders.service';
 import { CollectionCopySource } from '../../core/utils/collection-copy.util';
+import { shareBadge } from '../../core/utils/collection-sync.util';
 import { folderOptions } from '../../core/utils/folder-tree.util';
 import { rangeBetween } from '../../core/utils/sidebar-selection.util';
 import { FileDocsService } from '../../core/services/file-docs.service';
@@ -22,6 +26,7 @@ import { ProfilesService } from '../../core/services/profiles.service';
 import { transferMenu, transferTarget } from '../../core/utils/transfer-menu.util';
 import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
+import { CollectionShareMenuComponent } from '../sync/collection-share-menu.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { RowAddButtonComponent } from '../../shared/ui/row-add-button.component';
@@ -37,6 +42,7 @@ const ICON_DELETE = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0
 const ICON_REVEAL = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14l3 3 3-3';
 const ICON_REFRESH = 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5';
 const ICON_REMOVE = 'M18 6 6 18M6 6l12 12';
+const ICON_SYNC = 'M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5';
 const ICON_COPY = 'M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1';
 
 function nodeKey(root: string, path: string): string {
@@ -68,7 +74,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
 @Component({
   selector: 'app-collections-section',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, MoveToDialogComponent, RowAddButtonComponent],
+  imports: [ContextMenuComponent, CollectionShareMenuComponent, ConfirmDialogComponent, FocusSelectDirective, MoveToDialogComponent, RowAddButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="header">
@@ -85,6 +91,12 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
     </div>
 
     @if (open()) {
+      @if (collectionSync.pendingCount() > 0) {
+        <button type="button" class="pending-offers" (click)="sync.openScreen()">
+          <span class="pending-text">{{ i18n.plural('csync.pending', collectionSync.pendingCount()) }}</span>
+          <span class="pending-action">{{ i18n.t('csync.pending.open') }}</span>
+        </button>
+      }
       <div class="rows" role="tree" [attr.aria-label]="i18n.t('sidebar.collections.title')">
         @for (row of rows(); track row.key) {
           @if (row.kind === 'collection') {
@@ -137,6 +149,22 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
                   @case ('unloaded') {
                     <span class="status unloaded" [title]="i18n.t('sidebar.collections.notLoaded')">N</span>
                   }
+                }
+                @if (shareBadgeOf(row.state); as badge) {
+                  <span class="share-badge" role="img" [attr.data-tone]="badge.tone" [title]="badgeTitle(badge)" [attr.aria-label]="badge.tooltip" (click)="onBadgeClick($event, row.state)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      @switch (badge.glyph) {
+                        @case ('sync') { <path [attr.d]="iconSync"/> }
+                        @case ('warning') { <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/> }
+                        @case ('pause') { <path d="M8 5v14M16 5v14"/> }
+                        @case ('cross') { <path d="M18 6 6 18M6 6l12 12"/> }
+                        @case ('clock') { <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/> }
+                      }
+                    </svg>
+                    @if (badge.progress; as progress) {
+                      <span class="share-progress">{{ progress }}</span>
+                    }
+                  </span>
                 }
                 @if (canCreateFileIn(row.state)) {
                   <app-row-add-button [label]="i18n.t('sidebar.collections.newFileInFolder')" (pressed)="startNewFile(row.state.collection.path, null)" />
@@ -193,6 +221,9 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
                   (click)="$event.stopPropagation()" (keydown.enter)="commitEditing($event)" (keydown.escape)="editing.set(null); $event.stopPropagation()" (blur)="commitEditing($event)" />
               } @else {
                 <span class="row-label">{{ row.node.name }}</span>
+                @if (conflictIn(row.root, row.node)) {
+                  <span class="status conflict" [title]="i18n.t('csync.conflict.badge')">⚠</span>
+                }
                 @if (row.node.kind === 'folder') {
                   <app-row-add-button [label]="i18n.t('sidebar.collections.newFileInFolder')" (pressed)="startNewFile(row.root, row.node)" />
                 }
@@ -216,12 +247,25 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
       <app-context-menu [items]="current.items" [x]="current.x" [y]="current.y" (action)="onMenuAction($event)" (closed)="menu.set(null)" />
     }
 
+    @if (shareMenu(); as target) {
+      <app-collection-share-menu [root]="target.root" [name]="target.name" [x]="target.x" [y]="target.y" (closed)="shareMenu.set(null)" />
+    }
+
     @if (confirmTrash(); as target) {
       <app-confirm-dialog
         [title]="i18n.t(platformKey('sidebar.collections.trash.title'), { name: baseName(target.path) })"
         [message]="i18n.t(platformKey('sidebar.collections.trash.message'))"
         [actions]="trashActions()"
         (chosen)="onTrashChoice($event)"
+      />
+    }
+
+    @if (confirmStopShare(); as target) {
+      <app-confirm-dialog
+        [title]="i18n.t('csync.profile.stopTitle', { name: target.name })"
+        [message]="i18n.t('csync.profile.stopMessage')"
+        [actions]="stopShareActions()"
+        (chosen)="onStopShareChoice($event)"
       />
     }
 
@@ -254,6 +298,8 @@ export class CollectionsSectionComponent {
   private readonly copier = inject(CollectionCopyService);
   private readonly profiles = inject(ProfilesService);
   private readonly profileTransfer = inject(ProfileTransferService);
+  protected readonly collectionSync = inject(CollectionSyncService);
+  protected readonly sync = inject(SyncService);
 
   /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
   protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
@@ -267,6 +313,16 @@ export class CollectionsSectionComponent {
   }
 
   protected readonly iconFile = ICON_FILE;
+  protected readonly iconSync = ICON_SYNC;
+  protected readonly confirmStopShare = signal<CollectionShare | null>(null);
+  /** "Sync with…" of a collection, opened where its context menu was. */
+  protected readonly shareMenu = signal<{ root: string; name: string; x: number; y: number } | null>(null);
+  protected readonly stopShareActions = computed<ConfirmDialogAction[]>(() => [
+    { id: 'stop', label: this.i18n.t('csync.profile.stop'), danger: true },
+  ]);
+  /** Paths of the conflict copies of every shared collection, by collection root. */
+  private readonly conflictIndex = computed(() =>
+    new Map(this.collectionSync.shares().map(share => [share.root, share.conflicts.map(conflict => conflict.path)] as const)));
   protected readonly trashActions = computed<ConfirmDialogAction[]>(() => [
     { id: 'trash', label: this.i18n.t(this.platformKey('sidebar.collections.trash.confirm')), danger: true },
   ]);
@@ -638,8 +694,14 @@ export class CollectionsSectionComponent {
     const isFolder = state.collection.kind === 'folder';
     const items: ContextMenuEntry[] = [];
 
-    if (state.status === 'error') {
-      items.push({ id: 'relocate', label: t('sidebar.collections.menu.locate'), icon: ICON_REVEAL }, { divider: true });
+    const share = this.collectionSync.shareOf(state.collection.path);
+
+    if (state.status === 'error' || share?.status === 'missingFolder') {
+      // A shared collection is relinked through the sync: it forgets the history of exchanges, or a folder with other files would read as deletions
+      const locate: ContextMenuEntry = share
+        ? { id: 'relinkShare', label: t('csync.menu.relink'), icon: ICON_REVEAL }
+        : { id: 'relocate', label: t('sidebar.collections.menu.locate'), icon: ICON_REVEAL };
+      items.push(locate, { divider: true });
     } else if (canCreateFileIn(state)) {
       items.push({ id: 'newFile', label: t('sidebar.collections.menu.newFile'), icon: ICON_FILE }, { divider: true });
     }
@@ -647,6 +709,16 @@ export class CollectionsSectionComponent {
     // An unloaded folder collection has no tree to copy yet
     const source = this.collectionSource(state);
     items.push({ id: 'copyTo', label: t('sidebar.collections.menu.copyTo'), icon: ICON_COPY, disabled: !source }, { divider: true });
+
+    if (isFolder) {
+      items.push({ id: 'shareCollection', label: t('csync.menu.share'), icon: ICON_SYNC, disabled: state.status === 'error' });
+
+      if (share) {
+        items.push({ id: 'stopShare', label: t('csync.menu.stop'), icon: ICON_SYNC });
+      }
+
+      items.push({ divider: true });
+    }
 
     items.push(
       { id: 'renameCollection', label: t('sidebar.collections.menu.renameCollection'), icon: ICON_RENAME, shortcut: 'F2' },
@@ -737,6 +809,15 @@ export class CollectionsSectionComponent {
       case 'relocate':
         await this.report(() => this.collections.relocate(root));
         break;
+      case 'shareCollection':
+        this.shareMenu.set({ root, name: this.collectionName(root), x: current.x, y: current.y });
+        break;
+      case 'stopShare':
+        this.confirmStopShare.set(this.collectionSync.shareOf(root));
+        break;
+      case 'relinkShare':
+        await this.reportSync(() => this.collectionSync.relink(root));
+        break;
       case 'remove':
         await this.collections.remove(root);
         break;
@@ -746,6 +827,58 @@ export class CollectionsSectionComponent {
       case 'copyTo':
         this.copySources.set(current.copySources);
         break;
+    }
+  }
+
+  // ── Shared collections ─────────────────────────────────────────────────────
+
+  protected shareBadgeOf(state: CollectionState): CollectionShareBadge | null {
+    const share = this.collectionSync.shareOf(state.collection.path);
+    return share ? shareBadge(share, Date.now(), this.i18n.language()) : null;
+  }
+
+  /** What the badge says, then what a click does (missing folder: relink; otherwise the devices view). */
+  protected badgeTitle(badge: CollectionShareBadge): string {
+    const action = badge.status === 'missingFolder' ? this.i18n.t('csync.menu.relink') : this.i18n.t('csync.status.openDevices');
+    return `${badge.tooltip}\n${action}`;
+  }
+
+  protected async onBadgeClick(event: Event, state: CollectionState): Promise<void> {
+    // The row would toggle the collection
+    event.stopPropagation();
+
+    if (this.collectionSync.shareOf(state.collection.path)?.status === 'missingFolder') {
+      await this.reportSync(() => this.collectionSync.relink(state.collection.path));
+    } else {
+      this.sync.openScreen();
+    }
+  }
+
+  /** A conflict copy, or a folder holding one: marked with a warning in the tree. */
+  protected conflictIn(root: string, node: CollectionNode): boolean {
+    const paths = this.conflictIndex().get(root) ?? [];
+    return node.kind === 'file' ? paths.includes(node.path) : paths.some(path => path.startsWith(`${node.path}/`));
+  }
+
+  private collectionName(root: string): string {
+    return this.collections.states().find(state => state.collection.path === root)?.label ?? baseName(root);
+  }
+
+  protected async onStopShareChoice(choice: string | null): Promise<void> {
+    const target = this.confirmStopShare();
+    this.confirmStopShare.set(null);
+
+    if (choice === 'stop' && target) {
+      await this.reportSync(() => this.collectionSync.stop(target));
+    }
+  }
+
+  /** A failed sync command shows its translated message under the section. */
+  private async reportSync(operation: () => Promise<void>): Promise<void> {
+    try {
+      await operation();
+    } catch (error) {
+      this.failure.set(this.collectionSync.errorMessage(error));
     }
   }
 

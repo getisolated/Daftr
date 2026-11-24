@@ -1,0 +1,330 @@
+use app::ports::trust::{DeviceSecret, TrustOrigin, TrustStore, TrustedDevice};
+use domain::profile::ProfileId;
+use domain::sync::{DeviceKey, DeviceKind, DeviceName, SpaceId};
+
+use super::*;
+
+fn device(n: u8, name: &str) -> TrustedDevice {
+    TrustedDevice {
+        key: DeviceKey::from_bytes([n; 32]),
+        name: DeviceName::parse(name).unwrap(),
+        kind: DeviceKind::Laptop,
+        origin: TrustOrigin::Paired,
+        added_at: "2026-11-23 10:00:00".to_owned(),
+        revoked_at: None,
+    }
+}
+
+fn files(directory: &tempfile::TempDir) -> TrustFiles {
+    TrustFiles::new(directory.path().join(SYNC_FOLDER))
+}
+
+#[test]
+fn without_files_there_is_no_identity_and_no_device() {
+    let directory = tempfile::tempdir().unwrap();
+    let trust = files(&directory);
+
+    assert_eq!(trust.device_secret().unwrap(), None);
+    assert!(trust.devices().unwrap().is_empty());
+}
+
+#[test]
+fn the_device_secret_is_saved_and_reloaded() {
+    let directory = tempfile::tempdir().unwrap();
+    let trust = files(&directory);
+    let secret = DeviceSecret::from_bytes([7; 32]);
+
+    trust.save_device_secret(&secret).unwrap();
+
+    assert_eq!(trust.device_secret().unwrap(), Some(secret.clone()));
+    let key_file = directory.path().join(SYNC_FOLDER).join(DEVICE_KEY_FILE);
+    assert!(!temporary_path(&key_file).exists());
+    // Écraser la clé repasse par un fichier neuf, lui aussi lisible
+    trust.save_device_secret(&secret).unwrap();
+    assert_eq!(trust.device_secret().unwrap(), Some(secret));
+}
+
+#[cfg(unix)]
+#[test]
+fn the_device_secret_is_readable_by_its_owner_only() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::tempdir().unwrap();
+    files(&directory)
+        .save_device_secret(&DeviceSecret::from_bytes([7; 32]))
+        .unwrap();
+
+    let path = directory.path().join(SYNC_FOLDER).join(DEVICE_KEY_FILE);
+    let mode = std::fs::metadata(path).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o600);
+}
+
+#[test]
+fn a_corrupted_secret_is_set_aside() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join(DEVICE_KEY_FILE), b"short").unwrap();
+
+    assert_eq!(files(&directory).device_secret().unwrap(), None);
+    let aside = folder.join(format!("{DEVICE_KEY_FILE}{CORRUPTED_SUFFIX}"));
+    assert_eq!(std::fs::read(aside).unwrap(), b"short");
+    assert!(!folder.join(DEVICE_KEY_FILE).exists());
+}
+
+#[test]
+fn devices_are_added_then_replaced_by_key() {
+    let directory = tempfile::tempdir().unwrap();
+    let trust = files(&directory);
+    let laptop = device(1, "Laptop");
+    let mut revoked = device(2, "Desktop");
+
+    trust.put_device(&laptop).unwrap();
+    trust.put_device(&revoked).unwrap();
+    revoked.revoked_at = Some("2026-11-23 11:00:00".to_owned());
+    revoked.origin = TrustOrigin::Space;
+    trust.put_device(&revoked).unwrap();
+
+    assert_eq!(trust.devices().unwrap(), [laptop, revoked]);
+}
+
+/// Un arrêt brutal pendant l'écriture laisse au pire un fichier temporaire : le fichier lu
+/// est toujours la version complète précédente.
+#[test]
+fn an_interrupted_write_leaves_the_previous_devices() {
+    let directory = tempfile::tempdir().unwrap();
+    let trust = files(&directory);
+    let laptop = device(1, "Laptop");
+    trust.put_device(&laptop).unwrap();
+    let path = directory.path().join(SYNC_FOLDER).join(DEVICES_FILE);
+    assert!(!temporary_path(&path).exists());
+
+    std::fs::write(temporary_path(&path), "{ \"devices\": [ { \"ke").unwrap();
+
+    assert_eq!(trust.devices().unwrap(), std::slice::from_ref(&laptop));
+    let phone = device(3, "Phone");
+    trust.put_device(&phone).unwrap();
+    assert_eq!(trust.devices().unwrap(), [laptop, phone]);
+}
+
+#[test]
+fn a_corrupted_device_list_is_empty_and_kept_aside() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join(DEVICES_FILE), "{ nope").unwrap();
+
+    assert!(files(&directory).devices().unwrap().is_empty());
+    let copy = folder.join(format!("{DEVICES_FILE}{CORRUPTED_SUFFIX}"));
+    assert_eq!(std::fs::read_to_string(copy).unwrap(), "{ nope");
+}
+
+#[test]
+fn unreadable_entries_are_skipped_and_revocations_kept() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    let key = DeviceKey::from_bytes([4; 32]);
+    let text = format!(
+        r#"{{ "version": 1, "devices": [
+            {{ "key": "zz", "name": "Bad key" }},
+            {{ "key": "{key}", "name": "PC\u0007", "origin": "space",
+               "addedAt": "2026-11-23 10:00:00", "revokedAt": "garbage" }},
+            42
+        ] }}"#
+    );
+    std::fs::write(folder.join(DEVICES_FILE), text).unwrap();
+
+    let devices = files(&directory).devices().unwrap();
+
+    assert_eq!(devices.len(), 1);
+    assert_eq!(devices[0].key, key);
+    assert_eq!(devices[0].name.as_str(), "PC");
+    assert_eq!(devices[0].origin, TrustOrigin::Space);
+    assert!(!devices[0].is_trusted());
+}
+
+/// Un fichier écrit avant l'ajout du type d'appareil se lit toujours ; un type inconnu
+/// (version ultérieure) aussi.
+#[test]
+fn devices_without_a_known_kind_load_as_unknown() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    let (old, newer) = (
+        DeviceKey::from_bytes([5; 32]),
+        DeviceKey::from_bytes([6; 32]),
+    );
+    let text = format!(
+        r#"{{ "version": 1, "devices": [
+            {{ "key": "{old}", "name": "Ancien", "origin": "paired",
+               "addedAt": "2026-11-23 10:00:00", "revokedAt": null }},
+            {{ "key": "{newer}", "name": "Futur", "kind": "phone", "origin": "paired",
+               "addedAt": "2026-11-23 10:00:00", "revokedAt": null }}
+        ] }}"#
+    );
+    std::fs::write(folder.join(DEVICES_FILE), text).unwrap();
+
+    let devices = files(&directory).devices().unwrap();
+
+    assert_eq!(devices.len(), 2);
+    assert!(
+        devices
+            .iter()
+            .all(|device| device.kind == DeviceKind::Unknown)
+    );
+    assert!(devices.iter().all(TrustedDevice::is_trusted));
+}
+
+#[test]
+fn the_device_kind_is_saved_and_reloaded() {
+    let directory = tempfile::tempdir().unwrap();
+    let trust = files(&directory);
+    let mut desktop = device(7, "Bureau");
+    desktop.kind = DeviceKind::Desktop;
+
+    trust.put_device(&desktop).unwrap();
+    assert_eq!(trust.devices().unwrap()[0].kind, DeviceKind::Desktop);
+
+    assert!(
+        trust
+            .set_device_kind(&desktop.key, DeviceKind::Laptop)
+            .unwrap()
+    );
+    assert!(
+        !trust
+            .set_device_kind(&desktop.key, DeviceKind::Laptop)
+            .unwrap()
+    );
+    assert!(
+        !trust
+            .set_device_kind(&DeviceKey::from_bytes([8; 32]), DeviceKind::Laptop)
+            .unwrap()
+    );
+    let reloaded = trust.devices().unwrap();
+    assert_eq!(reloaded.len(), 1);
+    assert_eq!(reloaded[0].kind, DeviceKind::Laptop);
+}
+
+#[test]
+fn the_space_index_is_saved_and_reloaded() {
+    let directory = tempfile::tempdir().unwrap();
+    let index = SpaceIndexFile::new(&directory.path().join(SYNC_FOLDER));
+    let entries = vec![
+        SpaceIndexEntry {
+            space_id: SpaceId::from_bytes([1; 32]),
+            profile: ProfileId::default_profile(),
+            enabled: true,
+        },
+        SpaceIndexEntry {
+            space_id: SpaceId::from_bytes([2; 32]),
+            profile: ProfileId::parse("work").unwrap(),
+            enabled: false,
+        },
+    ];
+
+    assert!(index.load().is_empty());
+    index.save(&entries).unwrap();
+
+    assert_eq!(index.load(), entries);
+}
+
+#[test]
+fn a_corrupted_space_index_is_empty() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join(INDEX_FILE), [0xff, 0xfe, 0x00]).unwrap();
+
+    assert!(SpaceIndexFile::new(&folder).load().is_empty());
+}
+
+/// Les ACL restreintes laissent la clé lisible par son propriétaire.
+#[cfg(windows)]
+#[test]
+fn the_restricted_device_secret_stays_readable() {
+    let directory = tempfile::tempdir().unwrap();
+    let trust = files(&directory);
+    let secret = DeviceSecret::from_bytes([9; 32]);
+
+    trust.save_device_secret(&secret).unwrap();
+    trust.save_device_secret(&secret).unwrap();
+
+    assert_eq!(trust.device_secret().unwrap(), Some(secret));
+}
+
+fn pending(device: u8, share: u8, ignored: bool) -> PendingCollection {
+    PendingCollection {
+        device: DeviceKey::from_bytes([device; 32]),
+        offer: app::ports::sync::CollectionOffer {
+            share: domain::uuid::Uuid::from_random([share; 16]),
+            source_profile_id: "work".to_owned(),
+            source_profile_name: "Travail".to_owned(),
+            source_space: Some(SpaceId::from_bytes([3; 32])),
+            name: "Docs".to_owned(),
+            files: 12,
+            bytes: 4096,
+        },
+        ignored,
+    }
+}
+
+#[test]
+fn pending_collections_survive_a_restart() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    let inbox = InboxFile::new(&folder);
+    assert!(inbox.pending().unwrap().is_empty());
+
+    inbox.put(&pending(1, 1, false)).unwrap();
+    inbox.put(&pending(1, 2, true)).unwrap();
+    // Même appareil et même partage : l'entrée est remplacée
+    let mut newer = pending(1, 1, false);
+    newer.offer.files = 99;
+    inbox.put(&newer).unwrap();
+
+    let reopened = InboxFile::new(&folder).pending().unwrap();
+    assert_eq!(reopened.len(), 2);
+    let kept = reopened
+        .iter()
+        .find(|entry| !entry.ignored)
+        .expect("l'entrée non ignorée");
+    assert_eq!(kept.offer.files, 99);
+    assert_eq!(kept.offer.source_space, Some(SpaceId::from_bytes([3; 32])));
+    assert_eq!(kept.offer.source_profile_name, "Travail");
+    assert!(reopened.iter().any(|entry| entry.ignored));
+}
+
+#[test]
+fn pending_collections_are_removed_one_by_one_or_by_device() {
+    let directory = tempfile::tempdir().unwrap();
+    let inbox = InboxFile::new(&directory.path().join(SYNC_FOLDER));
+    for (device, share) in [(1, 1), (1, 2), (2, 3)] {
+        inbox.put(&pending(device, share, false)).unwrap();
+    }
+    let first = pending(1, 1, false);
+
+    assert!(inbox.remove(&first.device, &first.offer.share).unwrap());
+    assert!(!inbox.remove(&first.device, &first.offer.share).unwrap());
+    inbox.remove_device(&first.device).unwrap();
+
+    let left = inbox.pending().unwrap();
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].device, DeviceKey::from_bytes([2; 32]));
+}
+
+#[test]
+fn an_unreadable_inbox_is_kept_aside_and_reads_as_empty() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    let file = folder.join(INBOX_FILE);
+    std::fs::write(&file, "{ nope").unwrap();
+    let inbox = InboxFile::new(&folder);
+
+    assert!(inbox.pending().unwrap().is_empty());
+    assert!(suffixed(&file, CORRUPTED_SUFFIX).is_file());
+    // L'écriture suivante repart d'un fichier sain
+    inbox.put(&pending(1, 1, false)).unwrap();
+    assert_eq!(inbox.pending().unwrap().len(), 1);
+}

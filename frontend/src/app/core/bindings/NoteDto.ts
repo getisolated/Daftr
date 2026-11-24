@@ -9,6 +9,10 @@ export type NoteDto = {
  */
 id: number, 
 /**
+ * Identifiant stable, le même sur tous les appareils (liens `note://<uuid>`).
+ */
+uuid: string, 
+/**
  * Titre.
  */
 title: string, 

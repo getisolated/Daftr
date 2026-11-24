@@ -9,7 +9,7 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use crate::server::ChangeListener;
 use crate::tools::{
-    self, AppendToNoteArgs, CreateNoteArgs, GetNoteArgs, ListNotesArgs, McpServices,
+    self, AppendToNoteArgs, CreateNoteArgs, GetNoteArgs, KnownContents, ListNotesArgs, McpServices,
     McpServicesSource, SearchNotesArgs, ToolResult, UpdateNoteArgs,
 };
 
@@ -20,13 +20,16 @@ const LOCKED: &str = "Daftr is locked: the user must unlock the active profile i
 const INSTRUCTIONS: &str = "Daftr is the user's markdown note-taking app. Notes live in \
 folders (the default one is Inbox) and carry tags; the first line of a note is its title. \
 Use search_notes or list_notes to find notes, get_note to read one, and create_note, \
-update_note or append_to_note to write. Notes cannot be deleted from here. Dates are UTC.";
+update_note or append_to_note to write. Link to another note with [title](note://<uuid>), \
+using its uuid. Notes cannot be deleted from here. Dates are UTC.";
 
 /// Une connexion d'IA : chaque session MCP a la sienne, toutes partagent les services.
 #[derive(Clone)]
 pub(crate) struct DaftrTools {
     services: Arc<dyn McpServicesSource>,
     on_change: ChangeListener,
+    /// Contenus des notes lus ou écrits par cette IA : base de ses `update_note`.
+    known: KnownContents,
     tool_router: ToolRouter<Self>,
 }
 
@@ -36,6 +39,7 @@ impl DaftrTools {
         Self {
             services,
             on_change,
+            known: KnownContents::default(),
             tool_router: Self::tool_router(),
         }
     }
@@ -75,7 +79,7 @@ impl DaftrTools {
     }
 
     #[tool(
-        description = "List notes without their content (id, title, folder_id, tags, created_at, updated_at), most recently updated first. Optionally only those of a folder or carrying a tag. 'total' counts every matching note.",
+        description = "List notes without their content (id, uuid, title, folder_id, tags, created_at, updated_at), most recently updated first. Optionally only those of a folder or carrying a tag. 'total' counts every matching note.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn list_notes(
@@ -103,7 +107,8 @@ impl DaftrTools {
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn get_note(&self, Parameters(args): Parameters<GetNoteArgs>) -> Result<String, String> {
-        self.read(move |services| tools::get_note(services, args))
+        let known = self.known.clone();
+        self.read(move |services| tools::get_note(services, &known, args))
             .await
     }
 
@@ -145,7 +150,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<UpdateNoteArgs>,
     ) -> Result<String, String> {
-        self.write(move |services| tools::update_note(services, args))
+        let known = self.known.clone();
+        self.write(move |services| tools::update_note(services, &known, args))
             .await
     }
 
@@ -162,7 +168,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<AppendToNoteArgs>,
     ) -> Result<String, String> {
-        self.write(move |services| tools::append_to_note(services, args))
+        let known = self.known.clone();
+        self.write(move |services| tools::append_to_note(services, &known, args))
             .await
     }
 }

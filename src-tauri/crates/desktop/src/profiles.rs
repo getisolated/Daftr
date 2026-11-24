@@ -1,8 +1,10 @@
 //! Ouverture des données d'un profil et changement de profil actif, à chaud : les services
 //! des données (base, notes, dossiers, collections et leur surveillance) sont remplacés d'un
 //! bloc ; réglages, serveur MCP et fenêtres restent en place.
+//!
+//! Toutes les bases de profil s'ouvrent par la synchronisation (clé de l'appareil, écouteur
+//! des écritures) : celle du profil actif lui est confiée pour que le moteur la partage.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use adapter_fs::{CollectionsWatcher, DiskFiles};
@@ -10,16 +12,21 @@ use adapter_sqlite::SqliteStore;
 use app::collections::{CollectionPorts, CollectionsService};
 use app::folders::FoldersService;
 use app::notes::NotesService;
-use app::ports::ProfileFiles;
 use app::{AppError, AppResult};
 use domain::profile::ProfileId;
 use presentation::data::DataServices;
 use presentation::events::PROFILE_CHANGED;
 use tauri::AppHandle;
 
-use crate::data_dir::DATABASE_FILE;
 use crate::events::{WindowSink, emit_except};
 use crate::state::desktop;
+use crate::sync;
+
+/// Les données ouvertes d'un profil et sa base.
+pub struct OpenedProfile {
+    data: DataServices,
+    store: Arc<SqliteStore>,
+}
 
 /// Ouvre le dernier profil actif au lancement ; protégé, il reste verrouillé jusqu'à son mot
 /// de passe (aucune donnée n'est ouverte avant).
@@ -31,7 +38,7 @@ pub fn open_last_active(app: &AppHandle) -> AppResult<()> {
         .get(&id)
         .is_some_and(|profile| profile.is_protected());
 
-    let data = if protected {
+    let opened = if protected {
         tracing::info!(
             profile = id.as_str(),
             "profil protégé : en attente du mot de passe"
@@ -40,7 +47,7 @@ pub fn open_last_active(app: &AppHandle) -> AppResult<()> {
     } else {
         Some(open_data(app, &id)?)
     };
-    state.services.data.set(id, data);
+    drop(set_active(app, &id, opened));
     Ok(())
 }
 
@@ -55,9 +62,9 @@ pub fn activate(
     let services = &desktop(app).services;
     services.profiles.check_password(id, password)?;
 
-    let data = open_data(app, id)?;
+    let opened = open_data(app, id)?;
     // Les anciennes données sont fermées dès que la dernière commande en cours les lâche
-    drop(services.data.set(id.clone(), Some(data)));
+    drop(set_active(app, id, Some(opened)));
     if let Err(error) = services.profiles.set_last_active(id) {
         tracing::warn!(%error, "profil actif non retenu pour le prochain lancement");
     }
@@ -67,10 +74,22 @@ pub fn activate(
     Ok(())
 }
 
+/// Supprime un profil (voir [`delete_profile_data`]) ; il cesse aussitôt de se synchroniser.
+pub fn delete_profile(
+    app: &AppHandle,
+    sender: &str,
+    id: &ProfileId,
+    password: Option<&str>,
+) -> AppResult<()> {
+    delete_profile_data(app, sender, id, password)?;
+    sync::on_profile_deleted(app, id.clone());
+    Ok(())
+}
+
 /// Supprime un profil. S'il est actif, un autre le remplace d'abord : celui qui s'ouvre
 /// directement de préférence, sinon un protégé (qui reste verrouillé jusqu'à son mot de
 /// passe). Le profil par défaut, seul, repart vide et se rouvre aussitôt.
-pub fn delete_profile(
+fn delete_profile_data(
     app: &AppHandle,
     sender: &str,
     id: &ProfileId,
@@ -101,7 +120,7 @@ fn delete_only_profile(
     password: Option<&str>,
 ) -> AppResult<()> {
     let services = &desktop(app).services;
-    drop(services.data.set(id.clone(), None));
+    drop(set_active(app, id, None));
 
     let deleted = services.profiles.delete(id, password);
     // Après un échec, le profil garde son mot de passe
@@ -118,18 +137,34 @@ fn delete_only_profile(
 /// Rend `id` actif sans ouvrir ses données : il demande son mot de passe au rechargement.
 fn lock_on(app: &AppHandle, sender: &str, id: &ProfileId) {
     let services = &desktop(app).services;
-    drop(services.data.set(id.clone(), None));
+    drop(set_active(app, id, None));
     if let Err(error) = services.profiles.set_last_active(id) {
         tracing::warn!(%error, "profil actif non retenu pour le prochain lancement");
     }
     emit_except(app, sender, PROFILE_CHANGED, ());
 }
 
+/// Change de profil actif pour l'interface et pour la synchronisation ; rend les données
+/// d'avant.
+fn set_active(
+    app: &AppHandle,
+    id: &ProfileId,
+    opened: Option<OpenedProfile>,
+) -> Option<Arc<DataServices>> {
+    let state = desktop(app);
+    let (data, store) = match opened {
+        Some(opened) => (Some(opened.data), Some(opened.store)),
+        None => (None, None),
+    };
+    state.sync.profiles.set_active(id.clone(), store);
+    state.services.data.set(id.clone(), data)
+}
+
 /// Ouvre la base d'un profil (créée au besoin, avec son dossier par défaut) et démarre la
 /// surveillance de ses collections.
-pub fn open_data(app: &AppHandle, id: &ProfileId) -> AppResult<DataServices> {
+fn open_data(app: &AppHandle, id: &ProfileId) -> AppResult<OpenedProfile> {
     let state = desktop(app);
-    let store = open_store(&state.directories, id)?;
+    let store = state.sync.profiles.open_store(id)?;
     let folders = Arc::new(FoldersService::new(store.clone()));
     folders.ensure_default()?;
 
@@ -142,66 +177,12 @@ pub fn open_data(app: &AppHandle, id: &ProfileId) -> AppResult<DataServices> {
         watcher: Arc::new(watcher),
     });
 
-    Ok(DataServices {
+    let data = DataServices {
         notes: Arc::new(NotesService::new(store.clone(), store.clone())),
         folders,
         collections,
         note_store: store.clone(),
-        folder_store: store,
-    })
-}
-
-/// La base SQLite d'un profil, dossier créé au besoin.
-pub fn open_store(
-    directories: &adapter_fs::ProfileDirectories,
-    id: &ProfileId,
-) -> AppResult<Arc<SqliteStore>> {
-    directories.create_directory(id)?;
-    let path = directories.directory(id).join(DATABASE_FILE);
-    open_database(&path).map(Arc::new)
-}
-
-fn open_database(path: &Path) -> AppResult<SqliteStore> {
-    SqliteStore::open(path).inspect_err(|error| {
-        tracing::error!(%error, path = %path.display(), "base du profil illisible");
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use adapter_fs::ProfileDirectories;
-    use app::ports::NoteStore;
-    use domain::note::NewNote;
-
-    use super::*;
-
-    /// Rétrocompatibilité : la base d'avant les profils (`daftr.db` à la racine des données)
-    /// devient celle du profil par défaut, sans déplacement ; les autres profils ont la leur
-    /// dans `profiles/<id>`.
-    #[test]
-    fn the_default_profile_opens_the_existing_database_in_place() {
-        let root = tempfile::tempdir().unwrap();
-        let existing = SqliteStore::open(&root.path().join(DATABASE_FILE)).unwrap();
-        let note = NewNote {
-            title: "Avant".to_owned(),
-            content: "# Avant".to_owned(),
-            tags: vec![],
-            folder_id: None,
-        };
-        existing.insert(&note).unwrap();
-        drop(existing);
-        let directories = ProfileDirectories::new(root.path().to_path_buf());
-
-        let default = open_store(&directories, &ProfileId::default_profile()).unwrap();
-        let other = open_store(&directories, &ProfileId::parse("work").unwrap()).unwrap();
-
-        assert_eq!(default.all().unwrap()[0].title, "Avant");
-        assert!(other.all().unwrap().is_empty());
-        let other_file = root
-            .path()
-            .join("profiles")
-            .join("work")
-            .join(DATABASE_FILE);
-        assert!(other_file.is_file());
-    }
+        folder_store: store.clone(),
+    };
+    Ok(OpenedProfile { data, store })
 }

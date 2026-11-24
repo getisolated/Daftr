@@ -43,9 +43,35 @@
     top: calc(8px + var(--daftr-zen-titlebar-height));
   }
 
+  .remote-change {
+    top: calc(10px + var(--daftr-zen-titlebar-height));
+  }
+
   app-find-panel {
     padding-top: calc(56px + var(--daftr-zen-titlebar-height));
   }
+}
+
+// "Changed on <device>": left of the view modes, as discreet as them
+.remote-change {
+  position: absolute;
+  top: 10px;
+  right: 112px;
+  z-index: 10;
+  padding: 2px 8px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--daftr-text-soft);
+  background: color-mix(in srgb, var(--daftr-bg-panel) 60%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--daftr-border-soft);
+  border-radius: 6px;
+  pointer-events: none;
+  animation: remote-change-in 0.2s ease-out;
+}
+
+@keyframes remote-change-in {
+  from { opacity: 0; }
 }
 
 .view-mode {

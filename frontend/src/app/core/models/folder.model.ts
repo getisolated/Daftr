@@ -1,5 +1,7 @@
 export interface Folder {
   id: number;
+  /** Stable id, the same on every device. */
+  uuid: string;
   name: string;
   /** `null` for a folder at the root of the tree. */
   parentId: number | null;

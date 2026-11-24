@@ -26,6 +26,13 @@ describe('linkTargetAt', () => {
     expect(linkTargetAt(stateOf(doc), doc.indexOf('note://12') + 3)).toBe('note://12');
   });
 
+  it('finds a note://<uuid> link written as plain text, whole', () => {
+    const uuid = '0B1C2D3E-4f50-4a6b-8c7d-9e0f1a2b3c4d';
+    const text = `go note://${uuid} now`;
+
+    expect(linkTargetAt(stateOf(text), text.indexOf('4f50'))).toBe(`note://${uuid}`);
+  });
+
   it('finds a bare web address', () => {
     expect(linkTargetAt(stateOf(doc), doc.indexOf('https://x.io') + 4)).toBe('https://x.io');
   });

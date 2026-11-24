@@ -5,7 +5,7 @@ use tauri::AppHandle;
 
 use crate::state::desktop;
 use crate::windows::overlay;
-use crate::{mcp, startup, tray, updater};
+use crate::{mcp, startup, sync, tray, updater};
 
 /// Applique ce que le changement implique (le raccourci global est déjà enregistré par
 /// l'appelant, avant d'accepter le changement).
@@ -30,6 +30,9 @@ pub fn apply(app: &AppHandle, change: &SettingsChange) {
     }
     if change.mcp_changed() {
         mcp::sync(app);
+    }
+    if change.sync_changed() {
+        sync::on_settings_changed(app);
     }
     // Un profil verrouillé n'a pas de surveillance : il prendra les réglages à son ouverture
     if change.collections_exclude_changed()

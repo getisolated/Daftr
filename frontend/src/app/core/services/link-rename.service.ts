@@ -110,7 +110,7 @@ export class LinkRenameService {
       const content = current ? retargetNoteLinks(current.content, moves) : null;
 
       if (content !== null) {
-        await this.notes.update(candidate.id, { content });
+        await this.notes.update(candidate.id, { content, base: current?.content });
       }
 
       if (performance.now() - sliceStart > WORK_SLICE_MS) {
