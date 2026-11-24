@@ -151,6 +151,13 @@ Le profil n'est créé qu'à la fin du contenu : une réception interrompue ne l
 - « Retirer » un appareil de confiance : révocation dans `devices.json` et dans tous les espaces communs. Définitif : le relier demande un nouvel appairage.
 - Dans les deux cas, **les notes déjà copiées restent sur l'autre appareil**, et l'interface le dit.
 
+**L'appareil retiré l'apprend (`Removed`, indice 24, bit `features` 3).** Sans cela, A garderait B « lié mais absent » avec ses espaces et ses partages.
+- **Cas A, B est connecté à A quand il le retire** : `remove_device` met en file `Command::Removed` pour la session, puis la ferme ; la session envoie `Removed` (si A annonce le bit), attend la fermeture par A (2 s au plus : une fermeture brutale avec des octets non lus peut détruire le message en route) et se termine sans nouvelle tentative.
+- **Cas B, A est absent** : A recompose B plus tard. À l'accueil (`links.rs`, après le handshake Noise et `Open(Sync)`), si la clé authentifiée est **connue et révoquée**, B envoie `Removed` puis ferme. Une clé **inconnue** n'obtient rien : refus muet comme avant, sans révéler qu'une clé a pu être de confiance. L'initiateur (plus petite clé en cas de collision, ou A qui recompose) reçoit `Removed` à la place du `Hello` : la session le traite dès l'ouverture. B ne compose jamais un appareil révoqué (retentatives annulées, filtrés par `trusted_devices`), donc le chemin sortant n'a pas de cas propre. Ce cas ne connaît pas encore les fonctionnalités de l'appareil (pas de `Hello` avant) : le message part sans le bit, une ancienne version l'ignore (`UnknownMessage`) et se heurtent à la fermeture, comme avant.
+- **Réception par A** : seulement d'un appareil authentifié par Noise **et encore de confiance**. A fait alors exactement ce que fait un retrait volontaire (`unlink` : révocation dans `devices.json` et dans tous les espaces, retrait des partages de collections et des entrées « à configurer » de B, retentatives annulées, session fermée), **sans répondre `Removed`**, puis émet `sync:device-removed` (`DeviceRemovedDto { device: { key, name } }`) en plus de `sync:collection-state`, `sync:collection-offer` et `sync:status`. Notes, profils et fichiers locaux ne sont jamais supprimés.
+- **Pas de rebond** : après application, A refuse B comme révoqué ; si B revient, A reçoit son `Removed` et l'ignore (B n'est plus de confiance chez A) : pas de changement d'état ni de second événement. Deux retraits simultanés s'ignorent mutuellement de la même façon.
+- **Sécurité** : seul un `Removed` d'un appareil authentifié et de confiance est suivi ; il ne touche que le lien entre les deux appareils (pas ceux d'un tiers) ; un appareil retiré ne revient que par un nouvel appairage par code. Limite : B n'écoute plus s'il n'a ni profil synchronisé, ni appareil de confiance, ni appairage en cours : A ne peut alors pas apprendre son retrait tant que B ne réécoute pas.
+
 ## 5. Intégration
 
 ### Commandes Tauri
@@ -171,7 +178,7 @@ Le profil n'est créé qu'à la fin du contenu : une réception interrompue ne l
 
 Erreurs : `IpcError` de code `sync`, message = clé stable (`wrong_code`, `not_pairing`, `no_pairing_device`, `unreachable`, `timeout`, `not_local`, `listen_failed`, `discovery_failed`, `untrusted`, `unknown_offer`, `paused`, `fingerprint_mismatch`, `invalid_qr`, `protocol_version`, `protocol_failed`, `stopped`), traduite par le front.
 
-Événements : `sync:status`, `sync:notes-synced` (avec `notes:changed` pour le profil actif), `sync:progress`, `sync:initial-done`, `sync:device-linked`, `sync:profile-received` (`ProfileReceivedDto` : `profileId`, `name`, `device`), `sync:pairing`. `sync:offer-received` est supprimé : un profil proposé est accepté d'office.
+Événements : `sync:status`, `sync:notes-synced` (avec `notes:changed` pour le profil actif), `sync:progress`, `sync:initial-done`, `sync:device-linked`, `sync:device-removed` (`DeviceRemovedDto` : `device`), `sync:profile-received` (`ProfileReceivedDto` : `profileId`, `name`, `device`), `sync:pairing`. `sync:offer-received` est supprimé : un profil proposé est accepté d'office.
 
 Réglages de l'appareil (`settings.json`, appliqués à chaud) : `syncDeviceName` (vide = nom d'hôte), `syncPort` (47820, de 1024 à 65535), `syncPaused`. Le front passe par `settings_set`.
 
@@ -256,7 +263,7 @@ Intégration et interface :
 
 Retiré (backend) : commandes `sync_offer_profile`, `sync_stop_sharing`, `sync_answer_offer`, `collection_sync_answer_offer` ; paramètre `profileIds` de `sync_start_pairing` ; événement `sync:offer-received` ; DTO `OfferReceivedDto`, `ProfileOfferDto` (et leurs bindings TypeScript) ; `Engine::answer_offer`, `OfferChoice`, `CollectionAnswer`, `IncomingCollection`, les offres reçues en mémoire (`incoming_offers`, `accepted_offers`) ; `PairingMode::profiles`. Les composants Angular qui s'en servaient (dialogue des offres, assistant de partage, sous-vue « Appareils et synchronisations » du profil, ancien appairage par profils) sont retirés par les lots R2 et R3 (§5 Interface).
 
-Ajouté : `sync_profile_shares`, `sync_set_profile_shared`, `collection_sync_set_device`, `collection_sync_activate`, `collection_sync_ignore`, paramètre `profileId?` de `collection_sync_state`, `collection_sync_summary`, `collection_sync_share` ; événement `sync:profile-received` ; messages 22 et 23 ; bits `features` 1 et 2.
+Ajouté : `sync_profile_shares`, `sync_set_profile_shared`, `collection_sync_set_device`, `collection_sync_activate`, `collection_sync_ignore`, paramètre `profileId?` de `collection_sync_state`, `collection_sync_summary`, `collection_sync_share` ; événement `sync:profile-received` ; messages 22 et 23 ; bits `features` 1 et 2. Ensuite : événement `sync:device-removed`, message 24 `Removed`, bit 3 (`PROTOCOL_VERSION` reste à 1).
 
 Écarts :
 - **Un appareil de confiance écoute toujours** (voir §1) : sans cela, A ne pourrait pas joindre B après un appairage sans profil. L'appairage lui-même est symétrique et ne crée ni profil ni espace.
@@ -290,7 +297,7 @@ Non vérifié (à faire en recette sur deux PC réels) : critères d'acceptation
 
 - **Données** (`adapter-sqlite`) : migration sur fixture, soft delete et FTS, blobs tenus à jour, échanges entre bases (mêmes lignes), fusion d'un profil existant, base restaurée, enregistrement en vol rejoué sur la modification distante, profil non synchronisé inchangé.
 - **CRDT** (`app`) : convergence (propriété, N appareils, ordre aléatoire, doublons), contenu exact (UTF-16, emojis, CRLF), suppression contre modification, dossiers et cycles, fusion à trois voies (propriété : éditions disjointes toutes gardées ; base = courant → texte reçu ; idempotence).
-- **Protocole** (`adapter-sync`) : `Hello` avec type (aller-retour, `Hello` sans type ou de code inconnu lu « inconnu », lu par une version antérieure), type gardé par les deux appareils après l'appairage, appairage (bon et mauvais code, appairages simultanés, 10 échecs, expiration, QR d'une autre empreinte), sessions multi-espaces A/B/C, propagation transitive, offres différées, refus d'IP non privée et de clé révoquée, message trop gros, pause et reprise.
+- **Protocole** (`adapter-sync`) : `Hello` avec type (aller-retour, `Hello` sans type ou de code inconnu lu « inconnu », lu par une version antérieure), type gardé par les deux appareils après l'appairage, appairage (bon et mauvais code, appairages simultanés, 10 échecs, expiration, QR d'une autre empreinte), sessions multi-espaces A/B/C, propagation transitive, offres différées, refus d'IP non privée et de clé révoquée, retrait d'un appareil appris par l'appareil retiré (connecté, ou absent puis reconnecté ; clé inconnue jamais informée ; pas de rebond ni de perte de notes ; ancienne version sans le bit `Removed`), message trop gros, pause et reprise.
 - **Fichiers** (`adapter-fs`) : `devices.json` sans type (ancien) ou de type inconnu, type enregistré et mis à jour.
 - **Plateforme** (`platform`) : lecture de `BatteryFlag`, de `sysfs` (dossier temporaire) et de `pmset` ; repli « inconnu ».
 - **Intégration** (`desktop`) : fichiers `sync/`, `SyncProfiles`, démarrage sans rien qui tourne, et bout en bout à trois installations sur loopback.
@@ -344,10 +351,10 @@ Tests : tables de décision, chemins, noms de copies, fusion identique des deux 
 ### 12.3 Protocole
 
 **Compatibilité.** `PROTOCOL_VERSION` reste à 1. postcard encode l'indice de variante en varint et **décode un indice inconnu comme une erreur** : une version antérieure fermerait la session à la réception d'un message de collection. Deux protections :
-- `Hello` porte, après le type d'appareil, un octet `features` (**bit 1 : collections** rattachées à l'appareil ; bit 2 : `ProfileInfo`, voir §4 ; le bit 0 de la première version, abandonnée avant toute publication, n'est plus annoncé car ses offres avaient un autre format). Une version antérieure ignore les octets en trop (comme pour le type) ; un `Hello` sans cet octet se lit « aucune fonctionnalité ». **Les messages de collections ne partent qu'à un appareil qui annonce le bit** : entre une ancienne et une nouvelle version, la synchronisation des notes continue à l'identique.
+- `Hello` porte, après le type d'appareil, un octet `features` (**bit 1 : collections** rattachées à l'appareil ; bit 2 : `ProfileInfo`, voir §4 ; bit 3 : `Removed`, voir « Révocations » ; le bit 0 de la première version, abandonnée avant toute publication, n'est plus annoncé car ses offres avaient un autre format). Une version antérieure ignore les octets en trop (comme pour le type) ; un `Hello` sans cet octet se lit « aucune fonctionnalité ». **Les messages de collections ne partent qu'à un appareil qui annonce le bit** : entre une ancienne et une nouvelle version, la synchronisation des notes continue à l'identique.
 - `Message::decode` rend `Error::UnknownMessage` pour tout indice au-delà de la dernière variante connue, et la session **l'ignore** (elle continue) : une future version pourra ajouter des messages.
 
-Messages ajoutés en fin d'énumération (indices figés 14 à 23) :
+Messages ajoutés en fin d'énumération (indices figés 14 à 24) :
 
 | # | Message | Rôle |
 |---|---|---|
@@ -361,6 +368,7 @@ Messages ajoutés en fin d'énumération (indices figés 14 à 23) :
 | 21 | `ShareStop { share }` | Arrêt du partage, ou retrait de l'appareil. |
 | 22 | `ProfileInfo { space, name?, icon? }` | Nom et icône d'un profil partagé, avant son `Snapshot` (§4). Gardé par le bit 2. |
 | 23 | `CollectionPending { shares }` | Les entrées « à configurer » reçues de l'émetteur, envoyées une fois par session : il répond `ShareStop` pour celles qu'il ne partage plus (retirées pendant l'absence du destinataire). |
+| 24 | `Removed` | Sans charge : « je vous ai retiré de mes appareils ». Gardé par le bit 3 (sauf la réponse d'un appareil retiré à un `Open`, avant tout `Hello`). Voir « Révocations ». |
 
 **Déroulement.** Un partage ne concerne que **l'appareil de confiance** : la proposition voyage dans la session de l'appareil, que le profil qui porte la collection soit synchronisé avec lui ou non (le moteur ne vérifie que la confiance, à la création du partage). Chez le destinataire, la proposition devient une entrée « à configurer » persistée (jamais d'écriture sur le disque) ; l'**activation** crée la collection dans le profil choisi, actif ou non, puis répond `true`. L'état d'un appareil pour un partage est `offered` puis `active` (côté qui propose : à la réponse ; côté qui reçoit : à l'activation). Une proposition ignorée est refusée à l'appareil dès qu'il est joignable (le drapeau « ignorée » est gardé jusque-là).
 1. Chaque côté envoie son manifeste au démarrage de la session (parcours complet, hachage seulement des fichiers modifiés), puis après chaque changement de ses fichiers (surveillance, regroupée 1 s) ou de ses transferts, **seulement s'il a changé** (anti-boucle).
