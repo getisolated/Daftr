@@ -26,7 +26,9 @@
     border-color: var(--daftr-border);
     color: var(--daftr-text);
 
+    // Root of the purple hover: `.btn:hover` sets the accent background and this rule only set border and colour
     &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--daftr-danger) 14%, transparent);
       border-color: var(--daftr-danger);
       color: var(--daftr-danger);
     }

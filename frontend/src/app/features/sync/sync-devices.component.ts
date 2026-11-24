@@ -25,11 +25,17 @@ import { DeviceIconComponent } from './device-icon.component';
           </div>
         </div>
         <button
-          class="btn danger"
+          class="remove"
           type="button"
           [disabled]="busy()"
+          [title]="i18n.t('sync.devices.remove')"
+          [attr.aria-label]="i18n.t('sync.devices.remove')"
           (click)="removing.set(device)"
-        >{{ i18n.t('sync.devices.remove') }}</button>
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/>
+          </svg>
+        </button>
       </div>
     } @empty {
       <p class="hint">{{ i18n.t('sync.devices.empty') }}</p>
@@ -57,6 +63,26 @@ import { DeviceIconComponent } from './device-icon.component';
     .id { font-family: var(--daftr-font-mono); user-select: text; }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--daftr-text-faint); }
     .dot.ok { background: var(--daftr-syntax-comment); }
+    .remove {
+      display: flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--daftr-text-dimmed);
+      cursor: pointer;
+    }
+    .remove:hover:not(:disabled), .remove:focus-visible {
+      background: color-mix(in srgb, var(--daftr-danger) 14%, transparent);
+      color: var(--daftr-danger);
+    }
+    .remove:focus-visible { outline: 1px solid var(--daftr-danger); outline-offset: -1px; }
+    .remove:disabled { opacity: 0.5; cursor: default; }
     .dot.busy { background: var(--daftr-accent); }
   `],
 })
