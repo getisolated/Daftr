@@ -1,0 +1,111 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-select { min-width: 160px; }
+
+.matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+// One grid per row, the same columns everywhere: the boxes line up under the names of the devices
+.line {
+  display: grid;
+  grid-template-columns: var(--columns);
+  align-items: center;
+  min-height: 28px;
+  padding: 0 4px;
+  border-radius: 4px;
+
+  &:not(.header):hover { background: rgba(var(--daftr-hover-rgb), 0.05); }
+}
+
+.header {
+  min-height: 20px;
+  color: var(--daftr-text-dimmed);
+  font-size: 11px;
+}
+
+.device-name {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-cell {
+  overflow: hidden;
+  color: var(--daftr-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strong .label-cell { color: var(--daftr-text-strong); font-weight: 600; }
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.busy { opacity: 0.5; pointer-events: none; }
+.pending { flex: none; color: var(--daftr-text-dimmed); }
+
+.sub {
+  margin: 10px 0 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--daftr-text-soft);
+}
+
+.warn {
+  margin: 2px 4px 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--daftr-text);
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 4px 4px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(var(--daftr-hover-rgb), 0.05);
+}
+
+.notice-text { flex: 1; min-width: 0; }
+
+.info {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--daftr-text-soft);
+
+  &.warning { color: var(--daftr-text); }
+}
+
+.dismiss {
+  flex: none;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--daftr-text-dimmed);
+  cursor: pointer;
+
+  &:hover { color: var(--daftr-text-bright); }
+}

@@ -1,37 +1,41 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TrustedDevice } from '../../core/models/sync.model';
-import { ProfilesService } from '../../core/services/profiles.service';
 import { SyncService } from '../../core/services/sync.service';
-import { formatNoteTimestamp } from '../../core/utils/note-timestamp.util';
-import { profileDisplayName } from '../../core/utils/profile.util';
-import { lastSyncAt, sharedProfileIds } from '../../core/utils/sync.util';
+import { shortDeviceId } from '../../core/utils/sync.util';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
+import { DeviceIconComponent } from './device-icon.component';
 
-/** The trusted devices: name, presence, profiles shared, last sync, and "Remove" (final, after a confirmation). */
+/** The trusted devices of the sync screen: icon, name, short identifier, presence, and "Remove" (final, confirmed). */
 @Component({
   selector: 'app-sync-devices',
   standalone: true,
-  imports: [ConfirmDialogComponent],
+  imports: [ConfirmDialogComponent, DeviceIconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @for (device of devices(); track device.key) {
-      <div class="device" [class.revoked]="device.revokedAt !== null">
-        <span class="dot" [class.ok]="device.connected" [class.busy]="device.present && !device.connected"></span>
-        <div class="device-text">
-          <div class="name">{{ device.name }} <span class="presence">· {{ presenceOf(device) }}</span></div>
-          <div class="hint">{{ profilesOf(device) }}</div>
-          <div class="hint">{{ lastSyncOf(device) }}</div>
+      <div class="device">
+        <app-device-icon [kind]="device.kind" />
+        <div class="text">
+          <div class="name" [title]="device.name">{{ device.name }}</div>
+          <div class="meta">
+            <span class="id">{{ idOf(device) }}</span>
+            <span class="dot" [class.ok]="device.connected" [class.busy]="device.present && !device.connected"></span>
+            <span>{{ presenceOf(device) }}</span>
+          </div>
         </div>
-        @if (device.revokedAt === null) {
-          <button class="btn danger" type="button" [disabled]="busy()" (click)="removing.set(device)">{{ i18n.t('sync.devices.remove') }}</button>
-        }
+        <button
+          class="btn danger"
+          type="button"
+          [disabled]="busy()"
+          (click)="removing.set(device)"
+        >{{ i18n.t('sync.devices.remove') }}</button>
       </div>
     } @empty {
-      <div class="hint">{{ i18n.t('sync.devices.empty') }}</div>
+      <p class="hint">{{ i18n.t('sync.devices.empty') }}</p>
     }
     @if (error(); as message) {
-      <div class="error" role="alert">{{ message }}</div>
+      <p class="error" role="alert">{{ message }}</p>
     }
     @if (removing(); as device) {
       <app-confirm-dialog
@@ -42,30 +46,25 @@ import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/con
       />
     }
   `,
-  styleUrls: ['./sync-panel.scss'],
+  styleUrls: ['./sync-screen-ui.scss'],
   styles: [`
-    .device {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--daftr-border-subtle);
-    }
+    :host { display: flex; flex-direction: column; font-size: 12px; }
+    .device { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--daftr-border-subtle); }
     .device:last-of-type { border-bottom: none; }
-    .device .dot { margin-top: 5px; }
-    .device-text { flex: 1; min-width: 0; }
-    .device-text .hint { margin-top: 2px; }
-    .name { color: var(--daftr-text-strong); user-select: text; }
-    .presence { color: var(--daftr-text-soft); }
-    .revoked .name { color: var(--daftr-text-dimmed); text-decoration: line-through; }
+    .text { flex: 1; min-width: 0; }
+    .name { overflow: hidden; color: var(--daftr-text-strong); text-overflow: ellipsis; white-space: nowrap; }
+    .meta { display: flex; align-items: center; gap: 6px; margin-top: 1px; font-size: 11px; color: var(--daftr-text-dimmed); }
+    .id { font-family: var(--daftr-font-mono); user-select: text; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--daftr-text-faint); }
+    .dot.ok { background: var(--daftr-syntax-comment); }
+    .dot.busy { background: var(--daftr-accent); }
   `],
 })
 export class SyncDevicesComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly sync = inject(SyncService);
-  private readonly profiles = inject(ProfilesService);
 
-  protected readonly devices = this.sync.devices;
+  protected readonly devices = this.sync.trustedDevices;
   protected readonly removing = signal<TrustedDevice | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -77,31 +76,16 @@ export class SyncDevicesComponent implements OnInit {
     void this.sync.loadDevices();
   }
 
-  protected presenceOf(device: TrustedDevice): string {
-    if (device.revokedAt !== null) {
-      return this.i18n.t('sync.devices.removedState');
-    }
+  protected idOf(device: TrustedDevice): string {
+    return shortDeviceId(device.fingerprint);
+  }
 
+  protected presenceOf(device: TrustedDevice): string {
     if (device.connected) {
       return this.i18n.t('sync.devices.connected');
     }
 
     return this.i18n.t(device.present ? 'sync.devices.present' : 'sync.devices.absent');
-  }
-
-  protected profilesOf(device: TrustedDevice): string {
-    const names = sharedProfileIds(device).map(id => {
-      const profile = this.profiles.profiles().find(candidate => candidate.id === id);
-      return profile ? profileDisplayName(profile, this.i18n.t) : id;
-    });
-
-    return names.length > 0 ? this.i18n.t('sync.devices.profiles', { names: names.join(', ') }) : this.i18n.t('sync.devices.noProfile');
-  }
-
-  protected lastSyncOf(device: TrustedDevice): string {
-    const at = lastSyncAt(device);
-
-    return at ? this.i18n.t('sync.devices.lastSync', { date: formatNoteTimestamp(at, this.i18n.language()) }) : this.i18n.t('sync.devices.never');
   }
 
   protected async onRemoveChosen(device: TrustedDevice, choice: string | null): Promise<void> {

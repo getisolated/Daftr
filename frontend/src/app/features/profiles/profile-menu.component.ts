@@ -5,7 +5,7 @@ import { ProfilesService } from '../../core/services/profiles.service';
 import { profileDisplayName } from '../../core/utils/profile.util';
 import { ProfileAvatarComponent } from './profile-avatar.component';
 
-/** Menu of the profiles, opened on the right of the sidebar item: switch, create, configure. */
+/** Menu of the profiles, opened on the right of the sidebar item: switch, create, configure, open the sync screen. */
 @Component({
   selector: 'app-profile-menu',
   standalone: true,
@@ -30,6 +30,7 @@ export class ProfileMenuComponent implements AfterViewInit {
   readonly picked = output<Profile>();
   readonly created = output<void>();
   readonly configured = output<void>();
+  readonly synced = output<void>();
 
   ngAfterViewInit(): void {
     if (this.focusFirst()) {

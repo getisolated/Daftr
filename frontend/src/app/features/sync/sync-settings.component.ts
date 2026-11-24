@@ -3,7 +3,10 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { SyncService } from '../../core/services/sync.service';
 
-/** Controls of the sync settings that are more than a value: its state with "Sync now", and the name of the device. */
+/**
+ * Controls of the sync settings that are more than a value: its state with "Sync now", the name of the device, and the
+ * button that opens the sync screen (where devices are linked and what they receive is chosen).
+ */
 @Component({
   selector: 'app-sync-settings',
   standalone: true,
@@ -29,6 +32,10 @@ import { SyncService } from '../../core/services/sync.service';
       }
       <div class="row actions">
         <button class="btn" type="button" [disabled]="!canSyncNow() || busy()" (click)="syncNow()">{{ i18n.t('sync.settings.syncNow') }}</button>
+      </div>
+    } @else if (part() === 'screen') {
+      <div class="row">
+        <button class="btn" type="button" (click)="openScreen()">{{ i18n.t('sync.settings.screen.open') }}</button>
       </div>
     } @else {
       <input
@@ -56,8 +63,8 @@ export class SyncSettingsComponent {
   private readonly sync = inject(SyncService);
   private readonly settingsService = inject(SettingsService);
 
-  /** `status`: state and "Sync now"; `deviceName`: the name of this device. */
-  readonly part = input.required<'status' | 'deviceName'>();
+  /** `status`: state and "Sync now"; `deviceName`: the name of this device; `screen`: opens the sync screen. */
+  readonly part = input.required<'status' | 'deviceName' | 'screen'>();
 
   protected readonly overview = this.sync.overview;
   protected readonly indicator = this.sync.indicator;
@@ -73,6 +80,12 @@ export class SyncSettingsComponent {
     const state = this.sync.status()?.state;
     return state !== undefined && state !== 'disabled' && state !== 'paused';
   });
+
+  /** The screen opens over the settings: they close, the screen is where the work goes on. */
+  protected openScreen(): void {
+    this.settingsService.close();
+    this.sync.openScreen();
+  }
 
   protected async syncNow(): Promise<void> {
     await this.run(() => this.sync.syncNow());

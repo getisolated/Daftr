@@ -7,6 +7,7 @@ import { CollectionEditing, CollectionRow } from '../../core/models/collection-t
 import { CollectionFileRef, CollectionNode, CollectionState } from '../../core/models/collection.model';
 import { CollectionShare, CollectionShareBadge } from '../../core/models/collection-sync.model';
 import { CollectionSyncService } from '../../core/services/collection-sync.service';
+import { SyncService } from '../../core/services/sync.service';
 import { CollectionsService } from '../../core/services/collections.service';
 import { CollectionCopyService } from '../../core/services/collection-copy.service';
 import { FoldersService } from '../../core/services/folders.service';
@@ -25,6 +26,7 @@ import { ProfilesService } from '../../core/services/profiles.service';
 import { transferMenu, transferTarget } from '../../core/utils/transfer-menu.util';
 import { formatAccelerator } from '../../core/utils/accelerator.util';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
+import { CollectionShareMenuComponent } from '../sync/collection-share-menu.component';
 import { ConfirmDialogAction, ConfirmDialogComponent } from '../../shared/ui/confirm-dialog.component';
 import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { RowAddButtonComponent } from '../../shared/ui/row-add-button.component';
@@ -72,7 +74,7 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
 @Component({
   selector: 'app-collections-section',
   standalone: true,
-  imports: [ContextMenuComponent, ConfirmDialogComponent, FocusSelectDirective, MoveToDialogComponent, RowAddButtonComponent],
+  imports: [ContextMenuComponent, CollectionShareMenuComponent, ConfirmDialogComponent, FocusSelectDirective, MoveToDialogComponent, RowAddButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="header">
@@ -89,9 +91,9 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
     </div>
 
     @if (open()) {
-      @if (collectionSync.offers().length > 0) {
-        <button type="button" class="pending-offers" (click)="openPendingOffer()">
-          <span class="pending-text">{{ i18n.plural('csync.pending', collectionSync.offers().length) }}</span>
+      @if (collectionSync.pendingCount() > 0) {
+        <button type="button" class="pending-offers" (click)="sync.openScreen()">
+          <span class="pending-text">{{ i18n.plural('csync.pending', collectionSync.pendingCount()) }}</span>
           <span class="pending-action">{{ i18n.t('csync.pending.open') }}</span>
         </button>
       }
@@ -245,6 +247,10 @@ const COLLECTION_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
       <app-context-menu [items]="current.items" [x]="current.x" [y]="current.y" (action)="onMenuAction($event)" (closed)="menu.set(null)" />
     }
 
+    @if (shareMenu(); as target) {
+      <app-collection-share-menu [root]="target.root" [name]="target.name" [x]="target.x" [y]="target.y" (closed)="shareMenu.set(null)" />
+    }
+
     @if (confirmTrash(); as target) {
       <app-confirm-dialog
         [title]="i18n.t(platformKey('sidebar.collections.trash.title'), { name: baseName(target.path) })"
@@ -293,6 +299,7 @@ export class CollectionsSectionComponent {
   private readonly profiles = inject(ProfilesService);
   private readonly profileTransfer = inject(ProfileTransferService);
   protected readonly collectionSync = inject(CollectionSyncService);
+  protected readonly sync = inject(SyncService);
 
   /** Delete key label of the context menus: `⌘⌫` on macOS (Finder), `Del` elsewhere. */
   protected readonly deleteShortcut = this.platform.isMac ? formatAccelerator('CommandOrControl+Backspace', this.platform.platform) : 'Del';
@@ -308,6 +315,8 @@ export class CollectionsSectionComponent {
   protected readonly iconFile = ICON_FILE;
   protected readonly iconSync = ICON_SYNC;
   protected readonly confirmStopShare = signal<CollectionShare | null>(null);
+  /** "Sync with…" of a collection, opened where its context menu was. */
+  protected readonly shareMenu = signal<{ root: string; name: string; x: number; y: number } | null>(null);
   protected readonly stopShareActions = computed<ConfirmDialogAction[]>(() => [
     { id: 'stop', label: this.i18n.t('csync.profile.stop'), danger: true },
   ]);
@@ -702,10 +711,13 @@ export class CollectionsSectionComponent {
     items.push({ id: 'copyTo', label: t('sidebar.collections.menu.copyTo'), icon: ICON_COPY, disabled: !source }, { divider: true });
 
     if (isFolder) {
-      const sync: ContextMenuEntry = share
-        ? { id: 'stopShare', label: t('csync.menu.stop'), icon: ICON_SYNC }
-        : { id: 'shareCollection', label: t('csync.menu.share'), icon: ICON_SYNC, disabled: state.status === 'error' };
-      items.push(sync, { divider: true });
+      items.push({ id: 'shareCollection', label: t('csync.menu.share'), icon: ICON_SYNC, disabled: state.status === 'error' });
+
+      if (share) {
+        items.push({ id: 'stopShare', label: t('csync.menu.stop'), icon: ICON_SYNC });
+      }
+
+      items.push({ divider: true });
     }
 
     items.push(
@@ -798,7 +810,7 @@ export class CollectionsSectionComponent {
         await this.report(() => this.collections.relocate(root));
         break;
       case 'shareCollection':
-        this.collectionSync.openAssistant(root, 'sidebar');
+        this.shareMenu.set({ root, name: this.collectionName(root), x: current.x, y: current.y });
         break;
       case 'stopShare':
         this.confirmStopShare.set(this.collectionSync.shareOf(root));
@@ -838,7 +850,7 @@ export class CollectionsSectionComponent {
     if (this.collectionSync.shareOf(state.collection.path)?.status === 'missingFolder') {
       await this.reportSync(() => this.collectionSync.relink(state.collection.path));
     } else {
-      this.profiles.requestDevices();
+      this.sync.openScreen();
     }
   }
 
@@ -848,12 +860,8 @@ export class CollectionsSectionComponent {
     return node.kind === 'file' ? paths.includes(node.path) : paths.some(path => path.startsWith(`${node.path}/`));
   }
 
-  protected openPendingOffer(): void {
-    const first = this.collectionSync.offers()[0];
-
-    if (first) {
-      this.collectionSync.openOffer(first);
-    }
+  private collectionName(root: string): string {
+    return this.collections.states().find(state => state.collection.path === root)?.label ?? baseName(root);
   }
 
   protected async onStopShareChoice(choice: string | null): Promise<void> {

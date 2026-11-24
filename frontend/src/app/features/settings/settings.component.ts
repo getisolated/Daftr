@@ -12,8 +12,6 @@ import { SelectComponent } from '../../shared/ui/select.component';
 import { DaftrLogotypeComponent } from '../../shared/ui/brand.component';
 import { McpSettingsComponent } from './mcp-settings.component';
 import { CollectionFolderSettingComponent } from '../sync/collection-folder-setting.component';
-import { SyncDevicesComponent } from '../sync/sync-devices.component';
-import { SyncPairingComponent } from '../sync/sync-pairing.component';
 import { SyncSettingsComponent } from '../sync/sync-settings.component';
 import {
   SETTING_DEFINITIONS, SettingDefinition, definitionsForPlatform, filterSettings, groupByCategory, settingDescription, settingOptions, settingTitle,
@@ -22,7 +20,7 @@ import {
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CheckboxComponent, SelectComponent, DaftrLogotypeComponent, McpSettingsComponent, SyncSettingsComponent, SyncPairingComponent, SyncDevicesComponent, CollectionFolderSettingComponent],
+  imports: [CheckboxComponent, SelectComponent, DaftrLogotypeComponent, McpSettingsComponent, SyncSettingsComponent, CollectionFolderSettingComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isOpen()) {
@@ -140,13 +138,9 @@ import {
                           <div class="description">{{ descriptionOf(def) }}</div>
                           <app-sync-settings part="deviceName" />
                         }
-                        @case ('syncPairing') {
+                        @case ('syncScreen') {
                           <div class="description">{{ descriptionOf(def) }}</div>
-                          <app-sync-pairing />
-                        }
-                        @case ('syncDevices') {
-                          <div class="description">{{ descriptionOf(def) }}</div>
-                          <app-sync-devices />
+                          <app-sync-settings part="screen" />
                         }
                         @case ('receivedFolder') {
                           <div class="description">{{ descriptionOf(def) }}</div>

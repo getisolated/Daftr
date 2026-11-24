@@ -28,9 +28,7 @@ import { ThemeService } from './core/services/theme.service';
 import { ProfilesService } from './core/services/profiles.service';
 import { ConfirmDialogAction, ConfirmDialogComponent } from './shared/ui/confirm-dialog.component';
 import { ToastStackComponent } from './shared/ui/toast-stack.component';
-import { CollectionOfferDialogComponent } from './features/sync/collection-offer-dialog.component';
-import { CollectionShareDialogComponent } from './features/sync/collection-share-dialog.component';
-import { SyncOfferDialogComponent } from './features/sync/sync-offer-dialog.component';
+import { SyncScreenComponent } from './features/sync/sync-screen.component';
 import { CollectionSyncService } from './core/services/collection-sync.service';
 import { SyncService } from './core/services/sync.service';
 import { ToastService } from './core/services/toast.service';
@@ -44,8 +42,7 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
   standalone: true,
   imports: [
     TabsBarComponent, EditorComponent, PaletteComponent, HomeComponent, SettingsComponent, SidebarComponent, ZenSidebarComponent, FormattingBarComponent,
-    BacklinksPanelComponent, ConfirmDialogComponent, ToastStackComponent, SyncOfferDialogComponent,
-    CollectionOfferDialogComponent, CollectionShareDialogComponent,
+    BacklinksPanelComponent, ConfirmDialogComponent, ToastStackComponent, SyncScreenComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -92,14 +89,8 @@ import { findSampleNotesToGather } from './core/utils/sample-notes.util';
           (chosen)="onUpdateChoice($event)"
         />
       }
-      @if (offerDialogOpen()) {
-        <app-sync-offer-dialog />
-      }
-      @if (collectionOfferShown()) {
-        <app-collection-offer-dialog />
-      }
-      @if (shareAssistantShown()) {
-        <app-collection-share-dialog />
+      @if (syncScreenOpen()) {
+        <app-sync-screen />
       }
       <app-toast-stack
         [toasts]="toasts.toasts()"
@@ -181,9 +172,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private fileDocs = inject(FileDocsService);
   private collections = inject(CollectionsService);
   private readonly profiles = inject(ProfilesService);
-  // Injected eagerly: it follows the sync events from the start (indicator, notifications, proposed profiles)
+  // Injected eagerly: it follows the sync events from the start (indicator, notifications, received profiles)
   private readonly sync = inject(SyncService);
-  // Injected eagerly too: the shared collections (statuses, proposals) follow their events from the start
+  // Injected eagerly too: the shared collections (statuses, entries to configure) follow their events from the start
   private readonly collectionSync = inject(CollectionSyncService);
   protected readonly toasts = inject(ToastService);
 
@@ -195,9 +186,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly formattingBarShown = computed(() =>
     this.formattingBar.visible() && this.activeNoteId() !== null && !this.formattingBar.previewOnly());
   readonly formattingBarPosition = this.formattingBar.position;
-  readonly offerDialogOpen = this.sync.offerDialogOpen;
-  readonly collectionOfferShown = computed(() => this.collectionSync.offerInDialog() !== null);
-  readonly shareAssistantShown = computed(() => this.collectionSync.assistant() !== null);
+  readonly syncScreenOpen = this.sync.screenOpen;
 
   /** The read-only quick notes document has no identity of its own to be linked to. */
   readonly backlinksShown = computed(() => {

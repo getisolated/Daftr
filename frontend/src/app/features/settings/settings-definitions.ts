@@ -7,7 +7,7 @@ import type { Platform } from '../../core/services/platform.service';
 
 export type SettingControl =
   | 'checkbox' | 'number' | 'select' | 'shortcut' | 'list' | 'mcpToken' | 'mcpConnection'
-  | 'syncStatus' | 'syncDeviceName' | 'syncPairing' | 'syncDevices' | 'receivedFolder';
+  | 'syncStatus' | 'syncDeviceName' | 'syncScreen' | 'receivedFolder';
 
 /** Option of a select setting: a translated `labelKey`, or a literal `label` that is never translated (a language named in itself). */
 export interface SettingOption {
@@ -347,20 +347,11 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     control: 'checkbox',
   },
   {
-    key: 'syncPairing',
+    key: 'syncScreen',
     categoryKey: 'sync.settings.category',
-    titleKey: 'sync.settings.pairing.title',
-    descriptionKey: 'sync.settings.pairing.description',
-    control: 'syncPairing',
-    fixed: true,
-    panel: true,
-  },
-  {
-    key: 'syncDevices',
-    categoryKey: 'sync.settings.category',
-    titleKey: 'sync.settings.devices.title',
-    descriptionKey: 'sync.settings.devices.description',
-    control: 'syncDevices',
+    titleKey: 'sync.settings.screen.title',
+    descriptionKey: 'sync.settings.screen.description',
+    control: 'syncScreen',
     fixed: true,
     panel: true,
   },

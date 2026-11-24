@@ -12,6 +12,7 @@ export const FR_PROFILES: Record<keyof typeof EN_PROFILES, string> = {
   'profiles.menu.protected': 'Protégé par un mot de passe',
   'profiles.menu.new': 'Nouveau profil',
   'profiles.menu.settings': 'Paramétrer le profil…',
+  'profiles.menu.sync': 'Synchronisation…',
 
   // Dialogue de paramétrage
   'profiles.settings.title': 'Paramètres du profil',
