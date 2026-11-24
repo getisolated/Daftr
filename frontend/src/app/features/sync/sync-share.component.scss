@@ -32,6 +32,9 @@
   &:not(.header):hover { background: rgba(var(--daftr-hover-rgb), 0.05); }
 }
 
+// Collections stand out from their heading
+.indented { padding-left: 16px; }
+
 .header {
   min-height: 20px;
   color: var(--daftr-text-dimmed);
@@ -82,7 +85,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 0 4px 4px;
+  margin: 0 4px 4px 16px;
   padding: 6px 8px;
   border-radius: 4px;
   background: rgba(var(--daftr-hover-rgb), 0.05);

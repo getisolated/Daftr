@@ -6,7 +6,7 @@ import { ProfilesService } from '../../core/services/profiles.service';
 import { SyncService } from '../../core/services/sync.service';
 import { formatBytes, tooLargeCount } from '../../core/utils/collection-sync.util';
 import { matrixDevices } from '../../core/utils/sync-share.util';
-import { CheckboxComponent } from '../../shared/ui/checkbox.component';
+import { ToggleComponent } from '../../shared/ui/toggle.component';
 
 /** Width of the menu, in pixels (also its CSS width), to keep it inside the window. */
 const MENU_WIDTH = 280;
@@ -15,14 +15,14 @@ const MENU_HEIGHT_ESTIMATE = 260;
 const WINDOW_MARGIN = 8;
 
 /**
- * "Sync with…" of a collection of the sidebar: a small menu with a box per trusted device, applied as it is ticked. It
+ * "Sync with…" of a collection of the sidebar: a small menu with a switch per trusted device, applied as it is switched. It
  * tells what the folder shares (files, size, a warning for a git folder). Without any linked device, it leads to the sync
  * screen.
  */
 @Component({
   selector: 'app-collection-share-menu',
   standalone: true,
-  imports: [CheckboxComponent],
+  imports: [ToggleComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '(document:keydown.escape)': 'closed.emit()',
@@ -38,9 +38,9 @@ const WINDOW_MARGIN = 8;
       } @else {
         <div class="devices" role="group" [attr.aria-label]="i18n.t('csync.menu.title')">
           @for (device of devices(); track device.key) {
-            <app-checkbox [class.busy]="applying().has(device.key)" [checked]="isChecked(device.key)" (checkedChange)="toggle(device.key, $event)">
+            <app-toggle [class.busy]="applying().has(device.key)" [checked]="isChecked(device.key)" (checkedChange)="toggle(device.key, $event)">
               {{ device.name }}
-            </app-checkbox>
+            </app-toggle>
           }
         </div>
 

@@ -62,11 +62,11 @@
 }
 
 <ng-template #matrixRow let-row="row" let-strong="strong">
-  <div class="line" [class.strong]="strong">
+  <div class="line" [class.strong]="strong" [class.indented]="!strong">
     <span class="label-cell" [title]="row.label">{{ row.label }}</span>
     @for (cell of row.cells; track cell.deviceKey) {
       <span class="cell">
-        <app-checkbox
+        <app-toggle
           [checked]="cell.checked"
           [attr.aria-label]="i18n.t('sync.screen.cell', { row: row.label, device: deviceName(cell.deviceKey) })"
           [class.busy]="isApplying(row, cell.deviceKey)"

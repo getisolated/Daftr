@@ -10,8 +10,8 @@ import { profileDisplayName } from '../../core/utils/profile.util';
 import {
   MatrixRow, collectionRows, defaultOfferProfile, groupOffers, matrixDevices, profileRow,
 } from '../../core/utils/sync-share.util';
-import { CheckboxComponent } from '../../shared/ui/checkbox.component';
 import { SelectComponent, SelectOption } from '../../shared/ui/select.component';
+import { ToggleComponent } from '../../shared/ui/toggle.component';
 import { SyncOfferRowComponent } from './sync-offer-row.component';
 
 /**
@@ -23,7 +23,7 @@ import { SyncOfferRowComponent } from './sync-offer-row.component';
 @Component({
   selector: 'app-sync-share',
   standalone: true,
-  imports: [NgTemplateOutlet, CheckboxComponent, SelectComponent, SyncOfferRowComponent],
+  imports: [NgTemplateOutlet, SelectComponent, ToggleComponent, SyncOfferRowComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sync-share.component.html',
   styleUrls: ['./sync-screen-ui.scss', './sync-share.component.scss'],
