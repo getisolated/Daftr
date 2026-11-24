@@ -1,26 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { Profile } from '../src/app/core/models/profile.model';
-import type { PairingTicket, ProfileSync, SyncStatus, TrustedDevice } from '../src/app/core/models/sync.model';
+import type { PairingTicket, SyncStatus } from '../src/app/core/models/sync.model';
 import {
-  deviceIcon, deviceIconLabel, formatCountdown, formatPairingCode, initialPairingProfiles, initialSyncLabel, isPairingCode, lastSyncAt,
-  mergeCandidates, needsNewPairingCode, normalizePairingCode, offerDestinationOptions, offerTargets, pairingAddresses, parseOfferDestination,
-  remainingMs, remoteChangeLabel, remoteDeletionLabel, sharedDevices, sharedProfileIds, shortDeviceId, svgDataUrl, syncErrorMessage,
-  syncIndicator, syncReason,
+  deviceIcon, deviceIconLabel, formatCountdown, formatPairingCode, isPairingCode, needsNewPairingCode, normalizePairingCode, pairingAddresses,
+  remainingMs, remoteChangeLabel, remoteDeletionLabel, shortDeviceId, svgDataUrl, syncErrorMessage, syncIndicator, syncReason,
 } from '../src/app/core/utils/sync.util';
-
-function profile(id: string, name: string | null = id): Profile {
-  return { id, name, hasIcon: false, protected: false, isDefault: id === 'default' };
-}
 
 function status(state: SyncStatus['state'], devices: number | null = null, reason: string | null = null): SyncStatus {
   return { state, devices, reason };
-}
-
-function trusted(key: string, overrides: Partial<TrustedDevice> = {}): TrustedDevice {
-  return {
-    key, fingerprint: 'ab'.repeat(16), name: key, kind: 'unknown', origin: 'paired', addedAt: '2026-11-20 10:00:00', revokedAt: null, present: false, connected: false, profiles: [],
-    ...overrides,
-  };
 }
 
 describe('syncIndicator', () => {
@@ -59,7 +45,6 @@ describe('syncErrorMessage', () => {
 
   it('translates the refusals of the input checks', () => {
     expect(syncErrorMessage(new Error('invalid pairing code'), 'en')).toBe('Enter the 6-digit code.');
-    expect(syncErrorMessage(new Error('profile already synchronized'), 'fr')).toBe('Ce profil est déjà synchronisé.');
   });
 
   it('keeps an unknown message after a generic sentence', () => {
@@ -103,87 +88,6 @@ describe('pairing countdown and code', () => {
 
     expect(url.startsWith('data:image/svg+xml;charset=utf-8,')).toBe(true);
     expect(decodeURIComponent(url.slice(url.indexOf(',') + 1))).toBe('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
-  });
-
-  it('checks the active profile when "Link a device" opens', () => {
-    expect(initialPairingProfiles([profile('default'), profile('work')], 'work')).toEqual(['work']);
-    expect(initialPairingProfiles([profile('default')], 'gone')).toEqual([]);
-  });
-});
-
-describe('destination of a proposed profile', () => {
-  const profiles = [profile('default', null), profile('work', 'Work'), profile('home', 'Home')];
-  const offer = { spaceId: 'a'.repeat(64), name: 'Notes', noteCount: 12 };
-  const name = (candidate: Profile): string => candidate.name ?? 'My notes';
-
-  it('only proposes to merge into the profiles not synchronized yet', () => {
-    expect(mergeCandidates(profiles, ['work']).map(candidate => candidate.id)).toEqual(['default', 'home']);
-
-    const options = offerDestinationOptions(offer, profiles, ['work'], name, 'en');
-
-    expect(options).toEqual([
-      { value: 'new', label: 'New profile “Notes”' },
-      { value: 'merge:default', label: 'Merge with “My notes”' },
-      { value: 'merge:home', label: 'Merge with “Home”' },
-      { value: 'ignore', label: 'Ignore' },
-    ]);
-  });
-
-  it('offers only a new profile or nothing when every profile is synchronized', () => {
-    const options = offerDestinationOptions(offer, profiles, ['default', 'work', 'home'], name, 'fr');
-
-    expect(options.map(option => option.value)).toEqual(['new', 'ignore']);
-    expect(options[0]?.label).toBe('Nouveau profil « Notes »');
-  });
-
-  it('turns the chosen value back into the answer', () => {
-    expect(parseOfferDestination('new')).toEqual({ choice: 'new', profileId: null });
-    expect(parseOfferDestination('ignore')).toEqual({ choice: 'ignore', profileId: null });
-    expect(parseOfferDestination('merge:home')).toEqual({ choice: 'merge', profileId: 'home' });
-  });
-
-  it('shows the progress of the initial sync', () => {
-    expect(initialSyncLabel({ profileId: 'work', done: 120, total: 450 }, 'fr')).toBe('Synchronisation initiale : 120 / 450 notes');
-    expect(initialSyncLabel({ profileId: 'work', done: 451, total: 450 }, 'en')).toBe('Initial sync: 450 / 450 notes');
-    expect(initialSyncLabel(null, 'en')).toBe('Initial sync: waiting for the notes…');
-  });
-});
-
-describe('devices of a profile', () => {
-  const sync: ProfileSync = {
-    profileId: 'work',
-    spaceId: 'b'.repeat(64),
-    devices: [
-      { key: 'self', fingerprint: '1'.repeat(32), name: 'Desktop', kind: 'desktop', isSelf: true, revoked: false },
-      { key: 'laptop', fingerprint: '2'.repeat(32), name: 'Laptop', kind: 'laptop', isSelf: false, revoked: false },
-      { key: 'old', fingerprint: '3'.repeat(32), name: 'Old PC', kind: 'unknown', isSelf: false, revoked: true },
-    ],
-  };
-
-  it('lists the other devices still sharing the profile', () => {
-    expect(sharedDevices(sync).map(device => device.name)).toEqual(['Laptop']);
-    expect(sharedDevices(null)).toEqual([]);
-  });
-
-  it('proposes the profile to the trusted devices not sharing it yet', () => {
-    const devices = [trusted('laptop'), trusted('tablet'), trusted('old'), trusted('gone', { revokedAt: '2026-11-21 08:00:00' })];
-
-    expect(offerTargets(devices, sync).map(device => device.key)).toEqual(['tablet', 'old']);
-    expect(offerTargets(devices, null).map(device => device.key)).toEqual(['laptop', 'tablet', 'old']);
-  });
-
-  it('tells the last exchange and the profiles still shared with a device', () => {
-    const device = trusted('laptop', {
-      profiles: [
-        { profileId: 'work', revoked: false, lastSyncAt: '2026-11-22 09:00:00' },
-        { profileId: 'home', revoked: true, lastSyncAt: '2026-11-23 07:30:00' },
-        { profileId: 'default', revoked: false, lastSyncAt: null },
-      ],
-    });
-
-    expect(lastSyncAt(device)).toBe('2026-11-23 07:30:00');
-    expect(lastSyncAt(trusted('new'))).toBeNull();
-    expect(sharedProfileIds(device)).toEqual(['work', 'default']);
   });
 });
 

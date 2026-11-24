@@ -5,8 +5,8 @@ import {
   ConflictKeep, FolderSummary,
 } from '../models/collection-sync.model';
 import {
-  InitialSyncDone, LinkedDevice, NotesSynced, OfferChoice, OfferReceived, PairingState, PairingTicket, ProfileSync, SyncOverview,
-  SyncProgress, SyncStatus, TrustedDevice,
+  InitialSyncDone, LinkedDevice, NotesSynced, PairingState, PairingTicket, ProfileReceived, ProfileShares, SyncOverview, SyncStatus,
+  TrustedDevice,
 } from '../models/sync.model';
 import { call, inDesktop, subscribe } from './desktop-api';
 
@@ -33,13 +33,19 @@ export class SyncBridgeService {
     return this.available ? call<TrustedDevice[]>('sync_devices') : [];
   }
 
-  async profile(profileId: string): Promise<ProfileSync | null> {
-    return this.available ? call<ProfileSync>('sync_profile', { profileId }) : null;
+  /** Every profile against every trusted device: what the matrix of the sync screen shows. */
+  async profileShares(): Promise<ProfileShares | null> {
+    return this.available ? call<ProfileShares>('sync_profile_shares') : null;
   }
 
-  /** Opens the pairing mode for these profiles (their spaces are created if needed). */
-  startPairing(profileIds: string[]): Promise<PairingTicket> {
-    return this.required(() => call('sync_start_pairing', { profileIds }));
+  /** Shares a profile with a device (or stops): the device gets a clone of it, with no confirmation. */
+  setProfileShared(profileId: string, deviceKey: string, shared: boolean): Promise<ProfileShares> {
+    return this.required(() => call('sync_set_profile_shared', { profileId, deviceKey, shared }));
+  }
+
+  /** Opens the pairing mode: it only links two devices, whatever the profiles. */
+  startPairing(): Promise<PairingTicket> {
+    return this.required(() => call('sync_start_pairing'));
   }
 
   stopPairing(): Promise<void> {
@@ -49,19 +55,6 @@ export class SyncBridgeService {
   /** Links to the device showing `code`; `address` (`IP:port`) when it is not found on the network. */
   pair(code: string, address: string | null): Promise<LinkedDevice> {
     return this.required(() => call('sync_pair', { code, address }));
-  }
-
-  answerOffer(deviceKey: string, spaceId: string, choice: OfferChoice, profileId: string | null): Promise<void> {
-    return this.required(() => call('sync_answer_offer', { deviceKey, spaceId, choice, profileId }));
-  }
-
-  /** "Sync with…": proposes a profile to a trusted device (sent as soon as it shows up on the network). */
-  offerProfile(profileId: string, deviceKey: string): Promise<void> {
-    return this.required(() => call('sync_offer_profile', { profileId, deviceKey }));
-  }
-
-  stopSharing(profileId: string, deviceKey: string): Promise<void> {
-    return this.required(() => call('sync_stop_sharing', { profileId, deviceKey }));
   }
 
   /** Removes a device for good: only a new pairing lets it back. */
@@ -80,13 +73,14 @@ export class SyncBridgeService {
 
   // ── Shared collections (Rust module `desktop::commands::collection_sync`) ──
 
-  async collectionState(): Promise<CollectionSyncState | null> {
-    return this.available ? call<CollectionSyncState>('collection_sync_state') : null;
+  /** Without a profile: the collections and sharings of every profile; the proposals are always global. */
+  async collectionState(profileId: string | null = null): Promise<CollectionSyncState | null> {
+    return this.available ? call<CollectionSyncState>('collection_sync_state', { profileId }) : null;
   }
 
-  /** What a collection of the active profile would share. */
-  collectionSummary(root: string): Promise<FolderSummary> {
-    return this.required(() => call('collection_sync_summary', { root }));
+  /** What a collection would share. */
+  collectionSummary(root: string, profileId: string | null): Promise<FolderSummary> {
+    return this.required(() => call('collection_sync_summary', { root, profileId }));
   }
 
   /** What a folder holds, to warn about a destination that already exists. */
@@ -94,18 +88,22 @@ export class SyncBridgeService {
     return this.required(() => call('collection_sync_inspect_folder', { path }));
   }
 
-  /** The devices must already share the active profile. */
-  shareCollection(root: string, deviceKeys: string[]): Promise<CollectionShare> {
-    return this.required(() => call('collection_sync_share', { root, deviceKeys }));
+  /** Shares or stops sharing a collection with one device; `null` once no device is left. */
+  setCollectionDevice(root: string, deviceKey: string, shared: boolean, profileId: string): Promise<CollectionShare | null> {
+    return this.required(() => call('collection_sync_set_device', { root, deviceKey, shared, profileId }));
   }
 
   stopCollection(profileId: string, syncId: string): Promise<void> {
     return this.required(() => call('collection_sync_stop', { profileId, syncId }));
   }
 
-  /** `destination` is required except for `decline`. */
-  answerCollectionOffer(deviceKey: string, syncId: string, destination: string | null, mode: CollectionOfferMode): Promise<void> {
-    return this.required(() => call('collection_sync_answer_offer', { deviceKey, syncId, destination, mode }));
+  /** Activates an entry "to configure" into a profile (active or not) and a folder. */
+  activateCollection(deviceKey: string, syncId: string, profileId: string, destination: string, mode: CollectionOfferMode): Promise<void> {
+    return this.required(() => call('collection_sync_activate', { deviceKey, syncId, profileId, destination, mode }));
+  }
+
+  ignoreCollection(deviceKey: string, syncId: string): Promise<void> {
+    return this.required(() => call('collection_sync_ignore', { deviceKey, syncId }));
   }
 
   /** Without `folder`, a native folder dialog opens; `null` when none is chosen. */
@@ -146,10 +144,6 @@ export class SyncBridgeService {
     return subscribe('sync:notes-synced', callback);
   }
 
-  onProgress(callback: (progress: SyncProgress) => void): () => void {
-    return subscribe('sync:progress', callback);
-  }
-
   onInitialDone(callback: (event: InitialSyncDone) => void): () => void {
     return subscribe('sync:initial-done', callback);
   }
@@ -158,8 +152,8 @@ export class SyncBridgeService {
     return subscribe('sync:device-linked', callback);
   }
 
-  onOfferReceived(callback: (offer: OfferReceived) => void): () => void {
-    return subscribe('sync:offer-received', callback);
+  onProfileReceived(callback: (event: ProfileReceived) => void): () => void {
+    return subscribe('sync:profile-received', callback);
   }
 
   onPairing(callback: (state: PairingState) => void): () => void {

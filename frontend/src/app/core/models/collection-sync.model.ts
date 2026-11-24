@@ -9,6 +9,7 @@ import type { CollectionShareStatusKind } from '../bindings/CollectionShareStatu
 import type { CollectionStateEventDto } from '../bindings/CollectionStateEventDto';
 import type { CollectionSyncStateDto } from '../bindings/CollectionSyncStateDto';
 import type { FolderSummaryDto } from '../bindings/FolderSummaryDto';
+import type { ProfileCollectionDto } from '../bindings/ProfileCollectionDto';
 
 /** The DTOs of the collection sync (crate `presentation`, `dto/collection_sync.rs`), under the names the renderer uses. */
 export type CollectionShare = CollectionShareDto;
@@ -22,9 +23,10 @@ export type CollectionStateEvent = CollectionStateEventDto;
 export type CollectionConflicts = CollectionConflictsDto;
 export type CollectionSyncState = CollectionSyncStateDto;
 export type FolderSummary = FolderSummaryDto;
+export type ProfileCollection = ProfileCollectionDto;
 
-/** Answer to a proposed collection (`collection_sync_answer_offer`). */
-export type CollectionOfferMode = 'receive' | 'merge' | 'decline';
+/** How an entry "to configure" is activated: into an empty (or new) folder, or merged with the files already there. */
+export type CollectionOfferMode = 'receive' | 'merge';
 
 /** Side kept when a conflict is resolved. */
 export type ConflictKeep = 'mine' | 'other';
@@ -43,12 +45,4 @@ export interface CollectionShareBadge {
   /** "37 / 142" while syncing, `null` otherwise. */
   progress: string | null;
   tooltip: string;
-}
-
-/** The sharing assistant: asked for a collection of the sidebar, or from the profile view where the user picks one. */
-export interface ShareAssistantRequest {
-  /** Collection to share; `null`: the assistant asks which one. */
-  root: string | null;
-  /** Where it was opened from: the "link a device" hint then leads to the devices view, or stays in it. */
-  from: 'sidebar' | 'devices';
 }

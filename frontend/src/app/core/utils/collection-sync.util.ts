@@ -1,6 +1,5 @@
 import { Language } from '../i18n/language.model';
 import { translate, translatePlural } from '../i18n/translate';
-import { Collection } from '../models/collection.model';
 import {
   CollectionConflict, CollectionOffer, CollectionOfferMode, CollectionShare, CollectionShareBadge, FolderSummary,
 } from '../models/collection-sync.model';
@@ -64,9 +63,14 @@ export function relativeAgo(at: string | null, now: number, language: Language):
   return formatter.format(-Math.round(hours / 24), 'day');
 }
 
-/** The sharing of a collection, by its path on this device. */
-export function shareOfRoot(shares: readonly CollectionShare[], root: string): CollectionShare | null {
-  return shares.find(share => share.root === root) ?? null;
+/**
+ * The sharing of a collection, by its path on this device. The same folder can be a collection of two profiles: the
+ * one of `profileId` wins when given.
+ */
+export function shareOfRoot(shares: readonly CollectionShare[], root: string, profileId: string | null = null): CollectionShare | null {
+  const ofRoot = shares.filter(share => share.root === root);
+
+  return ofRoot.find(share => share.profileId === profileId) ?? ofRoot[0] ?? null;
 }
 
 /** Names of the devices of a sharing in a state (`offered`: not answered yet, `active`: sharing), joined for a sentence. */
@@ -217,13 +221,6 @@ export function sortOffers(offers: readonly CollectionOffer[]): CollectionOffer[
   return [...offers].sort((a, b) => a.device.name.localeCompare(b.device.name) || a.name.localeCompare(b.name) || a.syncId.localeCompare(b.syncId));
 }
 
-/** The pending proposals once a device proposed (again): its previous ones are replaced by the new list. */
-export function mergeDeviceOffers(
-  pending: readonly CollectionOffer[], deviceKey: string, proposed: readonly CollectionOffer[],
-): CollectionOffer[] {
-  return sortOffers([...pending.filter(offer => offer.device.key !== deviceKey), ...proposed]);
-}
-
 /** The proposals not seen yet, to announce them once (a device proposes again at each connection). */
 export function newOffers(offers: readonly CollectionOffer[], known: ReadonlySet<string>): CollectionOffer[] {
   return offers.filter(offer => !known.has(offerKey(offer)));
@@ -242,22 +239,7 @@ export function needsMergeWarning(folder: FolderSummary | null): boolean {
   return folder !== null && folder.exists && !folder.empty;
 }
 
-/** Folder collections that can still be shared (a file collection cannot, a shared one is already). */
-export function shareableCollections(collections: readonly Collection[], shares: readonly CollectionShare[]): Collection[] {
-  return collections.filter(collection => collection.kind === 'folder' && shareOfRoot(shares, collection.path) === null);
-}
-
 /** Files the summary leaves out because of their size, the others being unreadable or colliding by case. */
 export function tooLargeCount(folder: FolderSummary): number {
   return folder.ignored.filter(file => file.reason === 'tooLarge').length;
-}
-
-/** The sharings of a profile, by name. */
-export function sharesOfProfile(shares: readonly CollectionShare[], profileId: string): CollectionShare[] {
-  return shares.filter(share => share.profileId === profileId).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** The pending proposals of a profile. */
-export function offersOfProfile(offers: readonly CollectionOffer[], profileId: string): CollectionOffer[] {
-  return offers.filter(offer => offer.profileId === profileId);
 }

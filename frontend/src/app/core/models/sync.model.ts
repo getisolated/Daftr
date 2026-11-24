@@ -2,10 +2,12 @@ import type { DeviceKindDto } from '../bindings/DeviceKindDto';
 import type { InitialSyncDoneDto } from '../bindings/InitialSyncDoneDto';
 import type { LinkedDeviceDto } from '../bindings/LinkedDeviceDto';
 import type { NotesSyncedDto } from '../bindings/NotesSyncedDto';
-import type { OfferReceivedDto } from '../bindings/OfferReceivedDto';
 import type { PairingStateDto } from '../bindings/PairingStateDto';
 import type { PairingTicketDto } from '../bindings/PairingTicketDto';
-import type { ProfileOfferDto } from '../bindings/ProfileOfferDto';
+import type { ProfileReceivedDto } from '../bindings/ProfileReceivedDto';
+import type { ProfileShareDeviceDto } from '../bindings/ProfileShareDeviceDto';
+import type { ProfileShareDto } from '../bindings/ProfileShareDto';
+import type { ProfileSharesDto } from '../bindings/ProfileSharesDto';
 import type { ProfileSyncDto } from '../bindings/ProfileSyncDto';
 import type { SpaceDeviceDto } from '../bindings/SpaceDeviceDto';
 import type { SyncProgressDto } from '../bindings/SyncProgressDto';
@@ -24,28 +26,14 @@ export type PairingTicket = PairingTicketDto;
 export type PairingState = PairingStateDto;
 export type ProfileSync = ProfileSyncDto;
 export type SpaceDevice = SpaceDeviceDto;
-export type ProfileOffer = ProfileOfferDto;
-export type OfferReceived = OfferReceivedDto;
+export type ProfileShares = ProfileSharesDto;
+export type ProfileShare = ProfileShareDto;
+export type ProfileShareDevice = ProfileShareDeviceDto;
+export type ProfileReceived = ProfileReceivedDto;
 export type NotesSynced = NotesSyncedDto;
 export type SyncProgress = SyncProgressDto;
 export type InitialSyncDone = InitialSyncDoneDto;
 export type DeviceKind = DeviceKindDto;
-
-/** Answer to a proposed profile (`sync_answer_offer`). */
-export type OfferChoice = 'new' | 'merge' | 'ignore';
-
-/** Where a proposed profile goes on this device; `profileId` with `merge` only. */
-export interface OfferDestination {
-  choice: OfferChoice;
-  profileId: string | null;
-}
-
-/** An entry of the destination list of a proposed profile. */
-export interface OfferDestinationOption {
-  /** `new`, `ignore` or `merge:<profile id>`: the value of the drop-down. */
-  value: string;
-  label: string;
-}
 
 /** How the indicator of the sidebar draws a state. */
 export type SyncTone = 'off' | 'ok' | 'busy' | 'warning' | 'error';
@@ -58,15 +46,6 @@ export interface SyncIndicator {
   /** Translated cause of an error, `null` otherwise. */
   reason: string | null;
 }
-
-/** Step of "Link a device" / "Link to a device" in the sync settings. */
-export type PairingStep = 'idle' | 'chooseProfiles' | 'showCode' | 'enterCode';
-
-/**
- * Screen that opened the pairing mode: the engine has a single one, so a screen only shows (and stops) the code it
- * opened itself.
- */
-export type PairingOwner = 'settings' | 'profile';
 
 /** Icon drawn for a device. */
 export type DeviceIcon = 'laptop' | 'desktop' | 'device';

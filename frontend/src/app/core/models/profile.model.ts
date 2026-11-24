@@ -50,6 +50,6 @@ export interface SquareCrop {
 
 /** Dialog opened from the profile menu of the sidebar. */
 export type ProfileSwitcherDialog =
-  | { kind: 'settings'; profile: Profile | null; devices?: boolean }
+  | { kind: 'settings'; profile: Profile | null }
   | { kind: 'password'; purpose: 'switch' | 'delete'; profile: Profile }
   | { kind: 'confirmDelete'; profile: Profile };

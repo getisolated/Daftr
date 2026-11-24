@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import type { Collection } from '../src/app/core/models/collection.model';
 import type { CollectionOffer, CollectionShare, FolderSummary } from '../src/app/core/models/collection-sync.model';
 import {
-  acceptMode, applyConflicts, applyProgress, applyShareState, conflictOfFile, conflictPaths, formatBytes, lastSyncOfShare, mergeDeviceOffers,
-  needsMergeWarning, newOffers, offerKey, offersOfProfile, progressLabel, relativeAgo, shareBadge, shareOfRoot, shareableCollections, sharesOfProfile,
-  sortOffers, tooLargeCount, waitingDevices,
+  acceptMode, applyConflicts, applyProgress, applyShareState, conflictOfFile, conflictPaths, formatBytes, lastSyncOfShare, needsMergeWarning,
+  newOffers, offerKey, progressLabel, relativeAgo, shareBadge, shareOfRoot, sortOffers, tooLargeCount, waitingDevices,
 } from '../src/app/core/utils/collection-sync.util';
 import { syncErrorMessage } from '../src/app/core/utils/sync.util';
 
@@ -201,14 +199,6 @@ describe('proposals', () => {
     expect(sorted.map(item => `${item.device.name}/${item.name}`)).toEqual(['PC-A/beta', 'PC-B/alpha', 'PC-B/zeta']);
   });
 
-  it('replaces the previous proposals of a device, and keeps the others', () => {
-    const pending = [offer('PC-A', 'one'), offer('PC-B', 'two')];
-    const merged = mergeDeviceOffers(pending, 'key-PC-A', [offer('PC-A', 'three')]);
-
-    expect(merged.map(item => item.name)).toEqual(['three', 'two']);
-    expect(mergeDeviceOffers(pending, 'key-PC-A', []).map(item => item.name)).toEqual(['two']);
-  });
-
   it('announces only the proposals not seen yet', () => {
     const offers = [offer('PC-A', 'one'), offer('PC-A', 'two')];
 
@@ -217,12 +207,6 @@ describe('proposals', () => {
 
   it('identifies a proposal by device and sync id', () => {
     expect(offerKey(offer('PC-A', 'one', 'x'))).toBe('key-PC-A:x');
-  });
-
-  it('keeps the proposals of a profile', () => {
-    const other = { ...offer('PC-A', 'one'), profileId: 'work' };
-
-    expect(offersOfProfile([offer('PC-A', 'two'), other], 'work')).toEqual([other]);
   });
 });
 
@@ -242,17 +226,7 @@ describe('destination folder', () => {
   });
 });
 
-describe('sharing assistant', () => {
-  const collections: Collection[] = [
-    { path: 'C:\\notes\\wms', kind: 'folder', displayName: 'WMS', sortOrder: 0 },
-    { path: 'C:\\notes\\todo.md', kind: 'file', displayName: 'todo', sortOrder: 1 },
-    { path: 'C:\\notes\\docs', kind: 'folder', displayName: 'Docs', sortOrder: 2 },
-  ];
-
-  it('offers the folder collections not shared yet', () => {
-    expect(shareableCollections(collections, [share()]).map(item => item.displayName)).toEqual(['Docs']);
-  });
-
+describe('files a summary leaves out', () => {
   it('counts the files left out for their size', () => {
     const ignored = [
       { path: 'big.md', reason: 'tooLarge' as const },
@@ -262,13 +236,15 @@ describe('sharing assistant', () => {
 
     expect(tooLargeCount(folder({ ignored }))).toBe(2);
   });
+});
 
-  it('finds a sharing by root and lists the ones of a profile by name', () => {
-    const shares = [share({ name: 'Zed', syncId: 'z' }), share({ name: 'Alpha', syncId: 'a', root: 'C:\\a' }), share({ profileId: 'work', syncId: 'w' })];
+describe('sharing of a collection', () => {
+  it('finds a sharing by root, preferring the profile asked for', () => {
+    const shares = [share({ name: 'Zed', syncId: 'z' }), share({ name: 'Alpha', syncId: 'a', root: 'C:\a' }), share({ profileId: 'work', syncId: 'w', root: 'C:\a' })];
 
-    expect(shareOfRoot(shares, 'C:\\a')?.syncId).toBe('a');
-    expect(shareOfRoot(shares, 'C:\\none')).toBeNull();
-    expect(sharesOfProfile(shares, 'default').map(item => item.name)).toEqual(['Alpha', 'Zed']);
+    expect(shareOfRoot(shares, 'C:\a')?.syncId).toBe('a');
+    expect(shareOfRoot(shares, 'C:\a', 'work')?.syncId).toBe('w');
+    expect(shareOfRoot(shares, 'C:\none')).toBeNull();
   });
 });
 

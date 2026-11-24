@@ -1,11 +1,7 @@
 import { Language } from '../i18n/language.model';
 import { translate, translatePlural } from '../i18n/translate';
 import { TranslationKey } from '../i18n/translations';
-import { Profile } from '../models/profile.model';
-import {
-  DeviceIcon, DeviceKind, OfferDestination, OfferDestinationOption, PairingTicket, ProfileOffer, ProfileSync, SpaceDevice, SyncIndicator,
-  SyncProgress, SyncStatus, TrustedDevice,
-} from '../models/sync.model';
+import { DeviceIcon, DeviceKind, PairingTicket, SyncIndicator, SyncStatus } from '../models/sync.model';
 
 /** Number of digits of a pairing code. */
 export const PAIRING_CODE_LENGTH = 6;
@@ -41,7 +37,6 @@ const ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
   protocol_failed: 'sync.error.protocol_failed',
   stopped: 'sync.error.stopped',
   storage_failed: 'sync.error.storage_failed',
-  'profile already synchronized': 'sync.error.alreadySynced',
   'invalid pairing code': 'sync.error.invalidCode',
   'invalid address': 'sync.error.invalidAddress',
   'invalid device name': 'sync.error.invalidDeviceName',
@@ -175,82 +170,6 @@ export function deviceIcon(kind: DeviceKind): DeviceIcon {
 /** Accessible name of a device icon ("Laptop"). */
 export function deviceIconLabel(icon: DeviceIcon, language: Language): string {
   return translate(language, DEVICE_ICON_LABELS[icon]);
-}
-
-/** Profiles checked when "Link a device" opens: the active one. */
-export function initialPairingProfiles(profiles: Profile[], activeId: string): string[] {
-  return profiles.some(profile => profile.id === activeId) ? [activeId] : [];
-}
-
-/** Profiles a proposed profile can be merged into: the ones not synchronized yet (a profile belongs to one space). */
-export function mergeCandidates(profiles: Profile[], syncedProfileIds: readonly string[]): Profile[] {
-  const synced = new Set(syncedProfileIds);
-
-  return profiles.filter(profile => !synced.has(profile.id));
-}
-
-/** Choices for a proposed profile: a new profile, a merge into each profile not synchronized yet, or nothing. */
-export function offerDestinationOptions(
-  offer: ProfileOffer,
-  profiles: Profile[],
-  syncedProfileIds: readonly string[],
-  profileName: (profile: Profile) => string,
-  language: Language,
-): OfferDestinationOption[] {
-  const merges = mergeCandidates(profiles, syncedProfileIds).map(profile => ({
-    value: `merge:${profile.id}`,
-    label: translate(language, 'sync.offer.merge', { name: profileName(profile) }),
-  }));
-
-  return [
-    { value: 'new', label: translate(language, 'sync.offer.new', { name: offer.name }) },
-    ...merges,
-    { value: 'ignore', label: translate(language, 'sync.offer.ignore') },
-  ];
-}
-
-/** The choice behind a value of `offerDestinationOptions`. */
-export function parseOfferDestination(value: string): OfferDestination {
-  if (value.startsWith('merge:')) {
-    return { choice: 'merge', profileId: value.slice('merge:'.length) };
-  }
-
-  return { choice: value === 'ignore' ? 'ignore' : 'new', profileId: null };
-}
-
-/** The other devices a profile is synchronized with ("Synchronized with: …"). */
-export function sharedDevices(sync: ProfileSync | null): SpaceDevice[] {
-  return (sync?.devices ?? []).filter(device => !device.isSelf && !device.revoked);
-}
-
-/** Trusted devices a profile can still be proposed to: not removed, and not already sharing it. */
-export function offerTargets(devices: TrustedDevice[], sync: ProfileSync | null): TrustedDevice[] {
-  const sharing = new Set(sharedDevices(sync).map(device => device.key));
-
-  return devices.filter(device => device.revokedAt === null && !sharing.has(device.key));
-}
-
-/** Most recent exchange with a device, over the profiles it shares (SQLite UTC dates sort as text). */
-export function lastSyncAt(device: TrustedDevice): string | null {
-  return device.profiles.reduce<string | null>((latest, profile) => {
-    const at = profile.lastSyncAt;
-
-    return at !== null && (latest === null || at > latest) ? at : latest;
-  }, null);
-}
-
-/** Ids of the profiles a device still shares (not stopped with "Stop with…"). */
-export function sharedProfileIds(device: TrustedDevice): string[] {
-  return device.profiles.filter(profile => !profile.revoked).map(profile => profile.profileId);
-}
-
-/** "Initial sync: 120 / 450 notes", or a waiting message before the first count. */
-export function initialSyncLabel(progress: SyncProgress | null, language: Language): string {
-  if (!progress || progress.total === 0) {
-    return translate(language, 'sync.offer.waiting');
-  }
-
-  return translate(language, 'sync.offer.progress', { done: Math.min(progress.done, progress.total), total: progress.total });
 }
 
 /** "Changed on Laptop", or on another device when the event does not name it. */
