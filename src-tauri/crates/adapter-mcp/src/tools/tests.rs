@@ -6,6 +6,8 @@ use app::notes::NotesService;
 
 use super::*;
 
+mod edit;
+
 /// Base en mémoire avec le dossier par défaut (Inbox).
 fn services() -> McpServices {
     let store = Arc::new(SqliteStore::open_in_memory().unwrap());
@@ -30,6 +32,15 @@ fn create(services: &McpServices, content: &str, tags: &[&str]) -> i64 {
         tags: Some(tags.iter().map(|tag| (*tag).to_owned()).collect()),
     };
     create_note(services, args).unwrap()["id"].as_i64().unwrap()
+}
+
+fn whole(id: i64) -> GetNoteArgs {
+    GetNoteArgs {
+        id,
+        section: None,
+        from_line: None,
+        to_line: None,
+    }
 }
 
 fn ids(listed: &Value) -> Vec<i64> {
@@ -72,7 +83,7 @@ fn puts_an_explicit_title_on_the_first_line() {
     let id = create_note(&services, args).unwrap()["id"]
         .as_i64()
         .unwrap();
-    let note = get_note(&services, GetNoteArgs { id }).unwrap();
+    let note = get_note(&services, whole(id)).unwrap();
 
     assert_eq!(note["title"], "Groceries");
     assert_eq!(note["content"], "# Groceries\n\n- bread");
@@ -101,8 +112,8 @@ fn reads_a_whole_note_or_explains_it_is_missing() {
     let services = services();
     let id = create(&services, "Title\nbody", &["a"]);
 
-    let note = get_note(&services, GetNoteArgs { id }).unwrap();
-    let missing = get_note(&services, GetNoteArgs { id: 999 }).unwrap_err();
+    let note = get_note(&services, whole(id)).unwrap();
+    let missing = get_note(&services, whole(999)).unwrap_err();
 
     assert_eq!(note["content"], "Title\nbody");
     assert_eq!(note["tags"], json!(["a"]));
@@ -123,7 +134,7 @@ fn replaces_the_content_and_the_title() {
 
     assert_eq!(updated["title"], "New");
     assert_eq!(
-        get_note(&services, GetNoteArgs { id }).unwrap()["content"],
+        get_note(&services, whole(id)).unwrap()["content"],
         "# New\nother"
     );
     let missing = UpdateNoteArgs {
@@ -145,7 +156,7 @@ fn appends_after_a_blank_line() {
     append_to_note(&services, args).unwrap();
 
     assert_eq!(
-        get_note(&services, GetNoteArgs { id }).unwrap()["content"],
+        get_note(&services, whole(id)).unwrap()["content"],
         "Log\n- one\n\n- two"
     );
     let blank = AppendToNoteArgs {

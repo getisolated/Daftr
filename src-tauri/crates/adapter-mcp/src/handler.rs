@@ -9,8 +9,8 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use crate::server::ChangeListener;
 use crate::tools::{
-    self, AppendToNoteArgs, CreateNoteArgs, GetNoteArgs, ListNotesArgs, McpServices,
-    McpServicesSource, SearchNotesArgs, ToolResult, UpdateNoteArgs,
+    self, AppendToNoteArgs, CreateNoteArgs, EditNoteArgs, GetNoteArgs, GetNotesArgs, ListNotesArgs,
+    McpServices, McpServicesSource, SearchNotesArgs, ToolResult, UpdateNoteArgs,
 };
 
 /// Réponse à une IA tant que le profil actif attend son mot de passe.
@@ -19,8 +19,10 @@ const LOCKED: &str = "Daftr is locked: the user must unlock the active profile i
 /// Consignes données aux IA à la connexion.
 const INSTRUCTIONS: &str = "Daftr is the user's markdown note-taking app. Notes live in \
 folders (the default one is Inbox) and carry tags; the first line of a note is its title. \
-Use search_notes or list_notes to find notes, get_note to read one, and create_note, \
-update_note or append_to_note to write. Notes cannot be deleted from here. Dates are UTC.";
+Use search_notes or list_notes to find notes, get_note (or get_notes) to read them, and \
+create_note, edit_note, append_to_note or update_note to write. Prefer edit_note to change \
+part of a note and get_note with a section or lines to read part of one: they save tokens. \
+Notes cannot be deleted from here. Dates are UTC.";
 
 /// Une connexion d'IA : chaque session MCP a la sienne, toutes partagent les services.
 #[derive(Clone)]
@@ -75,7 +77,7 @@ impl DaftrTools {
     }
 
     #[tool(
-        description = "List notes without their content (id, title, folder_id, tags, created_at, updated_at), most recently updated first. Optionally only those of a folder or carrying a tag. 'total' counts every matching note.",
+        description = "List notes without their content (id, title, folder_id, tags, updated_at), most recently updated first. Optionally only those of a folder or carrying a tag. 'total' counts every matching note.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn list_notes(
@@ -99,11 +101,23 @@ impl DaftrTools {
     }
 
     #[tool(
-        description = "Read a note: its metadata and its full markdown content.",
+        description = "Read a note: its metadata and its markdown content, whole by default. For a long note, read only a section (by heading) or a range of lines; 'lines' and 'total_lines' then tell which part came back.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn get_note(&self, Parameters(args): Parameters<GetNoteArgs>) -> Result<String, String> {
         self.read(move |services| tools::get_note(services, args))
+            .await
+    }
+
+    #[tool(
+        description = "Read several notes (at most 20) in one call, with their full content. Ids that do not exist are listed in 'missing'.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn get_notes(
+        &self,
+        Parameters(args): Parameters<GetNotesArgs>,
+    ) -> Result<String, String> {
+        self.read(move |services| tools::get_notes(services, args))
             .await
     }
 
@@ -133,7 +147,7 @@ impl DaftrTools {
     }
 
     #[tool(
-        description = "Replace the whole markdown content of a note; its first line becomes its title. Read it with get_note first to keep what should stay.",
+        description = "Replace the whole markdown content of a note; its first line becomes its title. To change only part of a note, use edit_note instead.",
         annotations(
             read_only_hint = false,
             destructive_hint = true,
@@ -146,6 +160,23 @@ impl DaftrTools {
         Parameters(args): Parameters<UpdateNoteArgs>,
     ) -> Result<String, String> {
         self.write(move |services| tools::update_note(services, args))
+            .await
+    }
+
+    #[tool(
+        description = "Replace an exact passage of a note (old_text -> new_text), keeping the rest untouched: no need to send the whole note. Fails if old_text is missing or appears several times, unless replace_all is set. Returns the note without its content.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn edit_note(
+        &self,
+        Parameters(args): Parameters<EditNoteArgs>,
+    ) -> Result<String, String> {
+        self.write(move |services| tools::edit_note(services, args))
             .await
     }
 

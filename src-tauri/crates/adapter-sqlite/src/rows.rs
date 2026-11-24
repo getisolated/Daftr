@@ -2,7 +2,7 @@
 
 use domain::collection::{Collection, CollectionKind};
 use domain::folder::Folder;
-use domain::note::Note;
+use domain::note::{Note, NoteHead};
 use rusqlite::Row;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
 
@@ -19,6 +19,19 @@ pub(crate) fn note(row: &Row<'_>) -> rusqlite::Result<Note> {
         created_at: row
             .get::<_, Option<String>>("created_at")?
             .unwrap_or_default(),
+        updated_at: row
+            .get::<_, Option<String>>("updated_at")?
+            .unwrap_or_default(),
+    })
+}
+
+/// Les colonnes de `HEADS` : une note sans son contenu.
+pub(crate) fn note_head(row: &Row<'_>) -> rusqlite::Result<NoteHead> {
+    Ok(NoteHead {
+        id: row.get("id")?,
+        title: row.get("title")?,
+        tags: row.get("tags")?,
+        folder_id: row.get("folder_id")?,
         updated_at: row
             .get::<_, Option<String>>("updated_at")?
             .unwrap_or_default(),

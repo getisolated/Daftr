@@ -1,8 +1,11 @@
 //! Outils exposés aux IA : lecture et écriture des notes, sans suppression.
 //!
 //! Chaque outil est une fonction synchrone (comme les services) qui rend le JSON à renvoyer,
-//! ou un message d'erreur lisible par l'IA. Les paramètres sont décrits en anglais : ces
-//! descriptions forment le schéma JSON montré aux IA.
+//! ou un message d'erreur lisible par l'IA. Les réponses restent courtes : chaque octet est
+//! payé en tokens par l'IA.
+
+mod args;
+mod read;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,12 +14,20 @@ use app::AppError;
 use app::folders::FoldersService;
 use app::notes::NotesService;
 use domain::folder::Folder;
-use domain::note::{NewNote, Note, NoteChanges, append_text, content_with_title, extract_title};
+use domain::note::edit::{ReplaceError, replace_passage};
+use domain::note::{
+    NewNote, Note, NoteChanges, NoteHead, append_text, content_with_title, extract_title,
+};
 use domain::search::snippet;
 use domain::tags::normalize_tags;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{Value, json};
+
+pub(crate) use args::{
+    AppendToNoteArgs, CreateNoteArgs, EditNoteArgs, GetNoteArgs, GetNotesArgs, ListNotesArgs,
+    SearchNotesArgs, UpdateNoteArgs,
+};
+pub(crate) use read::{get_note, get_notes};
 
 /// Nombre de notes rendues par `list_notes` sans limite demandée.
 const DEFAULT_LIST_LIMIT: usize = 50;
@@ -26,6 +37,8 @@ const DEFAULT_SEARCH_LIMIT: usize = 20;
 const MAX_LIMIT: usize = 500;
 /// Longueur des extraits de `search_notes`, en caractères.
 const SNIPPET_LENGTH: usize = 200;
+/// Longueur d'une date rendue : `YYYY-MM-DD HH:MM`, les secondes n'apportent rien.
+const DATE_LENGTH: usize = 16;
 
 /// Services de l'application partagés avec le serveur MCP.
 #[derive(Clone)]
@@ -53,113 +66,15 @@ impl McpServicesSource for McpServices {
 /// Résultat d'un outil : le JSON à renvoyer, ou un message d'erreur pour l'IA.
 pub(crate) type ToolResult = Result<Value, String>;
 
-/// Paramètres de `list_notes`.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct ListNotesArgs {
-    /// Seulement les notes de ce dossier.
-    #[schemars(description = "Only the notes directly in this folder (id from list_folders).")]
-    #[serde(default)]
-    pub folder_id: Option<i64>,
-    /// Seulement les notes portant ce tag.
-    #[schemars(description = "Only the notes carrying this tag (exact name, see list_tags).")]
-    #[serde(default)]
-    pub tag: Option<String>,
-    /// Nombre maximal de notes.
-    #[schemars(
-        description = "Maximum number of notes to return, most recently updated first. Default 50, at most 500.",
-        range(min = 1, max = 500)
-    )]
-    #[serde(default)]
-    pub limit: Option<u32>,
-}
-
-/// Paramètres de `search_notes`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct SearchNotesArgs {
-    /// Mots cherchés.
-    #[schemars(
-        description = "Words to look for in the titles and contents of the notes. Every word must match; the last one also matches as a prefix."
-    )]
-    pub query: String,
-    /// Nombre maximal de résultats.
-    #[schemars(
-        description = "Maximum number of notes to return, best matches first. Default 20, at most 500.",
-        range(min = 1, max = 500)
-    )]
-    #[serde(default)]
-    pub limit: Option<u32>,
-}
-
-/// Paramètres de `get_note`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct GetNoteArgs {
-    /// Identifiant de la note.
-    #[schemars(description = "Id of the note (from list_notes or search_notes).")]
-    pub id: i64,
-}
-
-/// Paramètres de `create_note`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct CreateNoteArgs {
-    /// Texte markdown.
-    #[schemars(description = "Markdown content of the note.")]
-    pub content: String,
-    /// Titre.
-    #[schemars(
-        description = "Title of the note. Daftr titles a note with its first line: when the content does not already start with this title, a '# title' heading is added at the top. Without it, the first line of the content is the title."
-    )]
-    #[serde(default)]
-    pub title: Option<String>,
-    /// Dossier.
-    #[schemars(
-        description = "Folder to create the note in (id from list_folders). Defaults to the Inbox folder."
-    )]
-    #[serde(default)]
-    pub folder_id: Option<i64>,
-    /// Tags.
-    #[schemars(description = "Tags of the note.")]
-    #[serde(default)]
-    pub tags: Option<Vec<String>>,
-}
-
-/// Paramètres de `update_note`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct UpdateNoteArgs {
-    /// Identifiant de la note.
-    #[schemars(description = "Id of the note to update.")]
-    pub id: i64,
-    /// Nouveau texte.
-    #[schemars(
-        description = "New markdown content, replacing the whole note. Its first line becomes the title."
-    )]
-    pub content: String,
-}
-
-/// Paramètres de `append_to_note`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct AppendToNoteArgs {
-    /// Identifiant de la note.
-    #[schemars(description = "Id of the note to append to.")]
-    pub id: i64,
-    /// Texte ajouté.
-    #[schemars(description = "Markdown text added at the end of the note, after a blank line.")]
-    pub text: String,
-}
-
-/// Une note sans son contenu.
+/// Une note sans son contenu, réduite à ce qui aide à choisir : pas de date de création,
+/// pas de tags vides.
 #[derive(Debug, Serialize)]
 struct NoteSummary {
     id: i64,
     title: String,
     folder_id: Option<i64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     tags: Vec<String>,
-    created_at: String,
     updated_at: String,
 }
 
@@ -170,8 +85,19 @@ impl From<&Note> for NoteSummary {
             title: note.title.clone(),
             folder_id: note.folder_id,
             tags: app::notes::tags::decode(&note.tags),
-            created_at: note.created_at.clone(),
-            updated_at: note.updated_at.clone(),
+            updated_at: short_date(&note.updated_at),
+        }
+    }
+}
+
+impl From<&NoteHead> for NoteSummary {
+    fn from(head: &NoteHead) -> Self {
+        Self {
+            id: head.id,
+            title: head.title.clone(),
+            folder_id: head.folder_id,
+            tags: app::notes::tags::decode(&head.tags),
+            updated_at: short_date(&head.updated_at),
         }
     }
 }
@@ -205,26 +131,24 @@ pub(crate) fn list_folders(services: &McpServices) -> ToolResult {
     Ok(json!({ "folders": entries }))
 }
 
-/// Les notes, les plus récemment modifiées d'abord, filtrées par dossier et tag.
+/// Les notes, les plus récemment modifiées d'abord, filtrées par dossier et tag ; la base ne
+/// rend que les premières, et sans leur contenu.
 pub(crate) fn list_notes(services: &McpServices, args: ListNotesArgs) -> ToolResult {
     if let Some(folder_id) = args.folder_id {
         ensure_folder(services, folder_id)?;
     }
-    let notes = match args.tag.as_deref().map(str::trim) {
-        Some(tag) if !tag.is_empty() => services.notes.by_tag(tag).map_err(failure)?,
-        _ => services.notes.all().map_err(failure)?,
-    };
-    let matching: Vec<&Note> = notes
-        .iter()
-        .filter(|note| args.folder_id.is_none() || note.folder_id == args.folder_id)
-        .collect();
-    let total = matching.len();
-    let listed: Vec<NoteSummary> = matching
-        .into_iter()
-        .take(limit(args.limit, DEFAULT_LIST_LIMIT))
-        .map(NoteSummary::from)
-        .collect();
-    Ok(json!({ "total": total, "notes": listed }))
+    let tag = args
+        .tag
+        .as_deref()
+        .map(str::trim)
+        .filter(|tag| !tag.is_empty());
+    let page = services
+        .notes
+        .heads(args.folder_id, tag, limit(args.limit, DEFAULT_LIST_LIMIT))
+        .map_err(failure)?;
+    let listed: Vec<NoteSummary> = page.items.iter().map(NoteSummary::from).collect();
+
+    Ok(json!({ "total": page.total, "notes": listed }))
 }
 
 /// Recherche plein texte, avec un extrait autour des mots trouvés.
@@ -233,10 +157,13 @@ pub(crate) fn search_notes(services: &McpServices, args: SearchNotesArgs) -> Too
     if query.is_empty() {
         return Err("The query must not be empty.".to_owned());
     }
-    let found = services.notes.search(query).map_err(failure)?;
-    let results: Vec<Value> = found
+    let page = services
+        .notes
+        .search_page(query, limit(args.limit, DEFAULT_SEARCH_LIMIT))
+        .map_err(failure)?;
+    let results: Vec<Value> = page
+        .items
         .iter()
-        .take(limit(args.limit, DEFAULT_SEARCH_LIMIT))
         .map(|note| {
             let mut entry = json!(NoteSummary::from(note));
             entry["snippet"] = json!(snippet(&note.content, query, SNIPPET_LENGTH));
@@ -244,13 +171,7 @@ pub(crate) fn search_notes(services: &McpServices, args: SearchNotesArgs) -> Too
         })
         .collect();
 
-    Ok(json!({ "total": found.len(), "notes": results }))
-}
-
-/// Une note complète.
-pub(crate) fn get_note(services: &McpServices, args: GetNoteArgs) -> ToolResult {
-    let note = existing_note(services, args.id)?;
-    Ok(with_content(&note))
+    Ok(json!({ "total": page.total, "notes": results }))
 }
 
 /// Tous les tags utilisés.
@@ -285,6 +206,16 @@ pub(crate) fn update_note(services: &McpServices, args: UpdateNoteArgs) -> ToolR
     replace_content(services, args.id, args.content)
 }
 
+/// Remplace un passage exact d'une note, le reste du texte restant intact.
+pub(crate) fn edit_note(services: &McpServices, args: EditNoteArgs) -> ToolResult {
+    let note = existing_note(services, args.id)?;
+    let replace_all = args.replace_all.unwrap_or(false);
+    let edited = replace_passage(&note.content, &args.old_text, &args.new_text, replace_all)
+        .map_err(|error| edit_failure(error, args.id))?;
+
+    replace_content(services, args.id, edited)
+}
+
 /// Ajoute du texte à la fin d'une note, après une ligne vide.
 pub(crate) fn append_to_note(services: &McpServices, args: AppendToNoteArgs) -> ToolResult {
     if args.text.trim().is_empty() {
@@ -305,8 +236,10 @@ fn replace_content(services: &McpServices, id: i64, content: String) -> ToolResu
     Ok(json!(NoteSummary::from(&note)))
 }
 
+/// Une note avec son contenu et sa date de création, que les listes ne portent pas.
 fn with_content(note: &Note) -> Value {
     let mut value = json!(NoteSummary::from(note));
+    value["created_at"] = json!(short_date(&note.created_at));
     value["content"] = json!(note.content);
     value
 }
@@ -334,6 +267,20 @@ fn note_not_found(id: i64) -> String {
     format!("Note {id} not found. Use list_notes or search_notes to find notes.")
 }
 
+fn edit_failure(error: ReplaceError, id: i64) -> String {
+    match error {
+        ReplaceError::EmptyPassage => "old_text must not be empty.".to_owned(),
+        ReplaceError::NotFound => format!(
+            "old_text not found in note {id}: it must match exactly, whitespace included. \
+             Use get_note to read the current text."
+        ),
+        ReplaceError::Ambiguous(count) => format!(
+            "old_text appears {count} times in note {id}: add surrounding text to make it \
+             unique, or set replace_all."
+        ),
+    }
+}
+
 /// Chemin du dossier depuis la racine ; s'arrête sur un parent inconnu ou un cycle.
 fn folder_path(folder: &Folder, by_id: &HashMap<i64, &Folder>) -> String {
     let mut names = vec![folder.name.as_str()];
@@ -355,6 +302,11 @@ fn limit(requested: Option<u32>, default: usize) -> usize {
         .and_then(|value| usize::try_from(value).ok())
         .unwrap_or(default)
         .clamp(1, MAX_LIMIT)
+}
+
+/// La date sans ses secondes (`YYYY-MM-DD HH:MM`).
+fn short_date(date: &str) -> String {
+    date.chars().take(DATE_LENGTH).collect()
 }
 
 fn failure(error: AppError) -> String {
