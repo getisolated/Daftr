@@ -3,6 +3,7 @@
 //! Les services valident les entrées avec le crate `domain` puis délèguent les effets aux
 //! ports, implémentés par les crates `adapter-*` et assemblés par `desktop`.
 
+pub mod collection_sync;
 pub mod collections;
 pub mod error;
 pub mod export;
