@@ -9,11 +9,12 @@
 
 Daftr synchronise les notes d'un même utilisateur entre ses appareils, **en réseau local uniquement** : aucun serveur, aucun trafic Internet. Deux appareils échangent quand ils sont allumés en même temps sur le même réseau.
 
-- **Confiance** : établie une fois par **appairage** (code à 6 chiffres, QR code, `IP:port` en repli). Elle est transitive au sein d'un profil partagé : un appareil ajouté par un membre se synchronise avec tous les autres.
-- **Profils synchronisés** : choisis profil par profil et appareil par appareil, sans interrupteur : un profil est synchronisé dès qu'il est partagé avec un appareil. Tous les profils synchronisés tournent, actifs ou non, verrouillés compris (la base n'est pas chiffrée).
-- **Automatique et en temps réel**, avec pause globale et « Synchroniser maintenant ». Synchronisation complète dès l'appairage ou l'acceptation d'un profil.
+- **Confiance** : établie une fois par **appairage** (code à 6 chiffres, QR code, `IP:port` en repli), entre deux appareils, **sans aucun profil** (refonte du 2026-11-24, [refonte-ux.md](refonte-ux.md), qui l'emporte sur ce qui suit en cas d'écart). Elle est transitive au sein d'un profil partagé : un appareil ajouté par un membre se synchronise avec tous les autres.
+- **Profils synchronisés** : partagés profil par profil et appareil par appareil (case à cocher), sans interrupteur : un profil est synchronisé dès qu'il est partagé avec un appareil. **L'appareil qui le reçoit l'accepte d'office** : il en crée un nouveau profil, clone (même nom, même icône, sans mot de passe maître), sans rien demander. Tous les profils synchronisés tournent, actifs ou non, verrouillés compris (la base n'est pas chiffrée).
+- **Collections** : partagées avec n'importe quel appareil de confiance, que son profil soit synchronisé ou non ; chez le destinataire, une entrée « à configurer » (profil cible et dossier à choisir, §12).
+- **Automatique et en temps réel**, avec pause globale et « Synchroniser maintenant ». Synchronisation complète dès l'acceptation d'office d'un profil.
 - **Pas de dialogue de conflit** : chaque note est un document CRDT (`yrs`, format Yjs), fusionné caractère par caractère. La note ouverte reçoit les modifications sans perdre la saisie en cours.
-- **Coût nul sans profil synchronisé** : ni écoute, ni annonce, ni thread ; seule trace, `sync/device.key`.
+- **Coût nul sans appareil lié ni profil synchronisé** : ni écoute, ni annonce, ni thread ; seule trace, `sync/device.key`. Dès qu'un appareil est de confiance, l'écoute et l'annonce restent ouvertes pour recevoir ses offres (refonte du 2026-11-24).
 - **Hors périmètre** : partage avec d'autres personnes, réglages, mobile, historique des versions. Les collections (dossiers de fichiers `.md`) ont leur propre plan, [collections.md](collections.md), et leur section ici (§12).
 
 ## 2. Architecture
@@ -105,13 +106,25 @@ Bases utilisées :
 
 ### Appairage
 
-1. A : « Lier un appareil », choix des profils (actif coché). Un espace est créé pour chaque profil coché qui n'en a pas.
+1. A : « Lier un appareil ». **Aucun profil n'est choisi ni créé** : le mode appairage ne fait qu'ouvrir la fenêtre du code.
 2. A affiche un code à 6 chiffres et un QR code `daftr-pair:1:<IP:port,…>:<empreinte>:<code>` (IPv6 entre crochets, 4 adresses au plus), valables 5 minutes. Nouveau code après 10 échecs. Le mode se ferme à la première liaison.
 3. B : « Se lier à un appareil », saisie du code. B compose vers les appareils en mode appairage découverts (4 en parallèle au plus) ou vers l'`IP:port` saisi. Le QR est vérifié contre l'empreinte (scan prévu pour le mobile).
 4. Vérification : Noise XX, puis SPAKE2 (code = mot de passe), puis confirmation par HMAC sur le hash du handshake : le code est lié à la connexion, un seul essai par tentative, rien à rejouer hors ligne.
-5. A et B s'ajoutent dans `devices.json` (`paired`). A envoie l'offre (`space_id`, nom, nombre de notes par profil). B choisit par profil : nouveau profil, fusionner avec un profil non synchronisé, ignorer. A ajoute B dans `space.devices`, envoie un `Snapshot` (B l'adopte par `adopt_space`), et la session passe en `Sync` sur la même connexion.
+5. A et B s'ajoutent dans `devices.json` (`paired`), la session passe en `Sync` sur la même connexion, et **les deux appareils gardent l'écoute ouverte** (un appareil de confiance attend les profils et collections qu'on lui partage).
 
-Offre ultérieure (« Synchroniser avec… » dans les réglages du profil) : envoyée tout de suite si l'appareil est connecté, sinon dès son apparition.
+### Partage d'un profil
+
+Cocher un profil pour un appareil (`sync_set_profile_shared(profileId, deviceKey, true)`) :
+1. le profil reçoit son espace s'il n'en a pas (comme l'ancien « Lier un appareil ») ;
+2. l'appareil devient membre de l'espace chez A (écriture locale persistante : c'est l'état « partagé » affiché) ;
+3. A envoie `Offer` tout de suite si l'appareil est connecté, sinon dès son apparition (l'offre en attente n'est **pas** gardée au redémarrage de A ; décocher puis recocher la renvoie) ;
+4. **B accepte d'office** : il répond `OfferReply { accepted: true }`, sauf s'il a déjà un profil pour cet espace (un profil par espace et par appareil : refus, rien d'autre ne se passe) ;
+5. A envoie `ProfileInfo` (nom courant du profil et image de l'icône, voir « Nom et icône du clone »), puis le `Snapshot`, puis `SnapshotEnd` ;
+6. à `SnapshotEnd`, B **crée un nouveau profil** (jamais de fusion), lui fait rejoindre l'espace (`adopt_space`), émet `sync:profile-received` et acquitte ; le rattrapage normal part dans les deux sens (synchronisation initiale).
+
+Le profil n'est créé qu'à la fin du contenu : une réception interrompue ne laisse aucun profil vide, et A, qui garde son offre tant que B n'annonce pas l'espace, recommence à la reconnexion. Décocher (`false`) retire l'appareil de l'espace (« Arrêter de synchroniser ce profil avec X ») : ce que B a déjà copié lui reste, et recocher le réadmet dans le même profil.
+
+**Nom et icône du clone.** Ni le nom ni l'icône ne sont dans le document d'espace (le nom de l'espace est figé à sa création). Le message `ProfileInfo` (indice 22, voir ci-dessous) porte le nom courant du profil (absent pour un profil sans nom : le profil par défaut) et les octets de l'icône (PNG ou WebP, 512 Kio au plus, revalidés par B). Un profil sans nom arrive sous le nom par défaut de la langue de B (« Profil par défaut » / « Default profile », clé `SyncDefaultProfileName`). Le mot de passe maître n'est **pas** transmis : le clone n'en a pas. Une icône refusée laisse le clone sans icône sans bloquer la réception. Face à une version qui n'annonce pas le bit `FEATURE_PROFILE_INFO`, rien n'est envoyé et le clone prend le nom de l'offre (celui de l'espace), sans icône.
 
 ### Session `Sync`
 
@@ -147,10 +160,10 @@ Offre ultérieure (« Synchroniser avec… » dans les réglages du profil) : en
 | `sync_state` | — | `SyncStateDto` (statut, clé et nom de l'appareil, port, port d'écoute, pause, profils synchronisés) |
 | `sync_devices` | — | `TrustedDeviceDto[]` (type, empreinte, présent, connecté, profils partagés avec `lastSyncAt`) |
 | `sync_profile` | `profileId` | `ProfileSyncDto` (espace, membres avec type et empreinte) |
-| `sync_start_pairing` / `sync_stop_pairing` | `profileIds[]` / — | `PairingTicketDto` (code, uri, `qrSvg`, `expiresAt`) / — |
+| `sync_start_pairing` / `sync_stop_pairing` | — / — | `PairingTicketDto` (code, uri, `qrSvg`, `expiresAt`) / — ; aucun profil |
 | `sync_pair` | `code`, `address?` (`IP:port`, `[IPv6]:port`, IP seule) | `LinkedDeviceDto` |
-| `sync_answer_offer` | `deviceKey`, `spaceId`, `choice` (`new` / `merge` / `ignore`), `profileId?` | — |
-| `sync_offer_profile`, `sync_stop_sharing` | `profileId`, `deviceKey` | — |
+| `sync_profile_shares` | — | `ProfileSharesDto` : pour chaque profil (`profileId`, `spaceId?`) et chaque appareil de confiance non révoqué (`deviceKey`), `shared` (membre de l'espace) et `pending` (membre, rien encore échangé) |
+| `sync_set_profile_shared` | `profileId`, `deviceKey`, `shared` | `ProfileSharesDto` (état de tous les profils après le changement) ; remplace `sync_offer_profile`, `sync_stop_sharing` et `sync_answer_offer`, supprimés |
 | `sync_remove_device` | `deviceKey` | — |
 | `sync_now` | — | — |
 | `sync_set_paused`, `sync_set_device_name`, `sync_set_port` | valeur | `SyncStateDto` |
@@ -158,14 +171,14 @@ Offre ultérieure (« Synchroniser avec… » dans les réglages du profil) : en
 
 Erreurs : `IpcError` de code `sync`, message = clé stable (`wrong_code`, `not_pairing`, `no_pairing_device`, `unreachable`, `timeout`, `not_local`, `listen_failed`, `discovery_failed`, `untrusted`, `unknown_offer`, `paused`, `fingerprint_mismatch`, `invalid_qr`, `protocol_version`, `protocol_failed`, `stopped`), traduite par le front.
 
-Événements : `sync:status`, `sync:notes-synced` (avec `notes:changed` pour le profil actif), `sync:progress`, `sync:initial-done`, `sync:device-linked`, `sync:offer-received`, `sync:pairing`.
+Événements : `sync:status`, `sync:notes-synced` (avec `notes:changed` pour le profil actif), `sync:progress`, `sync:initial-done`, `sync:device-linked`, `sync:profile-received` (`ProfileReceivedDto` : `profileId`, `name`, `device`), `sync:pairing`. `sync:offer-received` est supprimé : un profil proposé est accepté d'office.
 
 Réglages de l'appareil (`settings.json`, appliqués à chaud) : `syncDeviceName` (vide = nom d'hôte), `syncPort` (47820, de 1024 à 65535), `syncPaused`. Le front passe par `settings_set`.
 
 ### Interface
 
 - **Réglages → Synchronisation** : état et « Synchroniser maintenant », nom de l'appareil, port, pause ; « Lier un appareil » (profils, QR, code, compte à rebours, adresses pour la saisie manuelle) ; « Se lier à un appareil » (code, `IP:port`) ; appareils de confiance (présent / connecté / absent, profils, dernière synchro, « Retirer »).
-- **Dialogue des profils proposés** : destination par profil, puis « Synchronisation initiale : 120 / 450 notes ».
+- **Dialogue des profils proposés** : supprimé (refonte) : le profil reçu est cloné d'office, l'interface affiche un toast « Profil “X” reçu depuis A » avec « Basculer ».
 - **Réglages du profil** : une ligne « Appareils et synchronisations » (même présentation que « Définir un mot de passe maître », cachée à la création d'un profil) remplace le contenu du dialogue par une sous-vue, avec un retour (bouton ou Échap) qui garde les champs saisis. Pas d'Enregistrer / Supprimer / Annuler dans la sous-vue : tout s'applique tout de suite.
   - En haut, un QR code centré et grand, le code à 6 chiffres dessous, puis le compte à rebours en petit. Ouvrir la sous-vue ouvre le mode appairage pour ce profil (`startPairing([profil])`, qui lui crée un espace au besoin) ; après une liaison ou à l'expiration, un nouveau code est demandé tout seul. Quitter la sous-vue (retour, Échap, fermeture du dialogue) ferme le mode. Chargement et erreur (avec « Réessayer ») à la place du code.
   - Un seul écran ouvre le mode à la fois : le service retient qui l'a ouvert (`settings` / `profile`), chaque écran n'affiche et ne ferme que le sien, et seule la sous-vue renouvelle le code.
@@ -213,13 +226,13 @@ Modèle et CRDT :
 
 Protocole :
 - Le temps réel relance un rattrapage ciblé (`Changed` / `Diffs` / `Updates` / `Done` / `Ack`) au lieu d'un `Update` direct.
-- Offre acceptée : `Snapshot` puis `adopt_space`. Offres en attente gardées en mémoire, perdues au redémarrage (moteur et front).
+- Offre de profil acceptée d'office : `ProfileInfo`, `Snapshot`, puis création du clone et `adopt_space` à `SnapshotEnd`. Les offres de profil en attente sont gardées en mémoire chez le proposant, perdues à son redémarrage (décocher puis recocher les renvoie). Pas de progression de la synchronisation initiale pendant la réception du contenu : le profil n'existe pas encore.
 - Mode appairage fermé à la première liaison ; `last_addr` enregistrée pour les connexions sortantes seulement ; pas de keepalive.
-- Un appareil sans profil synchronisé n'écoute pas : il ne reçoit une offre que s'il compose (« Se lier à un appareil »).
+- Un appareil de confiance écoute et s'annonce toujours (sans profil synchronisé non plus), pour recevoir les profils et collections qu'on lui partage ; sans appareil de confiance ni profil synchronisé, rien ne tourne.
 
 Intégration et interface :
 - Événements préfixés `sync:` ; un profil créé par une offre n'émet pas d'événement de liste : le front relit `profiles_state`.
-- Nom proposé d'un profil sans nom : « Mes notes » / « My notes ».
+- Nom de l'espace d'un profil sans nom : « Mes notes » / « My notes » (nom de repli de l'offre). Un clone dont l'original n'a pas de nom prend « Profil par défaut » / « Default profile » (clé `SyncDefaultProfileName`).
 - `device.key` créé au premier lancement, même sans synchronisation.
 - Changement de réseau détecté en relisant les adresses toutes les 30 s (les API natives demandent du `unsafe` ou une dépendance lourde).
 - Indicateur dans la barre latérale (pas de barre d'état), caché sans profil synchronisé.
@@ -228,6 +241,22 @@ Intégration et interface :
 - Pas de notification système : notifications dans l'interface.
 - Pas d'activation par profil : un profil est synchronisé dès qu'il est partagé (commande `sync_set_profile_enabled` retirée). Le drapeau `enabled` reste dans la base et le moteur ; l'appairage et les offres le remettent à vrai.
 - L'identifiant affiché sous le nom d'un appareil est le début de l'empreinte de sa clé, pas l'adresse MAC : le protocole ne la connaît pas, et elle change selon le réseau Wi-Fi (adresse aléatoire) et la carte réseau.
+
+### Refonte du 2026-11-24 (lots R0 et R1 de [refonte-ux.md](refonte-ux.md))
+
+Retiré (backend) : commandes `sync_offer_profile`, `sync_stop_sharing`, `sync_answer_offer`, `collection_sync_answer_offer` ; paramètre `profileIds` de `sync_start_pairing` ; événement `sync:offer-received` ; DTO `OfferReceivedDto`, `ProfileOfferDto` (et leurs bindings TypeScript) ; `Engine::answer_offer`, `OfferChoice`, `CollectionAnswer`, `IncomingCollection`, les offres reçues en mémoire (`incoming_offers`, `accepted_offers`) ; `PairingMode::profiles`. Les composants Angular qui s'en servaient (dialogue des offres, `sync.model.ts`) restent à retirer côté front (lots R2 et R3).
+
+Ajouté : `sync_profile_shares`, `sync_set_profile_shared`, `collection_sync_set_device`, `collection_sync_activate`, `collection_sync_ignore`, paramètre `profileId?` de `collection_sync_state`, `collection_sync_summary`, `collection_sync_share` ; événement `sync:profile-received` ; messages 22 et 23 ; bits `features` 1 et 2.
+
+Écarts :
+- **Un appareil de confiance écoute toujours** (voir §1) : sans cela, A ne pourrait pas joindre B après un appairage sans profil. L'appairage lui-même est symétrique et ne crée ni profil ni espace.
+- **Partager = devenir membre de l'espace tout de suite** (écriture persistante), avant que l'appareil ait reçu quoi que ce soit : c'est l'état « partagé » lu par `sync_profile_shares` (`pending` tant qu'aucun document n'a été échangé). L'envoi de l'offre, lui, n'est pas persistant. `send_snapshot` n'ajoute plus l'appareil (il vérifie qu'il est encore membre : un décochage pendant l'envoi n'est pas défait).
+- **Pas de progression** (`sync:progress`) pendant la réception du contenu d'un profil partagé : le profil n'est créé qu'à la fin. `sync:initial-done` arrive comme avant.
+- **Un seul profil accepté d'office par espace** : si l'espace a déjà son profil, l'offre est refusée silencieusement (aucune fusion, aucun doublon).
+- Profils lus par la session des collections : ceux dont la base a au moins un partage (`SyncProfiles::share_profiles`, lecture seule sans migration), pour ne pas rouvrir en écriture les profils inactifs à chaque message.
+- Le moteur retente un appareil absent vers ses adresses vues par mDNS aussi, plus seulement vers la dernière adresse enregistrée dans un profil synchronisé (un appareil lié sans profil partagé n'en a aucune).
+- Mot de passe maître non transmis : le clone n'en a pas.
+- `Message::CollectionPending` (23) : voir §12.3.
 
 ## 10. Limites connues et points d'attention
 
@@ -245,6 +274,8 @@ Intégration et interface :
 
 Non vérifié (à faire en recette sur deux PC réels) : critères d'acceptation 1 à 7 de la spec, invite et règles du pare-feu Windows (le hook est seulement compilé), autorisation « réseau local » de macOS, rendu des écrans (dont la sous-vue « Appareils et synchronisations » : QR code, renouvellement du code, retour, Échap), détection du type sous Linux et macOS, ordre réel des événements `sync:notes-synced` / `notes:changed`, historique d'annulation dans l'app, taille du binaire final.
 
+**Non vérifié (refonte R0 et R1, backend seul)** : l'appairage sans profil puis le partage d'un profil et d'une collection sur deux PC réels (les tests passent par des moteurs sur loopback et une découverte en mémoire) ; l'enregistrement réel de l'icône du clone (testé avec une image minimale) ; le comportement quand l'appareil qui partage s'éteint au milieu du contenu d'un profil ; un profil actif ou verrouillé comme cible d'une collection activée ; les verrous SQLite (`database is locked`) quand un profil inactif est ouvert en même temps par plusieurs accès (réduits en ne rouvrant que les profils qui ont des partages, jamais éliminés) ; tout l'écran de synchronisation (lots R2 et R3, non livrés).
+
 ## 11. Tests
 
 - **Données** (`adapter-sqlite`) : migration sur fixture, soft delete et FTS, blobs tenus à jour, échanges entre bases (mêmes lignes), fusion d'un profil existant, base restaurée, enregistrement en vol rejoué sur la modification distante, profil non synchronisé inchangé.
@@ -258,7 +289,7 @@ Non vérifié (à faire en recette sur deux PC réels) : critères d'acceptation
 
 ## 12. Collections partagées
 
-Backend livré (lots 0 à 3 de [collections.md](collections.md), qui garde les décisions et le parcours utilisateur). Les collections sont des dossiers de fichiers `.md` du disque : on ne synchronise pas du contenu en base mais des **fichiers**, par-dessus les canaux existants (session chiffrée, appareils de confiance, espace du profil). Le front (lots 4 et 5) n'est pas livré.
+Backend livré (lots 0 à 3 de [collections.md](collections.md), qui garde les décisions et le parcours utilisateur). Les collections sont des dossiers de fichiers `.md` du disque : on ne synchronise pas du contenu en base mais des **fichiers**, par-dessus les canaux existants (session chiffrée, appareils de confiance). Depuis la refonte du 2026-11-24 ([refonte-ux.md](refonte-ux.md), lot R1), **un partage ne dépend plus de l'espace du profil** : il appartient à (collection, appareil de confiance), que le profil soit synchronisé avec cet appareil ou non. Les passages de ce chapitre sur « les appareils qui partagent déjà le profil » (décision 7 de collections.md) sont caducs.
 
 ### 12.1 Modèle de données
 
@@ -267,10 +298,13 @@ Backend livré (lots 0 à 3 de [collections.md](collections.md), qui garde les d
 | Réglage `receivedCollectionsFolder` (`settings.json`, `SettingsDto`) | Dossier des collections reçues, **par appareil, jamais synchronisé**. Vide : `Documents/Daftr` (dossier Documents résolu par Tauri, repli : dossier des données). Sinon un chemin absolu (refusé sinon, valeur précédente gardée). |
 | `collection_shares` (base du profil) | `sync_id` (uuid, identifiant commun aux appareils) ↔ `path` de la collection (clé étrangère `ON UPDATE CASCADE ON DELETE CASCADE` : le partage suit un dossier déplacé et disparaît avec sa collection). |
 | `collection_share_peers` | Appareil, état `offered` / `active`, dernier échange complet. |
+| Entrées « à configurer » (`<données>/sync/collection-offers.json`) | Collections reçues et pas encore activées : appareil, partage, nom, nombre et volume des fichiers, profil source (identifiant, nom, espace s'il est synchronisé avec cet appareil), drapeau « ignorée ». **Hors base de profil** (aucun profil n'est encore choisi), écriture atomique, lecture tolérante (fichier illisible mis de côté, `.corrupted`), survit au redémarrage. |
 | `collection_files` | Index des fichiers locaux : chemin, empreinte, taille, date. Évite de relire un fichier qui n'a pas bougé (un fichier modifié depuis moins de 2 s est toujours relu : certains systèmes datent à la seconde). |
 | `collection_bases` | **Dernière version échangée avec chaque appareil**, par fichier : empreinte (SHA-256) et texte (UTF-8, 256 Kio au plus) pour la fusion à trois voies. |
 
-Migration : quatre `CREATE TABLE IF NOT EXISTS` à l'ouverture de la base (idempotent, sans sauvegarde : aucune table existante n'est touchée). Tests : base 1.7.0 migrée deux fois, partage / appareils / bases / index, cascades.
+**Le modèle de partage ne change pas** : `collection_share_peers` associe déjà un partage (`sync_id`) à un appareil. Seul le moteur cessait de s'en servir sans espace commun ; il lit désormais les partages de tous les profils (ceux dont la base a au moins un partage, lus en lecture seule sans ouvrir les autres) et ne vérifie plus que la confiance de l'appareil. **Aucune migration** : les partages existants continuent de marcher tels quels.
+
+Migration d'origine : quatre `CREATE TABLE IF NOT EXISTS` à l'ouverture de la base (idempotent, sans sauvegarde : aucune table existante n'est touchée). Tests : base 1.7.0 migrée deux fois, partage / appareils / bases / index, cascades.
 
 ### 12.2 Décision par fichier (`app::collection_sync`, pur)
 
@@ -300,23 +334,25 @@ Tests : tables de décision, chemins, noms de copies, fusion identique des deux 
 ### 12.3 Protocole
 
 **Compatibilité.** `PROTOCOL_VERSION` reste à 1. postcard encode l'indice de variante en varint et **décode un indice inconnu comme une erreur** : une version antérieure fermerait la session à la réception d'un message de collection. Deux protections :
-- `Hello` porte, après le type d'appareil, un octet `features` (bit 0 : collections). Une version antérieure ignore les octets en trop (comme pour le type) ; un `Hello` sans cet octet se lit « aucune fonctionnalité ». **Les messages de collections ne partent qu'à un appareil qui annonce le bit** : entre une ancienne et une nouvelle version, la synchronisation des notes continue à l'identique.
+- `Hello` porte, après le type d'appareil, un octet `features` (**bit 1 : collections** rattachées à l'appareil ; bit 2 : `ProfileInfo`, voir §4 ; le bit 0 de la première version, abandonnée avant toute publication, n'est plus annoncé car ses offres avaient un autre format). Une version antérieure ignore les octets en trop (comme pour le type) ; un `Hello` sans cet octet se lit « aucune fonctionnalité ». **Les messages de collections ne partent qu'à un appareil qui annonce le bit** : entre une ancienne et une nouvelle version, la synchronisation des notes continue à l'identique.
 - `Message::decode` rend `Error::UnknownMessage` pour tout indice au-delà de la dernière variante connue, et la session **l'ignore** (elle continue) : une future version pourra ajouter des messages.
 
-Messages ajoutés en fin d'énumération (indices figés 14 à 21) :
+Messages ajoutés en fin d'énumération (indices figés 14 à 23) :
 
 | # | Message | Rôle |
 |---|---|---|
-| 14 | `CollectionOffer(Vec<OfferedCollection>)` | Propose des collections : espace, partage, nom, nombre de fichiers, volume. |
-| 15 | `CollectionReply { share, accepted }` | Réponse de l'utilisateur. |
+| 14 | `CollectionOffer(Vec<OfferedCollection>)` | Propose des collections : partage, nom, nombre de fichiers, volume, **profil source** (identifiant, nom) et son espace s'il est synchronisé avec le destinataire (`Option`). |
+| 15 | `CollectionReply { share, accepted }` | Activation (`true`) ou refus. Un côté qui démarre un partage actif répète `true` avant son premier manifeste : un accord perdu (session remplacée) ne fait plus retirer le partage par l'autre côté. |
 | 16 | `Manifest { share, entries, last }` | Manifeste en parties de 500 lignes : chemin, empreinte (absente = suppression), taille, base. |
 | 17 | `FileRequest { share, path, hash }` | Demande d'une version d'un fichier. |
 | 18 | `FileChunk { share, path, hash, total, offset, data }` | Morceaux de 256 Kio, dans l'ordre. |
 | 19 | `FileUnavailable { share, path, hash }` | La version demandée n'existe plus. |
 | 20 | `FileAck { share, path, hash? }` | « J'ai maintenant cette version » (ou plus de fichier) : l'émetteur retient sa base. |
-| 21 | `ShareStop { share }` | Arrêt du partage. |
+| 21 | `ShareStop { share }` | Arrêt du partage, ou retrait de l'appareil. |
+| 22 | `ProfileInfo { space, name?, icon? }` | Nom et icône d'un profil partagé, avant son `Snapshot` (§4). Gardé par le bit 2. |
+| 23 | `CollectionPending { shares }` | Les entrées « à configurer » reçues de l'émetteur, envoyées une fois par session : il répond `ShareStop` pour celles qu'il ne partage plus (retirées pendant l'absence du destinataire). |
 
-**Déroulement.** Un partage ne concerne que les appareils qui **partagent déjà le profil** (espace commun) : l'offre voyage dans la session de ce profil, et la décision 7 est vérifiée par le moteur (appareils membres non révoqués) avant la création du partage. L'état d'un appareil pour un partage est `offered` puis `active` (côté qui propose : à la réponse ; côté qui reçoit : à l'acceptation).
+**Déroulement.** Un partage ne concerne que **l'appareil de confiance** : la proposition voyage dans la session de l'appareil, que le profil qui porte la collection soit synchronisé avec lui ou non (le moteur ne vérifie que la confiance, à la création du partage). Chez le destinataire, la proposition devient une entrée « à configurer » persistée (jamais d'écriture sur le disque) ; l'**activation** crée la collection dans le profil choisi, actif ou non, puis répond `true`. L'état d'un appareil pour un partage est `offered` puis `active` (côté qui propose : à la réponse ; côté qui reçoit : à l'activation). Une proposition ignorée est refusée à l'appareil dès qu'il est joignable (le drapeau « ignorée » est gardé jusque-là).
 1. Chaque côté envoie son manifeste au démarrage de la session (parcours complet, hachage seulement des fichiers modifiés), puis après chaque changement de ses fichiers (surveillance, regroupée 1 s) ou de ses transferts, **seulement s'il a changé** (anti-boucle).
 2. À la réception d'un manifeste complet, chaque côté compare à ses fichiers (§12.2), retient les versions identiques, puis demande un par un les fichiers à recevoir ; un manifeste reçu pendant un échange est évalué après.
 3. Chaque fichier reçu est vérifié (empreinte annoncée) ; une version demandée en même temps qu'elle est remplacée est servie depuis l'historique de la session (16 Mio, 64 versions), ce qui évite un faux conflit quand les deux côtés fusionnent ensemble.
@@ -334,19 +370,21 @@ Messages ajoutés en fin d'énumération (indices figés 14 à 21) :
 ### 12.5 Intégration (`desktop`)
 
 - **Surveillance** (`ShareWatcher`, `adapter-fs`) : un thread unique, **démarré avec le premier dossier partagé** (aucun thread sans partage), récursif, regroupe les rafales (400 ms) ; ignore les fichiers qui ne sont pas des `.md` et les temporaires de la synchronisation. Indépendante du profil actif et des collections dépliées.
-- **Parcours complet** au démarrage (tous les profils synchronisés, actifs ou non), à la connexion d'un appareil, et à chaque partage créé ou accepté.
+- **Parcours complet** au démarrage (tous les profils qui ont un partage, actifs ou non), à la connexion d'un appareil, et à chaque partage créé ou activé.
 - Retirer une collection de la liste, ou changer son dossier, passe par le partage : `collections_remove` arrête d'abord la synchronisation ; `collections_relocate` et `collection_sync_relink` **oublient l'historique des échanges** du partage (sinon un dossier relié sur un autre contenu serait lu comme une suppression de masse).
 
 Commandes (paramètres en camelCase côté renderer) :
 
 | Commande | Paramètres | Rend |
 |---|---|---|
-| `collection_sync_state` | — | `CollectionSyncStateDto` (partages de tous les profils synchronisés, propositions en attente, `receivedFolder` résolu) |
-| `collection_sync_summary` | `root` (collection du profil actif) | `FolderSummaryDto` (nombre et volume des `.md`, `hasGit`, fichiers écartés, `truncated`) |
+| `collection_sync_state` | `profileId?` (sans : tous les profils, actifs ou non) | `CollectionSyncStateDto` : `collections[]` (`profileId`, `root`, `name`, `syncId?`, collections de dossier de chaque profil, pour la matrice), `shares[]` (partages avec `devices[]` : `state` `offered` / `active`, `connected`, `syncing`), `offers[]` (entrées « à configurer », tous profils), `receivedFolder` résolu |
+| `collection_sync_summary` | `root`, `profileId?` (profil actif par défaut) | `FolderSummaryDto` (nombre et volume des `.md`, `hasGit`, fichiers écartés, `truncated`) |
 | `collection_sync_inspect_folder` | `path` (absolu) | `FolderSummaryDto` (`exists`, `empty`, `mdFiles` : « ce dossier existe déjà (87 .md) ») |
-| `collection_sync_share` | `root`, `deviceKeys[]` | `CollectionShareDto` ; les appareils doivent partager le profil actif |
+| `collection_sync_share` | `root`, `deviceKeys[]`, `profileId?` | `CollectionShareDto` ; **n'importe quel appareil de confiance** (le profil n'a pas besoin d'être partagé avec lui) ; refus `untrusted` sinon |
+| `collection_sync_set_device` | `root`, `deviceKey`, `shared`, `profileId?` | `CollectionShareDto?` : partage tel qu'il est ensuite, `null` quand plus aucun appareil ne le partage. `false` retire l'appareil seul (fichiers conservés des deux côtés ; son entrée « à configurer » disparaît chez lui) |
 | `collection_sync_stop` | `profileId`, `syncId` | — |
-| `collection_sync_answer_offer` | `deviceKey`, `syncId`, `destination?`, `mode` : `receive` / `merge` / `decline` | — ; ensuite relire `collections_list` |
+| `collection_sync_activate` | `deviceKey`, `syncId`, `profileId`, `destination`, `mode` : `receive` / `merge` | — ; ajoute la collection au profil choisi (actif ou non), rien n'est écrit avant ; si c'est le profil actif, relire `collections_list`. Remplace `collection_sync_answer_offer`, supprimé |
+| `collection_sync_ignore` | `deviceKey`, `syncId` | — ; l'entrée disparaît, le refus part à l'appareil |
 | `collection_sync_relink` | `root`, `folder?` (dialogue s'il est absent) | `CollectionDto?` (`null` : aucun dossier choisi) |
 | `collection_conflict_resolve` | `root`, `path` (la copie), `keep` : `mine` / `other` | — ; la version gardée prend la place de l'original, la copie part à la corbeille |
 
@@ -356,7 +394,7 @@ Erreurs : refus `Collection already shared`, `Destination folder is not empty`, 
 
 | Événement | Charge utile | Quand |
 |---|---|---|
-| `sync:collection-offer` | `CollectionOffersDto` | Un appareil propose des collections (aussi relisibles par `collection_sync_state`) |
+| `sync:collection-offer` | `CollectionOffersDto` : `added[]` (propositions arrivées avec l'événement, vide à une disparition) et `pending[]` (toutes les entrées « à configurer » ensuite) | Une collection est proposée, ou des entrées disparaissent (activée, ignorée, retirée par l'émetteur, appareil retiré) ; aussi relisible par `collection_sync_state` |
 | `sync:collection-progress` | `CollectionProgressDto` (`done` / `total` par appareil) | Un échange de fichiers avance |
 | `sync:collection-state` | `CollectionStateEventDto` (`share` absent : le partage n'existe plus) | État d'un partage changé : pastille, appareils, conflits, fichiers écartés |
 | `sync:collection-conflicts` | `CollectionConflictsDto` | Les copies de conflit d'un partage ont changé (liste vide : tout est résolu) |
@@ -368,11 +406,11 @@ La pastille (`CollectionShareStatusKind`) est calculée côté backend, dans l'o
 - **Un watcher dédié** (`ShareWatcher`) et non « le watcher existant des collections » : celui-ci ne surveille que les collections dépliées du profil actif et pousse des arbres vers l'interface ; le partage doit suivre tous les dossiers partagés de tous les profils.
 - **Aucune table de « conflits »** : une copie de conflit est reconnue à son nom (`nom (conflit X).md` à côté de `nom.md`) ; le résumé du partage les liste.
 - **Le suiveur fait la copie, l'arbitre ne fait rien** : la copie porte le nom de l'appareil qui l'a créée (le suiveur), pas celui de « l'autre » vu de chaque côté.
-- **Une proposition refusée n'est pas mémorisée** : si l'appareil qui propose est connecté, son partage se retire ; sinon il reproposera à la prochaine connexion. Les propositions en attente sont gardées en mémoire (perdues au redémarrage), mais le proposant les renvoie tant qu'elles n'ont pas de réponse.
+- **Une proposition ignorée est mémorisée jusqu'à ce que l'appareil la reçoive** (drapeau « ignorée » du fichier des entrées) : le refus lui est alors envoyé et l'entrée disparaît.
 - **Reprise au fichier, pas à l'octet.**
 - **Texte de la base limité à 256 Kio** : au-delà, deux versions différentes sont gardées en double plutôt que fusionnées.
-- Les réponses « Plus tard » ne passent pas par le backend (la proposition reste dans `collection_sync_state`).
-- Arrêter ou retirer un appareil du profil (`sync_stop_sharing`, `sync_remove_device`) retire l'appareil de ses collections partagées (un partage sans appareil disparaît) ; aucun événement `sync:collection-state` n'est émis dans ce cas : le renderer relit l'état.
+- Une entrée « à configurer » reste dans la liste, persistée, jusqu'à son activation, son refus ou son retrait par l'émetteur ; « Plus tard » n'a pas de commande.
+- **Retirer un appareil de confiance** (`sync_remove_device`) le retire de tous les partages de collections (un partage sans appareil disparaît) et supprime ses entrées « à configurer » ; chaque partage touché émet `sync:collection-state` (`share` absent) et `sync:collection-offer` est réémis. **Arrêter de partager un profil** avec un appareil ne touche plus à ses collections : elles ne dépendent pas du profil.
 
 ### 12.7 Limites et points non vérifiés
 
