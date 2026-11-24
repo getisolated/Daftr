@@ -5,7 +5,7 @@ import {
   ConflictKeep, FolderSummary,
 } from '../models/collection-sync.model';
 import {
-  InitialSyncDone, LinkedDevice, NotesSynced, PairingState, PairingTicket, ProfileReceived, ProfileShares, SyncOverview, SyncStatus,
+  DeviceRemoved, InitialSyncDone, LinkedDevice, NotesSynced, PairingState, PairingTicket, ProfileReceived, ProfileShares, SyncOverview, SyncStatus,
   TrustedDevice,
 } from '../models/sync.model';
 import { call, inDesktop, subscribe } from './desktop-api';
@@ -150,6 +150,10 @@ export class SyncBridgeService {
 
   onDeviceLinked(callback: (device: LinkedDevice) => void): () => void {
     return subscribe('sync:device-linked', callback);
+  }
+
+  onDeviceRemoved(callback: (event: DeviceRemoved) => void): () => void {
+    return subscribe('sync:device-removed', callback);
   }
 
   onProfileReceived(callback: (event: ProfileReceived) => void): () => void {

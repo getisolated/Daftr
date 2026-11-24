@@ -17,8 +17,8 @@ use serde::de::{self, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub(crate) use files::{
-    FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, FEATURE_REMOVED, MANIFEST_PART, MAX_OFFERED, OfferedCollection,
-    ProfileInfoEntry, WireEntry, file_entry, wire_entry,
+    FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, FEATURE_REMOVED, MANIFEST_PART, MAX_OFFERED,
+    OfferedCollection, ProfileInfoEntry, WireEntry, file_entry, wire_entry,
 };
 
 use crate::error::{Error, Result};

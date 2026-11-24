@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import { I18nService } from '../i18n/i18n.service';
 import {
-  InitialSyncDone, LinkedDevice, NotesSynced, PairingTicket, ProfileReceived, ProfileShares, SyncOverview, SyncStatus, TrustedDevice,
+  DeviceRemoved, InitialSyncDone, LinkedDevice, NotesSynced, PairingTicket, ProfileReceived, ProfileShares, SyncOverview, SyncStatus, TrustedDevice,
 } from '../models/sync.model';
 import { profileDisplayName } from '../utils/profile.util';
 import { syncErrorMessage, syncIndicator } from '../utils/sync.util';
@@ -71,6 +71,7 @@ export class SyncService implements OnDestroy {
       this.bridge.onNotesSynced(event => this.notesSyncedListeners.forEach(listener => listener(event))),
       this.bridge.onInitialDone(event => void this.onInitialDone(event)),
       this.bridge.onDeviceLinked(device => void this.onDeviceLinked(device)),
+      this.bridge.onDeviceRemoved(event => void this.onDeviceRemoved(event)),
       this.bridge.onProfileReceived(event => void this.onProfileReceived(event)),
       this.bridge.onPairing(state => this.onPairingTicket(state.active ? state.ticket : null)),
     ];
@@ -212,6 +213,15 @@ export class SyncService implements OnDestroy {
   private async onDeviceLinked(device: LinkedDevice): Promise<void> {
     this.noticeLinked(device);
     await Promise.all([this.refresh(), this.reloadDevices()]);
+  }
+
+  /**
+   * Another device removed this one from its devices: the engine already unlinked it here (the notes stay), the toast
+   * says why it disappears, and the lists are read again (the collection states come with their own events).
+   */
+  private async onDeviceRemoved(event: DeviceRemoved): Promise<void> {
+    this.toasts.show(this.i18n.t('sync.toast.deviceRemoved', { name: event.device.name }));
+    await Promise.all([this.refresh(), this.reloadDevices(), this.loadProfileShares()]);
   }
 
   /** A profile shared by another device arrived as a clone: the toast offers to switch to it. */

@@ -1,4 +1,5 @@
 import type { DeviceKindDto } from '../bindings/DeviceKindDto';
+import type { DeviceRemovedDto } from '../bindings/DeviceRemovedDto';
 import type { InitialSyncDoneDto } from '../bindings/InitialSyncDoneDto';
 import type { LinkedDeviceDto } from '../bindings/LinkedDeviceDto';
 import type { NotesSyncedDto } from '../bindings/NotesSyncedDto';
@@ -30,6 +31,7 @@ export type ProfileShares = ProfileSharesDto;
 export type ProfileShare = ProfileShareDto;
 export type ProfileShareDevice = ProfileShareDeviceDto;
 export type ProfileReceived = ProfileReceivedDto;
+export type DeviceRemoved = DeviceRemovedDto;
 export type NotesSynced = NotesSyncedDto;
 export type SyncProgress = SyncProgressDto;
 export type InitialSyncDone = InitialSyncDoneDto;

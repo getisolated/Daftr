@@ -105,8 +105,10 @@ async fn a_removed_device_connected_at_the_time_unlinks_itself() {
 
     eventually("A retiré chez lui aussi", || !a.trusts(&b)).await;
     eventually("événement chez A", || removed_events(&a) == 1).await;
-    assert!(a.has_event(|event| matches!(event, SyncEvent::DeviceRemoved { device, name }
-        if *device == b.key() && name.as_str() == "B")));
+    assert!(a.has_event(
+        |event| matches!(event, SyncEvent::DeviceRemoved { device, name }
+        if *device == b.key() && name.as_str() == "B")
+    ));
     let devices = a.store("p").devices().unwrap();
     assert!(
         devices
@@ -246,7 +248,10 @@ async fn removed_is_sent_only_to_a_peer_that_announces_it() {
     // Version antérieure : pas de bit, rien n'est envoyé, la session se ferme
     let (old, mut channel) = raw_peer(&b, 0).await;
     b.engine.remove_device(old.key()).await.unwrap();
-    assert!(!drain_told(&mut channel).await, "message envoyé sans le bit");
+    assert!(
+        !drain_told(&mut channel).await,
+        "message envoyé sans le bit"
+    );
 
     // Version qui l'annonce : elle le reçoit
     let (recent, mut channel) = raw_peer(&b, FEATURE_REMOVED).await;

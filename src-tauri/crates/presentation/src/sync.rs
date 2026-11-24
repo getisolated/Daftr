@@ -10,8 +10,8 @@ use domain::settings::{DEFAULT_SYNC_PORT, SYNC_MAX_PORT, SYNC_MIN_PORT};
 use domain::sync::{DeviceKey, DeviceName, PairingCode};
 
 use crate::dto::{
-    CollectionProgressDto, DeviceRemovedDto, InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, ProfileReceivedDto,
-    SyncProgressDto, SyncStatusDto,
+    CollectionProgressDto, DeviceRemovedDto, InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto,
+    ProfileReceivedDto, SyncProgressDto, SyncStatusDto,
 };
 use crate::{IpcError, IpcResult};
 

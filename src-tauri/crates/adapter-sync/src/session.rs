@@ -26,7 +26,8 @@ use crate::noise::{Channel, ChannelReader, ChannelWriter};
 use crate::pairing::LinkedDevice;
 use crate::stores::{self, ProfileKey};
 use crate::wire::{
-    self, FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, FEATURE_REMOVED, Hello, MAX_SPACES, Message, PROTOCOL_VERSION,
+    self, FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, FEATURE_REMOVED, Hello, MAX_SPACES, Message,
+    PROTOCOL_VERSION,
 };
 
 use catchup::Round;
@@ -267,7 +268,8 @@ impl<P: ProfileKey> Session<P> {
     async fn farewell(&mut self, inbound: &mut Inbound) -> Result<()> {
         if self.remote_features & FEATURE_REMOVED != 0 {
             self.send(&Message::Removed).await?;
-            let drain = async { while inbound.recv().await.is_some_and(|message| message.is_ok()) {} };
+            let drain =
+                async { while inbound.recv().await.is_some_and(|message| message.is_ok()) {} };
             let _ = tokio::time::timeout(crate::engine::FAREWELL, drain).await;
         }
         Ok(())
