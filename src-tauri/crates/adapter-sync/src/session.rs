@@ -4,7 +4,9 @@
 //! par un (l'ordre de TCP garantit qu'un `Done` arrive après les updates qu'il clôt).
 
 mod catchup;
+mod collections;
 mod offers;
+mod transfer;
 
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -13,6 +15,7 @@ use std::sync::Arc;
 use app::ports::sync::{Applied, SyncEvent};
 use app::ports::trust::{TrustOrigin, TrustedDevice};
 use domain::sync::{DeviceKey, DeviceKind, DeviceName, SpaceId};
+use domain::uuid::Uuid;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
@@ -22,10 +25,12 @@ use crate::error::{Error, Result};
 use crate::noise::{Channel, ChannelReader, ChannelWriter};
 use crate::pairing::LinkedDevice;
 use crate::stores::{self, ProfileKey};
-use crate::wire::{self, Hello, MAX_SPACES, Message, PROTOCOL_VERSION};
+use crate::wire::{self, FEATURE_COLLECTIONS, Hello, MAX_SPACES, Message, PROTOCOL_VERSION};
 
 use catchup::Round;
+use collections::ShareSession;
 use offers::Incoming;
+use transfer::Chunk;
 
 /// Appairage à conclure au premier `Hello` : confiance, événement, réponse à l'appelant.
 pub(crate) struct Linking {
@@ -70,6 +75,9 @@ pub(crate) fn spawn<P: ProfileKey>(
         offered: HashMap::new(),
         snapshots_sent: HashSet::new(),
         accepted: HashMap::new(),
+        remote_features: 0,
+        shares: HashMap::new(),
+        offered_collections: HashSet::new(),
     };
     shared.runtime.spawn(session.run(reader, receiver));
     true
@@ -103,6 +111,12 @@ struct Session<P: ProfileKey> {
     snapshots_sent: HashSet<SpaceId>,
     /// Offres acceptées dont nous recevons le contenu.
     accepted: HashMap<SpaceId, Incoming<P>>,
+    /// Fonctionnalités annoncées par l'appareil distant.
+    remote_features: u8,
+    /// Collections partagées actives avec l'appareil distant.
+    shares: HashMap<Uuid, ShareSession<P>>,
+    /// Collections proposées dans cette session, en attente de réponse.
+    offered_collections: HashSet<Uuid>,
 }
 
 type Inbound = UnboundedReceiver<Result<Message>>;
@@ -146,6 +160,7 @@ impl<P: ProfileKey> Session<P> {
 
     fn finish(self, end: End) {
         let current = self.shared.unregister_session(&self.remote, self.id);
+        self.shared.collections_disconnected(&self.remote);
         self.shared.publish_status();
         if let End::Failed(error) = end {
             tracing::debug!(remote = %self.remote, %error, "session terminée");
@@ -170,6 +185,41 @@ impl<P: ProfileKey> Session<P> {
             Message::OfferReply { space, accepted } => self.on_offer_reply(space, accepted).await,
             Message::Snapshot { space, total, docs } => self.on_snapshot(space, total, docs),
             Message::SnapshotEnd { space, seq } => self.on_snapshot_end(space, seq).await,
+            Message::CollectionOffer(entries) => self.on_collection_offer(entries).await,
+            Message::CollectionReply { share, accepted } => {
+                self.on_collection_reply(share, accepted).await
+            }
+            Message::Manifest {
+                share,
+                entries,
+                last,
+            } => self.on_manifest(share, entries, last).await,
+            Message::FileRequest { share, path, hash } => {
+                self.on_file_request(share, path, hash).await
+            }
+            Message::FileChunk {
+                share,
+                path,
+                hash,
+                total,
+                offset,
+                data,
+            } => {
+                let chunk = Chunk {
+                    share,
+                    path,
+                    hash,
+                    total,
+                    offset,
+                    data,
+                };
+                self.on_file_chunk(chunk).await
+            }
+            Message::FileUnavailable { share, path, hash } => {
+                self.on_file_unavailable(share, path, hash).await
+            }
+            Message::FileAck { share, path, hash } => self.on_file_ack(share, path, hash).await,
+            Message::ShareStop { share } => self.on_share_stop(share).await,
             Message::Open(_) | Message::Spake(_) | Message::Confirm(_) | Message::Refused(_) => {
                 Err(Error::Unexpected)
             }
@@ -186,6 +236,12 @@ impl<P: ProfileKey> Session<P> {
             Command::SendOffers => self.send_offers().await,
             Command::AcceptOffer { space, profile } => self.accept_offer(space, profile).await,
             Command::DeclineOffer { space } => self.reply_offer(space, false).await,
+            Command::CollectionsChanged => self.sync_collections().await,
+            Command::ShareChanged(share) => self.share_changed(share).await,
+            Command::CollectionAnswer { share, accepted } => {
+                self.collection_answer(share, accepted).await
+            }
+            Command::StopShare(share) => self.stop_share(share).await,
         }
     }
 
@@ -206,12 +262,14 @@ impl<P: ProfileKey> Session<P> {
             name: self.shared.state().device_name.as_str().to_owned(),
             spaces: spaces.keys().map(|space| *space.as_bytes()).collect(),
             kind: self.shared.config.device_kind,
+            features: FEATURE_COLLECTIONS,
         };
         self.send(&Message::Hello(hello)).await?;
 
         let before = self.common();
         self.local = spaces;
-        self.spaces_changed(&before).await
+        self.spaces_changed(&before).await?;
+        self.sync_collections().await
     }
 
     async fn on_hello(&mut self, hello: Hello) -> Result<()> {
@@ -223,6 +281,7 @@ impl<P: ProfileKey> Session<P> {
         }
         let first = self.remote_name.is_none();
         self.remote_name = Some(wire::device_name(&hello.name)?);
+        self.remote_features = hello.features;
         let before = self.common();
         self.remote_spaces = hello.spaces.into_iter().map(SpaceId::from_bytes).collect();
 
@@ -234,7 +293,7 @@ impl<P: ProfileKey> Session<P> {
         if first {
             self.send_offers().await?;
         }
-        Ok(())
+        self.sync_collections().await
     }
 
     /// Conclut un appairage : l'appareil devient de confiance (origine « appairé »).
@@ -348,6 +407,11 @@ impl<P: ProfileKey> Session<P> {
 async fn read_loop(mut reader: ChannelReader<TcpStream>, sender: UnboundedSender<Result<Message>>) {
     loop {
         let message = reader.recv().await;
+        // Un message d'une version plus récente est ignoré : la session continue
+        if matches!(message, Err(Error::UnknownMessage)) {
+            tracing::debug!("message de protocole inconnu ignoré");
+            continue;
+        }
         let failed = message.is_err();
         if sender.send(message).is_err() || failed {
             return;

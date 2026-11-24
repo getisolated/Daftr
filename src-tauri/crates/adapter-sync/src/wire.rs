@@ -6,6 +6,8 @@
 //! [`Hello`], lu de façon tolérante (voir [`Hello`]). Les identifiants voyagent en octets
 //! (`SpaceId`) ou en texte (`DocId` : `space` ou `note:<uuid>`) et sont validés à la réception.
 
+mod files;
+
 use std::fmt;
 
 use app::ports::sync::ProfileOffer;
@@ -13,6 +15,11 @@ use app::sync::{StateVector, Update};
 use domain::sync::{DeviceKind, DeviceName, DocId, SpaceId};
 use serde::de::{self, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+pub(crate) use files::{
+    FEATURE_COLLECTIONS, MANIFEST_PART, MAX_OFFERED, OfferedCollection, WireEntry, file_entry,
+    wire_entry,
+};
 
 use crate::error::{Error, Result};
 
@@ -91,9 +98,10 @@ pub(crate) struct OfferEntry {
 /// Annonce d'une session : nom, type et espaces que l'émetteur accepte d'échanger avec le
 /// destinataire (ceux où le destinataire est membre, synchronisation activée).
 ///
-/// `kind` a été ajouté en fin de message sans changer [`PROTOCOL_VERSION`] : une version
-/// antérieure ignore ces octets en trop (postcard ne vérifie pas la fin du message), et un
-/// `Hello` sans eux, ou avec un code inconnu (type ajouté plus tard), se lit `Unknown`.
+/// `kind` puis `features` ont été ajoutés en fin de message sans changer [`PROTOCOL_VERSION`] :
+/// une version antérieure ignore ces octets en trop (postcard ne vérifie pas la fin du
+/// message), et un `Hello` sans eux, ou avec un code de type inconnu, se lit `Unknown` et sans
+/// fonctionnalité.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct Hello {
     /// Version du protocole de l'émetteur.
@@ -105,10 +113,12 @@ pub(crate) struct Hello {
     /// Type de l'émetteur, en code d'un octet.
     #[serde(serialize_with = "serialize_kind")]
     pub kind: DeviceKind,
+    /// Fonctionnalités de l'émetteur, un bit chacune ([`FEATURE_COLLECTIONS`]).
+    pub features: u8,
 }
 
 /// Champs de [`Hello`].
-const HELLO_FIELDS: usize = 4;
+const HELLO_FIELDS: usize = 5;
 
 /// Codes des types d'appareil : figés, un nouveau type prend le code suivant.
 const KIND_UNKNOWN: u8 = 0;
@@ -165,11 +175,13 @@ impl<'de> Visitor<'de> for HelloVisitor {
             .ok_or_else(|| de::Error::invalid_length(2, &self))?;
         // Fin du message atteinte : `Hello` d'une version antérieure, sans type
         let kind = seq.next_element::<u8>().ok().flatten();
+        let features = seq.next_element::<u8>().ok().flatten();
         Ok(Hello {
             protocol,
             name,
             spaces,
             kind: kind.map_or(DeviceKind::Unknown, kind_from_code),
+            features: features.unwrap_or(0),
         })
     }
 }
@@ -249,7 +261,75 @@ pub(crate) enum Message {
         /// `seq` local de l'émetteur.
         seq: u64,
     },
+    /// Collections proposées (variantes suivantes : voir [`FEATURE_COLLECTIONS`]).
+    CollectionOffer(Vec<OfferedCollection>),
+    /// Réponse à une collection proposée.
+    CollectionReply {
+        /// Partage.
+        share: [u8; 16],
+        /// Acceptée ou refusée.
+        accepted: bool,
+    },
+    /// Manifeste d'un partage, en une ou plusieurs parties dans l'ordre.
+    Manifest {
+        /// Partage.
+        share: [u8; 16],
+        /// Lignes de cette partie.
+        entries: Vec<WireEntry>,
+        /// Dernière partie.
+        last: bool,
+    },
+    /// Demande de la version `hash` d'un fichier.
+    FileRequest {
+        /// Partage.
+        share: [u8; 16],
+        /// Chemin relatif.
+        path: String,
+        /// Version demandée.
+        hash: [u8; 32],
+    },
+    /// Un morceau de fichier, dans l'ordre ; le dernier atteint `total`.
+    FileChunk {
+        /// Partage.
+        share: [u8; 16],
+        /// Chemin relatif.
+        path: String,
+        /// Version envoyée.
+        hash: [u8; 32],
+        /// Taille totale du fichier.
+        total: u64,
+        /// Position de ce morceau.
+        offset: u64,
+        /// Octets.
+        data: Vec<u8>,
+    },
+    /// La version demandée n'existe plus ici.
+    FileUnavailable {
+        /// Partage.
+        share: [u8; 16],
+        /// Chemin relatif.
+        path: String,
+        /// Version demandée.
+        hash: [u8; 32],
+    },
+    /// Accusé : l'émetteur a maintenant cette version du fichier (ou plus de fichier).
+    FileAck {
+        /// Partage.
+        share: [u8; 16],
+        /// Chemin relatif.
+        path: String,
+        /// Version, absente quand le fichier est supprimé.
+        hash: Option<[u8; 32]>,
+    },
+    /// L'émetteur arrête de partager la collection avec le destinataire.
+    ShareStop {
+        /// Partage.
+        share: [u8; 16],
+    },
 }
+
+/// Nombre de variantes de [`Message`] : tout indice au-delà vient d'une version plus récente.
+const VARIANT_COUNT: u8 = 22;
 
 impl Message {
     /// Encode le message.
@@ -257,8 +337,12 @@ impl Message {
         Ok(postcard::to_allocvec(self)?)
     }
 
-    /// Décode un message reçu.
+    /// Décode un message reçu. Une variante inconnue (version plus récente) donne
+    /// [`Error::UnknownMessage`], que la session ignore.
     pub(crate) fn decode(bytes: &[u8]) -> Result<Self> {
+        if bytes.first().is_some_and(|first| *first >= VARIANT_COUNT) {
+            return Err(Error::UnknownMessage);
+        }
         Ok(postcard::from_bytes(bytes)?)
     }
 }
@@ -308,6 +392,9 @@ pub(crate) fn profile_offer(entry: &OfferEntry) -> ProfileOffer {
 }
 
 #[cfg(test)]
+mod collection_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -317,6 +404,7 @@ mod tests {
             name: "Bureau".to_owned(),
             spaces: vec![[1; 32]],
             kind,
+            features: FEATURE_COLLECTIONS,
         }
     }
 
@@ -372,9 +460,9 @@ mod tests {
     #[test]
     fn an_unknown_kind_code_reads_as_unknown() {
         let mut bytes = Message::Hello(hello(DeviceKind::Laptop)).encode().unwrap();
-        if let Some(last) = bytes.last_mut() {
-            *last = 9;
-        }
+        // Le type est l'avant-dernier octet (le dernier porte les fonctionnalités)
+        let kind = bytes.len() - 2;
+        bytes[kind] = 9;
         let Message::Hello(hello) = Message::decode(&bytes).unwrap() else {
             panic!("Hello attendu");
         };
@@ -421,7 +509,7 @@ mod tests {
 
     #[test]
     fn garbage_is_malformed_not_a_panic() {
-        for bytes in [&[][..], &[200], &[5, 255, 255, 255, 255, 255]] {
+        for bytes in [&[][..], &[5, 255, 255, 255, 255, 255], &[16, 1]] {
             assert!(matches!(Message::decode(bytes), Err(Error::Malformed)));
         }
         assert!(doc_id("note:42").is_err());

@@ -3,7 +3,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use adapter_fs::{DiskExportWriter, ProfileDirectories, ProfileRegistryFile, SettingsFile};
+use adapter_fs::{
+    DiskExportWriter, ProfileDirectories, ProfileRegistryFile, SettingsFile, ShareDisk,
+};
 use adapter_mcp::RandomSecrets;
 use adapter_password::Argon2Hasher;
 use adapter_print::WebviewPdfRenderer;
@@ -21,6 +23,9 @@ use crate::state::{DesktopState, desktop};
 use crate::sync::{SyncSetup, SyncState, WindowSyncEvents, default_device_name};
 use crate::windows::{main_window, overlay};
 use crate::{data_dir, mcp, profiles, shortcut, startup, tray, updater};
+
+/// Sous-dossier des Documents où arrivent par défaut les collections reçues.
+const RECEIVED_FOLDER_NAME: &str = "Daftr";
 
 /// Registre des profils, à la racine des données.
 const PROFILES_FILE: &str = "profiles.json";
@@ -85,11 +90,20 @@ fn build_sync(app: &AppHandle, directory: &Path, services: &Services) -> anyhow:
         profiles: Arc::clone(&services.profiles),
         events: Arc::new(WindowSyncEvents::new(app.clone())),
         discovery: Arc::new(MdnsDiscovery::new(AddrPolicy::Lan)),
+        files: Arc::new(ShareDisk::new(settings.collections_exclude.clone())),
+        default_received_folder: documents_folder(app, directory).join(RECEIVED_FOLDER_NAME),
         config,
         host_name,
         runtime: async_runtime::handle().inner().clone(),
     };
     SyncState::new(setup).context("synchronisation")
+}
+
+/// Le dossier Documents de l'utilisateur ; à défaut, le dossier des données.
+fn documents_folder(app: &AppHandle, fallback: &Path) -> std::path::PathBuf {
+    app.path()
+        .document_dir()
+        .unwrap_or_else(|_| fallback.to_path_buf())
 }
 
 fn start_windows(app: &AppHandle) -> anyhow::Result<()> {

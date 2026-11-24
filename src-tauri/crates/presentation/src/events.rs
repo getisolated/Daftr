@@ -38,5 +38,13 @@ pub const SYNC_INITIAL_DONE: &str = "sync:initial-done";
 pub const SYNC_DEVICE_LINKED: &str = "sync:device-linked";
 /// Offre de profils reçue (charge utile : `OfferReceivedDto`).
 pub const SYNC_OFFER_RECEIVED: &str = "sync:offer-received";
+/// Collections proposées par un appareil (charge utile : `CollectionOffersDto`).
+pub const SYNC_COLLECTION_OFFER: &str = "sync:collection-offer";
+/// Avancement d'un échange de fichiers (charge utile : `CollectionProgressDto`).
+pub const SYNC_COLLECTION_PROGRESS: &str = "sync:collection-progress";
+/// État d'un partage changé (charge utile : `CollectionStateEventDto`).
+pub const SYNC_COLLECTION_STATE: &str = "sync:collection-state";
+/// Copies de conflit d'un partage changées (charge utile : `CollectionConflictsDto`).
+pub const SYNC_COLLECTION_CONFLICTS: &str = "sync:collection-conflicts";
 /// Mode appairage : nouveau code ou fin (charge utile : `PairingStateDto`).
 pub const SYNC_PAIRING: &str = "sync:pairing";

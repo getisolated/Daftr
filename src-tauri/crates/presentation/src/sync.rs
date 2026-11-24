@@ -9,9 +9,10 @@ use domain::profile::ProfileId;
 use domain::settings::{DEFAULT_SYNC_PORT, SYNC_MAX_PORT, SYNC_MIN_PORT};
 use domain::sync::{DeviceKey, DeviceName, PairingCode, SpaceId};
 
+use crate::collection_sync::offer_dto;
 use crate::dto::{
-    InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, OfferReceivedDto, ProfileOfferDto,
-    SyncProgressDto, SyncStatusDto,
+    CollectionOffersDto, CollectionProgressDto, InitialSyncDoneDto, LinkedDeviceDto,
+    NotesSyncedDto, OfferReceivedDto, ProfileOfferDto, SyncProgressDto, SyncStatusDto,
 };
 use crate::profiles::parse_id;
 use crate::{IpcError, IpcResult};
@@ -135,11 +136,29 @@ pub enum SyncEventDto {
     DeviceLinked(LinkedDeviceDto),
     /// `sync:offer-received`.
     OfferReceived(OfferReceivedDto),
+    /// `sync:collection-offer`.
+    CollectionOffer(CollectionOffersDto),
+    /// `sync:collection-progress`.
+    CollectionProgress(CollectionProgressDto),
+    /// L'état d'un partage a changé : le crate `desktop` le relit et émet
+    /// `sync:collection-state` (et `sync:collection-conflicts` si les copies de conflit ont
+    /// changé).
+    CollectionChanged {
+        /// Profil local.
+        profile_id: String,
+        /// Partage.
+        sync_id: String,
+    },
 }
 
 impl SyncEventDto {
-    /// L'événement du moteur ; `active` : le profil actif, pour marquer ses notes.
-    pub fn from_event(event: &SyncEvent<ProfileId>, active: &ProfileId) -> Self {
+    /// L'événement du moteur ; `active` : le profil actif, pour marquer ses notes ;
+    /// `received_folder` : le dossier des collections reçues, pour la destination proposée.
+    pub fn from_event(
+        event: &SyncEvent<ProfileId>,
+        active: &ProfileId,
+        received_folder: &str,
+    ) -> Self {
         match event {
             SyncEvent::NotesSynced {
                 profile,
@@ -177,6 +196,36 @@ impl SyncEventDto {
                 device: linked_device(device, name),
                 offers: offers.iter().map(ProfileOfferDto::from).collect(),
             }),
+            SyncEvent::CollectionOfferReceived {
+                device,
+                name,
+                offers,
+            } => Self::CollectionOffer(CollectionOffersDto {
+                device: linked_device(device, name),
+                offers: offers
+                    .iter()
+                    .map(|(profile, offer)| {
+                        offer_dto(device, name, profile.as_str(), offer, received_folder)
+                    })
+                    .collect(),
+            }),
+            SyncEvent::CollectionProgress {
+                profile,
+                share,
+                device,
+                done,
+                total,
+            } => Self::CollectionProgress(CollectionProgressDto {
+                profile_id: profile.as_str().to_owned(),
+                sync_id: share.to_string(),
+                device_key: device.to_string(),
+                done: *done,
+                total: *total,
+            }),
+            SyncEvent::CollectionChanged { profile, share } => Self::CollectionChanged {
+                profile_id: profile.as_str().to_owned(),
+                sync_id: share.to_string(),
+            },
         }
     }
 }
@@ -269,7 +318,7 @@ mod tests {
             folders: true,
             from: Some(DeviceName::parse("Laptop").unwrap()),
         };
-        let SyncEventDto::NotesSynced(dto) = SyncEventDto::from_event(&synced, &work) else {
+        let SyncEventDto::NotesSynced(dto) = SyncEventDto::from_event(&synced, &work, "") else {
             panic!("événement inattendu");
         };
         assert!(dto.active && dto.folders);
@@ -280,7 +329,7 @@ mod tests {
             reason: "listen_failed".to_owned(),
         });
         let other = ProfileId::default_profile();
-        let SyncEventDto::Status(dto) = SyncEventDto::from_event(&status, &other) else {
+        let SyncEventDto::Status(dto) = SyncEventDto::from_event(&status, &other, "") else {
             panic!("événement inattendu");
         };
         assert_eq!(dto.state, SyncStatusKind::Error);
@@ -295,7 +344,7 @@ mod tests {
                 note_count: 12,
             }],
         };
-        let SyncEventDto::OfferReceived(dto) = SyncEventDto::from_event(&offer, &other) else {
+        let SyncEventDto::OfferReceived(dto) = SyncEventDto::from_event(&offer, &other, "") else {
             panic!("événement inattendu");
         };
         assert_eq!(dto.device.name, "Laptop");

@@ -34,9 +34,11 @@ fn reason(error: &Error) -> &'static str {
         Error::Protocol(_) => "protocol_version",
         Error::Stopped => "stopped",
         Error::App(_) => "storage_failed",
-        Error::Noise(_) | Error::TooLarge(_) | Error::Malformed | Error::Unexpected => {
-            "protocol_failed"
-        }
+        Error::Noise(_)
+        | Error::TooLarge(_)
+        | Error::Malformed
+        | Error::UnknownMessage
+        | Error::Unexpected => "protocol_failed",
     }
 }
 

@@ -35,6 +35,9 @@ pub enum Error {
     /// Message illisible ou incohérent.
     #[error("malformed message")]
     Malformed,
+    /// Message d'une version plus récente du protocole : ignoré.
+    #[error("unknown message")]
+    UnknownMessage,
     /// Message valide mais inattendu à ce stade du protocole.
     #[error("unexpected message")]
     Unexpected,

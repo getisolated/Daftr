@@ -170,6 +170,21 @@ pub struct ProfileOffer {
     pub note_count: u64,
 }
 
+/// Collection proposée par un appareil.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollectionOffer {
+    /// Identifiant du partage.
+    pub share: Uuid,
+    /// Espace du profil qui recevra la collection.
+    pub space_id: SpaceId,
+    /// Nom proposé (celui du dossier chez l'émetteur).
+    pub name: String,
+    /// Nombre de fichiers `.md`.
+    pub files: u64,
+    /// Volume des fichiers, en octets.
+    pub bytes: u64,
+}
+
 /// Événement de la synchronisation vers l'interface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncEvent<P> {
@@ -215,6 +230,36 @@ pub enum SyncEvent<P> {
         name: DeviceName,
         /// Les profils proposés.
         offers: Vec<ProfileOffer>,
+    },
+    /// Un appareil propose des collections : rien n'est écrit avant la réponse.
+    CollectionOfferReceived {
+        /// Sa clé.
+        device: DeviceKey,
+        /// Son nom.
+        name: DeviceName,
+        /// Les collections proposées, avec le profil local qui les recevra.
+        offers: Vec<(P, CollectionOffer)>,
+    },
+    /// Avancement d'un échange de fichiers avec un appareil.
+    CollectionProgress {
+        /// Le profil.
+        profile: P,
+        /// Le partage.
+        share: Uuid,
+        /// L'appareil.
+        device: DeviceKey,
+        /// Fichiers traités.
+        done: u64,
+        /// Fichiers à traiter.
+        total: u64,
+    },
+    /// L'état d'un partage a changé (échange terminé, conflit, dossier introuvable…) : à
+    /// relire par la commande d'état.
+    CollectionChanged {
+        /// Le profil.
+        profile: P,
+        /// Le partage.
+        share: Uuid,
     },
 }
 

@@ -208,6 +208,29 @@ fn stopping_a_share_forgets_everything_and_keeps_the_collection() {
 }
 
 #[test]
+fn resetting_the_files_keeps_the_share_and_forgets_the_history() {
+    let store = store();
+    with_collection(&store, "/docs");
+    store.create_share("/docs", &id(1), &[device(2)]).unwrap();
+    store
+        .set_base(&id(1), &device(2), "a.md", &base("a"))
+        .unwrap();
+    let row = IndexRow {
+        path: "a.md".to_owned(),
+        hash: hash("a"),
+        size: 1,
+        mtime: 1,
+    };
+    store.replace_file_index(&id(1), &[row]).unwrap();
+
+    store.reset_files(&id(1)).unwrap();
+
+    assert!(store.bases(&id(1), &device(2)).unwrap().is_empty());
+    assert!(store.file_index(&id(1)).unwrap().is_empty());
+    assert_eq!(store.share(&id(1)).unwrap().unwrap().peers.len(), 1);
+}
+
+#[test]
 fn removing_the_collection_removes_its_share() {
     let store = store();
     with_collection(&store, "/docs");
@@ -248,4 +271,10 @@ fn a_removed_device_leaves_every_share() {
     assert_eq!(share.peers.len(), 1);
     assert!(share.peer(&device(3)).is_some());
     assert!(store.bases(&id(1), &device(2)).unwrap().is_empty());
+
+    store.drop_device(&device(3)).unwrap();
+    assert!(
+        store.share(&id(1)).unwrap().is_none(),
+        "plus aucun appareil"
+    );
 }

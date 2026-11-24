@@ -115,14 +115,14 @@ pub(super) fn plan_of(me: &Replica, peer: &Replica) -> Vec<PlannedFile> {
 }
 
 /// Applique `planned` sur `me`, qui lit les versions chez `peer` et lui envoie les accusés.
-pub(super) fn execute(me: &mut Replica, peer: &mut Replica, planned: &[PlannedFile]) {
+pub(super) fn execute(me: &mut Replica, peer: &mut Replica, planned: &[PlannedFile], acks: bool) {
     let role = Role::between(&me.key, &peer.key);
     for item in planned {
         let name = item.path.as_str();
         match item.action {
-            FileAction::Pull => pull(me, peer, item),
-            FileAction::DeleteLocal => delete_local(me, peer, item),
-            FileAction::Reconcile => reconcile(me, peer, item, role),
+            FileAction::Pull => pull(me, peer, item, acks),
+            FileAction::DeleteLocal => delete_local(me, peer, item, acks),
+            FileAction::Reconcile => reconcile(me, peer, item, role, acks),
             FileAction::Adopt => adopt(me, name),
             FileAction::Forget => {
                 me.bases.remove(name);
@@ -145,17 +145,19 @@ fn fetch(peer: &Replica, item: &PlannedFile) -> Option<Vec<u8>> {
     peer.serve(item.path.as_str(), hash)
 }
 
-fn pull(me: &mut Replica, peer: &mut Replica, item: &PlannedFile) {
+fn pull(me: &mut Replica, peer: &mut Replica, item: &PlannedFile, acks: bool) {
     let Some(bytes) = fetch(peer, item).filter(|_| unchanged(me, item)) else {
         return;
     };
     let name = item.path.as_str();
     me.put(name, bytes.clone());
     me.remember(name, &bytes);
-    peer.acked(name, item.remote);
+    if acks {
+        peer.acked(name, item.remote);
+    }
 }
 
-fn delete_local(me: &mut Replica, peer: &mut Replica, item: &PlannedFile) {
+fn delete_local(me: &mut Replica, peer: &mut Replica, item: &PlannedFile, acks: bool) {
     let name = item.path.as_str();
     if !unchanged(me, item) {
         return;
@@ -164,7 +166,9 @@ fn delete_local(me: &mut Replica, peer: &mut Replica, item: &PlannedFile) {
         me.trash.push(old);
     }
     me.bases.remove(name);
-    peer.acked(name, None);
+    if acks {
+        peer.acked(name, None);
+    }
 }
 
 fn adopt(me: &mut Replica, name: &str) {
@@ -173,7 +177,7 @@ fn adopt(me: &mut Replica, name: &str) {
     }
 }
 
-fn reconcile(me: &mut Replica, peer: &mut Replica, item: &PlannedFile, role: Role) {
+fn reconcile(me: &mut Replica, peer: &mut Replica, item: &PlannedFile, role: Role, acks: bool) {
     let Some(remote) = fetch(peer, item).filter(|_| unchanged(me, item)) else {
         return;
     };
@@ -196,7 +200,9 @@ fn reconcile(me: &mut Replica, peer: &mut Replica, item: &PlannedFile, role: Rol
             me.put(copy.as_str(), local);
             me.put(name, remote.clone());
             me.remember(name, &remote);
-            peer.acked(name, item.remote);
+            if acks {
+                peer.acked(name, item.remote);
+            }
         }
         Resolution::KeepBoth => {}
     }
@@ -204,15 +210,20 @@ fn reconcile(me: &mut Replica, peer: &mut Replica, item: &PlannedFile, role: Rol
 
 /// Un échange complet : chacun planifie sur les instantanés, puis `first` applique en premier.
 pub(super) fn round(a: &mut Replica, b: &mut Replica, a_first: bool) {
+    exchange(a, b, a_first, true);
+}
+
+/// Comme [`round`], les accusés pouvant se perdre.
+pub(super) fn exchange(a: &mut Replica, b: &mut Replica, a_first: bool, acks: bool) {
     let plan_a = plan_of(a, b);
     let plan_b = plan_of(b, a);
 
     if a_first {
-        execute(a, b, &plan_a);
-        execute(b, a, &plan_b);
+        execute(a, b, &plan_a, acks);
+        execute(b, a, &plan_b, acks);
     } else {
-        execute(b, a, &plan_b);
-        execute(a, b, &plan_a);
+        execute(b, a, &plan_b, acks);
+        execute(a, b, &plan_a, acks);
     }
 }
 

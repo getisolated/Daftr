@@ -2,7 +2,7 @@
 //! chaque fichier) et accès au disque d'une collection partagée.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use domain::sync::DeviceKey;
 use domain::uuid::Uuid;
@@ -120,13 +120,19 @@ pub trait CollectionSyncStore: Send + Sync {
     fn stop_share(&self, sync_id: &Uuid) -> AppResult<()>;
     /// Retire l'appareil de tous les partages (appareil retiré ou révoqué du profil).
     fn drop_device(&self, device: &DeviceKey) -> AppResult<()>;
-    /// La collection partagée change de dossier.
-    fn relink_share(&self, sync_id: &Uuid, root: &str) -> AppResult<()>;
+
+    /// Oublie l'index et toutes les dernières versions échangées : le dossier est relié
+    /// ailleurs, le prochain échange repart de zéro (aucune suppression déduite).
+    fn reset_files(&self, sync_id: &Uuid) -> AppResult<()>;
 
     /// Index des fichiers locaux d'un partage, par chemin.
     fn file_index(&self, sync_id: &Uuid) -> AppResult<HashMap<String, IndexRow>>;
     /// Remplace l'index d'un partage.
     fn replace_file_index(&self, sync_id: &Uuid, rows: &[IndexRow]) -> AppResult<()>;
+    /// Met à jour l'index d'un fichier (écrit par la synchronisation elle-même).
+    fn put_index_row(&self, sync_id: &Uuid, row: &IndexRow) -> AppResult<()>;
+    /// Retire un fichier de l'index.
+    fn drop_index_row(&self, sync_id: &Uuid, path: &str) -> AppResult<()>;
     /// Dernières versions échangées avec un appareil, par chemin.
     fn bases(&self, sync_id: &Uuid, device: &DeviceKey) -> AppResult<HashMap<String, FileHash>>;
     /// La dernière version échangée d'un fichier, avec son texte.
@@ -181,6 +187,8 @@ pub trait CollectionDisk: Send + Sync {
     fn is_directory(&self, root: &Path) -> bool;
     /// La racine existe et ne contient aucun fichier ni dossier visible.
     fn is_empty_directory(&self, root: &Path) -> bool;
+    /// Crée le dossier s'il manque (parents compris) et rend son chemin canonique.
+    fn prepare_directory(&self, root: &Path) -> AppResult<PathBuf>;
     /// Parcourt la collection : les `.md`, hors dossiers exclus, de moins de 10 Mio.
     fn scan(&self, root: &Path) -> AppResult<LocalScan>;
     /// Le fichier existe (sans suivre un lien symbolique).

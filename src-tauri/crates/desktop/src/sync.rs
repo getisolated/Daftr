@@ -25,7 +25,7 @@ pub use profiles::DesktopSyncProfiles;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use adapter_fs::{SYNC_FOLDER, TrustFiles};
+use adapter_fs::{SYNC_FOLDER, ShareDisk, TrustFiles};
 use adapter_sync::{
     DeviceIdentity, Discovery, Engine, EngineConfig, EngineDeps, SystemClock,
     load_or_create_identity,
@@ -51,6 +51,10 @@ pub struct SyncSetup {
     pub events: Arc<dyn SyncEvents<Profile = ProfileId>>,
     /// Découverte (mDNS dans l'application).
     pub discovery: Arc<dyn Discovery>,
+    /// Fichiers des collections partagées.
+    pub files: Arc<ShareDisk>,
+    /// Dossier des collections reçues quand le réglage est vide (`Documents/Daftr`).
+    pub default_received_folder: PathBuf,
     /// Configuration initiale du moteur (nom et port tirés des réglages).
     pub config: EngineConfig,
     /// Nom de l'appareil quand le réglage est vide.
@@ -72,7 +76,10 @@ pub struct SyncState {
     pub profiles: Arc<DesktopSyncProfiles>,
     /// Le moteur.
     pub engine: Engine<ProfileId>,
+    /// Fichiers des collections partagées (dossiers ignorés à jour avec les réglages).
+    pub files: Arc<ShareDisk>,
     trust: Arc<TrustFiles>,
+    default_received_folder: PathBuf,
     host_name: DeviceName,
     /// Type de cet appareil, détecté au démarrage.
     device_kind: DeviceKind,
@@ -102,6 +109,7 @@ impl SyncState {
             profiles: Arc::clone(&profiles) as _,
             events: setup.events,
             trust: Arc::clone(&trust) as _,
+            files: Arc::clone(&setup.files) as _,
             discovery: setup.discovery,
             clock: Arc::new(SystemClock),
             runtime: setup.runtime.clone(),
@@ -113,6 +121,8 @@ impl SyncState {
         Ok(Self {
             profiles,
             engine,
+            files: setup.files,
+            default_received_folder: setup.default_received_folder,
             trust,
             host_name: setup.host_name,
             device_kind,
@@ -125,6 +135,15 @@ impl SyncState {
     /// Clé publique de cet appareil.
     pub fn device_key(&self) -> DeviceKey {
         self.engine.device_key()
+    }
+
+    /// Dossier où arrivent les collections reçues : le réglage, sinon `Documents/Daftr`.
+    pub fn received_folder(&self, settings: &AppSettings) -> String {
+        let configured = settings.received_collections_folder.trim();
+        if configured.is_empty() {
+            return self.default_received_folder.to_string_lossy().into_owned();
+        }
+        configured.to_owned()
     }
 
     /// Nom effectif de cet appareil : le réglage, sinon le nom d'hôte.
@@ -153,6 +172,7 @@ impl SyncState {
     pub async fn apply_settings(&self, settings: &SettingsService) {
         let mut applied = self.applied.lock().await;
         let current = settings.current();
+        self.files.set_excludes(current.collections_exclude.clone());
 
         let name = self.device_name(&current);
         if name != applied.name {

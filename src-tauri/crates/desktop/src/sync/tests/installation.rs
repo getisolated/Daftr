@@ -6,7 +6,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use adapter_fs::{ProfileDirectories, ProfileRegistryFile, SettingsFile};
+use adapter_fs::{ProfileDirectories, ProfileRegistryFile, SettingsFile, ShareDisk};
 use adapter_mcp::RandomSecrets;
 use adapter_password::Argon2Hasher;
 use adapter_sqlite::SqliteStore;
@@ -108,6 +108,8 @@ impl Installation {
             profiles: Arc::clone(&profiles),
             events: Arc::clone(&events) as _,
             discovery: Arc::clone(&discovery) as _,
+            files: Arc::new(ShareDisk::default()),
+            default_received_folder: root.path().join("received"),
             config,
             host_name: name,
             runtime: tokio::runtime::Handle::current(),

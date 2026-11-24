@@ -3,8 +3,8 @@
 use app::ports::sync::{SyncEvent, SyncEvents};
 use domain::profile::ProfileId;
 use presentation::events::{
-    NOTES_CHANGED, SYNC_DEVICE_LINKED, SYNC_INITIAL_DONE, SYNC_NOTES_SYNCED, SYNC_OFFER_RECEIVED,
-    SYNC_PROGRESS, SYNC_STATUS,
+    NOTES_CHANGED, SYNC_COLLECTION_OFFER, SYNC_COLLECTION_PROGRESS, SYNC_DEVICE_LINKED,
+    SYNC_INITIAL_DONE, SYNC_NOTES_SYNCED, SYNC_OFFER_RECEIVED, SYNC_PROGRESS, SYNC_STATUS,
 };
 use presentation::sync::SyncEventDto;
 use tauri::AppHandle;
@@ -36,7 +36,10 @@ impl SyncEvents for WindowSyncEvents {
             state.sync.on_status(status);
         }
         let active = state.services.data.profile();
-        match SyncEventDto::from_event(&event, &active) {
+        let received = state
+            .sync
+            .received_folder(&state.services.settings.current());
+        match SyncEventDto::from_event(&event, &active, &received) {
             SyncEventDto::NotesSynced(dto) => {
                 let refresh = dto.active;
                 emit_all(&self.app, SYNC_NOTES_SYNCED, dto);
@@ -49,6 +52,11 @@ impl SyncEvents for WindowSyncEvents {
             SyncEventDto::InitialSyncDone(dto) => emit_all(&self.app, SYNC_INITIAL_DONE, dto),
             SyncEventDto::DeviceLinked(dto) => emit_all(&self.app, SYNC_DEVICE_LINKED, dto),
             SyncEventDto::OfferReceived(dto) => emit_all(&self.app, SYNC_OFFER_RECEIVED, dto),
+            SyncEventDto::CollectionOffer(dto) => emit_all(&self.app, SYNC_COLLECTION_OFFER, dto),
+            SyncEventDto::CollectionProgress(dto) => {
+                emit_all(&self.app, SYNC_COLLECTION_PROGRESS, dto);
+            }
+            SyncEventDto::CollectionChanged { .. } => {}
         }
     }
 }

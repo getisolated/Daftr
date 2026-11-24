@@ -3,6 +3,7 @@
 //!
 //! Le crate `desktop` branche chaque commande IPC sur une fonction de ce crate.
 
+pub mod collection_sync;
 pub mod collections;
 pub mod data;
 pub mod dto;

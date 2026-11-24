@@ -1,7 +1,7 @@
 //! Disque de collections en mémoire : le même contrat que l'adaptateur de fichiers.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use platform::sync::lock;
@@ -111,6 +111,11 @@ impl CollectionDisk for MemoryDisk {
         let name = root.to_string_lossy();
         let state = self.state();
         state.directories.contains(name.as_ref()) && !state.files.keys().any(|(r, _)| *r == name)
+    }
+
+    fn prepare_directory(&self, root: &Path) -> AppResult<PathBuf> {
+        self.create_directory(root);
+        Ok(root.to_path_buf())
     }
 
     fn scan(&self, root: &Path) -> AppResult<LocalScan> {

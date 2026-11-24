@@ -114,6 +114,17 @@ fn a_base_known_by_one_side_only_is_ignored() {
 }
 
 #[test]
+fn a_lost_acknowledgement_does_not_make_a_conflict() {
+    // L'autre côté a écrit v1 (base v1) et l'a modifiée en v2 ; ici v1 est encore le fichier,
+    // mais l'accusé s'est perdu : la base est restée v0.
+    let here = action((Some("v1"), Some("v0")), (Some("v2"), Some("v1")));
+    let there = action((Some("v2"), Some("v1")), (Some("v1"), Some("v0")));
+
+    assert_eq!(here, Some(FileAction::Pull));
+    assert_eq!(there, None);
+}
+
+#[test]
 fn the_plan_carries_what_the_execution_checks() {
     let base = Some("v1");
     let mine = manifest_of(&[("f.md", (Some("v2"), base))]);

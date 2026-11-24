@@ -6,6 +6,8 @@
 //! signale les changements : [`Engine::refresh`] (profils), [`Engine::local_change`]
 //! (sauvegarde), [`Engine::network_changed`] (réseau).
 
+mod collection_state;
+mod collections;
 mod links;
 mod offers;
 mod pairing;
@@ -16,9 +18,12 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
+use app::ports::collection_sync::CollectionDisk;
+use app::ports::collection_sync::ShareRecord;
 use app::ports::sync::{SyncEvents, SyncStatus};
 use app::ports::trust::TrustStore;
 use domain::sync::{DeviceKey, DeviceKind, DeviceName, PairingCode, SpaceId};
+use domain::uuid::Uuid;
 use tokio::runtime::Handle;
 use tokio::sync::watch;
 
@@ -31,6 +36,9 @@ use crate::keys::DeviceIdentity;
 use crate::pairing::{LinkedDevice, PAIRING_DURATION, PairingState, PairingTicket};
 use crate::stores::{ProfileKey, Profiles};
 
+pub(crate) use collection_state::PeerRuntime;
+pub use collection_state::{CollectionPeerStatus, CollectionStatus, IncomingCollection};
+pub use collections::CollectionAnswer;
 pub(crate) use links::schedule_retry;
 pub(crate) use runtime::request_refresh;
 pub(crate) use shared::{Command, Shared};
@@ -115,6 +123,8 @@ pub struct EngineDeps<P> {
     pub events: Arc<dyn SyncEvents<Profile = P>>,
     /// Identité et appareils de confiance.
     pub trust: Arc<dyn TrustStore>,
+    /// Fichiers des collections partagées.
+    pub files: Arc<dyn CollectionDisk>,
     /// Découverte (mDNS).
     pub discovery: Arc<dyn Discovery>,
     /// Horloge.
@@ -249,6 +259,50 @@ impl<P: ProfileKey> Engine<P> {
     /// tous les espaces communs.
     pub async fn remove_device(&self, device: DeviceKey) -> Result<()> {
         offers::remove_device(&self.shared, device).await
+    }
+
+    /// « Synchroniser avec mes appareils » : propose la collection `root` (déjà listée dans le
+    /// profil) à `devices`, qui doivent tous partager le profil. Rien n'est envoyé aux
+    /// appareils absents : la proposition part à leur connexion.
+    pub async fn share_collection(
+        &self,
+        profile: P,
+        root: String,
+        devices: Vec<DeviceKey>,
+    ) -> Result<ShareRecord> {
+        collections::share(&self.shared, profile, root, devices).await
+    }
+
+    /// « Arrêter de synchroniser cette collection » : les fichiers restent des deux côtés.
+    pub async fn stop_collection(&self, profile: P, share: Uuid) -> Result<()> {
+        collections::stop(&self.shared, profile, share).await
+    }
+
+    /// Répond à une collection proposée
+    /// ([`app::ports::sync::SyncEvent::CollectionOfferReceived`]).
+    pub async fn answer_collection(
+        &self,
+        device: DeviceKey,
+        share: Uuid,
+        answer: CollectionAnswer,
+    ) -> Result<()> {
+        collections::answer(&self.shared, device, share, answer).await
+    }
+
+    /// Les collections proposées qui attendent une réponse.
+    pub fn pending_collections(&self) -> Vec<IncomingCollection<P>> {
+        self.shared.pending_collections()
+    }
+
+    /// Des fichiers d'une collection partagée ont changé sur le disque (ou au démarrage) : le
+    /// résumé est recalculé et les appareils connectés reçoivent un manifeste à jour.
+    pub async fn collection_changed(&self, profile: P, share: Uuid) -> Result<()> {
+        collections::changed(&self.shared, profile, share).await
+    }
+
+    /// L'état d'un partage : dossier, copies de conflit, avancement par appareil.
+    pub fn collection_status(&self, share: &Uuid, devices: &[DeviceKey]) -> CollectionStatus {
+        self.shared.collection_status(share, devices)
     }
 
     /// Change le nom annoncé de cet appareil.

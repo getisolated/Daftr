@@ -126,7 +126,11 @@ pub(super) async fn stop_sharing<P: ProfileKey>(
     let now = shared.clock.timestamp();
     let changed = shared
         .stores
-        .with(&profile, move |store| store.revoke_device(&device, &now))
+        .with(&profile, move |store| {
+            // Ses collections partagées s'arrêtent avec le partage du profil
+            store.drop_device(&device)?;
+            store.revoke_device(&device, &now)
+        })
         .await?;
     shared.offer_delivered(&device, &profile);
     shared.command(&device, Command::Announce);
@@ -149,6 +153,7 @@ pub(super) async fn remove_device<P: ProfileKey>(
         .run(move |profiles| {
             let mut changed = Vec::new();
             for profile in stores::enabled_profiles(profiles)? {
+                in_store(profiles, &profile, |store| store.drop_device(&device))?;
                 if in_store(profiles, &profile, |store| {
                     store.revoke_device(&device, &now)
                 })? {

@@ -1,6 +1,6 @@
 use proptest::prelude::*;
 
-use super::sim::{Replica, round, settle};
+use super::sim::{Replica, exchange, round, settle};
 
 const NAMES: [&str; 4] = ["a.md", "b.md", "docs/c.md", "docs/deep/d.md"];
 
@@ -156,6 +156,7 @@ enum Op {
     },
     Round {
         a_first: bool,
+        acks: bool,
     },
 }
 
@@ -167,7 +168,7 @@ fn ops() -> impl Strategy<Value = Vec<Op>> {
             content
         }),
         (any::<bool>(), 0..NAMES.len()).prop_map(|(on_b, file)| Op::Delete { on_b, file }),
-        any::<bool>().prop_map(|a_first| Op::Round { a_first }),
+        (any::<bool>(), any::<bool>()).prop_map(|(a_first, acks)| Op::Round { a_first, acks }),
     ];
     prop::collection::vec(op, 1..40)
 }
@@ -198,10 +199,12 @@ fn never_loses(ops: &[Op]) -> Result<(), TestCaseError> {
     for (serial, op) in (1_u32..).zip(ops) {
         let unique = |content: u8| [&[0xff, content][..], &serial.to_le_bytes()].concat();
         apply_user(&mut a, &mut b, op, unique);
-        let Op::Round { a_first } = op else { continue };
+        let Op::Round { a_first, acks } = op else {
+            continue;
+        };
         let mut pending = a.unsynced();
         pending.extend(b.unsynced());
-        round(&mut a, &mut b, *a_first);
+        exchange(&mut a, &mut b, *a_first, *acks);
         let kept: Vec<Vec<u8>> = [a.everything(), b.everything()].concat();
         for content in pending {
             prop_assert!(kept.contains(&content), "contenu perdu : {content:?}");
@@ -225,8 +228,8 @@ fn always_converges(ops: &[Op]) -> Result<(), TestCaseError> {
                 .into_bytes()
         };
         apply_user(&mut a, &mut b, op, lines);
-        if let Op::Round { a_first } = op {
-            round(&mut a, &mut b, *a_first);
+        if let Op::Round { a_first, acks } = op {
+            exchange(&mut a, &mut b, *a_first, *acks);
         }
     }
     prop_assert!(settle(&mut a, &mut b).is_some(), "pas de convergence");

@@ -191,22 +191,23 @@ impl CollectionSyncStore for MemorySyncStore {
             peers.retain(|peer| peer.device != *device);
         }
         collections.bases.retain(|(_, key, _), _| key != device);
+        let orphans: Vec<Uuid> = collections
+            .shares
+            .iter()
+            .filter(|(_, (_, peers))| peers.is_empty())
+            .map(|(id, _)| *id)
+            .collect();
+        for id in orphans {
+            collections.shares.remove(&id);
+            collections.index.remove(&id);
+        }
         Ok(())
     }
 
-    fn relink_share(&self, sync_id: &Uuid, root: &str) -> AppResult<()> {
+    fn reset_files(&self, sync_id: &Uuid) -> AppResult<()> {
         let mut collections = self.collections();
-        let old = collections
-            .shares
-            .get(sync_id)
-            .map(|(path, _)| path.clone());
-        let Some(old) = old else { return Ok(()) };
-        if let Some(name) = collections.listed.remove(&old) {
-            collections.listed.insert(root.to_owned(), name);
-        }
-        if let Some((path, _)) = collections.shares.get_mut(sync_id) {
-            root.clone_into(path);
-        }
+        collections.index.remove(sync_id);
+        collections.bases.retain(|(id, _, _), _| id != sync_id);
         Ok(())
     }
 
@@ -225,6 +226,20 @@ impl CollectionSyncStore for MemorySyncStore {
             .map(|row| (row.path.clone(), row.clone()))
             .collect();
         self.collections().index.insert(*sync_id, index);
+        Ok(())
+    }
+
+    fn put_index_row(&self, sync_id: &Uuid, row: &IndexRow) -> AppResult<()> {
+        let mut collections = self.collections();
+        let rows = collections.index.entry(*sync_id).or_default();
+        rows.insert(row.path.clone(), row.clone());
+        Ok(())
+    }
+
+    fn drop_index_row(&self, sync_id: &Uuid, path: &str) -> AppResult<()> {
+        if let Some(rows) = self.collections().index.get_mut(sync_id) {
+            rows.remove(path);
+        }
         Ok(())
     }
 

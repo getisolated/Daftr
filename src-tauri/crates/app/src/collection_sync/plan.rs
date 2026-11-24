@@ -85,7 +85,7 @@ pub fn plan(local: &Manifest, remote: &[FileEntry]) -> Vec<PlannedFile> {
                 action,
                 local: mine.and_then(|entry| entry.hash),
                 remote: theirs.and_then(|entry| entry.hash),
-                base: mine.and_then(|entry| common_base(entry.base, theirs?.base)),
+                base: effective_base(mine, theirs),
                 size: theirs.map_or(0, |entry| entry.size),
             });
         }
@@ -133,7 +133,7 @@ fn action_for(mine: Option<&FileEntry>, theirs: Option<&FileEntry>) -> Option<Fi
     let local = mine.and_then(|entry| entry.hash);
     let remote = theirs.and_then(|entry| entry.hash);
     let own_base = mine.and_then(|entry| entry.base);
-    let base = common_base(own_base, theirs.and_then(|entry| entry.base));
+    let base = effective_base(mine, theirs);
 
     if local == remote {
         return match local {
@@ -144,9 +144,22 @@ fn action_for(mine: Option<&FileEntry>, theirs: Option<&FileEntry>) -> Option<Fi
     decide(local, remote, base)
 }
 
-/// La base commune : celle que les deux côtés annoncent à l'identique.
-fn common_base(own: Option<FileHash>, theirs: Option<FileHash>) -> Option<FileHash> {
-    own.filter(|base| theirs == Some(*base))
+/// La base que les deux côtés déduisent à l'identique : celle qu'ils annoncent tous deux, ou,
+/// quand un accusé s'est perdu, celle que l'un annonce et que l'autre a exactement dans son
+/// fichier (la version que l'un croit avoir échangée est bien celle de l'autre).
+fn effective_base(mine: Option<&FileEntry>, theirs: Option<&FileEntry>) -> Option<FileHash> {
+    let local = mine.and_then(|entry| entry.hash);
+    let remote = theirs.and_then(|entry| entry.hash);
+    let own = mine.and_then(|entry| entry.base);
+    let other = theirs.and_then(|entry| entry.base);
+
+    if own.is_some() && own == other {
+        return own;
+    }
+    if other.is_some() && other == local {
+        return other;
+    }
+    own.filter(|base| Some(*base) == remote)
 }
 
 /// `L ≠ R`, la table du module.

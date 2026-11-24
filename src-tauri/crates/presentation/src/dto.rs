@@ -5,6 +5,7 @@
 //! d'Electron ; le reste est en camelCase.
 
 mod collection;
+mod collection_sync;
 mod folder;
 mod mcp;
 mod note;
@@ -16,6 +17,12 @@ mod update;
 pub use collection::{
     CollectionDto, CollectionEventDto, CollectionFileRefDto, CollectionGraphDto, CollectionNodeDto,
     FileMatchDto, GraphLinkDto, GraphNodeDto,
+};
+pub use collection_sync::{
+    CollectionConflictDto, CollectionConflictsDto, CollectionOfferDto, CollectionOffersDto,
+    CollectionPeerStateDto, CollectionProgressDto, CollectionShareDeviceDto, CollectionShareDto,
+    CollectionShareStatusKind, CollectionStateEventDto, CollectionSyncStateDto, FolderSummaryDto,
+    IgnoredFileDto, IgnoredReasonDto,
 };
 pub use folder::FolderDto;
 pub use mcp::{McpErrorKind, McpState, McpStatusDto};

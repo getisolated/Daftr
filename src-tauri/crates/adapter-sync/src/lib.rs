@@ -9,6 +9,7 @@ mod clock;
 mod discovery;
 mod engine;
 mod error;
+mod files;
 mod framing;
 mod keys;
 mod net;
@@ -30,7 +31,10 @@ pub use discovery::{
 };
 #[cfg(any(test, feature = "testing"))]
 pub use discovery::{MemoryDiscovery, MemoryNetwork};
-pub use engine::{DEFAULT_PORT, Engine, EngineConfig, EngineDeps, OfferChoice, Timings};
+pub use engine::{
+    CollectionAnswer, CollectionPeerStatus, CollectionStatus, DEFAULT_PORT, Engine, EngineConfig,
+    EngineDeps, IncomingCollection, OfferChoice, Timings,
+};
 pub use error::{Error, Result};
 pub use framing::MAX_MESSAGE_BYTES;
 pub use keys::{DeviceIdentity, Fingerprint, load_or_create_identity};

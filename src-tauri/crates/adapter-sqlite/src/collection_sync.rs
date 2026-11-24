@@ -184,15 +184,21 @@ impl CollectionSyncStore for SqliteStore {
             let delete = format!("DELETE FROM {table} WHERE device_key = ?");
             connection.execute(&delete, [&key]).map_err(storage)?;
         }
+        // Un partage sans plus aucun appareil n'a plus d'objet
+        let orphans = "DELETE FROM collection_shares WHERE sync_id NOT IN                        (SELECT sync_id FROM collection_share_peers)";
+        connection.execute(orphans, []).map_err(storage)?;
         Ok(())
     }
 
-    fn relink_share(&self, sync_id: &Uuid, root: &str) -> AppResult<()> {
-        let update = "UPDATE collection_shares SET path = ? WHERE sync_id = ?";
-        self.connection()
-            .execute(update, params![root, sync_id.to_string()])
-            .map(drop)
-            .map_err(storage)
+    fn reset_files(&self, sync_id: &Uuid) -> AppResult<()> {
+        let connection = self.connection();
+        let id = sync_id.to_string();
+        for table in ["collection_files", "collection_bases"] {
+            // `table` est une constante de ce module
+            let delete = format!("DELETE FROM {table} WHERE sync_id = ?");
+            connection.execute(&delete, [&id]).map_err(storage)?;
+        }
+        Ok(())
     }
 
     fn file_index(&self, sync_id: &Uuid) -> AppResult<HashMap<String, IndexRow>> {
@@ -234,6 +240,30 @@ impl CollectionSyncStore for SqliteStore {
             }
         }
         transaction.commit().map_err(storage)
+    }
+
+    fn put_index_row(&self, sync_id: &Uuid, row: &IndexRow) -> AppResult<()> {
+        let upsert = "INSERT OR REPLACE INTO collection_files (sync_id, path, hash, size, mtime)                       VALUES (?, ?, ?, ?, ?)";
+        let size = i64::try_from(row.size).unwrap_or(i64::MAX);
+        let values = params![
+            sync_id.to_string(),
+            row.path,
+            row.hash.as_bytes(),
+            size,
+            row.mtime
+        ];
+        self.connection()
+            .execute(upsert, values)
+            .map(drop)
+            .map_err(storage)
+    }
+
+    fn drop_index_row(&self, sync_id: &Uuid, path: &str) -> AppResult<()> {
+        let delete = "DELETE FROM collection_files WHERE sync_id = ? AND path = ?";
+        self.connection()
+            .execute(delete, params![sync_id.to_string(), path])
+            .map(drop)
+            .map_err(storage)
     }
 
     fn bases(&self, sync_id: &Uuid, device: &DeviceKey) -> AppResult<HashMap<String, FileHash>> {

@@ -6,15 +6,18 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use app::AppResult;
+use app::ports::collection_sync::CollectionDisk;
 use app::ports::sync::{ProfileOffer, SyncEvent, SyncEvents, SyncStatus};
 use app::ports::trust::TrustStore;
 use domain::sync::{DeviceKey, DeviceName, SpaceId};
+use domain::uuid::Uuid;
 use platform::sync::lock;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{Notify, watch};
 use tokio::task::{AbortHandle, JoinHandle};
 
+use super::collection_state::{IncomingCollection, ShareRuntime};
 use super::{EngineConfig, EngineDeps};
 use crate::clock::Clock;
 use crate::discovery::Discovery;
@@ -44,6 +47,19 @@ pub(crate) enum Command<P> {
         /// Espace proposé.
         space: SpaceId,
     },
+    /// Les partages de collections ont changé : offres, manifestes, partages arrêtés.
+    CollectionsChanged,
+    /// Des fichiers d'une collection partagée ont changé sur le disque.
+    ShareChanged(Uuid),
+    /// Réponse de l'utilisateur à une collection proposée.
+    CollectionAnswer {
+        /// Le partage.
+        share: Uuid,
+        /// Acceptée ou refusée.
+        accepted: bool,
+    },
+    /// Arrêter de partager une collection avec cet appareil.
+    StopShare(Uuid),
 }
 
 /// Session ouverte avec un appareil.
@@ -103,6 +119,12 @@ pub(crate) struct State<P> {
     pub accepted_offers: HashMap<(DeviceKey, SpaceId), P>,
     /// Espaces rejoints dont la synchronisation initiale n'est pas finie.
     pub joining: HashSet<SpaceId>,
+    /// Collections partagées : résumé du dossier et avancement par appareil.
+    pub collections: HashMap<Uuid, ShareRuntime>,
+    /// Collections proposées par un autre appareil, en attente de réponse.
+    pub incoming_collections: HashMap<(DeviceKey, Uuid), IncomingCollection<P>>,
+    pending_share_pushes: HashSet<Uuid>,
+    share_push_scheduled: bool,
     pub seen: HashMap<Fingerprint, Seen>,
     pub retries: HashMap<DeviceKey, Retry>,
     /// Tentatives de connexion en cours, avec les adresses confiées entre-temps.
@@ -121,6 +143,7 @@ pub(crate) struct Shared<P: ProfileKey> {
     pub stores: Stores<P>,
     pub events: Arc<dyn SyncEvents<Profile = P>>,
     pub trust: Arc<dyn TrustStore>,
+    pub files: Arc<dyn CollectionDisk>,
     pub discovery: Arc<dyn Discovery>,
     pub clock: Arc<dyn Clock>,
     pub runtime: Handle,
@@ -150,6 +173,10 @@ impl<P: ProfileKey> Shared<P> {
             incoming_offers: HashMap::new(),
             accepted_offers: HashMap::new(),
             joining: HashSet::new(),
+            collections: HashMap::new(),
+            incoming_collections: HashMap::new(),
+            pending_share_pushes: HashSet::new(),
+            share_push_scheduled: false,
             seen: HashMap::new(),
             retries: HashMap::new(),
             dialing: HashMap::new(),
@@ -165,6 +192,7 @@ impl<P: ProfileKey> Shared<P> {
             stores: Stores::new(deps.profiles),
             events: deps.events,
             trust: deps.trust,
+            files: deps.files,
             discovery: deps.discovery,
             clock: deps.clock,
             runtime: deps.runtime,
@@ -284,6 +312,34 @@ impl<P: ProfileKey> Shared<P> {
                 tokio::time::sleep(shared.config.timings.push_delay).await;
                 shared.flush_pushes();
             });
+        }
+    }
+
+    /// Prévient les sessions que des fichiers de la collection `share` ont changé, après le
+    /// délai de regroupement (un enregistrement fait souvent plusieurs événements disque).
+    pub(crate) fn request_share_push(self: &Arc<Self>, share: Uuid) {
+        let schedule = {
+            let mut state = self.state();
+            state.pending_share_pushes.insert(share);
+            !std::mem::replace(&mut state.share_push_scheduled, true)
+        };
+        if schedule {
+            let shared = Arc::clone(self);
+            self.runtime.spawn(async move {
+                tokio::time::sleep(shared.config.timings.push_delay).await;
+                shared.flush_share_pushes();
+            });
+        }
+    }
+
+    fn flush_share_pushes(&self) {
+        let state = &mut *self.state();
+        state.share_push_scheduled = false;
+        for share in state.pending_share_pushes.drain() {
+            for entry in state.sessions.values() {
+                // Une session qui se termine n'a plus besoin de l'ordre
+                let _ = entry.commands.send(Command::ShareChanged(share));
+            }
         }
     }
 
