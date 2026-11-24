@@ -9,6 +9,7 @@ mod profile_registry_file;
 mod scan;
 mod settings_file;
 mod share_disk;
+mod share_watcher;
 mod sync_files;
 mod watcher;
 
@@ -19,5 +20,6 @@ pub use profile_registry_file::ProfileRegistryFile;
 pub use scan::{ScanResult, scan_folder};
 pub use settings_file::SettingsFile;
 pub use share_disk::ShareDisk;
+pub use share_watcher::{OnChange, ShareWatcher};
 pub use sync_files::{SYNC_FOLDER, SpaceIndexEntry, SpaceIndexFile, TrustFiles};
 pub use watcher::CollectionsWatcher;

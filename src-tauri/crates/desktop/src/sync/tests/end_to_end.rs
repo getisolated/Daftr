@@ -13,7 +13,7 @@ use super::installation::{Installation, eventually};
 
 /// `joiner` se lie par code à `host`, qui propose `profile` ; il accepte en nouveau profil et
 /// attend la fin de la synchronisation initiale. Rend son profil.
-async fn link_by_code(
+pub(super) async fn link_by_code(
     host: &Installation,
     profile: &ProfileId,
     joiner: &Installation,

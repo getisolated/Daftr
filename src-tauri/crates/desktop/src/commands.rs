@@ -4,6 +4,7 @@
 //! les fenêtres (les dialogues bloquants en dépendent).
 
 mod clipboard;
+mod collection_sync;
 mod collections;
 mod export;
 mod folders;
@@ -56,6 +57,14 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         collections::collections_search,
         collections::collections_cancel_search,
         collections::collections_graph,
+        collection_sync::collection_sync_state,
+        collection_sync::collection_sync_summary,
+        collection_sync::collection_sync_inspect_folder,
+        collection_sync::collection_sync_share,
+        collection_sync::collection_sync_stop,
+        collection_sync::collection_sync_answer_offer,
+        collection_sync::collection_sync_relink,
+        collection_sync::collection_conflict_resolve,
         profiles::profiles_state,
         profiles::profiles_unlock,
         profiles::profiles_switch,

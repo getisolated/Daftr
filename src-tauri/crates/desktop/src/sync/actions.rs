@@ -206,6 +206,7 @@ impl SyncState {
     /// Un profil a été supprimé : il n'est plus synchronisé.
     pub async fn forget_profile(&self, profile: &ProfileId) {
         self.profiles.forget(profile);
+        self.unwatch_profile(profile);
         self.refresh().await;
     }
 
@@ -230,7 +231,7 @@ impl SyncState {
     }
 
     /// Exécute `work` sur les profils hors des threads du runtime (accès SQLite).
-    async fn on_profiles<T, F>(&self, work: F) -> IpcResult<T>
+    pub(super) async fn on_profiles<T, F>(&self, work: F) -> IpcResult<T>
     where
         T: Send + 'static,
         F: FnOnce(&DesktopSyncProfiles) -> AppResult<T> + Send + 'static,
@@ -240,7 +241,7 @@ impl SyncState {
     }
 }
 
-async fn blocking<T, F>(work: F) -> IpcResult<T>
+pub(super) async fn blocking<T, F>(work: F) -> IpcResult<T>
 where
     T: Send + 'static,
     F: FnOnce() -> AppResult<T> + Send + 'static,

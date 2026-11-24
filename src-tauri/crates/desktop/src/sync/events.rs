@@ -2,9 +2,11 @@
 
 use app::ports::sync::{SyncEvent, SyncEvents};
 use domain::profile::ProfileId;
+use domain::uuid::Uuid;
 use presentation::events::{
-    NOTES_CHANGED, SYNC_COLLECTION_OFFER, SYNC_COLLECTION_PROGRESS, SYNC_DEVICE_LINKED,
-    SYNC_INITIAL_DONE, SYNC_NOTES_SYNCED, SYNC_OFFER_RECEIVED, SYNC_PROGRESS, SYNC_STATUS,
+    NOTES_CHANGED, SYNC_COLLECTION_CONFLICTS, SYNC_COLLECTION_OFFER, SYNC_COLLECTION_PROGRESS,
+    SYNC_COLLECTION_STATE, SYNC_DEVICE_LINKED, SYNC_INITIAL_DONE, SYNC_NOTES_SYNCED,
+    SYNC_OFFER_RECEIVED, SYNC_PROGRESS, SYNC_STATUS,
 };
 use presentation::sync::SyncEventDto;
 use tauri::AppHandle;
@@ -22,6 +24,32 @@ impl WindowSyncEvents {
     /// Destinataire branché sur l'application.
     pub fn new(app: AppHandle) -> Self {
         Self { app }
+    }
+}
+
+impl WindowSyncEvents {
+    /// L'état d'un partage a changé : il est relu (base de son profil) hors du moteur, puis
+    /// envoyé aux fenêtres, avec ses copies de conflit si elles ont changé.
+    fn emit_collection_state(&self, profile_id: &str, sync_id: &str) {
+        let (Some(profile), Some(share)) = (ProfileId::parse(profile_id), Uuid::parse(sync_id))
+        else {
+            return;
+        };
+        let app = self.app.clone();
+        tauri::async_runtime::spawn(async move {
+            let state = desktop(&app);
+            let settings = state.services.settings.current();
+            let events = state.sync.share_events(&profile, share, &settings).await;
+            match events {
+                Ok(events) => {
+                    emit_all(&app, SYNC_COLLECTION_STATE, events.state);
+                    if let Some(conflicts) = events.conflicts {
+                        emit_all(&app, SYNC_COLLECTION_CONFLICTS, conflicts);
+                    }
+                }
+                Err(error) => tracing::debug!(?error, "état du partage non relu"),
+            }
+        });
     }
 }
 
@@ -56,7 +84,10 @@ impl SyncEvents for WindowSyncEvents {
             SyncEventDto::CollectionProgress(dto) => {
                 emit_all(&self.app, SYNC_COLLECTION_PROGRESS, dto);
             }
-            SyncEventDto::CollectionChanged { .. } => {}
+            SyncEventDto::CollectionChanged {
+                profile_id,
+                sync_id,
+            } => self.emit_collection_state(&profile_id, &sync_id),
         }
     }
 }

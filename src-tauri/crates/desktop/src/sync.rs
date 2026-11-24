@@ -6,6 +6,8 @@
 //! mDNS, ni surveillance du réseau (critère d'acceptation 8).
 
 mod actions;
+mod collection_dto;
+mod collections;
 mod errors;
 mod events;
 mod host;
@@ -25,7 +27,7 @@ pub use profiles::DesktopSyncProfiles;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use adapter_fs::{SYNC_FOLDER, ShareDisk, TrustFiles};
+use adapter_fs::{SYNC_FOLDER, ShareDisk, ShareWatcher, TrustFiles};
 use adapter_sync::{
     DeviceIdentity, Discovery, Engine, EngineConfig, EngineDeps, SystemClock,
     load_or_create_identity,
@@ -84,6 +86,11 @@ pub struct SyncState {
     /// Type de cet appareil, détecté au démarrage.
     device_kind: DeviceKind,
     runtime: Handle,
+    /// Dossiers partagés surveillés : où ils sont, à quel profil et quel partage ils vont.
+    routes: collections::Routes,
+    /// Démarré avec le premier dossier partagé : sans partage, aucun thread.
+    watcher: std::sync::Mutex<Option<ShareWatcher>>,
+    seen_conflicts: collections::SeenConflicts,
     /// Sérialise l'application des réglages (la dernière tâche applique l'état courant).
     applied: tokio::sync::Mutex<Applied>,
     network: NetworkWatch,
@@ -127,6 +134,9 @@ impl SyncState {
             host_name: setup.host_name,
             device_kind,
             runtime: setup.runtime,
+            routes: collections::Routes::default(),
+            watcher: std::sync::Mutex::new(None),
+            seen_conflicts: collections::SeenConflicts::default(),
             applied: tokio::sync::Mutex::new(applied),
             network: NetworkWatch::default(),
         })
@@ -166,6 +176,7 @@ impl SyncState {
         }
         drop(applied);
         self.apply_settings(settings).await;
+        self.start_collections().await;
     }
 
     /// Applique au moteur les réglages courants de l'appareil (nom, port, pause).
