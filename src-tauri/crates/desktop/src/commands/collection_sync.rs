@@ -135,6 +135,16 @@ pub async fn collection_sync_relink(
     Ok(relinked)
 }
 
+/// Dialogue natif de choix d'un dossier (destination d'une collection reçue, dossier des
+/// collections reçues). Rend `None` si l'utilisateur annule.
+#[tauri::command]
+pub async fn collection_sync_pick_folder(
+    app: AppHandle,
+    window: WebviewWindow,
+) -> IpcResult<Option<String>> {
+    Ok(pick_folder(&app, &window).map(|path| path.to_string_lossy().into_owned()))
+}
+
 /// Résout une copie de conflit `nom (conflit <appareil>).md` : `keep` vaut `mine` (garder la
 /// version de cet appareil) ou `other` ; la version gardée est à la place de l'original et la
 /// copie part à la corbeille.

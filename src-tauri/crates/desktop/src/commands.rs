@@ -64,6 +64,7 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         collection_sync::collection_sync_stop,
         collection_sync::collection_sync_answer_offer,
         collection_sync::collection_sync_relink,
+        collection_sync::collection_sync_pick_folder,
         collection_sync::collection_conflict_resolve,
         profiles::profiles_state,
         profiles::profiles_unlock,
