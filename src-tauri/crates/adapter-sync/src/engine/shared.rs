@@ -48,6 +48,8 @@ pub(crate) enum Command<P> {
     },
     /// Arrêter de partager une collection avec cet appareil.
     StopShare(Uuid),
+    /// L'appareil vient d'être retiré : lui dire (s'il comprend le message) et fermer.
+    Removed,
 }
 
 /// Session ouverte avec un appareil.

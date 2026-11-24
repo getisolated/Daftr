@@ -31,7 +31,7 @@ pub use profile::{ProfileDto, ProfilesStateDto, TransferResultDto};
 pub use settings::{OverlayPositionDto, SettingsDto, SettingsUpdateResultDto};
 pub use sync::{
     InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, PairingStateDto, PairingTicketDto,
-    ProfileReceivedDto, ProfileShareDeviceDto, ProfileShareDto, ProfileSharesDto, ProfileSyncDto,
+    DeviceRemovedDto, ProfileReceivedDto, ProfileShareDeviceDto, ProfileShareDto, ProfileSharesDto, ProfileSyncDto,
     SharedProfileDto, SpaceDeviceDto, SyncProgressDto, SyncStateDto, SyncStatusDto, SyncStatusKind,
     SyncedProfileDto, TrustOriginDto, TrustedDeviceDto,
 };

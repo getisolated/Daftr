@@ -265,6 +265,14 @@ pub enum SyncEvent<P> {
         /// Son nom.
         name: DeviceName,
     },
+    /// Un appareil de confiance nous a retirés de ses appareils : nous l'avons retiré à notre
+    /// tour (révoqué, retiré des espaces et des partages). Nos notes et fichiers restent.
+    DeviceRemoved {
+        /// Sa clé.
+        device: DeviceKey,
+        /// Son nom.
+        name: DeviceName,
+    },
     /// Un profil partagé par un appareil a été accepté d'office : un nouveau profil local en
     /// est le clone, la synchronisation initiale démarre.
     ProfileReceived {

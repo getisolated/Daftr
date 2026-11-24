@@ -14,6 +14,9 @@ pub(crate) const FEATURE_COLLECTIONS: u8 = 1 << 1;
 /// Bit de `Hello::features` : l'appareil comprend `ProfileInfo` (nom et icône d'un profil
 /// partagé, pour en créer le clone).
 pub(crate) const FEATURE_PROFILE_INFO: u8 = 1 << 2;
+/// Bit de `Hello::features` : l'appareil comprend `Removed` (« je vous ai retiré de mes
+/// appareils »). Annoncé pour que le message ne parte qu'à un appareil qui le lit.
+pub(crate) const FEATURE_REMOVED: u8 = 1 << 3;
 
 /// Lignes de manifeste au plus par message.
 pub(crate) const MANIFEST_PART: usize = 500;

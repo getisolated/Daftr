@@ -281,6 +281,16 @@ pub struct LinkedDeviceDto {
     pub name: String,
 }
 
+/// Un appareil nous a retirés de ses appareils (événement `sync:device-removed`) : le lien est
+/// coupé ici aussi, sans rien supprimer des notes ni des fichiers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DeviceRemovedDto {
+    /// L'appareil qui nous a retirés.
+    pub device: LinkedDeviceDto,
+}
+
 /// Un profil partagé accepté d'office, clone du profil d'un autre appareil (événement
 /// `sync:profile-received`). L'interface affiche « Profil “X” reçu depuis A » avec un bouton
 /// pour basculer dessus.

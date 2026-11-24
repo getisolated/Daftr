@@ -36,6 +36,9 @@ pub const SYNC_PROGRESS: &str = "sync:progress";
 pub const SYNC_INITIAL_DONE: &str = "sync:initial-done";
 /// Appareil lié (charge utile : `LinkedDeviceDto`).
 pub const SYNC_DEVICE_LINKED: &str = "sync:device-linked";
+/// Un appareil nous a retirés de ses appareils : le lien est coupé de notre côté aussi
+/// (charge utile : `DeviceRemovedDto`).
+pub const SYNC_DEVICE_REMOVED: &str = "sync:device-removed";
 /// Profil partagé par un appareil, accepté d'office : un clone est créé (charge utile :
 /// `ProfileReceivedDto`).
 pub const SYNC_PROFILE_RECEIVED: &str = "sync:profile-received";

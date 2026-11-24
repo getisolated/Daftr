@@ -41,8 +41,12 @@ use crate::stores::{ProfileKey, Profiles};
 pub(crate) use collection_state::PeerRuntime;
 pub use collection_state::{CollectionPeerStatus, CollectionStatus};
 pub(crate) use links::schedule_retry;
+pub(crate) use offers::apply_removed;
 pub(crate) use runtime::request_refresh;
 pub(crate) use shared::{Command, Shared};
+
+/// Attente, après `Removed`, de la fermeture par l'appareil retiré (voir `Session::farewell`).
+pub(crate) const FAREWELL: Duration = Duration::from_secs(2);
 
 /// Port d'écoute par défaut.
 pub const DEFAULT_PORT: u16 = 47_820;

@@ -3,6 +3,7 @@
 
 mod collections;
 mod pairing;
+mod removal;
 mod security;
 mod sessions;
 mod support;

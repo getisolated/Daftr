@@ -131,6 +131,7 @@ fn collection_messages_round_trip_with_frozen_indexes() {
         Message::CollectionPending {
             shares: vec![share],
         },
+        Message::Removed,
     ];
     for (offset, message) in messages.into_iter().enumerate() {
         let bytes = message.encode().unwrap();
@@ -141,7 +142,7 @@ fn collection_messages_round_trip_with_frozen_indexes() {
         );
         assert_eq!(Message::decode(&bytes).unwrap(), message);
     }
-    assert_eq!(VARIANT_COUNT, 24);
+    assert_eq!(VARIANT_COUNT, 25);
 }
 
 #[test]

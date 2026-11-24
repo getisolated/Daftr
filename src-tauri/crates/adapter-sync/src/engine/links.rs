@@ -14,7 +14,7 @@ use super::pairing;
 use crate::error::{Error, Result};
 use crate::keys::Fingerprint;
 use crate::net;
-use crate::noise::{self, Role};
+use crate::noise::{self, Channel, Role};
 use crate::session::{self, Opening};
 use crate::stores::{self, ProfileKey};
 use crate::wire::{Message, SessionKind};
@@ -41,6 +41,11 @@ async fn open_incoming<P: ProfileKey>(shared: &Arc<Shared<P>>, stream: TcpStream
         SessionKind::Pair => pairing::respond(shared, channel).await,
         SessionKind::Sync => {
             if !is_trusted(shared, channel.remote).await? {
+                // Clé authentifiée par le handshake et retirée par nous : on le lui dit. Une
+                // clé inconnue n'apprend rien (pas même qu'elle a été connue).
+                if is_revoked(shared, channel.remote).await? {
+                    tell_removed(shared, channel).await;
+                }
                 return Err(Error::Untrusted);
             }
             let opening = Opening {
@@ -74,6 +79,31 @@ pub(super) async fn is_trusted<P: ProfileKey>(shared: &Shared<P>, key: DeviceKey
                 .any(|device| device.key == key && device.is_trusted()))
         })
         .await
+}
+
+/// La clé est celle d'un appareil que nous avons retiré (révoqué dans la liste de confiance).
+async fn is_revoked<P: ProfileKey>(shared: &Shared<P>, key: DeviceKey) -> Result<bool> {
+    shared
+        .with_trust(move |trust| {
+            Ok(trust
+                .devices()?
+                .iter()
+                .any(|device| device.key == key && !device.is_trusted()))
+        })
+        .await
+}
+
+/// Envoie `Removed` à un appareil retiré qui vient de se connecter, puis laisse sa fermeture
+/// venir (au plus `FAREWELL`) : fermer avec des octets non lus peut détruire le message. Un
+/// appareil d'une version antérieure ignore ce message et se heurte à la fermeture, comme
+/// avant. Un échec d'envoi ne change rien : la connexion est refusée de toute façon.
+async fn tell_removed<P: ProfileKey>(shared: &Shared<P>, mut channel: Channel<TcpStream>) {
+    let wait = async {
+        channel.send(&Message::Removed).await?;
+        while channel.recv().await.is_ok() {}
+        Ok::<(), Error>(())
+    };
+    let _ = tokio::time::timeout(super::FAREWELL.min(shared.config.timings.handshake), wait).await;
 }
 
 /// Ouvre une session vers un appareil de confiance (rien s'il est déjà connecté).

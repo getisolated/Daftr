@@ -26,7 +26,7 @@ use crate::noise::{Channel, ChannelReader, ChannelWriter};
 use crate::pairing::LinkedDevice;
 use crate::stores::{self, ProfileKey};
 use crate::wire::{
-    self, FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, Hello, MAX_SPACES, Message, PROTOCOL_VERSION,
+    self, FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, FEATURE_REMOVED, Hello, MAX_SPACES, Message, PROTOCOL_VERSION,
 };
 
 use catchup::Round;
@@ -156,6 +156,7 @@ impl<P: ProfileKey> Session<P> {
                     None => return Err(Error::Closed),
                 },
                 command = commands.recv() => match command {
+                    Some(Command::Removed) => return self.farewell(inbound).await,
                     Some(command) => self.execute(command).await?,
                     None => return Ok(()),
                 },
@@ -176,6 +177,10 @@ impl<P: ProfileKey> Session<P> {
     }
 
     async fn handle(&mut self, message: Message) -> Result<()> {
+        // Valable dès l'ouverture : un appareil qui nous a retiré répond ainsi à notre `Open`
+        if matches!(message, Message::Removed) {
+            return self.on_removed().await;
+        }
         if self.remote_name.is_none() && !matches!(message, Message::Hello(_)) {
             return Err(Error::Unexpected);
         }
@@ -230,6 +235,7 @@ impl<P: ProfileKey> Session<P> {
             }
             Message::FileAck { share, path, hash } => self.on_file_ack(share, path, hash).await,
             Message::ShareStop { share } => self.on_share_stop(share).await,
+            Message::Removed => Ok(()),
             Message::Open(_) | Message::Spake(_) | Message::Confirm(_) | Message::Refused(_) => {
                 Err(Error::Unexpected)
             }
@@ -250,7 +256,32 @@ impl<P: ProfileKey> Session<P> {
                 self.collection_answer(share, accepted).await
             }
             Command::StopShare(share) => self.stop_share(share).await,
+            // Traité par la boucle de la session (voir `serve`)
+            Command::Removed => Ok(()),
         }
+    }
+
+    /// Nous venons de retirer l'appareil distant : on le lui dit s'il comprend le message, puis
+    /// on laisse l'autre côté fermer (une fermeture brutale avec des données non lues peut
+    /// détruire le message en route), au plus un court instant.
+    async fn farewell(&mut self, inbound: &mut Inbound) -> Result<()> {
+        if self.remote_features & FEATURE_REMOVED != 0 {
+            self.send(&Message::Removed).await?;
+            let drain = async { while inbound.recv().await.is_some_and(|message| message.is_ok()) {} };
+            let _ = tokio::time::timeout(crate::engine::FAREWELL, drain).await;
+        }
+        Ok(())
+    }
+
+    /// L'appareil distant nous a retirés : si nous lui faisons confiance (appareil authentifié
+    /// par Noise, non révoqué), on le retire à notre tour, sans lui répondre, puis la session
+    /// se ferme. Sinon (inconnu, ou déjà retiré : message d'un appareil qui n'a plus à être
+    /// cru, ou écho) le message est ignoré.
+    async fn on_removed(&mut self) -> Result<()> {
+        if crate::engine::apply_removed(&self.shared, self.remote).await? {
+            return Err(Error::Closed);
+        }
+        Ok(())
     }
 
     async fn send(&mut self, message: &Message) -> Result<()> {
@@ -270,7 +301,7 @@ impl<P: ProfileKey> Session<P> {
             name: self.shared.state().device_name.as_str().to_owned(),
             spaces: spaces.keys().map(|space| *space.as_bytes()).collect(),
             kind: self.shared.config.device_kind,
-            features: FEATURE_COLLECTIONS | FEATURE_PROFILE_INFO,
+            features: FEATURE_COLLECTIONS | FEATURE_PROFILE_INFO | FEATURE_REMOVED,
         };
         self.send(&Message::Hello(hello)).await?;
 

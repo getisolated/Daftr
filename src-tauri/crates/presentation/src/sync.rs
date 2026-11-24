@@ -10,7 +10,7 @@ use domain::settings::{DEFAULT_SYNC_PORT, SYNC_MAX_PORT, SYNC_MIN_PORT};
 use domain::sync::{DeviceKey, DeviceName, PairingCode};
 
 use crate::dto::{
-    CollectionProgressDto, InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, ProfileReceivedDto,
+    CollectionProgressDto, DeviceRemovedDto, InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, ProfileReceivedDto,
     SyncProgressDto, SyncStatusDto,
 };
 use crate::{IpcError, IpcResult};
@@ -89,6 +89,8 @@ pub enum SyncEventDto {
     InitialSyncDone(InitialSyncDoneDto),
     /// `sync:device-linked`.
     DeviceLinked(LinkedDeviceDto),
+    /// `sync:device-removed`.
+    DeviceRemoved(DeviceRemovedDto),
     /// `sync:profile-received`.
     ProfileReceived(ProfileReceivedDto),
     /// Nouvelles collections reçues « à configurer » : le crate `desktop` complète chaque
@@ -148,6 +150,9 @@ impl SyncEventDto {
             SyncEvent::DeviceLinked { device, name } => {
                 Self::DeviceLinked(linked_device(device, name))
             }
+            SyncEvent::DeviceRemoved { device, name } => Self::DeviceRemoved(DeviceRemovedDto {
+                device: linked_device(device, name),
+            }),
             SyncEvent::ProfileReceived {
                 profile,
                 name,

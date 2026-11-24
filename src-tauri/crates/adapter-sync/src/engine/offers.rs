@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use app::ports::sync::SyncEvent;
 use app::ports::trust::{TrustOrigin, TrustedDevice};
 use domain::sync::{DeviceKey, DeviceKind, DeviceName};
 
@@ -97,11 +98,34 @@ pub(super) async fn stop_sharing<P: ProfileKey>(
 
 /// « Retirer l'appareil » : révoqué dans la liste de confiance (définitif) et dans tous les
 /// espaces dont il est membre ; ses partages de collections et ses propositions en attente
-/// disparaissent ; sa session est fermée.
+/// disparaissent ; sa session est fermée, après lui avoir dit qu'il est retiré (`Removed`).
+/// Les notes et fichiers locaux ne sont jamais touchés.
 pub(super) async fn remove_device<P: ProfileKey>(
     shared: &Arc<Shared<P>>,
     device: DeviceKey,
 ) -> Result<()> {
+    // L'ordre part avant la fermeture : le canal d'ordres livre ce qu'il contient avant de
+    // se terminer, la session envoie `Removed` puis ferme
+    shared.command(&device, Command::Removed);
+    unlink(shared, device).await
+}
+
+/// `device` nous a retirés de ses appareils (`Removed`, reçu sur un canal authentifié) : même
+/// effet qu'un retrait volontaire, sans lui répondre. Rend `false`, sans rien changer, si
+/// `device` n'est pas de confiance (inconnu, ou déjà retiré : pas de rebond ni de doublon).
+pub(crate) async fn apply_removed<P: ProfileKey>(
+    shared: &Arc<Shared<P>>,
+    device: DeviceKey,
+) -> Result<bool> {
+    let Some(name) = trusted_name(shared, device).await? else {
+        return Ok(false);
+    };
+    unlink(shared, device).await?;
+    shared.publish(SyncEvent::DeviceRemoved { device, name });
+    Ok(true)
+}
+
+async fn unlink<P: ProfileKey>(shared: &Arc<Shared<P>>, device: DeviceKey) -> Result<()> {
     let now = shared.clock.timestamp();
     revoke_trust(shared, device, now.clone()).await?;
     let (changed, dropped) = shared
@@ -144,7 +168,7 @@ pub(super) async fn remove_device<P: ProfileKey>(
     for (profile, share) in &dropped {
         shared.collection_changed(profile, *share);
     }
-    shared.publish(app::ports::sync::SyncEvent::CollectionPendingChanged);
+    shared.publish(SyncEvent::CollectionPendingChanged);
     for profile in changed {
         shared.request_push(profile, None);
     }

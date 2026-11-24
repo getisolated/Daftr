@@ -17,7 +17,7 @@ use serde::de::{self, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub(crate) use files::{
-    FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, MANIFEST_PART, MAX_OFFERED, OfferedCollection,
+    FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, FEATURE_REMOVED, MANIFEST_PART, MAX_OFFERED, OfferedCollection,
     ProfileInfoEntry, WireEntry, file_entry, wire_entry,
 };
 
@@ -335,10 +335,13 @@ pub(crate) enum Message {
         /// Partages en attente.
         shares: Vec<[u8; 16]>,
     },
+    /// L'émetteur a retiré le destinataire de ses appareils (voir [`FEATURE_REMOVED`]) : le
+    /// destinataire, s'il fait confiance à l'émetteur, coupe le lien de son côté. Sans charge.
+    Removed,
 }
 
 /// Nombre de variantes de [`Message`] : tout indice au-delà vient d'une version plus récente.
-const VARIANT_COUNT: u8 = 24;
+const VARIANT_COUNT: u8 = 25;
 
 impl Message {
     /// Encode le message.
@@ -514,6 +517,31 @@ mod tests {
             seq: 1,
         };
         assert_eq!(end.encode().unwrap()[0], 13);
+    }
+
+    #[test]
+    fn removed_is_the_last_variant_and_round_trips() {
+        let bytes = Message::Removed.encode().unwrap();
+        assert_eq!(bytes, [24]);
+        assert_eq!(Message::decode(&bytes).unwrap(), Message::Removed);
+        // Le premier indice inconnu est le suivant
+        assert!(matches!(
+            Message::decode(&[VARIANT_COUNT]),
+            Err(Error::UnknownMessage)
+        ));
+    }
+
+    #[test]
+    fn the_removed_feature_bit_is_distinct_and_round_trips_in_hello() {
+        let bits = [FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, FEATURE_REMOVED];
+        assert_eq!(bits.iter().fold(0, |all, bit| all | bit), 0b1110);
+        let mut announced = hello(DeviceKind::Laptop);
+        announced.features = FEATURE_REMOVED;
+        let bytes = Message::Hello(announced).encode().unwrap();
+        let Message::Hello(read) = Message::decode(&bytes).unwrap() else {
+            panic!("Hello attendu");
+        };
+        assert_eq!(read.features & FEATURE_REMOVED, FEATURE_REMOVED);
     }
 
     #[test]

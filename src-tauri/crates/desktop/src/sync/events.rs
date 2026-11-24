@@ -6,7 +6,7 @@ use domain::sync::DeviceKey;
 use domain::uuid::Uuid;
 use presentation::events::{
     NOTES_CHANGED, SYNC_COLLECTION_CONFLICTS, SYNC_COLLECTION_OFFER, SYNC_COLLECTION_PROGRESS,
-    SYNC_COLLECTION_STATE, SYNC_DEVICE_LINKED, SYNC_INITIAL_DONE, SYNC_NOTES_SYNCED,
+    SYNC_COLLECTION_STATE, SYNC_DEVICE_LINKED, SYNC_DEVICE_REMOVED, SYNC_INITIAL_DONE, SYNC_NOTES_SYNCED,
     SYNC_PROFILE_RECEIVED, SYNC_PROGRESS, SYNC_STATUS,
 };
 use presentation::sync::SyncEventDto;
@@ -91,6 +91,7 @@ impl SyncEvents for WindowSyncEvents {
             SyncEventDto::Progress(dto) => emit_all(&self.app, SYNC_PROGRESS, dto),
             SyncEventDto::InitialSyncDone(dto) => emit_all(&self.app, SYNC_INITIAL_DONE, dto),
             SyncEventDto::DeviceLinked(dto) => emit_all(&self.app, SYNC_DEVICE_LINKED, dto),
+            SyncEventDto::DeviceRemoved(dto) => emit_all(&self.app, SYNC_DEVICE_REMOVED, dto),
             SyncEventDto::ProfileReceived(dto) => emit_all(&self.app, SYNC_PROFILE_RECEIVED, dto),
             SyncEventDto::CollectionOffered { device, offers } => {
                 let added = offers.iter().map(|offer| (device, offer.share)).collect();
