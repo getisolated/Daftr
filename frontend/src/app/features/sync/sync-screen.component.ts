@@ -7,7 +7,7 @@ import { SyncShareComponent } from './sync-share.component';
 
 /**
  * The "Synchronization" screen, a wide dialog: on the left what is shared (profile and collections against each trusted
- * device) then the devices, on the right "Link a device". It opens from the sync row of the sidebar, the profile menu and
+ * device) then the devices, on the right "Link a device". It opens from the profile menu, the "to set up" row of the collections and
  * the settings; opening it starts the pairing mode and closing it stops it.
  */
 @Component({

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, in
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Profile, ProfileSwitcherDialog } from '../../core/models/profile.model';
 import { ProfileTransferService } from '../../core/services/profile-transfer.service';
+import { CollectionSyncService } from '../../core/services/collection-sync.service';
 import { ProfilesService } from '../../core/services/profiles.service';
 import { SyncService } from '../../core/services/sync.service';
 import { HoverIntent, MenuPosition, profileMenuPosition } from '../../core/utils/profile-menu.util';
@@ -35,6 +36,7 @@ export class ProfileSwitcherComponent implements OnDestroy {
   protected readonly i18n = inject(I18nService);
   protected readonly profiles = inject(ProfilesService);
   protected readonly transfer = inject(ProfileTransferService);
+  protected readonly collectionSync = inject(CollectionSyncService);
   private readonly sync = inject(SyncService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');

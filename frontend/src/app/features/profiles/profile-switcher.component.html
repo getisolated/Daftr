@@ -13,6 +13,9 @@
 >
   <app-profile-avatar [name]="profiles.active()?.name ?? null" [iconUrl]="profiles.iconUrl(profiles.activeId())" [size]="18" />
   <span class="profile-name">{{ activeName() }}</span>
+  @if (collectionSync.pendingCount() > 0) {
+    <span class="pending-dot" role="img" [attr.aria-label]="i18n.plural('csync.pending', collectionSync.pendingCount())"></span>
+  }
   <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="9 6 15 12 9 18"/>
   </svg>
