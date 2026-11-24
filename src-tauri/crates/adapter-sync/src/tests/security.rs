@@ -115,6 +115,8 @@ async fn unknown_and_revoked_keys_are_refused() {
             .any(|d| d.key == b.key() && d.revoked_at.is_some())
     );
     let mut channel = open_sync(&b.identity, a.addr()).await;
+    // Clé retirée : pas de session, seulement `Removed`, puis la fermeture
+    assert_eq!(channel.recv().await.unwrap(), Message::Removed);
     assert!(channel.recv().await.is_err(), "clé révoquée acceptée");
 }
 
