@@ -112,7 +112,7 @@ function overlaps(a: LabelBox, b: LabelBox): boolean {
         <div class="graph-legend">
           <span>{{ i18n.plural('workspace.graph.noteCount', graph().nodes.length) }} · {{ i18n.plural('workspace.graph.linkCount', graph().links.length) }}</span>
           @if (graph().links.length === 0) {
-            <span>{{ i18n.t('workspace.graph.hintBefore') }} <kbd>note://ID</kbd> {{ i18n.t('workspace.graph.hintMiddle') }} <em>{{ i18n.t('workspace.palette.cmd.copyNoteLink') }}</em> {{ i18n.t('workspace.graph.hintAfter') }}</span>
+            <span>{{ i18n.t('workspace.graph.hintBefore') }} <kbd>note://…</kbd> {{ i18n.t('workspace.graph.hintMiddle') }} <em>{{ i18n.t('workspace.palette.cmd.copyNoteLink') }}</em> {{ i18n.t('workspace.graph.hintAfter') }}</span>
           }
         </div>
       }

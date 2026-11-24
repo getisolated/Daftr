@@ -12,6 +12,8 @@ pub struct NoteDto {
     /// Identifiant.
     #[ts(type = "number")]
     pub id: i64,
+    /// Identifiant stable, le même sur tous les appareils (liens `note://<uuid>`).
+    pub uuid: String,
     /// Titre.
     pub title: String,
     /// Texte markdown.
@@ -36,6 +38,7 @@ impl From<Note> for NoteDto {
     fn from(note: Note) -> Self {
         Self {
             id: note.id,
+            uuid: note.uuid.to_string(),
             title: note.title,
             content: note.content,
             tags: note.tags,
@@ -61,6 +64,10 @@ pub struct NoteChangesDto {
     /// Nouveaux tags, tableau JSON encodé.
     #[ts(optional)]
     pub tags: Option<String>,
+    /// Contenu sur lequel `content` a été construit (dernier lu ou enregistré) : ce qui a
+    /// changé depuis, sur un autre appareil, est gardé.
+    #[ts(optional)]
+    pub base: Option<String>,
 }
 
 impl From<NoteChangesDto> for NoteChanges {
@@ -69,6 +76,7 @@ impl From<NoteChangesDto> for NoteChanges {
             title: changes.title,
             content: changes.content,
             tags: changes.tags,
+            base: changes.base,
         }
     }
 }

@@ -77,6 +77,12 @@ pub async fn notes_delete(app: AppHandle, id: i64) -> IpcResult<bool> {
     notes::delete(&desktop(&app).services.data.get()?.notes, id)
 }
 
+/// Rétablit une note supprimée ; la note, `None` si elle n'existe pas.
+#[tauri::command]
+pub async fn notes_restore(app: AppHandle, id: i64) -> IpcResult<Option<NoteDto>> {
+    notes::restore(&desktop(&app).services.data.get()?.notes, id)
+}
+
 #[tauri::command]
 pub async fn notes_set_color(
     app: AppHandle,

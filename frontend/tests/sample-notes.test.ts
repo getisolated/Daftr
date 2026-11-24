@@ -4,8 +4,8 @@ import { SAMPLE_NOTES, getSampleNotes } from '../src/app/core/data/sample-notes'
 import { findSampleNotesToGather } from '../src/app/core/utils/sample-notes.util';
 
 const TITLES = ['Markdown Basics', 'Code Blocks'];
-const INBOX: Folder = { id: 1, name: 'Inbox', parentId: null, createdAt: '', isDefault: true, sortOrder: null };
-const GETTING_STARTED: Folder = { id: 2, name: 'Getting started', parentId: null, createdAt: '', isDefault: false, sortOrder: null };
+const INBOX: Folder = { id: 1, uuid: 'folder-1', name: 'Inbox', parentId: null, createdAt: '', isDefault: true, sortOrder: null };
+const GETTING_STARTED: Folder = { id: 2, uuid: 'folder-2', name: 'Getting started', parentId: null, createdAt: '', isDefault: false, sortOrder: null };
 
 describe('findSampleNotesToGather', () => {
   it('returns the sample notes sitting at the root', () => {

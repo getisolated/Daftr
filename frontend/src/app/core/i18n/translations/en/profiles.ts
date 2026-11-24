@@ -10,6 +10,7 @@ export const EN_PROFILES = {
   'profiles.menu.protected': 'Protected by a password',
   'profiles.menu.new': 'New Profile',
   'profiles.menu.settings': 'Profile Settings…',
+  'profiles.menu.sync': 'Synchronization…',
 
   // Settings dialog
   'profiles.settings.title': 'Profile settings',

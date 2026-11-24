@@ -4,7 +4,8 @@ use domain::note::edit::{headings, line_count, lines_between, section_lines};
 use serde_json::json;
 
 use super::{
-    GetNoteArgs, GetNotesArgs, McpServices, ToolResult, existing_note, failure, with_content,
+    GetNoteArgs, GetNotesArgs, KnownContents, McpServices, ToolResult, existing_note, failure,
+    with_content,
 };
 
 /// Nombre maximal de notes lues par `get_notes`.
@@ -20,9 +21,15 @@ struct Part {
 }
 
 /// Une note complète, ou seulement une section ou des lignes pour ne pas en payer le reste.
-pub(crate) fn get_note(services: &McpServices, args: GetNoteArgs) -> ToolResult {
+/// La note lue devient la base du prochain `update_note` de l'IA.
+pub(crate) fn get_note(
+    services: &McpServices,
+    known: &KnownContents,
+    args: GetNoteArgs,
+) -> ToolResult {
     let note = existing_note(services, args.id)?;
     let mut value = with_content(&note);
+    known.remember(note.uuid, note.content.clone());
 
     if args.section.is_none() && args.from_line.is_none() && args.to_line.is_none() {
         return Ok(value);
@@ -35,7 +42,11 @@ pub(crate) fn get_note(services: &McpServices, args: GetNoteArgs) -> ToolResult 
 }
 
 /// Plusieurs notes complètes en un appel ; les identifiants inconnus sont listés à part.
-pub(crate) fn get_notes(services: &McpServices, args: GetNotesArgs) -> ToolResult {
+pub(crate) fn get_notes(
+    services: &McpServices,
+    known: &KnownContents,
+    args: GetNotesArgs,
+) -> ToolResult {
     if args.ids.is_empty() || args.ids.len() > MAX_BATCH {
         return Err(format!("Give between 1 and {MAX_BATCH} ids."));
     }
@@ -44,7 +55,10 @@ pub(crate) fn get_notes(services: &McpServices, args: GetNotesArgs) -> ToolResul
 
     for id in args.ids {
         match services.notes.by_id(id).map_err(failure)? {
-            Some(note) => notes.push(with_content(&note)),
+            Some(note) => {
+                notes.push(with_content(&note));
+                known.remember(note.uuid, note.content);
+            }
             None => missing.push(id),
         }
     }

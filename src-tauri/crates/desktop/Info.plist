@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Fusionné par Tauri avec l'Info.plist généré (même dossier que tauri.conf.json).
+     Synchronisation entre appareils : sans ces clés, macOS bloque en silence l'accès au
+     réseau local (écoute, connexions et mDNS). -->
+<plist version="1.0">
+<dict>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Daftr synchronizes your notes with your other devices on the same local network.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_daftr-sync._tcp</string>
+  </array>
+</dict>
+</plist>

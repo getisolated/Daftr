@@ -9,7 +9,7 @@ import { FocusSelectDirective } from '../../shared/ui/focus-select.directive';
 import { ProfileAvatarComponent } from './profile-avatar.component';
 
 /**
- * Settings of a profile: name, icon (cropped to a square and resized here), master password. Without `profile` it
+ * Settings of a profile: name, icon (cropped to a square and resized here) and master password. Without `profile` it
  * creates a new one and switches to it once saved.
  */
 @Component({

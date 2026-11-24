@@ -1,0 +1,38 @@
+[package]
+name = "adapter-sync"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Synchronisation LAN : écoute, Noise, appairage SPAKE2, mDNS, sessions entre appareils"
+
+[lints]
+workspace = true
+
+[dependencies]
+app.workspace = true
+domain.workspace = true
+platform.workspace = true
+
+getrandom.workspace = true
+hmac.workspace = true
+if-addrs.workspace = true
+mdns-sd.workspace = true
+postcard.workspace = true
+qrcode.workspace = true
+serde.workspace = true
+sha2.workspace = true
+snow.workspace = true
+spake2.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["io-util"] }
+tracing.workspace = true
+
+[dev-dependencies]
+app = { workspace = true, features = ["testing"] }
+tokio = { workspace = true, features = ["io-util", "test-util"] }
+
+[features]
+# Découverte en mémoire, pour les tests des crates qui assemblent le moteur
+testing = []

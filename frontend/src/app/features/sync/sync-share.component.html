@@ -1,0 +1,84 @@
+<div class="head">
+  <h3 class="section">{{ i18n.t('sync.screen.share') }}</h3>
+  <app-select class="profile-select" [value]="profileId()" [options]="profileOptions()" [ariaLabel]="i18n.t('sync.screen.profile')" (valueChange)="onProfilePicked($event)" />
+</div>
+
+@if (devices().length === 0) {
+  <p class="hint">{{ i18n.t('sync.screen.noDevice') }}</p>
+} @else {
+  <div class="matrix" [style.--columns]="columns()">
+    <div class="line header" aria-hidden="true">
+      <span></span>
+      @for (device of devices(); track device.key) {
+        <span class="device-name" [title]="device.name">{{ device.name }}</span>
+      }
+    </div>
+
+    <ng-container *ngTemplateOutlet="matrixRow; context: { row: profileLine(), strong: true }" />
+    @if (profile()?.protected) {
+      <p class="warn" role="note"><span aria-hidden="true">⚠</span> {{ i18n.t('sync.screen.passwordNotice') }}</p>
+    }
+
+    <h4 class="sub">{{ i18n.t('sync.screen.collections') }}</h4>
+    @for (row of rows(); track row.id) {
+      <ng-container *ngTemplateOutlet="matrixRow; context: { row, strong: false }" />
+      @if (noticeOf(row); as folder) {
+        <div class="notice" role="status">
+          <div class="notice-text">
+            <p class="info">{{ i18n.plural('csync.share.summary', folder.mdFiles, { size: size(folder) }) }}</p>
+            @if (tooLarge(folder) > 0) {
+              <p class="info">{{ i18n.plural('csync.share.tooLarge', tooLarge(folder)) }}</p>
+            }
+            @if (folder.truncated) {
+              <p class="info">{{ i18n.t('csync.share.truncated') }}</p>
+            }
+            @if (folder.hasGit) {
+              <p class="info warning"><span aria-hidden="true">⚠</span> {{ i18n.t('csync.share.git') }}</p>
+            }
+          </div>
+          <button class="dismiss" type="button" [attr.aria-label]="i18n.t('sync.screen.dismiss')" [title]="i18n.t('sync.screen.dismiss')" (click)="dismissNotice(row)">✕</button>
+        </div>
+      }
+    }
+    @for (offer of offersHere(); track offer.device.key + offer.syncId) {
+      <app-sync-offer-row [offer]="offer" [profileOptions]="profileOptions()" [defaultProfile]="defaultProfileOf(offer)" />
+    }
+    @if (rows().length === 0 && offersHere().length === 0) {
+      <p class="hint">{{ i18n.t('sync.screen.noCollection') }}</p>
+    }
+
+    @if (offersWithoutProfile().length > 0) {
+      <h4 class="sub">{{ i18n.t('csync.offer.noProfile') }}</h4>
+      <p class="hint">{{ i18n.t('csync.offer.noProfileHint') }}</p>
+      @for (offer of offersWithoutProfile(); track offer.device.key + offer.syncId) {
+        <app-sync-offer-row [offer]="offer" [profileOptions]="profileOptions()" [defaultProfile]="defaultProfileOf(offer)" />
+      }
+    }
+  </div>
+}
+
+@if (error(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+}
+
+<ng-template #matrixRow let-row="row" let-strong="strong">
+  <div class="line" [class.strong]="strong" [class.indented]="!strong">
+    <span class="label-cell" [title]="row.label">{{ row.label }}</span>
+    @for (cell of row.cells; track cell.deviceKey) {
+      <span class="cell">
+        <app-toggle
+          [checked]="cell.checked"
+          [attr.aria-label]="i18n.t('sync.screen.cell', { row: row.label, device: deviceName(cell.deviceKey) })"
+          [class.busy]="isApplying(row, cell.deviceKey)"
+          (checkedChange)="toggle(row, cell.deviceKey, $event)"
+        />
+        @if (cell.pending) {
+          <svg class="pending" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" [attr.aria-label]="i18n.t('sync.screen.pending')">
+            <title>{{ i18n.t('sync.screen.pending') }}</title>
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+          </svg>
+        }
+      </span>
+    }
+  </div>
+</ng-template>

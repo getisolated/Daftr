@@ -12,12 +12,15 @@ export class SettingsService implements OnDestroy {
   private readonly _settings = signal<AppSettings>(DEFAULT_SETTINGS);
   private readonly _isOpen = signal(false);
   private readonly _loaded = signal(false);
+  private readonly _openedCategory = signal<string | null>(null);
   private readonly unsubscribers: (() => void)[];
 
   readonly settings = this._settings.asReadonly();
   readonly isOpen = this._isOpen.asReadonly();
   /** False until the main process answered: before that, `settings` only holds the defaults. */
   readonly loaded = this._loaded.asReadonly();
+  /** Category the editor scrolls to when it opens (`openAt`), `null` for the top. */
+  readonly openedCategory = this._openedCategory.asReadonly();
   /** Accelerator in effect for every rebindable in-app shortcut, by shortcut id (defaults depend on the platform). */
   readonly appShortcuts = computed(() => resolveAppShortcuts(this._settings().appShortcuts, this.platform));
 
@@ -57,7 +60,17 @@ export class SettingsService implements OnDestroy {
     if (settings) this._settings.set(settings);
   }
 
-  open(): void { this._isOpen.set(true); }
+  open(): void {
+    this._openedCategory.set(null);
+    this._isOpen.set(true);
+  }
+
+  /** Opens the settings on a category (translation key of its title, e.g. the sync indicator). */
+  openAt(category: string): void {
+    this._openedCategory.set(category);
+    this._isOpen.set(true);
+  }
+
   close(): void { this._isOpen.set(false); }
 
   ngOnDestroy(): void {

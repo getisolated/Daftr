@@ -2,11 +2,15 @@
 
 pub mod edit;
 
+use crate::uuid::Uuid;
+
 /// Une note telle que stockée.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note {
     /// Identifiant attribué par la base.
     pub id: i64,
+    /// Identifiant stable, le même sur tous les appareils (liens `note://<uuid>`).
+    pub uuid: Uuid,
     /// Titre (première ligne, extraite par le renderer).
     pub title: String,
     /// Texte markdown complet.
@@ -80,6 +84,11 @@ pub struct NoteChanges {
     pub content: Option<String>,
     /// Nouveaux tags, déjà encodés en tableau JSON.
     pub tags: Option<String>,
+    /// Le contenu sur lequel `content` a été construit (dernier contenu lu ou enregistré par
+    /// l'éditeur). Dans un profil synchronisé, ce qui a changé depuis cette base (modification
+    /// d'un autre appareil) est gardé : `content` est rejoué par-dessus. `None` : `content`
+    /// remplace le contenu actuel.
+    pub base: Option<String>,
 }
 
 impl NoteChanges {

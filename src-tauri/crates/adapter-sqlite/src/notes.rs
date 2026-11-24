@@ -1,35 +1,71 @@
 //! Requêtes sur les notes.
+//!
+//! Une note supprimée reste en base (suppression douce, `deleted_at`) : elle disparaît de
+//! toutes les lectures et de la recherche plein texte, et ne se modifie plus.
 
 use app::notes::tags;
 use app::ports::NoteStore;
 use app::{AppError, AppResult};
 use domain::note::{NewNote, Note, NoteChanges, NoteFilter, NoteHead, Page};
 use rusqlite::types::Value;
-use rusqlite::{OptionalExtension, params, params_from_iter};
+use rusqlite::{OptionalExtension, Transaction, params, params_from_iter};
 
-use crate::{SqliteStore, placeholders, rows, storage};
+use crate::{SqliteStore, placeholders, random_uuid, rows, storage};
 
-const ALL: &str = "SELECT * FROM notes ORDER BY updated_at DESC";
-const BY_ID: &str = "SELECT * FROM notes WHERE id = ?";
-const INSERT: &str = "INSERT INTO notes (title, content, tags, folder_id) VALUES (?, ?, ?, ?)";
-const SEARCH: &str = "SELECT notes.* FROM notes JOIN notes_fts ON notes.id = notes_fts.rowid \
-                      WHERE notes_fts MATCH ? ORDER BY rank";
-const BY_TAG: &str = "SELECT * FROM notes WHERE tags LIKE ? ESCAPE '\\' ORDER BY updated_at DESC";
-const SEARCH_PAGE: &str = "SELECT notes.* FROM notes JOIN notes_fts ON notes.id = notes_fts.rowid \
-                           WHERE notes_fts MATCH ? ORDER BY rank LIMIT ?";
-const SEARCH_COUNT: &str = "SELECT COUNT(*) FROM notes_fts WHERE notes_fts MATCH ?";
+/// `SELECT` des colonnes lues par [`rows::note`] (jamais le blob CRDT, coûteux), suivi de
+/// `$rest`.
+macro_rules! select_notes {
+    ($rest:literal) => {
+        concat!(
+            "SELECT notes.id, notes.uuid, notes.title, notes.content, notes.tags, ",
+            "notes.folder_id, notes.sort_order, notes.color, notes.created_at, notes.updated_at ",
+            "FROM notes ",
+            $rest
+        )
+    };
+}
+
+const ALL: &str = select_notes!("WHERE notes.deleted_at IS NULL ORDER BY notes.updated_at DESC");
+const BY_ID: &str = select_notes!("WHERE notes.id = ? AND notes.deleted_at IS NULL");
+const SEARCH: &str = select_notes!(
+    "JOIN notes_fts ON notes.id = notes_fts.rowid \
+     WHERE notes_fts MATCH ? AND notes.deleted_at IS NULL ORDER BY rank"
+);
+const BY_TAG: &str = select_notes!(
+    "WHERE notes.tags LIKE ? ESCAPE '\\' AND notes.deleted_at IS NULL \
+     ORDER BY notes.updated_at DESC"
+);
+const INSERT: &str = "INSERT INTO notes (uuid, title, content, tags, folder_id, folder_uuid) \
+                      VALUES (?1, ?2, ?3, ?4, ?5, (SELECT uuid FROM folders WHERE id = ?5))";
+const SEARCH_PAGE: &str = select_notes!(
+    "JOIN notes_fts ON notes.id = notes_fts.rowid \
+     WHERE notes_fts MATCH ? AND notes.deleted_at IS NULL ORDER BY rank LIMIT ?"
+);
+const SEARCH_COUNT: &str = "SELECT COUNT(*) FROM notes \
+                            JOIN notes_fts ON notes.id = notes_fts.rowid \
+                            WHERE notes_fts MATCH ? AND notes.deleted_at IS NULL";
 /// Dans `HEADS` et `HEADS_COUNT`, `?1` (dossier) et `?2` (motif de tag) à `NULL` ne filtrent pas.
 const HEADS: &str = "SELECT id, title, tags, folder_id, updated_at FROM notes \
-                     WHERE (?1 IS NULL OR folder_id = ?1) \
+                     WHERE deleted_at IS NULL \
+                     AND (?1 IS NULL OR folder_id = ?1) \
                      AND (?2 IS NULL OR tags LIKE ?2 ESCAPE '\\') \
                      ORDER BY updated_at DESC LIMIT ?3";
-const HEADS_COUNT: &str = "SELECT COUNT(*) FROM notes WHERE (?1 IS NULL OR folder_id = ?1) \
+const HEADS_COUNT: &str = "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL \
+                           AND (?1 IS NULL OR folder_id = ?1) \
                            AND (?2 IS NULL OR tags LIKE ?2 ESCAPE '\\')";
 /// Une note qui change de dossier perd sa position : elle est listée après les positionnées.
 const SET_FOLDER: &str = "UPDATE notes SET folder_id = ?1, \
+                          folder_uuid = (SELECT uuid FROM folders WHERE id = ?1), \
                           sort_order = CASE WHEN folder_id IS ?1 THEN sort_order ELSE NULL END \
-                          WHERE id = ?2";
-const SET_POSITION: &str = "UPDATE notes SET sort_order = ? WHERE id = ? AND folder_id IS ?";
+                          WHERE id = ?2 AND deleted_at IS NULL";
+const SET_POSITION: &str = "UPDATE notes SET sort_order = ? \
+                            WHERE id = ? AND folder_id IS ? AND deleted_at IS NULL";
+const DELETE: &str = "UPDATE notes SET deleted_at = datetime('now') \
+                      WHERE id = ? AND deleted_at IS NULL";
+/// La suppression est levée sans toucher `updated_at` : le document de la note efface sa
+/// marque de suppression (voir `sync::local::reconcile`).
+const RESTORE: &str = "UPDATE notes SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL";
+const TAG_COLUMNS: &str = "SELECT tags FROM notes WHERE deleted_at IS NULL";
 
 impl NoteStore for SqliteStore {
     fn all(&self) -> AppResult<Vec<Note>> {
@@ -46,76 +82,92 @@ impl NoteStore for SqliteStore {
     }
 
     fn insert(&self, note: &NewNote) -> AppResult<Note> {
-        let id = {
-            let connection = self.connection();
+        let uuid = random_uuid()?;
+        let id = self.write(|transaction, local| {
             let encoded = tags::encode(&note.tags);
-            let values = params![note.title, note.content, encoded, note.folder_id];
-            connection.execute(INSERT, values).map_err(storage)?;
-            connection.last_insert_rowid()
-        };
+            let values = params![
+                uuid.to_string(),
+                note.title,
+                note.content,
+                encoded,
+                note.folder_id
+            ];
+            transaction.execute(INSERT, values).map_err(storage)?;
+            let id = transaction.last_insert_rowid();
+            local.notes_written(transaction, &[id])?;
+            Ok(id)
+        })?;
         self.by_id(id)?
             .ok_or_else(|| AppError::storage("note not saved"))
     }
 
+    /// Avec une base, le contenu est rejoué sur le contenu actuel dans la même transaction
+    /// (profil synchronisé seulement, voir [`NoteChanges::base`]).
     fn update(&self, id: i64, changes: &NoteChanges) -> AppResult<()> {
-        let (assignments, mut values) = assignments(changes);
-        if assignments.is_empty() {
+        if changes.is_empty() {
             return Ok(());
         }
-        let sql = format!(
-            "UPDATE notes SET {}, updated_at = datetime('now') WHERE id = ?",
-            assignments.join(", ")
-        );
-        values.push(Value::Integer(id));
+        self.write(|transaction, local| {
+            let rebased = local.rebased(transaction, id, changes)?;
+            let (assignments, mut values) = assignments(rebased.as_ref().unwrap_or(changes));
+            let sql = format!(
+                "UPDATE notes SET {}, updated_at = datetime('now')                  WHERE id = ? AND deleted_at IS NULL",
+                assignments.join(", ")
+            );
+            values.push(Value::Integer(id));
 
-        let connection = self.connection();
-        connection
-            .execute(&sql, params_from_iter(values))
-            .map_err(storage)?;
-        Ok(())
+            if transaction
+                .execute(&sql, params_from_iter(values))
+                .map_err(storage)?
+                > 0
+            {
+                local.notes_written(transaction, &[id])?;
+            }
+            Ok(())
+        })
     }
 
     fn set_folder(&self, id: i64, folder_id: Option<i64>) -> AppResult<()> {
-        let connection = self.connection();
-        connection
-            .execute(SET_FOLDER, params![folder_id, id])
-            .map_err(storage)?;
-        Ok(())
+        self.write_notes(&[id], |transaction| {
+            transaction.execute(SET_FOLDER, params![folder_id, id])
+        })
     }
 
     fn set_positions(&self, folder_id: Option<i64>, ordered_ids: &[i64]) -> AppResult<()> {
-        let mut connection = self.connection();
-        let transaction = connection.transaction().map_err(storage)?;
-
-        for (position, id) in (1_i64..).zip(ordered_ids) {
-            transaction
-                .execute(SET_POSITION, params![position, id, folder_id])
-                .map_err(storage)?;
-        }
-        transaction.commit().map_err(storage)
+        self.write_notes(ordered_ids, |transaction| {
+            let mut statement = transaction.prepare_cached(SET_POSITION)?;
+            for (position, id) in (1_i64..).zip(ordered_ids) {
+                statement.execute(params![position, id, folder_id])?;
+            }
+            Ok(ordered_ids.len())
+        })
     }
 
     fn delete(&self, id: i64) -> AppResult<()> {
-        let connection = self.connection();
-        connection
-            .execute("DELETE FROM notes WHERE id = ?", [id])
-            .map_err(storage)?;
-        Ok(())
+        self.write_notes(&[id], |transaction| transaction.execute(DELETE, [id]))
+    }
+
+    fn restore(&self, id: i64) -> AppResult<bool> {
+        self.write(|transaction, local| {
+            let restored = transaction.execute(RESTORE, [id]).map_err(storage)? > 0;
+            if restored {
+                local.notes_written(transaction, &[id])?;
+            }
+            Ok(restored)
+        })
     }
 
     fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {
         let sql = format!(
-            "UPDATE notes SET color = ? WHERE id IN ({})",
+            "UPDATE notes SET color = ? WHERE id IN ({}) AND deleted_at IS NULL",
             placeholders(ids.len())
         );
         let values = std::iter::once(Value::from(color.map(str::to_owned)))
             .chain(ids.iter().map(|id| Value::Integer(*id)));
 
-        let connection = self.connection();
-        connection
-            .execute(&sql, params_from_iter(values))
-            .map_err(storage)?;
-        Ok(())
+        self.write_notes(ids, |transaction| {
+            transaction.execute(&sql, params_from_iter(values))
+        })
     }
 
     fn search(&self, fts_query: &str) -> AppResult<Vec<Note>> {
@@ -128,9 +180,7 @@ impl NoteStore for SqliteStore {
 
     fn tag_columns(&self) -> AppResult<Vec<String>> {
         let connection = self.connection();
-        let mut statement = connection
-            .prepare_cached("SELECT tags FROM notes")
-            .map_err(storage)?;
+        let mut statement = connection.prepare_cached(TAG_COLUMNS).map_err(storage)?;
         let columns = statement.query_map([], |row| row.get(0)).map_err(storage)?;
         columns.collect::<rusqlite::Result<_>>().map_err(storage)
     }
@@ -190,8 +240,22 @@ impl SqliteStore {
             .map_err(storage)?;
         notes.collect::<rusqlite::Result<_>>().map_err(storage)
     }
-}
 
+    /// Modifie les notes `ids` par `update` (qui rend le nombre de lignes touchées) et reporte
+    /// les modifications dans leurs documents.
+    fn write_notes(
+        &self,
+        ids: &[i64],
+        update: impl FnOnce(&Transaction<'_>) -> rusqlite::Result<usize>,
+    ) -> AppResult<()> {
+        self.write(|transaction, local| {
+            if update(transaction).map_err(storage)? > 0 {
+                local.notes_written(transaction, ids)?;
+            }
+            Ok(())
+        })
+    }
+}
 /// Colonnes `col = ?` à modifier et leurs valeurs, dans l'ordre.
 fn assignments(changes: &NoteChanges) -> (Vec<&'static str>, Vec<Value>) {
     let fields = [

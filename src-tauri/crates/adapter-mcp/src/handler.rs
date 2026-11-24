@@ -9,8 +9,8 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use crate::server::ChangeListener;
 use crate::tools::{
-    self, AppendToNoteArgs, CreateNoteArgs, EditNoteArgs, GetNoteArgs, GetNotesArgs, ListNotesArgs,
-    McpServices, McpServicesSource, SearchNotesArgs, ToolResult, UpdateNoteArgs,
+    self, AppendToNoteArgs, CreateNoteArgs, EditNoteArgs, GetNoteArgs, GetNotesArgs, KnownContents,
+    ListNotesArgs, McpServices, McpServicesSource, SearchNotesArgs, ToolResult, UpdateNoteArgs,
 };
 
 /// Réponse à une IA tant que le profil actif attend son mot de passe.
@@ -22,6 +22,7 @@ folders (the default one is Inbox) and carry tags; the first line of a note is i
 Use search_notes or list_notes to find notes, get_note (or get_notes) to read them, and \
 create_note, edit_note, append_to_note or update_note to write. Prefer edit_note to change \
 part of a note and get_note with a section or lines to read part of one: they save tokens. \
+Link to another note with [title](note://<id>), using its id (or its uuid, shown by get_note). \
 Notes cannot be deleted from here. Dates are UTC.";
 
 /// Une connexion d'IA : chaque session MCP a la sienne, toutes partagent les services.
@@ -29,6 +30,8 @@ Notes cannot be deleted from here. Dates are UTC.";
 pub(crate) struct DaftrTools {
     services: Arc<dyn McpServicesSource>,
     on_change: ChangeListener,
+    /// Contenus des notes lus ou écrits par cette IA : base de ses `update_note`.
+    known: KnownContents,
     tool_router: ToolRouter<Self>,
 }
 
@@ -38,6 +41,7 @@ impl DaftrTools {
         Self {
             services,
             on_change,
+            known: KnownContents::default(),
             tool_router: Self::tool_router(),
         }
     }
@@ -105,7 +109,8 @@ impl DaftrTools {
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn get_note(&self, Parameters(args): Parameters<GetNoteArgs>) -> Result<String, String> {
-        self.read(move |services| tools::get_note(services, args))
+        let known = self.known.clone();
+        self.read(move |services| tools::get_note(services, &known, args))
             .await
     }
 
@@ -117,7 +122,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<GetNotesArgs>,
     ) -> Result<String, String> {
-        self.read(move |services| tools::get_notes(services, args))
+        let known = self.known.clone();
+        self.read(move |services| tools::get_notes(services, &known, args))
             .await
     }
 
@@ -159,7 +165,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<UpdateNoteArgs>,
     ) -> Result<String, String> {
-        self.write(move |services| tools::update_note(services, args))
+        let known = self.known.clone();
+        self.write(move |services| tools::update_note(services, &known, args))
             .await
     }
 
@@ -176,7 +183,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<EditNoteArgs>,
     ) -> Result<String, String> {
-        self.write(move |services| tools::edit_note(services, args))
+        let known = self.known.clone();
+        self.write(move |services| tools::edit_note(services, &known, args))
             .await
     }
 
@@ -193,7 +201,8 @@ impl DaftrTools {
         &self,
         Parameters(args): Parameters<AppendToNoteArgs>,
     ) -> Result<String, String> {
-        self.write(move |services| tools::append_to_note(services, args))
+        let known = self.known.clone();
+        self.write(move |services| tools::append_to_note(services, &known, args))
             .await
     }
 }

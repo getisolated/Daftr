@@ -19,6 +19,7 @@ adapter-mcp.workspace = true
 adapter-password.workspace = true
 adapter-print.workspace = true
 adapter-sqlite.workspace = true
+adapter-sync.workspace = true
 app.workspace = true
 domain.workspace = true
 platform.workspace = true
@@ -35,9 +36,13 @@ tauri-plugin-global-shortcut.workspace = true
 tauri-plugin-opener.workspace = true
 tauri-plugin-single-instance.workspace = true
 tauri-plugin-updater.workspace = true
+# Runtime de Tauri : le moteur de synchronisation y tourne
+tokio = { workspace = true, features = ["rt", "time", "sync"] }
 serde.workspace = true
 tracing.workspace = true
 window-vibrancy.workspace = true
 
 [dev-dependencies]
+adapter-sync = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync"] }

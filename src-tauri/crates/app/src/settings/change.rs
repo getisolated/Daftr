@@ -59,4 +59,16 @@ impl SettingsChange {
     pub fn collections_exclude_changed(&self) -> bool {
         self.before.collections_exclude != self.after.collections_exclude
     }
+
+    /// Un réglage de la synchronisation a changé (nom de l'appareil, port ou pause).
+    pub fn sync_changed(&self) -> bool {
+        let sync = |settings: &AppSettings| {
+            (
+                settings.sync_device_name.clone(),
+                settings.sync_port,
+                settings.sync_paused,
+            )
+        };
+        sync(&self.before) != sync(&self.after)
+    }
 }

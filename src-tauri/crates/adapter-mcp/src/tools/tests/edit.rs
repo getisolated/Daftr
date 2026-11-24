@@ -15,7 +15,7 @@ fn edit(id: i64, old: &str, new: &str, replace_all: bool) -> EditNoteArgs {
 }
 
 fn content_of(services: &McpServices, id: i64) -> String {
-    get_note(services, whole(id)).unwrap()["content"]
+    get_note(services, &KnownContents::default(), whole(id)).unwrap()["content"]
         .as_str()
         .unwrap()
         .to_owned()
@@ -24,6 +24,7 @@ fn content_of(services: &McpServices, id: i64) -> String {
 fn read(services: &McpServices, id: i64, section: Option<&str>, lines: (u32, u32)) -> ToolResult {
     get_note(
         services,
+        &KnownContents::default(),
         GetNoteArgs {
             id,
             section: section.map(str::to_owned),
@@ -38,7 +39,12 @@ fn edits_one_passage_and_keeps_the_rest() {
     let services = services();
     let id = create(&services, "# Plan\nbuy bread\nbuy milk", &["x"]);
 
-    let edited = edit_note(&services, edit(id, "bread", "butter", false)).unwrap();
+    let edited = edit_note(
+        &services,
+        &KnownContents::default(),
+        edit(id, "bread", "butter", false),
+    )
+    .unwrap();
 
     assert_eq!(content_of(&services, id), "# Plan\nbuy butter\nbuy milk");
     assert!(edited.get("content").is_none());
@@ -50,7 +56,12 @@ fn editing_the_first_line_changes_the_title() {
     let services = services();
     let id = create(&services, "# Old\nbody", &[]);
 
-    let edited = edit_note(&services, edit(id, "# Old", "# New", false)).unwrap();
+    let edited = edit_note(
+        &services,
+        &KnownContents::default(),
+        edit(id, "# Old", "# New", false),
+    )
+    .unwrap();
 
     assert_eq!(edited["title"], "New");
 }
@@ -60,10 +71,30 @@ fn refuses_a_missing_or_ambiguous_passage_without_touching_the_note() {
     let services = services();
     let id = create(&services, "Note\nna na", &[]);
 
-    let missing = edit_note(&services, edit(id, "zzz", "y", false)).unwrap_err();
-    let ambiguous = edit_note(&services, edit(id, "na", "y", false)).unwrap_err();
-    let empty = edit_note(&services, edit(id, "", "y", false)).unwrap_err();
-    let unknown = edit_note(&services, edit(999, "a", "b", false)).unwrap_err();
+    let missing = edit_note(
+        &services,
+        &KnownContents::default(),
+        edit(id, "zzz", "y", false),
+    )
+    .unwrap_err();
+    let ambiguous = edit_note(
+        &services,
+        &KnownContents::default(),
+        edit(id, "na", "y", false),
+    )
+    .unwrap_err();
+    let empty = edit_note(
+        &services,
+        &KnownContents::default(),
+        edit(id, "", "y", false),
+    )
+    .unwrap_err();
+    let unknown = edit_note(
+        &services,
+        &KnownContents::default(),
+        edit(999, "a", "b", false),
+    )
+    .unwrap_err();
 
     assert!(missing.contains("not found"), "{missing}");
     assert!(ambiguous.contains("2 times"), "{ambiguous}");
@@ -77,7 +108,12 @@ fn edits_every_occurrence_when_asked() {
     let services = services();
     let id = create(&services, "Note\nna na", &[]);
 
-    edit_note(&services, edit(id, "na", "ba", true)).unwrap();
+    edit_note(
+        &services,
+        &KnownContents::default(),
+        edit(id, "na", "ba", true),
+    )
+    .unwrap();
 
     assert_eq!(content_of(&services, id), "Note\nba ba");
 }
@@ -138,6 +174,7 @@ fn reads_several_notes_and_lists_the_missing_ones() {
 
     let both = get_notes(
         &services,
+        &KnownContents::default(),
         GetNotesArgs {
             ids: vec![second, first],
         },
@@ -145,6 +182,7 @@ fn reads_several_notes_and_lists_the_missing_ones() {
     .unwrap();
     let partial = get_notes(
         &services,
+        &KnownContents::default(),
         GetNotesArgs {
             ids: vec![first, 999],
         },
@@ -155,8 +193,22 @@ fn reads_several_notes_and_lists_the_missing_ones() {
     assert_eq!(both["notes"][0]["content"], "Two\nb");
     assert!(both.get("missing").is_none());
     assert_eq!(partial["missing"], json!([999]));
-    assert!(get_notes(&services, GetNotesArgs { ids: vec![] }).is_err());
-    assert!(get_notes(&services, GetNotesArgs { ids: vec![1; 21] }).is_err());
+    assert!(
+        get_notes(
+            &services,
+            &KnownContents::default(),
+            GetNotesArgs { ids: vec![] }
+        )
+        .is_err()
+    );
+    assert!(
+        get_notes(
+            &services,
+            &KnownContents::default(),
+            GetNotesArgs { ids: vec![1; 21] }
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -193,4 +245,22 @@ fn search_keeps_the_total_beyond_its_limit() {
 
     assert_eq!(found["total"], 2);
     assert_eq!(ids(&found).len(), 1);
+}
+
+#[test]
+fn an_edit_becomes_the_base_of_the_next_update() {
+    let services = synced_services();
+    let known = KnownContents::default();
+    let id = create(&services, "# Plan\nun\ndeux", &[]);
+
+    edit_note(&services, &known, edit(id, "un", "1", false)).unwrap();
+    edit_elsewhere(&services, id, "# Plan\n1\ndeux\ntrois");
+    let update = UpdateNoteArgs {
+        id,
+        content: "# Plan\n1\nDEUX".to_owned(),
+    };
+    update_note(&services, &known, update).unwrap();
+
+    // Le changement fait ailleurs depuis l'édition est gardé
+    assert_eq!(content_of(&services, id), "# Plan\n1\nDEUX\ntrois");
 }

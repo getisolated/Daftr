@@ -35,9 +35,23 @@ pub async fn collections_pick(
     collections::add_all(&desktop(&app).services.data.get()?.collections, &paths)
 }
 
+/// Retire une collection de la liste ; sa synchronisation s'arrête d'abord (les fichiers
+/// restent des deux côtés).
 #[tauri::command]
 pub async fn collections_remove(app: AppHandle, root: String) -> IpcResult<bool> {
-    collections::remove(&desktop(&app).services.data.get()?.collections, &root)
+    let state = desktop(&app);
+    let data = state.services.data.get()?;
+    let profile = state.services.data.profile();
+    match state.sync.share_of(&profile, root.clone()).await {
+        Ok(Some(share)) => {
+            if let Err(error) = state.sync.stop_collection(profile, share.sync_id).await {
+                tracing::warn!(?error, "synchronisation de la collection non arrêtée");
+            }
+        }
+        Ok(None) => {}
+        Err(error) => tracing::warn!(?error, "partage de la collection non lu"),
+    }
+    collections::remove(&data.collections, &root)
 }
 
 #[tauri::command]
@@ -68,8 +82,21 @@ pub async fn collections_relocate(
         .find(|c| c.path == root)
         .map_or(CollectionKind::Folder, |c| c.kind);
     let picked = pick(&app, &window, kind, None, false).into_iter().next();
+    let state = desktop(&app);
+    let profile = state.services.data.profile();
+    let share = state
+        .sync
+        .share_of(&profile, root.clone())
+        .await
+        .ok()
+        .flatten();
 
-    collections::relocate(service, &root, picked)
+    let relocated = collections::relocate(service, &root, picked)?;
+    if let (Some(_), Some(share)) = (&relocated, share) {
+        // Le dossier d'une collection partagée change : l'historique des échanges est oublié
+        state.sync.relinked(&profile, share.sync_id).await?;
+    }
+    Ok(relocated)
 }
 
 #[tauri::command]
@@ -189,6 +216,13 @@ pub async fn collections_cancel_search(app: AppHandle, request_id: u64) -> IpcRe
 #[tauri::command]
 pub async fn collections_graph(app: AppHandle, root: String) -> IpcResult<bool> {
     collections::request_graph(&desktop(&app).services.data.get()?.collections, &root)
+}
+
+/// Dialogue de choix d'un dossier (nouvel emplacement d'une collection partagée).
+pub(super) fn pick_folder(app: &AppHandle, window: &WebviewWindow) -> Option<PathBuf> {
+    pick(app, window, CollectionKind::Folder, None, false)
+        .into_iter()
+        .next()
 }
 
 /// Dialogue d'ouverture de dossiers ou de fichiers markdown (titré si `language` est donné).

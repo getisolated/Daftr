@@ -4,7 +4,7 @@ import type { FolderDto } from '../bindings/FolderDto';
 import type { McpStatusDto } from '../bindings/McpStatusDto';
 import type { NoteDto } from '../bindings/NoteDto';
 import { Folder, FolderDeleteMode } from '../models/folder.model';
-import { Note } from '../models/note.model';
+import { Note, NoteUpdate } from '../models/note.model';
 import { UpdateInfo, UpdateProgress } from '../models/update.model';
 import { AppSettings, SettingsPatch, SettingsUpdateResult } from '../models/settings.model';
 import { call, inDesktop, subscribe } from './desktop-api';
@@ -12,6 +12,7 @@ import { call, inDesktop, subscribe } from './desktop-api';
 function mapRow(row: NoteDto): Note {
   return {
     id: row.id,
+    uuid: row.uuid,
     title: row.title,
     content: row.content,
     tags: JSON.parse(row.tags) as string[],
@@ -26,6 +27,7 @@ function mapRow(row: NoteDto): Note {
 function mapFolderRow(row: FolderDto): Folder {
   return {
     id: row.id,
+    uuid: row.uuid,
     name: row.name,
     parentId: row.parent_id,
     createdAt: row.created_at,
@@ -94,7 +96,7 @@ export class DesktopBridgeService {
     return row ? mapRow(row) : null;
   }
 
-  async updateNote(id: number, data: { title?: string; content?: string; tags?: string[] }): Promise<Note | null> {
+  async updateNote(id: number, data: NoteUpdate): Promise<Note | null> {
     if (!this.available) return null;
     const changes = { ...data, tags: data.tags !== undefined ? JSON.stringify(data.tags) : undefined };
     const row = await call<NoteDto | null>('notes_update', { id, data: changes });
@@ -104,6 +106,13 @@ export class DesktopBridgeService {
   async deleteNote(id: number): Promise<boolean> {
     if (!this.available) return false;
     return call<boolean>('notes_delete', { id });
+  }
+
+  /** Brings back a deleted note (e.g. deleted on another device); `null` when it does not exist. */
+  async restoreNote(id: number): Promise<Note | null> {
+    if (!this.available) return null;
+    const row = await call<NoteDto | null>('notes_restore', { id });
+    return row ? mapRow(row) : null;
   }
 
   /** Moves the note to `folderId` at the position described by `orderedIds` (the folder content, in order). */

@@ -17,6 +17,9 @@ pub enum IpcErrorCode {
     FileSystem,
     /// Demande mal formée.
     InvalidInput,
+    /// Échec de la synchronisation entre appareils ; le message est une clé stable
+    /// (`wrong_code`, `unreachable`, `not_local`…) que le renderer traduit.
+    Sync,
 }
 
 /// Erreur d'une commande, sérialisée vers le renderer (qui en fait une `Error` de message
@@ -31,6 +34,14 @@ pub struct IpcError {
 }
 
 impl IpcError {
+    /// Échec de la synchronisation, de cause `reason` (clé stable).
+    pub fn sync(reason: impl Into<String>) -> Self {
+        Self {
+            code: IpcErrorCode::Sync,
+            message: reason.into(),
+        }
+    }
+
     /// Demande mal formée.
     pub fn invalid_input(message: impl Into<String>) -> Self {
         Self {
@@ -43,7 +54,7 @@ impl IpcError {
 impl From<AppError> for IpcError {
     fn from(error: AppError) -> Self {
         let code = match &error {
-            AppError::Refused(_) => IpcErrorCode::Refused,
+            AppError::Refused(_) | AppError::Sync(_) => IpcErrorCode::Refused,
             AppError::Storage(_) => IpcErrorCode::Storage,
             AppError::FileSystem(_) => IpcErrorCode::FileSystem,
         };

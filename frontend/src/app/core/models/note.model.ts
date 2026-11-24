@@ -3,7 +3,10 @@ import { EditorViewMode } from './editor.model';
 import { ThemePickerItem } from './theme.model';
 
 export interface Note {
+  /** Local handle (tabs, IPC): another device gives the same note another id. */
   id: number;
+  /** Stable id, the same on every device: the `note://<uuid>` links point to it. Empty for a pseudo note (quick notes, collection file). */
+  uuid: string;
   title: string;
   content: string;
   tags: string[];
@@ -15,6 +18,15 @@ export interface Note {
   color: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Fields of a note to change (absent: unchanged). */
+export interface NoteUpdate {
+  title?: string;
+  content?: string;
+  tags?: string[];
+  /** The text `content` was built on (last loaded or saved): in a synced profile, what changed since elsewhere is kept. */
+  base?: string;
 }
 
 export interface NotePreview {

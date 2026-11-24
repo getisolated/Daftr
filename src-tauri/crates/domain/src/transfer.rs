@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::folder::Folder;
 use crate::note::Note;
+use crate::uuid::Uuid;
 
 /// Copie d'un dossier. `key` est son identifiant d'origine : il relie les sous-dossiers et
 /// les notes à leur parent dans la base cible, où les identifiants changent.
@@ -30,6 +31,9 @@ pub struct FolderCopy {
 /// Copie d'une note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoteCopy {
+    /// Uuid d'origine : la note copiée en reçoit un nouveau, et les liens entre notes copiées
+    /// ensemble suivent.
+    pub uuid: Uuid,
     /// Dossier d'origine, `None` pour une note transférée seule (elle arrive dans le dossier
     /// par défaut du profil cible).
     pub folder_key: Option<i64>,
@@ -147,6 +151,7 @@ fn folder_copy(folder: &Folder, roots: &HashSet<i64>) -> FolderCopy {
 /// `keeps_folder` : la note suit son dossier (transféré avec elle), sinon elle part seule.
 fn note_copy(note: &Note, keeps_folder: bool) -> NoteCopy {
     NoteCopy {
+        uuid: note.uuid,
         folder_key: note.folder_id.filter(|_| keeps_folder),
         title: note.title.clone(),
         content: note.content.clone(),

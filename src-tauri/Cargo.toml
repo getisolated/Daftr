@@ -29,18 +29,37 @@ adapter-fs = { path = "crates/adapter-fs" }
 adapter-mcp = { path = "crates/adapter-mcp" }
 adapter-password = { path = "crates/adapter-password" }
 adapter-print = { path = "crates/adapter-print" }
+adapter-sync = { path = "crates/adapter-sync" }
 presentation = { path = "crates/presentation" }
 
 anyhow = "1"
 argon2 = "0.6"
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 getrandom = "0.3"
+hmac = "0.12"
+# Déjà tiré par mdns-sd (même version) : énumération des interfaces annoncées
+if-addrs = "0.15"
+# Sans `async` ni `logging` : un seul thread démon, démarré à la demande
+mdns-sd = { version = "0.22", default-features = false }
 notify = "8"
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+proptest = { version = "1.12", default-features = false, features = ["std"] }
+qrcode = { version = "0.15", default-features = false, features = ["std", "svg"] }
 rmcp = { version = "3.7", features = ["transport-streamable-http-server"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 schemars = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+similar = { version = "3.2", default-features = false, features = ["std"] }
+# Sans `std` : elle active `ring/std` ; seules les primitives de Noise_XX_25519_ChaChaPoly_BLAKE2s
+snow = { version = "0.10", default-features = false, features = [
+    "use-chacha20poly1305",
+    "use-blake2",
+    "use-curve25519",
+    "use-getrandom",
+] }
+spake2 = { version = "0.4", features = ["std"] }
 sys-locale = "0.3"
 tempfile = "3"
 thiserror = "2"
@@ -51,6 +70,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 trash = "5"
 ts-rs = "12"
 window-vibrancy = "0.8"
+yrs = "0.28"
 zip = { version = "9", default-features = false, features = ["deflate"] }
 
 tauri = { version = "2.12", features = ["tray-icon", "image-png"] }

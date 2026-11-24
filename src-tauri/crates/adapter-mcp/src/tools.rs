@@ -6,6 +6,7 @@
 
 mod args;
 mod read;
+mod reads;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,6 +15,7 @@ use app::AppError;
 use app::folders::FoldersService;
 use app::notes::NotesService;
 use domain::folder::Folder;
+use domain::links::rewrite_note_links;
 use domain::note::edit::{ReplaceError, replace_passage};
 use domain::note::{
     NewNote, Note, NoteChanges, NoteHead, append_text, content_with_title, extract_title,
@@ -28,6 +30,7 @@ pub(crate) use args::{
     SearchNotesArgs, UpdateNoteArgs,
 };
 pub(crate) use read::{get_note, get_notes};
+pub(crate) use reads::KnownContents;
 
 /// Nombre de notes rendues par `list_notes` sans limite demandée.
 const DEFAULT_LIST_LIMIT: usize = 50;
@@ -189,6 +192,7 @@ pub(crate) fn create_note(services: &McpServices, args: CreateNoteArgs) -> ToolR
         Some(title) => content_with_title(title, &args.content),
         None => args.content,
     };
+    let content = with_uuid_links(services, &content).unwrap_or(content);
     let note = NewNote {
         title: extract_title(&content),
         content,
@@ -200,45 +204,92 @@ pub(crate) fn create_note(services: &McpServices, args: CreateNoteArgs) -> ToolR
     Ok(json!(NoteSummary::from(&created)))
 }
 
-/// Remplace le contenu d'une note (et donc son titre, sa première ligne).
-pub(crate) fn update_note(services: &McpServices, args: UpdateNoteArgs) -> ToolResult {
-    existing_note(services, args.id)?;
-    replace_content(services, args.id, args.content)
+/// Remplace le contenu d'une note (et donc son titre, sa première ligne). Le contenu est
+/// rejoué sur la version lue par l'IA : ce qui a changé depuis ailleurs est gardé.
+pub(crate) fn update_note(
+    services: &McpServices,
+    known: &KnownContents,
+    args: UpdateNoteArgs,
+) -> ToolResult {
+    let note = existing_note(services, args.id)?;
+    let content = with_uuid_links(services, &args.content).unwrap_or(args.content);
+    let base = known.of(&note.uuid);
+    // Le contenu envoyé est aussi ce que l'IA connaît désormais de la note
+    let updated = replace_content(services, args.id, content.clone(), base)?;
+    known.remember(note.uuid, content);
+    Ok(json!(NoteSummary::from(&updated)))
 }
 
-/// Remplace un passage exact d'une note, le reste du texte restant intact.
-pub(crate) fn edit_note(services: &McpServices, args: EditNoteArgs) -> ToolResult {
+/// Remplace un passage exact d'une note, le reste du texte restant intact. Le passage est
+/// cherché dans la version actuelle, qui sert aussi de base : ce qui change ailleurs en même
+/// temps (autre appareil, éditeur) est gardé.
+pub(crate) fn edit_note(
+    services: &McpServices,
+    known: &KnownContents,
+    args: EditNoteArgs,
+) -> ToolResult {
     let note = existing_note(services, args.id)?;
     let replace_all = args.replace_all.unwrap_or(false);
     let edited = replace_passage(&note.content, &args.old_text, &args.new_text, replace_all)
         .map_err(|error| edit_failure(error, args.id))?;
-
-    replace_content(services, args.id, edited)
+    let content = with_uuid_links(services, &edited).unwrap_or(edited);
+    let updated = replace_content(services, args.id, content.clone(), Some(note.content))?;
+    known.remember(note.uuid, content);
+    Ok(json!(NoteSummary::from(&updated)))
 }
 
 /// Ajoute du texte à la fin d'une note, après une ligne vide.
-pub(crate) fn append_to_note(services: &McpServices, args: AppendToNoteArgs) -> ToolResult {
+pub(crate) fn append_to_note(
+    services: &McpServices,
+    known: &KnownContents,
+    args: AppendToNoteArgs,
+) -> ToolResult {
     if args.text.trim().is_empty() {
         return Err("The text to append must not be empty.".to_owned());
     }
     let note = existing_note(services, args.id)?;
-    replace_content(services, args.id, append_text(&note.content, &args.text))
+    let appended = append_text(&note.content, &args.text);
+    let content = with_uuid_links(services, &appended).unwrap_or(appended);
+    let updated = replace_content(services, args.id, content.clone(), Some(note.content))?;
+    known.remember(note.uuid, content);
+    Ok(json!(NoteSummary::from(&updated)))
 }
 
-fn replace_content(services: &McpServices, id: i64, content: String) -> ToolResult {
+/// Écrit le contenu (déjà en liens `note://<uuid>`) construit sur `base`.
+fn replace_content(
+    services: &McpServices,
+    id: i64,
+    content: String,
+    base: Option<String>,
+) -> Result<Note, String> {
     let changes = NoteChanges {
         title: Some(extract_title(&content)),
         content: Some(content),
         tags: None,
+        base,
     };
     let updated = services.notes.update(id, &changes).map_err(failure)?;
-    let note = updated.ok_or_else(|| note_not_found(id))?;
-    Ok(json!(NoteSummary::from(&note)))
+    updated.ok_or_else(|| note_not_found(id))
 }
 
-/// Une note avec son contenu et sa date de création, que les listes ne portent pas.
+/// Les liens `note://<id>` que l'IA écrit avec les identifiants qu'elle voit, réécrits avec
+/// l'uuid de la note visée : seul l'uuid est le même sur tous les appareils.
+fn with_uuid_links(services: &McpServices, content: &str) -> Option<String> {
+    let uuid_of = |id: i64| {
+        services
+            .notes
+            .by_id(id)
+            .ok()
+            .flatten()
+            .map(|note| note.uuid)
+    };
+    rewrite_note_links(content, uuid_of)
+}
+
+/// Une note avec son contenu, son uuid et sa date de création, que les listes ne portent pas.
 fn with_content(note: &Note) -> Value {
     let mut value = json!(NoteSummary::from(note));
+    value["uuid"] = json!(note.uuid.to_string());
     value["created_at"] = json!(short_date(&note.created_at));
     value["content"] = json!(note.content);
     value

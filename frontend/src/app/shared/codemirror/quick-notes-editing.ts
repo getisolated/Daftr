@@ -8,7 +8,8 @@ import { BlockRange, noteTimestamps, timestampBlocks } from './note-timestamps';
 
 /** What the quick notes document asks the app to do with one of its notes. */
 export interface QuickNoteHandlers {
-  save: (id: number, text: string) => void;
+  /** `base`: the text when the edit started, so that the changes made meanwhile elsewhere are kept. */
+  save: (id: number, text: string, base: string) => void;
   remove: (id: number) => void;
   copy: (text: string) => void;
   /** Turns the quick note into a normal note (it leaves the quick notes document). */
@@ -103,7 +104,7 @@ function commit(view: EditorView): boolean {
 
   const handlers = view.state.facet(handlersFacet);
   if (text !== editing.original.trim()) {
-    handlers?.save(editing.id, text);
+    handlers?.save(editing.id, text, editing.original);
   }
   handlers?.editEnded();
   return true;
