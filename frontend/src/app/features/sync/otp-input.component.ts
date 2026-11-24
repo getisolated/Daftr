@@ -41,9 +41,10 @@ import {
   styles: [`
     :host { display: block; }
     .boxes { display: flex; justify-content: center; gap: 8px; }
-    .box:nth-child(3) { margin-right: 10px; }
     .box {
-      width: 40px;
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: 40px;
       height: 54px;
       padding: 0;
       border: none;

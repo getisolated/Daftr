@@ -42,21 +42,34 @@ let nextFormId = 0;
       }
 
       <div class="actions">
-        <button class="btn" type="submit" [disabled]="busy() || !codeComplete()">
+        <button class="btn connect" type="submit" [disabled]="busy() || !codeComplete()">
           {{ busy() ? i18n.t('sync.pairing.connecting') : i18n.t('sync.pairing.connect') }}
         </button>
-        <button class="btn secondary" type="button" [disabled]="busy()" (click)="cancelled.emit()">{{ i18n.t('sync.join.cancel') }}</button>
+        <button class="cancel" type="button" [disabled]="busy()" (click)="cancelled.emit()">{{ i18n.t('sync.join.cancel') }}</button>
       </div>
     </form>
   `,
   styleUrls: ['./sync-screen-ui.scss'],
   styles: [`
     :host { display: block; }
-    .join { display: flex; flex-direction: column; gap: 16px; }
+    .join { display: flex; flex-direction: column; gap: 22px; }
     .intro { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--daftr-text-soft); text-align: center; }
-    .otp { margin: 4px 0; }
+    .otp { margin: 8px 0 10px; }
     .address { display: flex; flex-direction: column; gap: 4px; }
-    .actions { display: flex; justify-content: center; gap: 8px; }
+    .actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 6px; }
+    .connect { width: 100%; height: 40px; font-size: 14px; font-weight: 600; }
+    .cancel {
+      align-self: center;
+      padding: 4px 12px;
+      border: none;
+      background: none;
+      color: var(--daftr-text-soft);
+      font: inherit;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    .cancel:hover:not(:disabled) { color: var(--daftr-text); }
+    .cancel:disabled { opacity: 0.6; cursor: default; }
   `],
 })
 export class SyncJoinFormComponent {
