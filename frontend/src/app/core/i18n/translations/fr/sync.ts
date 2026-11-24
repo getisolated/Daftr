@@ -55,6 +55,10 @@ export const FR_SYNC: Record<keyof typeof EN_SYNC, string> = {
   'sync.error.invalidAddress': 'Adresse invalide : saisissez l’IP:port d’un appareil du réseau local.',
   'sync.error.invalidDeviceName': 'Nom invalide : 64 caractères au plus.',
   'sync.error.invalidPort': 'Le port doit être compris entre 1024 et 65535.',
+  'sync.error.collectionShared': 'Cette collection est déjà synchronisée.',
+  'sync.error.destinationNotEmpty': 'Le dossier de destination n’est pas vide : choisissez de le fusionner, ou un autre dossier.',
+  'sync.error.unknownShare': 'Cette collection n’est plus synchronisée.',
+  'sync.error.unknownCollection': 'Cette collection n’existe plus.',
   'sync.error.generic': 'La synchronisation a échoué : {message}',
 
   // Appairage

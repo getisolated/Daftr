@@ -53,6 +53,10 @@ export const EN_SYNC = {
   'sync.error.invalidAddress': 'Invalid address: enter the IP:port of a device of the local network.',
   'sync.error.invalidDeviceName': 'Invalid name: up to 64 characters.',
   'sync.error.invalidPort': 'The port must be between 1024 and 65535.',
+  'sync.error.collectionShared': 'This collection is already synced.',
+  'sync.error.destinationNotEmpty': 'The destination folder is not empty: choose to merge with it, or another folder.',
+  'sync.error.unknownShare': 'This collection is no longer synced.',
+  'sync.error.unknownCollection': 'This collection no longer exists.',
   'sync.error.generic': 'The sync failed: {message}',
 
   // Pairing

@@ -46,6 +46,10 @@ const ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
   'invalid address': 'sync.error.invalidAddress',
   'invalid device name': 'sync.error.invalidDeviceName',
   'invalid port': 'sync.error.invalidPort',
+  'Collection already shared': 'sync.error.collectionShared',
+  'Destination folder is not empty': 'sync.error.destinationNotEmpty',
+  'Unknown collection share': 'sync.error.unknownShare',
+  'Unknown collection': 'sync.error.unknownCollection',
 };
 
 /** Causes of the error state of the indicator (`SyncStatusDto.reason`). */

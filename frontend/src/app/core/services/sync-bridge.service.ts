@@ -1,4 +1,9 @@
 import { Injectable } from '@angular/core';
+import type { CollectionDto } from '../bindings/CollectionDto';
+import {
+  CollectionConflicts, CollectionOfferMode, CollectionOffers, CollectionProgress, CollectionShare, CollectionStateEvent, CollectionSyncState,
+  ConflictKeep, FolderSummary,
+} from '../models/collection-sync.model';
 import {
   InitialSyncDone, LinkedDevice, NotesSynced, OfferChoice, OfferReceived, PairingState, PairingTicket, ProfileSync, SyncOverview,
   SyncProgress, SyncStatus, TrustedDevice,
@@ -71,6 +76,66 @@ export class SyncBridgeService {
   /** Empty name: the host name. */
   setDeviceName(name: string): Promise<SyncOverview> {
     return this.required(() => call('sync_set_device_name', { name }));
+  }
+
+  // ── Shared collections (Rust module `desktop::commands::collection_sync`) ──
+
+  async collectionState(): Promise<CollectionSyncState | null> {
+    return this.available ? call<CollectionSyncState>('collection_sync_state') : null;
+  }
+
+  /** What a collection of the active profile would share. */
+  collectionSummary(root: string): Promise<FolderSummary> {
+    return this.required(() => call('collection_sync_summary', { root }));
+  }
+
+  /** What a folder holds, to warn about a destination that already exists. */
+  inspectFolder(path: string): Promise<FolderSummary> {
+    return this.required(() => call('collection_sync_inspect_folder', { path }));
+  }
+
+  /** The devices must already share the active profile. */
+  shareCollection(root: string, deviceKeys: string[]): Promise<CollectionShare> {
+    return this.required(() => call('collection_sync_share', { root, deviceKeys }));
+  }
+
+  stopCollection(profileId: string, syncId: string): Promise<void> {
+    return this.required(() => call('collection_sync_stop', { profileId, syncId }));
+  }
+
+  /** `destination` is required except for `decline`. */
+  answerCollectionOffer(deviceKey: string, syncId: string, destination: string | null, mode: CollectionOfferMode): Promise<void> {
+    return this.required(() => call('collection_sync_answer_offer', { deviceKey, syncId, destination, mode }));
+  }
+
+  /** Without `folder`, a native folder dialog opens; `null` when none is chosen. */
+  relinkCollection(root: string, folder: string | null): Promise<CollectionDto | null> {
+    return this.required(() => call('collection_sync_relink', { root, folder }));
+  }
+
+  /** Native folder dialog; `null` when cancelled. */
+  pickFolder(): Promise<string | null> {
+    return this.required(() => call('collection_sync_pick_folder'));
+  }
+
+  resolveConflict(root: string, path: string, keep: ConflictKeep): Promise<void> {
+    return this.required(() => call('collection_conflict_resolve', { root, path, keep }));
+  }
+
+  onCollectionOffer(callback: (offers: CollectionOffers) => void): () => void {
+    return subscribe('sync:collection-offer', callback);
+  }
+
+  onCollectionProgress(callback: (progress: CollectionProgress) => void): () => void {
+    return subscribe('sync:collection-progress', callback);
+  }
+
+  onCollectionState(callback: (event: CollectionStateEvent) => void): () => void {
+    return subscribe('sync:collection-state', callback);
+  }
+
+  onCollectionConflicts(callback: (event: CollectionConflicts) => void): () => void {
+    return subscribe('sync:collection-conflicts', callback);
   }
 
   onStatus(callback: (status: SyncStatus) => void): () => void {

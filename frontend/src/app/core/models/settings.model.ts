@@ -71,6 +71,8 @@ export interface AppSettings {
   syncPort: number;
   /** true: the LAN sync is paused (no listening, no announce, no connection). */
   syncPaused: boolean;
+  /** Folder where the collections proposed by other devices arrive by default; empty = `Documents/Daftr`. */
+  receivedCollectionsFolder: string;
 }
 
 export type SettingsPatch = Partial<AppSettings>;
@@ -119,6 +121,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   syncDeviceName: '',
   syncPort: 47820,
   syncPaused: false,
+  receivedCollectionsFolder: '',
 };
 
 /** Tag of the notes sent from the quick-note overlay (formerly `overlay`, migrated by the main process). */

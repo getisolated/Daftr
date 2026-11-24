@@ -42,6 +42,8 @@ export class SyncService implements OnDestroy {
   private readonly _pairingRenewed = signal(false);
   private readonly _offers = signal<OfferReceived[]>([]);
   private readonly _offerDialogOpen = signal(false);
+  /** Counts the devices removed from a profile or from the app: their shared collections change without an event. */
+  private readonly _membershipChanges = signal(0);
   /** Initial sync of each profile that accepted an offer: progress, then `done`. */
   private readonly _initialSyncs = signal<ReadonlyMap<string, { progress: SyncProgress | null; done: boolean }>>(new Map());
   private readonly notesSyncedListeners = new Set<(event: NotesSynced) => void>();
@@ -70,6 +72,7 @@ export class SyncService implements OnDestroy {
   /** Proposals waiting for an answer, oldest first. */
   readonly offers = this._offers.asReadonly();
   readonly offerDialogOpen = this._offerDialogOpen.asReadonly();
+  readonly membershipChanges = this._membershipChanges.asReadonly();
   readonly initialSyncs = this._initialSyncs.asReadonly();
   /** Profiles of this device that have a space, synchronized or not. */
   readonly syncedProfileIds = computed(() => (this._overview()?.profiles ?? []).map(profile => profile.profileId));
@@ -225,11 +228,13 @@ export class SyncService implements OnDestroy {
 
   async stopSharing(profileId: string, deviceKey: string): Promise<void> {
     await this.bridge.stopSharing(profileId, deviceKey);
+    this._membershipChanges.update(count => count + 1);
     await this.reloadDevices();
   }
 
   async removeDevice(deviceKey: string): Promise<void> {
     await this.bridge.removeDevice(deviceKey);
+    this._membershipChanges.update(count => count + 1);
     await this.reloadDevices();
   }
 
