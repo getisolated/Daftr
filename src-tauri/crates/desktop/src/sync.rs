@@ -2,8 +2,9 @@
 //! (`adapter-sync`), branché sur les profils, les fichiers `sync/`, les réglages de
 //! l'appareil et les événements vers les fenêtres.
 //!
-//! Sans profil synchronisé, ou en pause, rien ne tourne : ni écoute, ni annonce, ni thread
-//! mDNS, ni surveillance du réseau (critère d'acceptation 8).
+//! Sans appareil de confiance ni profil synchronisé, ou en pause, rien ne tourne : ni écoute, ni
+//! annonce, ni thread mDNS, ni surveillance du réseau (critère d'acceptation 8). Un appareil lié
+//! garde l'écoute ouverte pour recevoir les profils et collections qu'on lui partage.
 
 mod actions;
 mod collection_dto;
@@ -27,7 +28,7 @@ pub use profiles::DesktopSyncProfiles;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use adapter_fs::{SYNC_FOLDER, ShareDisk, ShareWatcher, TrustFiles};
+use adapter_fs::{InboxFile, SYNC_FOLDER, ShareDisk, ShareWatcher, TrustFiles};
 use adapter_sync::{
     DeviceIdentity, Discovery, Engine, EngineConfig, EngineDeps, SystemClock,
     load_or_create_identity,
@@ -117,6 +118,7 @@ impl SyncState {
             events: setup.events,
             trust: Arc::clone(&trust) as _,
             files: Arc::clone(&setup.files) as _,
+            inbox: Arc::new(InboxFile::new(&setup.root.join(SYNC_FOLDER))),
             discovery: setup.discovery,
             clock: Arc::new(SystemClock),
             runtime: setup.runtime.clone(),
@@ -164,6 +166,7 @@ impl SyncState {
     /// Démarrage : relit l'espace de chaque profil, puis démarre le moteur s'il y a quelque
     /// chose à synchroniser et que la synchronisation n'est pas en pause.
     pub async fn start(&self, settings: &SettingsService) {
+        self.profiles.set_language(settings.current().language);
         let profiles = Arc::clone(&self.profiles);
         if let Err(error) = tokio::task::spawn_blocking(move || profiles.rebuild_index()).await {
             tracing::warn!(%error, "espaces des profils non relus");
@@ -183,6 +186,7 @@ impl SyncState {
     pub async fn apply_settings(&self, settings: &SettingsService) {
         let mut applied = self.applied.lock().await;
         let current = settings.current();
+        self.profiles.set_language(current.language);
         self.files.set_excludes(current.collections_exclude.clone());
 
         let name = self.device_name(&current);

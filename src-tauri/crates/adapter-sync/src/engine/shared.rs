@@ -6,8 +6,8 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use app::AppResult;
-use app::ports::collection_sync::CollectionDisk;
-use app::ports::sync::{ProfileOffer, SyncEvent, SyncEvents, SyncStatus};
+use app::ports::collection_sync::{CollectionDisk, CollectionInbox};
+use app::ports::sync::{SyncEvent, SyncEvents, SyncStatus};
 use app::ports::trust::TrustStore;
 use domain::sync::{DeviceKey, DeviceName, SpaceId};
 use domain::uuid::Uuid;
@@ -17,7 +17,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{Notify, watch};
 use tokio::task::{AbortHandle, JoinHandle};
 
-use super::collection_state::{IncomingCollection, ShareRuntime};
+use super::collection_state::ShareRuntime;
 use super::{EngineConfig, EngineDeps};
 use crate::clock::Clock;
 use crate::discovery::Discovery;
@@ -35,23 +35,11 @@ pub(crate) enum Command<P> {
     Push(P),
     /// Envoyer les offres en attente pour cet appareil.
     SendOffers,
-    /// Accepter un profil proposé, vers ce profil local.
-    AcceptOffer {
-        /// Espace proposé.
-        space: SpaceId,
-        /// Profil local qui le rejoint.
-        profile: P,
-    },
-    /// Refuser un profil proposé.
-    DeclineOffer {
-        /// Espace proposé.
-        space: SpaceId,
-    },
     /// Les partages de collections ont changé : offres, manifestes, partages arrêtés.
     CollectionsChanged,
     /// Des fichiers d'une collection partagée ont changé sur le disque.
     ShareChanged(Uuid),
-    /// Réponse de l'utilisateur à une collection proposée.
+    /// Réponse de l'utilisateur à une collection proposée (activée ou ignorée).
     CollectionAnswer {
         /// Le partage.
         share: Uuid,
@@ -110,19 +98,16 @@ pub(crate) struct State<P> {
     /// Recherche temporaire (appairage par code sans écoute en cours).
     pub search: Option<AbortHandle>,
     pub enabled_profiles: usize,
+    /// Appareils de confiance (non révoqués) : l'écoute reste ouverte pour recevoir leurs offres.
+    pub trusted_devices: usize,
     pub sessions: HashMap<DeviceKey, SessionEntry<P>>,
     pub next_session: u64,
-    pub pairing: Option<PairingMode<P>>,
+    pub pairing: Option<PairingMode>,
     pub outgoing_offers: HashMap<DeviceKey, Vec<P>>,
-    pub incoming_offers: HashMap<(DeviceKey, SpaceId), ProfileOffer>,
-    /// Offres reçues acceptées dont le contenu n'est pas encore arrivé, avec leur profil.
-    pub accepted_offers: HashMap<(DeviceKey, SpaceId), P>,
     /// Espaces rejoints dont la synchronisation initiale n'est pas finie.
     pub joining: HashSet<SpaceId>,
     /// Collections partagées : résumé du dossier et avancement par appareil.
     pub collections: HashMap<Uuid, ShareRuntime>,
-    /// Collections proposées par un autre appareil, en attente de réponse.
-    pub incoming_collections: HashMap<(DeviceKey, Uuid), IncomingCollection<P>>,
     pending_share_pushes: HashSet<Uuid>,
     share_push_scheduled: bool,
     pub seen: HashMap<Fingerprint, Seen>,
@@ -144,6 +129,7 @@ pub(crate) struct Shared<P: ProfileKey> {
     pub events: Arc<dyn SyncEvents<Profile = P>>,
     pub trust: Arc<dyn TrustStore>,
     pub files: Arc<dyn CollectionDisk>,
+    pub inbox: Arc<dyn CollectionInbox>,
     pub discovery: Arc<dyn Discovery>,
     pub clock: Arc<dyn Clock>,
     pub runtime: Handle,
@@ -166,15 +152,13 @@ impl<P: ProfileKey> Shared<P> {
             runtime: None,
             search: None,
             enabled_profiles: 0,
+            trusted_devices: 0,
             sessions: HashMap::new(),
             next_session: 0,
             pairing: None,
             outgoing_offers: HashMap::new(),
-            incoming_offers: HashMap::new(),
-            accepted_offers: HashMap::new(),
             joining: HashSet::new(),
             collections: HashMap::new(),
-            incoming_collections: HashMap::new(),
             pending_share_pushes: HashSet::new(),
             share_push_scheduled: false,
             seen: HashMap::new(),
@@ -193,6 +177,7 @@ impl<P: ProfileKey> Shared<P> {
             events: deps.events,
             trust: deps.trust,
             files: deps.files,
+            inbox: deps.inbox,
             discovery: deps.discovery,
             clock: deps.clock,
             runtime: deps.runtime,
@@ -367,6 +352,17 @@ impl<P: ProfileKey> Shared<P> {
         Ok(joined.map_err(|_| Error::Stopped)??)
     }
 
+    /// Exécute `work` sur les propositions de collections en attente, dans un thread bloquant.
+    pub(crate) async fn with_inbox<T, F>(&self, work: F) -> Result<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(&dyn CollectionInbox) -> AppResult<T> + Send + 'static,
+    {
+        let inbox = Arc::clone(&self.inbox);
+        let joined = tokio::task::spawn_blocking(move || work(inbox.as_ref())).await;
+        Ok(joined.map_err(|_| Error::Stopped)??)
+    }
+
     /// Profils à proposer à `remote`.
     pub(crate) fn pending_offers(&self, remote: &DeviceKey) -> Vec<P> {
         self.state()
@@ -385,29 +381,6 @@ impl<P: ProfileKey> Shared<P> {
                 state.outgoing_offers.remove(remote);
             }
         }
-    }
-
-    /// Offres reçues de `remote`, en attente du choix de l'utilisateur.
-    pub(crate) fn receive_offers(&self, remote: &DeviceKey, offers: &[ProfileOffer]) {
-        let mut state = self.state();
-        for offer in offers {
-            state
-                .incoming_offers
-                .insert((*remote, offer.space_id), offer.clone());
-        }
-    }
-
-    /// Le profil choisi pour une offre déjà acceptée de `remote`.
-    pub(crate) fn accepted_offer(&self, remote: &DeviceKey, space: &SpaceId) -> Option<P> {
-        self.state()
-            .accepted_offers
-            .get(&(*remote, *space))
-            .cloned()
-    }
-
-    /// Oublie une offre reçue (traitée).
-    pub(crate) fn forget_offer(&self, remote: &DeviceKey, space: &SpaceId) {
-        self.state().incoming_offers.remove(&(*remote, *space));
     }
 
     /// Marque une session en cours d'échange (ou non) et met à jour l'état affiché.
@@ -465,7 +438,7 @@ fn status_of<P>(state: &State<P>) -> SyncStatus {
             reason: reason.to_owned(),
         };
     }
-    if state.enabled_profiles == 0 {
+    if state.enabled_profiles == 0 && state.trusted_devices == 0 {
         return SyncStatus::Disabled;
     }
     if !state.syncing.is_empty() {

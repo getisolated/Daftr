@@ -17,8 +17,8 @@ use serde::de::{self, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub(crate) use files::{
-    FEATURE_COLLECTIONS, MANIFEST_PART, MAX_OFFERED, OfferedCollection, WireEntry, file_entry,
-    wire_entry,
+    FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, MANIFEST_PART, MAX_OFFERED, OfferedCollection,
+    ProfileInfoEntry, WireEntry, file_entry, wire_entry,
 };
 
 use crate::error::{Error, Result};
@@ -326,10 +326,19 @@ pub(crate) enum Message {
         /// Partage.
         share: [u8; 16],
     },
+    /// Nom et icône d'un profil proposé, envoyés avant son contenu (voir
+    /// [`FEATURE_PROFILE_INFO`]).
+    ProfileInfo(ProfileInfoEntry),
+    /// Les collections reçues de l'émetteur que le destinataire n'a pas encore activées : il
+    /// répond `ShareStop` pour celles qu'il ne propose plus.
+    CollectionPending {
+        /// Partages en attente.
+        shares: Vec<[u8; 16]>,
+    },
 }
 
 /// Nombre de variantes de [`Message`] : tout indice au-delà vient d'une version plus récente.
-const VARIANT_COUNT: u8 = 22;
+const VARIANT_COUNT: u8 = 24;
 
 impl Message {
     /// Encode le message.

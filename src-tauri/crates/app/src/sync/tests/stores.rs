@@ -196,7 +196,7 @@ fn the_space_comes_first_and_garbage_is_rejected_alone() {
 #[test]
 fn profiles_are_found_by_space() {
     let profiles = MemoryProfiles::new(device(0));
-    let created = profiles.create_profile("Travail").unwrap();
+    let created = profiles.create_profile(Some("Travail"), None).unwrap();
     assert!(profiles.synced_profiles().unwrap().is_empty());
 
     let store = profiles.store(&created).unwrap();

@@ -2,7 +2,8 @@
 import type { LinkedDeviceDto } from "./LinkedDeviceDto";
 
 /**
- * Une collection proposée par un appareil.
+ * Une collection reçue d'un appareil et pas encore activée ici : une entrée « à configurer »,
+ * gardée au redémarrage. Rien n'est écrit sur le disque avant `collection_sync_activate`.
  */
 export type CollectionOfferDto = { 
 /**
@@ -10,11 +11,7 @@ export type CollectionOfferDto = {
  */
 device: LinkedDeviceDto, 
 /**
- * Profil qui recevra la collection.
- */
-profileId: string, 
-/**
- * Identifiant du partage, à renvoyer dans la réponse.
+ * Identifiant du partage, à renvoyer à l'activation ou au refus.
  */
 syncId: string, 
 /**
@@ -29,6 +26,19 @@ files: number,
  * Volume des fichiers, en octets.
  */
 bytes: number, 
+/**
+ * Identifiant du profil qui porte la collection chez l'émetteur.
+ */
+sourceProfileId: string, 
+/**
+ * Nom de ce profil chez l'émetteur (vide : profil sans nom).
+ */
+sourceProfileName: string, 
+/**
+ * Le profil local, déjà synchronisé avec le profil source : il reçoit la collection par
+ * défaut. Absent sinon (l'utilisateur choisit le profil, dans la liste de ses profils).
+ */
+sourceProfileSyncedHere: string | null, 
 /**
  * Destination proposée : `<dossier des collections reçues>/<nom>`.
  */

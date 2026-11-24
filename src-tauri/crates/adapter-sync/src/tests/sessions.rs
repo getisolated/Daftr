@@ -4,7 +4,7 @@
 use app::ports::sync::{SyncEvent, SyncProfiles, SyncStatus};
 
 use super::support::{contents, device, eventually, link, share, space, write_note};
-use crate::{MemoryNetwork, OfferChoice};
+use crate::MemoryNetwork;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn devices_exchange_only_their_common_spaces_on_one_connection() {
@@ -147,16 +147,13 @@ async fn an_offer_to_an_absent_device_is_sent_when_it_appears() {
     assert!(a.engine.connected_devices().is_empty());
 
     b.engine.set_paused(false).await.unwrap();
+    let a_key = a.key();
     eventually("offre reçue à l'apparition", || {
         b.has_event(
-            |event| matches!(event, SyncEvent::OfferReceived { device, .. } if *device == a.key()),
+            |event| matches!(event, SyncEvent::ProfileReceived { device, .. } if *device == a_key),
         )
     })
     .await;
-    b.engine
-        .answer_offer(a.key(), space(1), OfferChoice::NewProfile)
-        .await
-        .unwrap();
 
     eventually("synchronisation après acceptation", || {
         b.has_event(|event| matches!(event, SyncEvent::InitialSyncDone { .. }))
@@ -209,4 +206,17 @@ async fn nothing_runs_without_a_synchronized_profile() {
     assert!(a.engine.listening_port().is_some());
     assert!(a.discovery.announcement().is_some());
     assert_eq!(a.engine.status(), SyncStatus::NoDevice);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_trusted_device_alone_keeps_the_engine_listening_for_offers() {
+    let network = MemoryNetwork::new();
+    let (a, b) = (device(&network, "A"), device(&network, "B"));
+    link(&a, &b);
+
+    b.engine.refresh().await.unwrap();
+
+    assert!(b.engine.listening_port().is_some());
+    assert!(b.discovery.announcement().is_some());
+    assert_eq!(b.engine.status(), SyncStatus::NoDevice);
 }

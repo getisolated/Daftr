@@ -92,6 +92,9 @@ pub enum MessageKey {
     SyncDefaultDeviceName,
     /// Synchronisation : nom proposé pour un profil sans nom.
     SyncDefaultSpaceName,
+    /// Synchronisation : nom d'un profil cloné dont l'original n'a pas de nom (le profil par
+    /// défaut), comme l'interface l'affiche.
+    SyncDefaultProfileName,
 }
 
 /// Le texte `key` dans `language`.
@@ -138,6 +141,7 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::MenuCloseWindow => "Close Window",
         MessageKey::SyncDefaultDeviceName => "Computer",
         MessageKey::SyncDefaultSpaceName => "My notes",
+        MessageKey::SyncDefaultProfileName => "Default profile",
     }
 }
 
@@ -173,6 +177,7 @@ fn french(key: MessageKey) -> &'static str {
         MessageKey::MenuCloseWindow => "Fermer la fenêtre",
         MessageKey::SyncDefaultDeviceName => "Ordinateur",
         MessageKey::SyncDefaultSpaceName => "Mes notes",
+        MessageKey::SyncDefaultProfileName => "Profil par défaut",
     }
 }
 

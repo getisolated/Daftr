@@ -3,13 +3,13 @@
 
 use presentation::IpcResult;
 use presentation::dto::{
-    LinkedDeviceDto, PairingTicketDto, ProfileSyncDto, SettingsDto, SyncStateDto, TrustedDeviceDto,
+    LinkedDeviceDto, PairingTicketDto, ProfileSharesDto, ProfileSyncDto, SettingsDto, SyncStateDto,
+    TrustedDeviceDto,
 };
 use presentation::events::SETTINGS_CHANGED;
 use presentation::profiles::parse_id;
 use presentation::sync::{
-    parse_address, parse_device_key, parse_device_name, parse_offer_answer, parse_pairing_code,
-    parse_port, parse_profiles, parse_space_id,
+    parse_address, parse_device_key, parse_device_name, parse_pairing_code, parse_port,
 };
 use serde_json::{Value, json};
 use tauri::AppHandle;
@@ -41,16 +41,11 @@ pub async fn sync_profile(app: AppHandle, profile_id: String) -> IpcResult<Profi
         .await
 }
 
-/// « Lier un appareil » avec les profils cochés ; le suivi du mode arrive par `sync:pairing`.
+/// « Lier un appareil » : ouvre le mode appairage, sans profil (il ne crée que la confiance
+/// entre deux appareils). Le suivi du mode arrive par `sync:pairing`.
 #[tauri::command]
-pub async fn sync_start_pairing(
-    app: AppHandle,
-    profile_ids: Vec<String>,
-) -> IpcResult<PairingTicketDto> {
-    let profiles = parse_profiles(&profile_ids)?;
-    let state = desktop(&app);
-    let settings = state.services.settings.current();
-    let ticket = state.sync.start_pairing(profiles, &settings).await?;
+pub async fn sync_start_pairing(app: AppHandle) -> IpcResult<PairingTicketDto> {
+    let ticket = desktop(&app).sync.start_pairing().await?;
     sync::forward_pairing(&app);
     Ok(ticket)
 }
@@ -73,45 +68,30 @@ pub async fn sync_pair(
     desktop(&app).sync.pair(code, address).await
 }
 
-/// Réponse à un profil proposé : `choice` vaut `new`, `merge` (avec `profileId`) ou `ignore`.
+/// Le partage de chaque profil avec chaque appareil de confiance.
 #[tauri::command]
-pub async fn sync_answer_offer(
-    app: AppHandle,
-    device_key: String,
-    space_id: String,
-    choice: String,
-    profile_id: Option<String>,
-) -> IpcResult<()> {
-    let device = parse_device_key(&device_key)?;
-    let space = parse_space_id(&space_id)?;
-    let answer = parse_offer_answer(&choice, profile_id.as_deref())?;
-    desktop(&app).sync.answer_offer(device, space, answer).await
+pub async fn sync_profile_shares(app: AppHandle) -> IpcResult<ProfileSharesDto> {
+    desktop(&app).sync.profile_shares().await
 }
 
-/// « Synchroniser avec… » : propose un profil à un appareil de confiance.
+/// Partage le profil avec l'appareil de confiance (`shared`), ou arrête de le partager.
+/// L'appareil reçoit un clone du profil (même nom, même icône) sans rien confirmer ; le mot de
+/// passe maître n'est pas transmis. Rend le partage de tous les profils après le changement.
 #[tauri::command]
-pub async fn sync_offer_profile(
+pub async fn sync_set_profile_shared(
     app: AppHandle,
     profile_id: String,
     device_key: String,
-) -> IpcResult<()> {
+    shared: bool,
+) -> IpcResult<ProfileSharesDto> {
     let profile = parse_id(&profile_id)?;
     let device = parse_device_key(&device_key)?;
     let state = desktop(&app);
     let settings = state.services.settings.current();
-    state.sync.offer_profile(profile, device, &settings).await
-}
-
-/// « Arrêter de synchroniser ce profil avec <appareil> ».
-#[tauri::command]
-pub async fn sync_stop_sharing(
-    app: AppHandle,
-    profile_id: String,
-    device_key: String,
-) -> IpcResult<()> {
-    let profile = parse_id(&profile_id)?;
-    let device = parse_device_key(&device_key)?;
-    desktop(&app).sync.stop_sharing(profile, device).await
+    state
+        .sync
+        .set_profile_shared(profile, device, shared, &settings)
+        .await
 }
 
 /// « Retirer l'appareil » (définitif).

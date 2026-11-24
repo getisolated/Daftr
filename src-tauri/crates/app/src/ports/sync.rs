@@ -4,6 +4,7 @@
 use std::hash::Hash;
 use std::net::SocketAddr;
 
+use domain::profile::IconFormat;
 use domain::sync::{DeviceKey, DeviceName, DocId, SpaceId};
 use domain::uuid::Uuid;
 
@@ -116,6 +117,25 @@ pub struct SyncedProfile<P> {
     pub enabled: bool,
 }
 
+/// Ce qu'un profil local montre de lui à un autre appareil.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileInfo {
+    /// Identifiant local du profil, sous forme de texte.
+    pub id: String,
+    /// Nom choisi, `None` pour un profil sans nom (le profil par défaut d'une installation
+    /// neuve).
+    pub name: Option<String>,
+}
+
+/// L'icône d'un profil.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileIcon {
+    /// Format de l'image.
+    pub format: IconFormat,
+    /// Octets de l'image (déjà vérifiée à l'enregistrement).
+    pub bytes: Vec<u8>,
+}
+
 /// Accès aux profils de l'installation. Le profil actif passe par sa base déjà ouverte (pour
 /// que l'interface reçoive les événements) ; les autres sont ouverts à la demande.
 pub trait SyncProfiles: Send + Sync {
@@ -130,10 +150,27 @@ pub trait SyncProfiles: Send + Sync {
         profile: &Self::Profile,
         work: &mut dyn FnMut(&dyn SyncStore) -> AppResult<()>,
     ) -> AppResult<()>;
-    /// Crée un profil (offre acceptée en « nouveau profil »).
-    fn create_profile(&self, name: &str) -> AppResult<Self::Profile>;
+    /// Crée un profil cloné d'un profil partagé : `name` absent donne le nom par défaut de
+    /// la langue de l'application ; l'icône est enregistrée si elle est donnée. Le profil
+    /// créé n'a pas de mot de passe maître.
+    fn create_profile(
+        &self,
+        name: Option<&str>,
+        icon: Option<&ProfileIcon>,
+    ) -> AppResult<Self::Profile>;
     /// Les profils synchronisés, actifs ou non.
     fn synced_profiles(&self) -> AppResult<Vec<SyncedProfile<Self::Profile>>>;
+    /// Tous les profils de l'installation, synchronisés ou non.
+    fn profiles(&self) -> AppResult<Vec<Self::Profile>>;
+    /// Les profils dont la base liste au moins un partage de collection : les autres ne sont pas
+    /// ouverts pour chaque message d'une session. Par défaut, tous les profils.
+    fn share_profiles(&self) -> AppResult<Vec<Self::Profile>> {
+        self.profiles()
+    }
+    /// Identifiant et nom d'un profil.
+    fn profile_info(&self, profile: &Self::Profile) -> AppResult<ProfileInfo>;
+    /// L'icône d'un profil, `None` sans icône.
+    fn profile_icon(&self, profile: &Self::Profile) -> AppResult<Option<ProfileIcon>>;
 }
 
 /// État affiché par la barre d'état.
@@ -170,13 +207,19 @@ pub struct ProfileOffer {
     pub note_count: u64,
 }
 
-/// Collection proposée par un appareil.
+/// Collection proposée par un appareil : une entrée « à configurer » tant que l'utilisateur
+/// n'a pas choisi le profil et le dossier qui la reçoivent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CollectionOffer {
     /// Identifiant du partage.
     pub share: Uuid,
-    /// Espace du profil qui recevra la collection.
-    pub space_id: SpaceId,
+    /// Identifiant du profil qui porte la collection chez l'émetteur.
+    pub source_profile_id: String,
+    /// Nom de ce profil chez l'émetteur (vide : profil sans nom).
+    pub source_profile_name: String,
+    /// Espace de ce profil, s'il est synchronisé avec cet appareil : le profil local de même
+    /// espace reçoit la collection par défaut.
+    pub source_space: Option<SpaceId>,
     /// Nom proposé (celui du dossier chez l'émetteur).
     pub name: String,
     /// Nombre de fichiers `.md`.
@@ -222,24 +265,31 @@ pub enum SyncEvent<P> {
         /// Son nom.
         name: DeviceName,
     },
-    /// Un appareil propose des profils.
-    OfferReceived {
-        /// Sa clé.
+    /// Un profil partagé par un appareil a été accepté d'office : un nouveau profil local en
+    /// est le clone, la synchronisation initiale démarre.
+    ProfileReceived {
+        /// Le profil créé.
+        profile: P,
+        /// Son nom (celui du profil d'origine, ou le nom par défaut).
+        name: String,
+        /// L'appareil qui l'a partagé.
         device: DeviceKey,
         /// Son nom.
-        name: DeviceName,
-        /// Les profils proposés.
-        offers: Vec<ProfileOffer>,
+        device_name: DeviceName,
     },
-    /// Un appareil propose des collections : rien n'est écrit avant la réponse.
+    /// Un appareil propose des collections : rien n'est écrit avant l'activation. Toutes les
+    /// entrées en attente sont relisibles par la commande d'état.
     CollectionOfferReceived {
         /// Sa clé.
         device: DeviceKey,
         /// Son nom.
         name: DeviceName,
-        /// Les collections proposées, avec le profil local qui les recevra.
-        offers: Vec<(P, CollectionOffer)>,
+        /// Les collections proposées, nouvelles seulement.
+        offers: Vec<CollectionOffer>,
     },
+    /// Des entrées en attente ont disparu (activées, ignorées, retirées par l'émetteur ou avec
+    /// l'appareil) : à relire par la commande d'état.
+    CollectionPendingChanged,
     /// Avancement d'un échange de fichiers avec un appareil.
     CollectionProgress {
         /// Le profil.

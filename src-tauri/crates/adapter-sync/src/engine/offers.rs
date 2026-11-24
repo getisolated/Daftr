@@ -1,34 +1,52 @@
-//! Offres de profils et retraits : « Synchroniser avec… », réponse à une offre, « Arrêter de
+//! Partage d'un profil avec un appareil et retraits : « Synchroniser avec… », « Arrêter de
 //! synchroniser ce profil avec… », « Retirer l'appareil ».
+//!
+//! Le profil proposé est accepté d'office par l'appareil qui le reçoit (voir
+//! `session::offers`) : il n'y a pas de réponse de l'utilisateur à donner.
 
 use std::sync::Arc;
 
-use app::SyncError;
-use app::ports::sync::ProfileOffer;
 use app::ports::trust::{TrustOrigin, TrustedDevice};
-use domain::sync::{DeviceKey, DeviceKind, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName};
 
-use super::links::{self, fallback_name, is_trusted};
-use super::{Command, OfferChoice, Shared, runtime};
+use super::links::{self, fallback_name};
+use super::{Command, Shared};
 use crate::error::{Error, Result};
 use crate::stores::{self, ProfileKey, in_store};
 
-/// Propose `profile` à `device` : tout de suite s'il est connecté, sinon dès qu'il apparaît
-/// (une tentative immédiate est faite vers ses adresses connues).
+/// Partage `profile` avec `device` : l'appareil devient membre de l'espace (écriture locale
+/// persistante), puis le profil lui est proposé tout de suite s'il est connecté, sinon dès
+/// qu'il apparaît (une tentative immédiate est faite vers ses adresses connues).
 pub(super) async fn offer<P: ProfileKey>(
     shared: &Arc<Shared<P>>,
     profile: P,
     device: DeviceKey,
 ) -> Result<()> {
-    if !is_trusted(shared, device).await? {
-        return Err(Error::Untrusted);
-    }
+    let name = trusted_name(shared, device)
+        .await?
+        .ok_or(Error::Untrusted)?;
+    let now = shared.clock.timestamp();
+    let changed = shared
+        .stores
+        .with(&profile, move |store| {
+            if store.space_id()?.is_none() {
+                return Ok(None);
+            }
+            store.add_device(&device, &name, &now).map(Some)
+        })
+        .await?
+        .ok_or(Error::UnknownOffer)?;
     {
         let mut state = shared.state();
         let pending = state.outgoing_offers.entry(device).or_default();
         if !pending.contains(&profile) {
-            pending.push(profile);
+            pending.push(profile.clone());
         }
+    }
+    if changed {
+        // Membre (de nouveau) : l'espace est annoncé à l'appareil, qui le connaît peut-être déjà
+        shared.command(&device, Command::Announce);
+        shared.request_push(profile, None);
     }
     if shared.command(&device, Command::SendOffers) {
         return Ok(());
@@ -41,83 +59,24 @@ pub(super) async fn offer<P: ProfileKey>(
     Ok(())
 }
 
-/// Répond à une offre reçue. « Nouveau profil » est refusé si l'espace est déjà synchronisé
-/// ici (un espace par appareil) ; « Fusionner » seulement avec un profil non synchronisé.
-pub(super) async fn answer<P: ProfileKey>(
-    shared: &Arc<Shared<P>>,
-    device: DeviceKey,
-    space: SpaceId,
-    choice: OfferChoice<P>,
-) -> Result<()> {
-    let offer = shared
-        .state()
-        .incoming_offers
-        .get(&(device, space))
-        .cloned()
-        .ok_or(Error::UnknownOffer)?;
-    let Some(profile) = target_profile(shared, &offer, choice).await? else {
-        // Hors connexion, l'appareil reproposera l'offre à la prochaine
-        shared.forget_offer(&device, &space);
-        shared.command(&device, Command::DeclineOffer { space });
-        return runtime::refresh(shared).await;
-    };
-
-    shared.forget_offer(&device, &space);
-    shared
-        .state()
-        .accepted_offers
-        .insert((device, space), profile.clone());
-    if shared.command(&device, Command::AcceptOffer { space, profile }) {
-        return Ok(());
-    }
-    // Connexion perdue entre-temps : l'offre, reproposée à la reconnexion, sera acceptée
-    // d'office avec ce choix
-    let addrs = links::known_addrs(shared, device).await?;
-    let task_shared = Arc::clone(shared);
-    shared.runtime.spawn(async move {
-        links::connect_or_retry(&task_shared, device, &addrs).await;
-    });
-    Ok(())
-}
-
-/// Le profil local qui rejoindra l'espace proposé, `None` si l'offre est ignorée.
-async fn target_profile<P: ProfileKey>(
+/// Le nom d'un appareil de confiance non révoqué, `None` s'il ne l'est pas.
+async fn trusted_name<P: ProfileKey>(
     shared: &Shared<P>,
-    offer: &ProfileOffer,
-    choice: OfferChoice<P>,
-) -> Result<Option<P>> {
-    let already_synced = || Error::App(SyncError::AlreadySynced.into());
-    match choice {
-        OfferChoice::Ignore => Ok(None),
-        OfferChoice::NewProfile => {
-            let (space, name) = (offer.space_id, offer.name.clone());
-            let existing = shared
-                .stores
-                .run(move |profiles| profiles.profile_for(&space))
-                .await?;
-            if existing.is_some() {
-                return Err(already_synced());
-            }
-            let profile = shared
-                .stores
-                .run(move |profiles| profiles.create_profile(&name))
-                .await?;
-            Ok(Some(profile))
-        }
-        OfferChoice::Merge(profile) => {
-            let synced = shared
-                .stores
-                .with(&profile, |store| store.space_id())
-                .await?;
-            if synced.is_some() {
-                return Err(already_synced());
-            }
-            Ok(Some(profile))
-        }
-    }
+    key: DeviceKey,
+) -> Result<Option<DeviceName>> {
+    shared
+        .with_trust(move |trust| {
+            Ok(trust
+                .devices()?
+                .into_iter()
+                .find(|device| device.key == key && device.is_trusted())
+                .map(|device| device.name))
+        })
+        .await
 }
 
-/// « Arrêter de synchroniser ce profil avec <appareil> » : révocation dans l'espace.
+/// « Arrêter de synchroniser ce profil avec <appareil> » : révocation dans l'espace. Ses
+/// collections partagées ne changent pas : elles ne dépendent pas du profil.
 pub(super) async fn stop_sharing<P: ProfileKey>(
     shared: &Arc<Shared<P>>,
     profile: P,
@@ -126,11 +85,7 @@ pub(super) async fn stop_sharing<P: ProfileKey>(
     let now = shared.clock.timestamp();
     let changed = shared
         .stores
-        .with(&profile, move |store| {
-            // Ses collections partagées s'arrêtent avec le partage du profil
-            store.drop_device(&device)?;
-            store.revoke_device(&device, &now)
-        })
+        .with(&profile, move |store| store.revoke_device(&device, &now))
         .await?;
     shared.offer_delivered(&device, &profile);
     shared.command(&device, Command::Announce);
@@ -141,42 +96,59 @@ pub(super) async fn stop_sharing<P: ProfileKey>(
 }
 
 /// « Retirer l'appareil » : révoqué dans la liste de confiance (définitif) et dans tous les
-/// espaces dont il est membre ; sa session est fermée.
+/// espaces dont il est membre ; ses partages de collections et ses propositions en attente
+/// disparaissent ; sa session est fermée.
 pub(super) async fn remove_device<P: ProfileKey>(
     shared: &Arc<Shared<P>>,
     device: DeviceKey,
 ) -> Result<()> {
     let now = shared.clock.timestamp();
     revoke_trust(shared, device, now.clone()).await?;
-    let changed = shared
+    let (changed, dropped) = shared
         .stores
         .run(move |profiles| {
             let mut changed = Vec::new();
-            for profile in stores::enabled_profiles(profiles)? {
+            let mut dropped = Vec::new();
+            for profile in profiles.share_profiles()? {
+                let shares = in_store(profiles, &profile, |store| store.shares())?;
+                for share in shares.iter().filter(|share| share.peer(&device).is_some()) {
+                    dropped.push((profile.clone(), share.sync_id));
+                }
                 in_store(profiles, &profile, |store| store.drop_device(&device))?;
+            }
+            for profile in stores::enabled_profiles(profiles)? {
                 if in_store(profiles, &profile, |store| {
                     store.revoke_device(&device, &now)
                 })? {
                     changed.push(profile);
                 }
             }
-            Ok(changed)
+            Ok((changed, dropped))
         })
+        .await?;
+    shared
+        .with_inbox(move |inbox| inbox.remove_device(&device))
         .await?;
 
     {
         let mut state = shared.state();
         state.outgoing_offers.remove(&device);
-        state.incoming_offers.retain(|(key, _), _| *key != device);
-        state.accepted_offers.retain(|(key, _), _| *key != device);
         if let Some(retry) = state.retries.remove(&device).and_then(|retry| retry.task) {
             retry.abort();
         }
+        for (_, share) in &dropped {
+            state.collections.remove(share);
+        }
     }
     shared.close_session(&device);
+    for (profile, share) in &dropped {
+        shared.collection_changed(profile, *share);
+    }
+    shared.publish(app::ports::sync::SyncEvent::CollectionPendingChanged);
     for profile in changed {
         shared.request_push(profile, None);
     }
+    super::runtime::request_refresh(shared);
     shared.command_all(&Command::Announce);
     shared.publish_status();
     Ok(())

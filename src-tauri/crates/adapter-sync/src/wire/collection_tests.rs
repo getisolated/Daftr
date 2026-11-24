@@ -82,7 +82,9 @@ fn collection_messages_round_trip_with_frozen_indexes() {
     let path = || "a.md".to_owned();
     let messages = [
         Message::CollectionOffer(vec![OfferedCollection {
-            space: [1; 32],
+            space: Some([1; 32]),
+            profile_id: "work".to_owned(),
+            profile_name: "Travail".to_owned(),
             share,
             name: "Docs".to_owned(),
             files: 3,
@@ -121,6 +123,14 @@ fn collection_messages_round_trip_with_frozen_indexes() {
             hash: None,
         },
         Message::ShareStop { share },
+        Message::ProfileInfo(ProfileInfoEntry {
+            space: [1; 32],
+            name: Some("Travail".to_owned()),
+            icon: Some(vec![1, 2, 3]),
+        }),
+        Message::CollectionPending {
+            shares: vec![share],
+        },
     ];
     for (offset, message) in messages.into_iter().enumerate() {
         let bytes = message.encode().unwrap();
@@ -131,7 +141,7 @@ fn collection_messages_round_trip_with_frozen_indexes() {
         );
         assert_eq!(Message::decode(&bytes).unwrap(), message);
     }
-    assert_eq!(VARIANT_COUNT, 22);
+    assert_eq!(VARIANT_COUNT, 24);
 }
 
 #[test]
@@ -160,7 +170,9 @@ fn a_received_path_is_validated_before_use() {
 #[test]
 fn a_collection_name_received_is_cleaned() {
     let offer = OfferedCollection {
-        space: [1; 32],
+        space: None,
+        profile_id: "w\u{7}ork\n".to_owned(),
+        profile_name: format!(" Tra\u{7}vail{} ", "x".repeat(500)),
         share: [2; 16],
         name: format!(" ../Do\u{7}cs{} ", "x".repeat(500)),
         files: 0,
@@ -170,4 +182,14 @@ fn a_collection_name_received_is_cleaned() {
     assert!(name.starts_with("..Docs"));
     assert!(!name.contains('/') && !name.contains('\\'));
     assert!(name.chars().count() <= 128);
+    assert_eq!(offer.clean_profile_id(), "work");
+    let profile = offer.clean_profile_name();
+    assert!(profile.starts_with("Travail") && profile.chars().count() <= 64);
+}
+
+#[test]
+fn the_collections_bit_is_not_the_one_of_the_first_unreleased_version() {
+    // Le bit 0 annonçait des offres liées à l'espace d'un profil, au format abandonné
+    assert_eq!(FEATURE_COLLECTIONS & 1, 0);
+    assert_eq!(FEATURE_PROFILE_INFO & (FEATURE_COLLECTIONS | 1), 0);
 }

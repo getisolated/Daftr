@@ -134,7 +134,7 @@ fn ignored_dto(ignored: &Ignored) -> IgnoredFileDto {
 }
 
 /// Début de l'identifiant d'un appareil dont le nom est inconnu.
-fn short_key(key: &DeviceKey) -> String {
+pub(super) fn short_key(key: &DeviceKey) -> String {
     key.to_string().chars().take(8).collect()
 }
 

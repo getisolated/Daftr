@@ -4,16 +4,22 @@
 use std::path::{Path, PathBuf};
 
 use app::collection_sync::{IgnoredReason, MAX_FILE_BYTES};
-use app::ports::collection_sync::{CollectionDisk, CollectionSyncStore};
+use app::ports::collection_sync::{
+    CollectionDisk, CollectionInbox, CollectionSyncStore, PendingCollection,
+};
 use app::ports::sync::SyncEvent;
 use domain::uuid::Uuid;
 
 use super::support::{Device, device, eventually, link, share, space};
-use crate::{CollectionAnswer, MemoryNetwork};
+use crate::MemoryNetwork;
 
+/// Le profil de A qui porte la collection.
 const PROFILE: &str = "p";
+/// Le profil de B qui la reçoit : il ne partage rien avec A.
+const TARGET: &str = "q";
 
-/// A et B partagent le profil `p` ; A a la collection `docs`.
+/// A et B se font confiance sans partager de profil ; A a la collection `docs` dans `p`, B
+/// a un profil `q` pour la recevoir.
 struct Pair {
     a: Device,
     b: Device,
@@ -30,8 +36,8 @@ fn root(name: &str) -> PathBuf {
 async fn pair() -> Pair {
     let network = MemoryNetwork::new();
     let (a, b) = (device(&network, "A"), device(&network, "B"));
-    a.create_space(PROFILE, space(1));
-    share(&a, PROFILE, &b, PROFILE);
+    a.profiles.add(PROFILE);
+    b.profiles.add(TARGET);
     link(&a, &b);
     let a_root = root("a-docs");
     a.store(PROFILE)
@@ -64,20 +70,45 @@ impl Pair {
         record.sync_id
     }
 
+    /// A propose une seconde collection à B ; rend l'identifiant du partage.
+    async fn offer_second(&self) -> Uuid {
+        let second = root("a-second");
+        self.a
+            .store(PROFILE)
+            .list_collection(&second.to_string_lossy(), "Second");
+        self.a.disk.create_directory(&second);
+        self.a
+            .engine
+            .share_collection(
+                PROFILE.to_owned(),
+                second.to_string_lossy().into_owned(),
+                vec![self.b.key()],
+            )
+            .await
+            .unwrap()
+            .sync_id
+    }
+
     async fn accept(&self, share: Uuid, merge: bool) {
-        eventually("proposition reçue", || {
-            !self.b.engine.pending_collections().is_empty()
-        })
-        .await;
-        let answer = CollectionAnswer::Accept {
-            destination: self.b_root.clone(),
-            merge,
-        };
+        eventually("proposition reçue", || !self.pending().is_empty()).await;
         self.b
             .engine
-            .answer_collection(self.a.key(), share, answer)
+            .activate_collection(
+                self.a.key(),
+                share,
+                TARGET.to_owned(),
+                self.b_root.clone(),
+                merge,
+            )
             .await
             .unwrap();
+    }
+
+    /// Les entrées « à configurer » de B.
+    fn pending(&self) -> Vec<PendingCollection> {
+        let mut entries = self.b.inbox.pending().unwrap();
+        entries.retain(|entry| !entry.ignored);
+        entries
     }
 
     async fn a_changed(&self, share: Uuid) {
@@ -112,13 +143,14 @@ async fn nothing_is_written_before_the_user_accepts_then_files_arrive() {
     eventually("proposition reçue", || {
         pair.b.has_event(|event| {
             matches!(event, SyncEvent::CollectionOfferReceived { offers, .. }
-                if offers[0].1.files == 2 && offers[0].1.name == "Docs")
+                if offers[0].files == 2 && offers[0].name == "Docs"
+                    && offers[0].source_profile_id == PROFILE)
         })
     })
     .await;
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     assert!(pair.b_files().is_empty(), "rien avant l'acceptation");
-    assert!(pair.b.store(PROFILE).shares().unwrap().is_empty());
+    assert!(pair.b.store(TARGET).shares().unwrap().is_empty());
     assert!(!pair.b.disk.is_directory(&pair.b_root));
 
     pair.accept(share, false).await;
@@ -131,7 +163,7 @@ async fn nothing_is_written_before_the_user_accepts_then_files_arrive() {
         text(&pair.b, &pair.b_root, "guide/intro.md").as_deref(),
         Some("intro")
     );
-    let record = pair.b.store(PROFILE).share(&share).unwrap().unwrap();
+    let record = pair.b.store(TARGET).share(&share).unwrap().unwrap();
     assert_eq!(record.root, pair.b_root.to_string_lossy());
     assert!(record.is_active_with(&pair.a.key()));
     eventually("côté A actif", || {
@@ -176,7 +208,7 @@ async fn changes_deletions_and_new_files_follow_in_both_directions() {
     pair.b.disk.put(&pair.b_root, "from-b.md", b"hello");
     pair.b
         .engine
-        .collection_changed(PROFILE.to_owned(), share)
+        .collection_changed(TARGET.to_owned(), share)
         .await
         .unwrap();
     eventually("fichier de B reçu par A", || {
@@ -194,27 +226,23 @@ async fn a_folder_that_is_not_empty_needs_the_merge() {
     pair.b.disk.put(&pair.b_root, "existing.md", b"b");
     pair.start().await;
     let share = pair.offer().await;
-    eventually("proposition reçue", || {
-        !pair.b.engine.pending_collections().is_empty()
-    })
-    .await;
+    eventually("proposition reçue", || !pair.pending().is_empty()).await;
 
     let refused = pair
         .b
         .engine
-        .answer_collection(
+        .activate_collection(
             pair.a.key(),
             share,
-            CollectionAnswer::Accept {
-                destination: pair.b_root.clone(),
-                merge: false,
-            },
+            TARGET.to_owned(),
+            pair.b_root.clone(),
+            false,
         )
         .await;
 
     assert!(refused.is_err());
     assert_eq!(pair.b_files(), ["existing.md"]);
-    assert!(pair.b.store(PROFILE).shares().unwrap().is_empty());
+    assert!(pair.b.store(TARGET).shares().unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -275,7 +303,7 @@ async fn disjoint_edits_made_on_both_sides_are_merged() {
     pair.accept(share, false).await;
     eventually("copie initiale", || pair.b_files() == ["n.md"]).await;
     eventually("bases posées avec le texte", || {
-        let store = pair.b.store(PROFILE);
+        let store = pair.b.store(TARGET);
         store
             .base(&share, &pair.a.key(), "n.md")
             .unwrap()
@@ -320,7 +348,7 @@ async fn a_modification_wins_over_a_deletion_made_while_apart() {
             == 1
             && pair
                 .b
-                .store(PROFILE)
+                .store(TARGET)
                 .bases(&share, &pair.a.key())
                 .unwrap()
                 .len()
@@ -404,14 +432,11 @@ async fn declining_clears_the_offer_and_blocks_nothing() {
     pair.a.disk.put(&pair.a_root, "a.md", b"a");
     pair.start().await;
     let share = pair.offer().await;
-    eventually("proposition reçue", || {
-        !pair.b.engine.pending_collections().is_empty()
-    })
-    .await;
+    eventually("proposition reçue", || !pair.pending().is_empty()).await;
 
     pair.b
         .engine
-        .answer_collection(pair.a.key(), share, CollectionAnswer::Decline)
+        .ignore_collection(pair.a.key(), share)
         .await
         .unwrap();
 
@@ -419,14 +444,11 @@ async fn declining_clears_the_offer_and_blocks_nothing() {
         pair.a.store(PROFILE).share(&share).unwrap().is_none()
     })
     .await;
-    assert!(pair.b.engine.pending_collections().is_empty());
+    assert!(pair.pending().is_empty());
     assert!(pair.b_files().is_empty());
     // Une nouvelle proposition reste possible
     let again = pair.offer().await;
-    eventually("nouvelle proposition", || {
-        !pair.b.engine.pending_collections().is_empty()
-    })
-    .await;
+    eventually("nouvelle proposition", || !pair.pending().is_empty()).await;
     assert_ne!(again, share);
 }
 
@@ -446,7 +468,7 @@ async fn stopping_cuts_the_link_on_both_sides_and_keeps_the_files() {
         .unwrap();
 
     eventually("lien coupé chez B", || {
-        pair.b.store(PROFILE).share(&share).unwrap().is_none()
+        pair.b.store(TARGET).share(&share).unwrap().is_none()
     })
     .await;
     assert_eq!(pair.a_files(), ["a.md"]);
@@ -462,7 +484,7 @@ async fn stopping_cuts_the_link_on_both_sides_and_keeps_the_files() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn only_devices_sharing_the_profile_can_receive_a_collection() {
+async fn only_trusted_devices_can_receive_a_collection() {
     let pair = pair().await;
     let outsider = device(&pair._network, "C");
     pair.a.disk.put(&pair.a_root, "a.md", b"a");
@@ -476,11 +498,206 @@ async fn only_devices_sharing_the_profile_can_receive_a_collection() {
     let nobody = pair
         .a
         .engine
-        .share_collection(PROFILE.to_owned(), root, vec![])
+        .share_collection(PROFILE.to_owned(), root.clone(), vec![])
+        .await;
+    // B ne partage aucun profil avec A : la confiance suffit
+    let accepted = pair
+        .a
+        .engine
+        .share_collection(PROFILE.to_owned(), root, vec![pair.b.key()])
         .await;
 
     assert!(refused.is_err() && nobody.is_err());
+    assert!(accepted.is_ok());
+    assert_eq!(pair.a.store(PROFILE).shares().unwrap().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_offer_is_a_persisted_entry_to_configure_that_names_the_source_profile() {
+    let pair = pair().await;
+    pair.a.disk.put(&pair.a_root, "a.md", b"a");
+    pair.a.profiles.set_name(PROFILE, "Travail");
+    pair.start().await;
+    let share = pair.offer().await;
+
+    eventually("entrée reçue", || !pair.pending().is_empty()).await;
+
+    let entry = &pair.pending()[0];
+    assert_eq!(entry.device, pair.a.key());
+    assert_eq!(entry.offer.share, share);
+    assert_eq!(entry.offer.source_profile_id, PROFILE);
+    assert_eq!(entry.offer.source_profile_name, "Travail");
+    // Le profil source n'est pas synchronisé vers B : aucune présélection
+    assert_eq!(entry.offer.source_space, None);
+    // Rien n'est écrit ni enregistré avant l'activation
+    assert!(pair.b.store(TARGET).shares().unwrap().is_empty());
+    assert!(pair.b.store(TARGET).listed_collections().is_empty());
+    assert!(!pair.b.disk.is_directory(&pair.b_root));
+    assert_eq!(pair.b.engine.pending_collections().await.unwrap().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_source_space_is_named_when_the_profile_is_synced_with_the_device() {
+    let pair = pair().await;
+    pair.a
+        .store(PROFILE)
+        .create_space(space(7), "Profil p", &pair.a.name, super::support::NOW)
+        .unwrap();
+    share(&pair.a, PROFILE, &pair.b, "copie");
+    pair.a.disk.put(&pair.a_root, "a.md", b"a");
+    pair.start().await;
+    pair.offer().await;
+
+    eventually("entrée reçue", || !pair.pending().is_empty()).await;
+
+    assert_eq!(pair.pending()[0].offer.source_space, Some(space(7)));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_entry_to_configure_survives_a_restart() {
+    let pair = pair().await;
+    pair.a.disk.put(&pair.a_root, "a.md", b"a");
+    pair.start().await;
+    let share = pair.offer().await;
+    eventually("entrée reçue", || !pair.pending().is_empty()).await;
+
+    // B redémarre : le moteur est neuf, la liste est dans le fichier
+    pair.b.engine.shutdown().await;
+    pair.b.engine.refresh().await.unwrap();
+
+    assert_eq!(pair.pending().len(), 1);
+    pair.accept(share, false).await;
+    eventually("fichiers reçus", || pair.b_files() == ["a.md"]).await;
+    assert!(pair.pending().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_collection_goes_into_the_chosen_profile_whatever_the_source_one() {
+    let pair = pair().await;
+    pair.b.profiles.add("autre");
+    pair.a.disk.put(&pair.a_root, "a.md", b"a");
+    pair.start().await;
+    let share = pair.offer().await;
+    eventually("entrée reçue", || !pair.pending().is_empty()).await;
+
+    pair.b
+        .engine
+        .activate_collection(
+            pair.a.key(),
+            share,
+            "autre".to_owned(),
+            pair.b_root.clone(),
+            false,
+        )
+        .await
+        .unwrap();
+
+    eventually("fichiers reçus", || pair.b_files() == ["a.md"]).await;
+    let record = pair.b.store("autre").share(&share).unwrap().unwrap();
+    assert_eq!(record.root, pair.b_root.to_string_lossy());
+    assert!(pair.b.store(TARGET).shares().unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_ignored_entry_is_refused_to_the_device_even_when_it_was_absent() {
+    let pair = pair().await;
+    pair.a.disk.put(&pair.a_root, "a.md", b"a");
+    pair.start().await;
+    let share = pair.offer().await;
+    eventually("entrée reçue", || !pair.pending().is_empty()).await;
+    pair.a.engine.set_paused(true).await.unwrap();
+    pair.b.engine.set_paused(true).await.unwrap();
+
+    pair.b
+        .engine
+        .ignore_collection(pair.a.key(), share)
+        .await
+        .unwrap();
+
+    // Hors connexion : l'entrée disparaît de la liste mais le refus reste à envoyer
+    assert!(pair.pending().is_empty());
+    assert!(pair.b.inbox.pending().unwrap()[0].ignored);
+    pair.a.engine.set_paused(false).await.unwrap();
+    pair.b.engine.set_paused(false).await.unwrap();
+    eventually("partage retiré chez A", || {
+        pair.a.store(PROFILE).share(&share).unwrap().is_none()
+    })
+    .await;
+    eventually("entrée oubliée chez B", || {
+        pair.b.inbox.pending().unwrap().is_empty()
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn unsharing_with_one_device_removes_its_entry_and_keeps_the_others() {
+    let pair = pair().await;
+    let c = device(&pair._network, "C");
+    link(&pair.a, &c);
+    c.profiles.add("c");
+    pair.a.disk.put(&pair.a_root, "a.md", b"a");
+    pair.start().await;
+    c.engine.refresh().await.unwrap();
+    let root = pair.a_root.to_string_lossy().into_owned();
+    pair.a
+        .engine
+        .share_collection(
+            PROFILE.to_owned(),
+            root.clone(),
+            vec![pair.b.key(), c.key()],
+        )
+        .await
+        .unwrap();
+    eventually("entrées reçues", || {
+        !pair.pending().is_empty() && !c.inbox.pending().unwrap().is_empty()
+    })
+    .await;
+
+    let left = pair
+        .a
+        .engine
+        .set_collection_device(PROFILE.to_owned(), root.clone(), pair.b.key(), false)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert!(left.peer(&pair.b.key()).is_none());
+    assert!(left.peer(&c.key()).is_some());
+    eventually("entrée de B retirée", || pair.pending().is_empty()).await;
+    assert_eq!(c.inbox.pending().unwrap().len(), 1);
+    // Retirer le dernier appareil supprime le partage
+    let none = pair
+        .a
+        .engine
+        .set_collection_device(PROFILE.to_owned(), root, c.key(), false)
+        .await
+        .unwrap();
+    assert!(none.is_none());
     assert!(pair.a.store(PROFILE).shares().unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_entry_withdrawn_while_the_device_was_absent_is_dropped_on_reconnection() {
+    let pair = pair().await;
+    pair.a.disk.put(&pair.a_root, "a.md", b"a");
+    pair.start().await;
+    pair.offer().await;
+    eventually("entrée reçue", || !pair.pending().is_empty()).await;
+    let root = pair.a_root.to_string_lossy().into_owned();
+    pair.b.engine.set_paused(true).await.unwrap();
+
+    pair.a
+        .engine
+        .set_collection_device(PROFILE.to_owned(), root, pair.b.key(), false)
+        .await
+        .unwrap();
+    assert_eq!(pair.pending().len(), 1, "B n'a rien su");
+    pair.b.engine.set_paused(false).await.unwrap();
+
+    eventually("entrée retirée après la reconnexion", || {
+        pair.pending().is_empty()
+    })
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -527,21 +744,29 @@ async fn non_markdown_files_are_never_sent_nor_deleted() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_removed_device_leaves_the_share() {
+async fn a_removed_device_leaves_the_share_and_its_entries_disappear() {
     let pair = pair().await;
     pair.a.disk.put(&pair.a_root, "a.md", b"a");
     pair.start().await;
     let share = pair.offer().await;
     pair.accept(share, false).await;
     eventually("copie initiale", || pair.b_files() == ["a.md"]).await;
+    let other = pair.offer_second().await;
+    eventually("seconde entrée chez B", || !pair.pending().is_empty()).await;
+    pair.a.events.taken();
 
-    pair.a
-        .engine
-        .stop_sharing(PROFILE.to_owned(), pair.b.key())
-        .await
-        .unwrap();
+    pair.a.engine.remove_device(pair.b.key()).await.unwrap();
 
     let store = pair.a.store(PROFILE);
-    let record = store.share(&share).unwrap();
-    assert!(record.is_none_or(|record| record.peer(&pair.b.key()).is_none()));
+    assert!(store.share(&share).unwrap().is_none());
+    assert!(store.share(&other).unwrap().is_none());
+    // Les fenêtres sont prévenues : l'état du partage et la liste des entrées sont à relire
+    assert!(pair.a.has_event(|event| matches!(
+        event,
+        SyncEvent::CollectionChanged { share: changed, .. } if *changed == share
+    )));
+    assert!(
+        pair.a
+            .has_event(|event| matches!(event, SyncEvent::CollectionPendingChanged))
+    );
 }

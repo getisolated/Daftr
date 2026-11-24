@@ -21,7 +21,7 @@ mod state;
 mod tests;
 
 pub(crate) use local::{FolderRemovalRequest, LocalWrites};
-pub use peek::{StoredSync, read_stored_sync};
+pub use peek::{StoredSync, read_has_shares, read_stored_sync};
 pub(crate) use purge::purge_deleted;
 
 use std::sync::Arc;

@@ -1,27 +1,39 @@
-//! Offres de profils dans la session : l'appareil qui propose envoie `Offer` ; l'autre répond
-//! `OfferReply` après le choix de l'utilisateur. Accepté, le proposant ajoute l'appareil à
-//! l'espace et envoie tout son contenu (`Snapshot`, `SnapshotEnd`) ; l'autre fait rejoindre
-//! l'espace au profil choisi (`adopt_space`), acquitte, puis le rattrapage normal part dans
-//! les deux sens (ses propres notes, fusionnées, remontent ainsi).
+//! Offres de profils dans la session : l'appareil qui partage un profil envoie `Offer` ;
+//! l'autre l'accepte d'office (`OfferReply`) sans rien demander à l'utilisateur. Le proposant
+//! envoie alors le nom et l'icône (`ProfileInfo`), ajoute l'appareil à l'espace et envoie tout
+//! le contenu (`Snapshot`, `SnapshotEnd`) ; l'autre crée un NOUVEAU profil, clone du profil
+//! d'origine, qui rejoint l'espace (`adopt_space`), acquitte, puis le rattrapage normal part
+//! dans les deux sens.
+//!
+//! Le profil n'est créé qu'à la fin du contenu : une réception interrompue ne laisse aucun
+//! profil vide, et le proposant, qui garde son offre tant que l'espace n'est pas annoncé,
+//! recommence à la reconnexion. Un espace déjà présent ici n'est pas recréé (un profil par
+//! espace et par appareil).
 
 use app::AppResult;
-use app::ports::sync::{ProfileOffer, RemoteSnapshot, SyncEvent, SyncStore};
+use app::ports::sync::{ProfileIcon, ProfileOffer, RemoteSnapshot, SyncEvent, SyncStore};
 use app::sync::{StateVector, Update};
-use domain::sync::{DeviceKey, DeviceName, DocId, SpaceId};
+use domain::profile::validate_icon;
+use domain::sync::{DeviceKey, DocId, SpaceId};
 use domain::uuid::Uuid;
 
 use super::Session;
 use super::catchup::batch_updates;
 use crate::error::{Error, Result};
-use crate::stores::{ProfileKey, in_store};
-use crate::wire::{self, BATCH_DOCS, DocUpdate, MAX_OFFERS, Message, OfferEntry};
+use crate::stores::{ProfileKey, in_store, is_member};
+use crate::wire::{
+    self, BATCH_DOCS, DocUpdate, FEATURE_PROFILE_INFO, MAX_OFFERS, Message, OfferEntry,
+    ProfileInfoEntry,
+};
 
 /// Volume maximal du contenu reçu pour un espace (gardé en mémoire jusqu'à sa fusion).
 const MAX_SNAPSHOT_BYTES: usize = 1024 * 1024 * 1024;
 
 /// Contenu d'un espace accepté, en cours de réception.
-pub(super) struct Incoming<P> {
-    profile: P,
+pub(super) struct Incoming {
+    /// Nom de l'offre, repli quand `ProfileInfo` n'arrive pas (version sans clone).
+    offer_name: String,
+    info: Option<ProfileInfoEntry>,
     space: Option<Update>,
     notes: Vec<(Uuid, Update)>,
     bytes: usize,
@@ -43,14 +55,21 @@ impl<P: ProfileKey> Session<P> {
                     .into_iter()
                     .map(|profile| {
                         let offer = in_store(profiles, &profile, |store| store.offer())?;
-                        Ok((profile, offer))
+                        // Le nom courant du profil prime sur celui de l'espace, figé à sa
+                        // création
+                        let info = profiles.profile_info(&profile)?;
+                        Ok((profile, offer, info.name))
                     })
                     .collect::<AppResult<Vec<_>>>()
             })
             .await?;
 
         let mut entries = Vec::new();
-        for (profile, offer) in offers {
+        for (profile, offer, name) in offers {
+            let offer = offer.map(|offer| ProfileOffer {
+                name: name.unwrap_or(offer.name),
+                ..offer
+            });
             match offer.filter(|offer| !self.remote_spaces.contains(&offer.space_id)) {
                 Some(offer) => {
                     entries.push(wire::offer_entry(&offer));
@@ -65,8 +84,8 @@ impl<P: ProfileKey> Session<P> {
         self.send(&Message::Offer(entries)).await
     }
 
-    /// Offre reçue : proposée à l'utilisateur, sauf les espaces déjà synchronisés ici
-    /// (refusés d'office : l'appartenance arrivera par le document de l'espace).
+    /// Offre reçue : acceptée d'office, sauf les espaces déjà synchronisés ici (refusés :
+    /// l'appartenance arrivera par le document de l'espace).
     pub(super) async fn on_offer(&mut self, entries: Vec<OfferEntry>) -> Result<()> {
         if entries.len() > MAX_OFFERS {
             return Err(Error::Malformed);
@@ -84,51 +103,40 @@ impl<P: ProfileKey> Session<P> {
             })
             .await?;
 
-        let mut fresh = Vec::new();
         for (offer, known) in offers.into_iter().zip(known) {
-            let answered = self.shared.accepted_offer(&self.remote, &offer.space_id);
-            match (known, answered) {
-                // Déjà acceptée sur une connexion précédente : pas de nouvelle question
-                (_, Some(profile)) => self.accept_offer(offer.space_id, profile).await?,
-                (true, None) => self.reply_offer(offer.space_id, false).await?,
-                (false, None) => fresh.push(offer),
+            if known {
+                self.reply_offer(offer.space_id, false).await?;
+            } else {
+                self.accept_offer(offer).await?;
             }
         }
-        let Some(name) = self.remote_name.clone().filter(|_| !fresh.is_empty()) else {
-            return Ok(());
-        };
-        self.shared.receive_offers(&self.remote, &fresh);
-        self.shared.publish(SyncEvent::OfferReceived {
-            device: self.remote,
-            name,
-            offers: fresh,
-        });
         Ok(())
     }
 
-    /// L'utilisateur a accepté : le contenu de l'espace ira dans `profile`. Sans effet si la
-    /// réception est déjà en cours (offre répétée par une nouvelle connexion).
-    pub(super) async fn accept_offer(&mut self, space: SpaceId, profile: P) -> Result<()> {
-        if self.accepted.contains_key(&space) {
+    /// Accepte le profil proposé : son contenu arrive ensuite, le profil est créé à la fin.
+    /// Sans effet si la réception est déjà en cours (offre répétée par une nouvelle connexion).
+    async fn accept_offer(&mut self, offer: ProfileOffer) -> Result<()> {
+        if self.accepted.contains_key(&offer.space_id) {
             return Ok(());
         }
         let incoming = Incoming {
-            profile,
+            offer_name: offer.name,
+            info: None,
             space: None,
             notes: Vec::new(),
             bytes: 0,
         };
-        self.accepted.insert(space, incoming);
-        self.reply_offer(space, true).await
+        self.accepted.insert(offer.space_id, incoming);
+        self.reply_offer(offer.space_id, true).await
     }
 
     /// Répond à une offre.
-    pub(super) async fn reply_offer(&mut self, space: SpaceId, accepted: bool) -> Result<()> {
+    async fn reply_offer(&mut self, space: SpaceId, accepted: bool) -> Result<()> {
         let space = *space.as_bytes();
         self.send(&Message::OfferReply { space, accepted }).await
     }
 
-    /// Réponse à notre offre : acceptée, on envoie le contenu de l'espace.
+    /// Réponse à notre offre : acceptée, on envoie le nom, l'icône et le contenu de l'espace.
     pub(super) async fn on_offer_reply(&mut self, space: [u8; 32], accepted: bool) -> Result<()> {
         let space = SpaceId::from_bytes(space);
         let Some(profile) = self.offered.remove(&space) else {
@@ -138,21 +146,53 @@ impl<P: ProfileKey> Session<P> {
             self.shared.offer_delivered(&self.remote, &profile);
             return Ok(());
         }
+        self.send_profile_info(space, &profile).await?;
         self.send_snapshot(space, profile).await
     }
 
-    /// Ajoute l'appareil à l'espace, puis envoie tous les documents du profil.
-    async fn send_snapshot(&mut self, space: SpaceId, profile: P) -> Result<()> {
-        let remote = self.remote;
-        let name = self.remote_name.clone().ok_or(Error::Unexpected)?;
-        let now = self.shared.clock.timestamp();
-        let (docs, upto) = self
+    /// Le nom et l'icône du profil, pour que l'autre appareil en crée le clone. Un profil
+    /// illisible ou une icône absente n'empêchent pas la synchronisation : le nom de
+    /// l'espace sert alors de repli. Rien ne part à une version qui ne le comprend pas.
+    async fn send_profile_info(&mut self, space: SpaceId, profile: &P) -> Result<()> {
+        if self.remote_features & FEATURE_PROFILE_INFO == 0 {
+            return Ok(());
+        }
+        let source = profile.clone();
+        let info = self
             .shared
             .stores
-            .with(&profile, move |store| {
-                snapshot_docs(store, &remote, &name, &now)
+            .run(move |profiles| {
+                let name = profiles.profile_info(&source)?.name;
+                let icon = profiles.profile_icon(&source).unwrap_or_else(|error| {
+                    tracing::warn!(%error, "icône du profil illisible : non envoyée");
+                    None
+                });
+                Ok((name, icon))
             })
             .await?;
+        let (name, icon) = info;
+        let entry = ProfileInfoEntry {
+            space: *space.as_bytes(),
+            name,
+            icon: icon.map(|icon| icon.bytes),
+        };
+        self.send(&Message::ProfileInfo(entry)).await
+    }
+
+    /// Envoie tous les documents du profil, si l'appareil est encore membre de l'espace : il
+    /// l'est depuis le partage du profil, et l'utilisateur a pu décocher entre-temps (rien ne
+    /// part alors, et l'appareil n'est pas réadmis).
+    async fn send_snapshot(&mut self, space: SpaceId, profile: P) -> Result<()> {
+        let remote = self.remote;
+        let snapshot = self
+            .shared
+            .stores
+            .with(&profile, move |store| snapshot_docs(store, &remote))
+            .await?;
+        let Some((docs, upto)) = snapshot else {
+            self.shared.offer_delivered(&self.remote, &profile);
+            return Ok(());
+        };
 
         let total = docs.len() as u64;
         let bytes = *space.as_bytes();
@@ -178,13 +218,16 @@ impl<P: ProfileKey> Session<P> {
         Ok(())
     }
 
+    /// Nom et icône du profil proposé, reçus avant son contenu.
+    pub(super) fn on_profile_info(&mut self, entry: ProfileInfoEntry) {
+        let Some(incoming) = self.accepted.get_mut(&SpaceId::from_bytes(entry.space)) else {
+            return;
+        };
+        incoming.info = Some(entry);
+    }
+
     /// Un morceau du contenu d'un espace accepté.
-    pub(super) fn on_snapshot(
-        &mut self,
-        space: [u8; 32],
-        total: u64,
-        docs: Vec<DocUpdate>,
-    ) -> Result<()> {
+    pub(super) fn on_snapshot(&mut self, space: [u8; 32], docs: Vec<DocUpdate>) -> Result<()> {
         let Some(incoming) = self.accepted.get_mut(&SpaceId::from_bytes(space)) else {
             return Ok(());
         };
@@ -201,16 +244,11 @@ impl<P: ProfileKey> Session<P> {
                 DocId::Note(uuid) => incoming.notes.push((uuid, wire::update(doc.update))),
             }
         }
-        let done = incoming.notes.len() as u64 + u64::from(incoming.space.is_some());
-        self.shared.publish(SyncEvent::Progress {
-            profile: incoming.profile.clone(),
-            done,
-            total,
-        });
         Ok(())
     }
 
-    /// Fin du contenu : le profil rejoint l'espace, puis le rattrapage normal démarre.
+    /// Fin du contenu : un nouveau profil est créé, clone du profil d'origine (sans mot de
+    /// passe maître), et rejoint l'espace ; puis le rattrapage normal démarre.
     pub(super) async fn on_snapshot_end(&mut self, space: [u8; 32], seq: u64) -> Result<()> {
         let space_id = SpaceId::from_bytes(space);
         let Some(incoming) = self.accepted.remove(&space_id) else {
@@ -220,7 +258,24 @@ impl<P: ProfileKey> Session<P> {
             space: incoming.space.ok_or(Error::Malformed)?,
             notes: incoming.notes,
         };
-        let profile = incoming.profile;
+        let (name, icon) = clone_identity(incoming.info.as_ref(), incoming.offer_name);
+
+        let created = self
+            .shared
+            .stores
+            .run(move |profiles| {
+                // Un autre appareil a pu apporter le même espace entre-temps
+                if profiles.profile_for(&space_id)?.is_some() {
+                    return Ok(None);
+                }
+                let profile = profiles.create_profile(name.as_deref(), icon.as_ref())?;
+                let shown = profiles.profile_info(&profile)?.name;
+                Ok(Some((profile, shown)))
+            })
+            .await?;
+        let Some((profile, shown)) = created else {
+            return Ok(());
+        };
         let applied = self
             .shared
             .stores
@@ -228,19 +283,22 @@ impl<P: ProfileKey> Session<P> {
                 store.adopt_space(&space_id, &snapshot)
             })
             .await?;
-        self.shared.forget_offer(&self.remote, &space_id);
         self.shared.publish(SyncEvent::NotesSynced {
             profile: profile.clone(),
             notes: applied.notes,
             folders: true,
             from: self.remote_name.clone(),
         });
-
-        {
-            let mut state = self.shared.state();
-            state.accepted_offers.remove(&(self.remote, space_id));
-            state.joining.insert(space_id);
+        if let Some(device_name) = self.remote_name.clone() {
+            self.shared.publish(SyncEvent::ProfileReceived {
+                profile,
+                name: shown.unwrap_or_default(),
+                device: self.remote,
+                device_name,
+            });
         }
+
+        self.shared.state().joining.insert(space_id);
         self.send(&Message::Ack { space, seq }).await?;
         self.announce().await?;
         crate::engine::request_refresh(&self.shared);
@@ -248,15 +306,35 @@ impl<P: ProfileKey> Session<P> {
     }
 }
 
-/// Ajoute l'appareil à l'espace, puis rend tous les documents du profil en entier et le
-/// dernier `seq` écrit.
+/// Le nom et l'icône du clone : ceux du profil d'origine quand `ProfileInfo` est arrivé (un
+/// nom absent laisse le nom par défaut de cette installation), sinon le nom de l'offre. Une
+/// icône invalide est ignorée.
+fn clone_identity(
+    info: Option<&ProfileInfoEntry>,
+    offer_name: String,
+) -> (Option<String>, Option<ProfileIcon>) {
+    let Some(info) = info else {
+        let name = Some(offer_name).filter(|name| !name.is_empty());
+        return (name, None);
+    };
+    let icon = info.icon.as_ref().and_then(|bytes| {
+        validate_icon(bytes).map(|format| ProfileIcon {
+            format,
+            bytes: bytes.clone(),
+        })
+    });
+    (info.clean_name(), icon)
+}
+
+/// Tous les documents du profil en entier et le dernier `seq` écrit ; `None` si l'appareil
+/// n'est pas (ou plus) membre non révoqué de l'espace.
 fn snapshot_docs(
     store: &dyn SyncStore,
     remote: &DeviceKey,
-    name: &DeviceName,
-    now: &str,
-) -> AppResult<(Vec<DocUpdate>, u64)> {
-    store.add_device(remote, name, now)?;
+) -> AppResult<Option<(Vec<DocUpdate>, u64)>> {
+    if !is_member(&store.devices()?, remote) {
+        return Ok(None);
+    }
     let changed = store.changed_since(0)?;
     let upto = changed.iter().map(|doc| doc.seq).max().unwrap_or(0);
     let docs = changed
@@ -269,5 +347,5 @@ fn snapshot_docs(
             })
         })
         .collect::<AppResult<Vec<_>>>()?;
-    Ok((docs, upto))
+    Ok(Some((docs, upto)))
 }

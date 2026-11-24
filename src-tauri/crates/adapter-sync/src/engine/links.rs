@@ -214,11 +214,7 @@ pub(crate) fn schedule_retry<P: ProfileKey>(shared: &Arc<Shared<P>>, key: Device
 }
 
 async fn retry_now<P: ProfileKey>(shared: &Arc<Shared<P>>, key: DeviceKey) {
-    let addrs = match shared
-        .stores
-        .run(move |profiles| stores::last_addrs(profiles, &key))
-        .await
-    {
+    let addrs = match known_addrs(shared, key).await {
         Ok(addrs) => addrs,
         Err(error) => return tracing::debug!(%error, "dernières adresses illisibles"),
     };

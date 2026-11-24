@@ -21,5 +21,5 @@ pub use scan::{ScanResult, scan_folder};
 pub use settings_file::SettingsFile;
 pub use share_disk::ShareDisk;
 pub use share_watcher::{OnChange, ShareWatcher};
-pub use sync_files::{SYNC_FOLDER, SpaceIndexEntry, SpaceIndexFile, TrustFiles};
+pub use sync_files::{InboxFile, SYNC_FOLDER, SpaceIndexEntry, SpaceIndexFile, TrustFiles};
 pub use watcher::CollectionsWatcher;

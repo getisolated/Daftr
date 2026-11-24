@@ -1,5 +1,6 @@
 //! Cycle de vie du moteur : écoute et découverte démarrées seulement quand il y a quelque
-//! chose à synchroniser (ou un appairage), arrêtées sinon et pendant la pause.
+//! chose à synchroniser, un appareil de confiance dont attendre les offres, ou un appairage ;
+//! arrêtées sinon et pendant la pause.
 
 use std::net::SocketAddr;
 use std::sync::{Arc, Weak};
@@ -29,10 +30,12 @@ pub(super) async fn refresh<P: ProfileKey>(shared: &Arc<Shared<P>>) -> Result<()
         .stores
         .run(|profiles| Ok(stores::enabled_profiles(profiles)?.len()))
         .await?;
+    let trusted = links::trusted_devices(shared).await?.len();
     let (wanted, running) = {
         let mut state = shared.state();
         state.enabled_profiles = enabled;
-        let wanted = !state.paused && (enabled > 0 || state.pairing.is_some());
+        state.trusted_devices = trusted;
+        let wanted = !state.paused && (enabled > 0 || trusted > 0 || state.pairing.is_some());
         (wanted, state.runtime.is_some())
     };
 
@@ -195,17 +198,9 @@ fn stop_tasks<P: ProfileKey>(shared: &Shared<P>) -> Vec<JoinHandle<()>> {
     listeners
 }
 
-/// Sans profil à synchroniser, seules restent les sessions qui attendent la réponse de
-/// l'utilisateur à une offre, ou le contenu d'une offre acceptée.
+/// Sans profil à synchroniser ni appareil de confiance, plus aucune session n'a d'objet.
 fn close_idle_sessions<P: ProfileKey>(shared: &Shared<P>) {
-    let mut state = shared.state();
-    let waiting: Vec<_> = state
-        .incoming_offers
-        .keys()
-        .chain(state.accepted_offers.keys())
-        .map(|(key, _)| *key)
-        .collect();
-    state.sessions.retain(|key, _| waiting.contains(key));
+    shared.state().sessions.clear();
 }
 
 /// Accepte les connexions ; celles dont l'adresse n'est pas locale sont fermées avant le
@@ -386,14 +381,16 @@ pub(super) async fn set_device_name<P: ProfileKey>(
     Ok(())
 }
 
-/// Ferme le mode appairage et retire `pairing=1` de l'annonce ; rend les profils proposés.
-pub(super) fn end_pairing<P: ProfileKey>(shared: &Shared<P>) -> Option<Vec<P>> {
-    let mode = shared.state().pairing.take()?;
+/// Ferme le mode appairage et retire `pairing=1` de l'annonce ; `true` s'il était ouvert.
+pub(super) fn end_pairing<P: ProfileKey>(shared: &Shared<P>) -> bool {
+    if shared.state().pairing.take().is_none() {
+        return false;
+    }
     shared.pairing_state.send_replace(PairingState::Inactive);
     if let Err(error) = reannounce(shared) {
         tracing::debug!(%error, "réannonce impossible");
     }
-    Some(mode.profiles)
+    true
 }
 
 /// Arrête tout.

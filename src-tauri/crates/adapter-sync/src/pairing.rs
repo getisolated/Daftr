@@ -44,29 +44,21 @@ pub struct LinkedDevice {
     pub name: DeviceName,
 }
 
-/// Mode appairage ouvert : code courant, profils proposés, échecs, expiration.
+/// Mode appairage ouvert : code courant, échecs, expiration.
 #[derive(Debug)]
-pub(crate) struct PairingMode<P> {
+pub(crate) struct PairingMode {
     code: PairingCode,
     failures: u32,
     expires_at: Instant,
-    /// Profils proposés à l'appareil qui se lie.
-    pub profiles: Vec<P>,
 }
 
-impl<P> PairingMode<P> {
+impl PairingMode {
     /// Ouvre le mode à `now` pour `duration`.
-    pub(crate) fn new(
-        code: PairingCode,
-        now: Instant,
-        duration: Duration,
-        profiles: Vec<P>,
-    ) -> Self {
+    pub(crate) fn new(code: PairingCode, now: Instant, duration: Duration) -> Self {
         Self {
             code,
             failures: 0,
             expires_at: now + duration,
-            profiles,
         }
     }
 
@@ -122,7 +114,7 @@ mod tests {
     #[test]
     fn the_mode_expires() {
         let now = Instant::now();
-        let mode = PairingMode::new(code("123456"), now, PAIRING_DURATION, vec![1]);
+        let mode = PairingMode::new(code("123456"), now, PAIRING_DURATION);
         assert!(mode.is_open(now));
         assert!(mode.is_open(now + PAIRING_DURATION - Duration::from_secs(1)));
         assert!(!mode.is_open(now + PAIRING_DURATION));
@@ -130,7 +122,7 @@ mod tests {
 
     #[test]
     fn ten_failures_renew_the_code() {
-        let mut mode = PairingMode::new(code("123456"), Instant::now(), PAIRING_DURATION, vec![1]);
+        let mut mode = PairingMode::new(code("123456"), Instant::now(), PAIRING_DURATION);
         for _ in 1..MAX_FAILURES {
             assert!(!mode.record_failure(code("654321")));
             assert_eq!(mode.code().as_str(), "123456");

@@ -1,12 +1,12 @@
 //! Appairage : mode appairage de l'appareil qui affiche le code, et liaison depuis l'autre
 //! appareil (code saisi, `IP:port` en repli, ou QR code). Après la vérification, la même
-//! connexion devient une session de synchronisation : l'appareil qui affichait le code y
-//! envoie aussitôt l'offre de ses profils.
+//! connexion devient une session de synchronisation. L'appairage ne fait que créer la confiance
+//! entre les deux appareils : aucun profil n'est proposé.
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
-use domain::sync::{DeviceKey, PairingCode};
+use domain::sync::PairingCode;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio::task::JoinSet;
@@ -31,15 +31,12 @@ use crate::wire::{Message, PairRefusal, SessionKind};
 const PARALLEL_ATTEMPTS: usize = 4;
 
 /// Ouvre le mode appairage.
-pub(super) async fn start<P: ProfileKey>(
-    shared: &Arc<Shared<P>>,
-    profiles: Vec<P>,
-) -> Result<PairingTicket> {
+pub(super) async fn start<P: ProfileKey>(shared: &Arc<Shared<P>>) -> Result<PairingTicket> {
     if shared.state().paused {
         return Err(Error::Paused);
     }
     let duration = shared.config.timings.pairing;
-    let mode = PairingMode::new(random_code()?, shared.clock.now(), duration, profiles);
+    let mode = PairingMode::new(random_code()?, shared.clock.now(), duration);
     shared.state().pairing = Some(mode);
     if let Err(error) = runtime::refresh(shared).await {
         end_pairing(shared);
@@ -157,8 +154,7 @@ pub(super) async fn respond<P: ProfileKey>(
         }
         Verdict::Paired => {
             let remote = channel.remote;
-            let profiles = end_pairing(shared).unwrap_or_default();
-            queue_offers(shared, remote, profiles);
+            end_pairing(shared);
             let opening = Opening {
                 initiator: remote,
                 addr: None,
@@ -182,16 +178,6 @@ fn record_failure<P: ProfileKey>(shared: &Shared<P>) -> Result<()> {
         publish_ticket(shared)?;
     }
     Ok(())
-}
-
-fn queue_offers<P: ProfileKey>(shared: &Shared<P>, remote: DeviceKey, profiles: Vec<P>) {
-    let mut state = shared.state();
-    let pending = state.outgoing_offers.entry(remote).or_default();
-    for profile in profiles {
-        if !pending.contains(&profile) {
-            pending.push(profile);
-        }
-    }
 }
 
 /// Côté appareil qui se lie, par code : vers `address` (repli), ou vers chaque appareil en

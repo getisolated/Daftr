@@ -22,7 +22,7 @@ pub use collection_sync::{
     CollectionConflictDto, CollectionConflictsDto, CollectionOfferDto, CollectionOffersDto,
     CollectionPeerStateDto, CollectionProgressDto, CollectionShareDeviceDto, CollectionShareDto,
     CollectionShareStatusKind, CollectionStateEventDto, CollectionSyncStateDto, FolderSummaryDto,
-    IgnoredFileDto, IgnoredReasonDto,
+    IgnoredFileDto, IgnoredReasonDto, ProfileCollectionDto,
 };
 pub use folder::FolderDto;
 pub use mcp::{McpErrorKind, McpState, McpStatusDto};
@@ -30,9 +30,9 @@ pub use note::{ExportProgressDto, ExportedNoteDto, NoteChangesDto, NoteDto};
 pub use profile::{ProfileDto, ProfilesStateDto, TransferResultDto};
 pub use settings::{OverlayPositionDto, SettingsDto, SettingsUpdateResultDto};
 pub use sync::{
-    InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, OfferReceivedDto, PairingStateDto,
-    PairingTicketDto, ProfileOfferDto, ProfileSyncDto, SharedProfileDto, SpaceDeviceDto,
-    SyncProgressDto, SyncStateDto, SyncStatusDto, SyncStatusKind, SyncedProfileDto, TrustOriginDto,
-    TrustedDeviceDto,
+    InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, PairingStateDto, PairingTicketDto,
+    ProfileReceivedDto, ProfileShareDeviceDto, ProfileShareDto, ProfileSharesDto, ProfileSyncDto,
+    SharedProfileDto, SpaceDeviceDto, SyncProgressDto, SyncStateDto, SyncStatusDto, SyncStatusKind,
+    SyncedProfileDto, TrustOriginDto, TrustedDeviceDto,
 };
 pub use update::{UpdateInfoDto, UpdateProgressDto};

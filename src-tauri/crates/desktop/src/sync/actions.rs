@@ -1,5 +1,5 @@
 //! Ce que font les commandes de la synchronisation, sans Tauri : vue d'ensemble, appareils,
-//! appairage, offres, retraits. Les entrées sont déjà validées par
+//! appairage, partage des profils, retraits. Les entrées sont déjà validées par
 //! `presentation::sync`.
 
 use std::collections::HashMap;
@@ -7,20 +7,21 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use adapter_sync::{Fingerprint, LinkedDevice, OfferChoice, PairingState, PairingTicket};
+use adapter_sync::{Fingerprint, LinkedDevice, PairingState, PairingTicket};
+use app::AppResult;
 use app::ports::sync::{SyncProfiles, SyncStore};
 use app::ports::trust::{TrustStore, TrustedDevice};
-use app::{AppResult, SyncError};
 use domain::i18n::{MessageKey, message};
 use domain::profile::ProfileId;
 use domain::settings::AppSettings;
-use domain::sync::{DeviceKey, DeviceKind, PairingCode, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, PairingCode};
 use presentation::IpcResult;
 use presentation::dto::{
-    LinkedDeviceDto, PairingStateDto, PairingTicketDto, ProfileSyncDto, SharedProfileDto,
-    SpaceDeviceDto, SyncStateDto, SyncedProfileDto, TrustedDeviceDto,
+    LinkedDeviceDto, PairingStateDto, PairingTicketDto, ProfileShareDeviceDto, ProfileShareDto,
+    ProfileSharesDto, ProfileSyncDto, SharedProfileDto, SpaceDeviceDto, SyncStateDto,
+    SyncedProfileDto, TrustedDeviceDto,
 };
-use presentation::sync::{OfferAnswer, linked_device};
+use presentation::sync::linked_device;
 
 use super::{DesktopSyncProfiles, SyncState, ipc_error};
 
@@ -106,19 +107,10 @@ impl SyncState {
         })
     }
 
-    /// « Lier un appareil » : les profils cochés deviennent synchronisés (espace créé au
-    /// besoin), puis le mode appairage s'ouvre.
-    pub async fn start_pairing(
-        &self,
-        profiles: Vec<ProfileId>,
-        settings: &AppSettings,
-    ) -> IpcResult<PairingTicketDto> {
-        self.ensure_spaces(profiles.clone(), settings).await?;
-        let ticket = self
-            .engine
-            .start_pairing(profiles)
-            .await
-            .map_err(ipc_error)?;
+    /// « Lier un appareil » : ouvre le mode appairage. Il ne fait que créer la confiance entre
+    /// deux appareils, aucun profil n'est partagé ni créé (voir [`SyncState::set_profile_shared`]).
+    pub async fn start_pairing(&self) -> IpcResult<PairingTicketDto> {
+        let ticket = self.engine.start_pairing().await.map_err(ipc_error)?;
         Ok(ticket_dto(&ticket))
     }
 
@@ -146,51 +138,43 @@ impl SyncState {
         Ok(linked_device(&key, &name))
     }
 
-    /// Réponse à un profil proposé ; « nouveau profil » est refusé si l'espace a déjà son
-    /// profil ici (un espace par appareil).
-    pub async fn answer_offer(
-        &self,
-        device: DeviceKey,
-        space: SpaceId,
-        answer: OfferAnswer,
-    ) -> IpcResult<()> {
-        let choice = match answer {
-            OfferAnswer::NewProfile => {
-                if self.profiles.profile_for(&space)?.is_some() {
-                    return Err(app::AppError::from(SyncError::AlreadySynced).into());
-                }
-                OfferChoice::NewProfile
-            }
-            OfferAnswer::Merge(profile) => {
-                self.profiles.profile_name(&profile)?;
-                OfferChoice::Merge(profile)
-            }
-            OfferAnswer::Ignore => OfferChoice::Ignore,
-        };
-        self.engine
-            .answer_offer(device, space, choice)
-            .await
-            .map_err(ipc_error)
-    }
-
-    /// « Synchroniser avec… » : propose le profil (synchronisé au besoin) à un appareil.
-    pub async fn offer_profile(
+    /// Partage le profil avec l'appareil (`shared`) ou arrête de le partager. Partager crée
+    /// l'espace du profil au besoin et le propose à l'appareil, qui en crée un clone sans rien
+    /// demander ; arrêter le retire de l'espace (ce que l'appareil a déjà copié lui reste).
+    pub async fn set_profile_shared(
         &self,
         profile: ProfileId,
         device: DeviceKey,
+        shared: bool,
         settings: &AppSettings,
-    ) -> IpcResult<()> {
-        self.ensure_spaces(vec![profile.clone()], settings).await?;
-        self.engine.offer(profile, device).await.map_err(ipc_error)
+    ) -> IpcResult<ProfileSharesDto> {
+        self.profiles.profile_name(&profile)?;
+        if shared {
+            self.ensure_spaces(vec![profile.clone()], settings).await?;
+            self.engine
+                .offer(profile, device)
+                .await
+                .map_err(ipc_error)?;
+        } else if self.profiles.space_of(&profile).is_some() {
+            self.engine
+                .stop_sharing(profile, device)
+                .await
+                .map_err(ipc_error)?;
+        }
+        self.profile_shares().await
     }
 
-    /// « Arrêter de synchroniser ce profil avec <appareil> ».
-    pub async fn stop_sharing(&self, profile: ProfileId, device: DeviceKey) -> IpcResult<()> {
-        self.profiles.profile_name(&profile)?;
-        self.engine
-            .stop_sharing(profile, device)
+    /// Le partage de chaque profil avec chaque appareil de confiance non révoqué.
+    pub async fn profile_shares(&self) -> IpcResult<ProfileSharesDto> {
+        let trust = Arc::clone(&self.trust);
+        let devices: Vec<DeviceKey> = blocking(move || trust.devices())
+            .await?
+            .into_iter()
+            .filter(TrustedDevice::is_trusted)
+            .map(|device| device.key)
+            .collect();
+        self.on_profiles(move |profiles| shares_of(profiles, &devices))
             .await
-            .map_err(ipc_error)
     }
 
     /// « Retirer l'appareil ».
@@ -295,6 +279,43 @@ fn shared_profiles(
         }
     }
     Ok(shared)
+}
+
+/// Le partage des profils : un appareil est « partagé » quand il est membre non révoqué de
+/// l'espace du profil, « en attente » tant qu'il n'a échangé aucun document.
+fn shares_of(profiles: &DesktopSyncProfiles, devices: &[DeviceKey]) -> AppResult<ProfileSharesDto> {
+    let mut shares = Vec::new();
+    for profile in profiles.profiles()? {
+        let space = profiles.space_of(&profile);
+        let members = match space {
+            Some(_) => profiles.with_sqlite(&profile, |store| {
+                store
+                    .devices()?
+                    .into_iter()
+                    .filter(|device| device.revoked_at.is_none())
+                    .map(|device| Ok((store.peer(&device.key)?.is_some(), device.key)))
+                    .collect::<AppResult<Vec<_>>>()
+            })?,
+            None => Vec::new(),
+        };
+        let devices = devices
+            .iter()
+            .map(|key| {
+                let member = members.iter().find(|(_, member)| member == key);
+                ProfileShareDeviceDto {
+                    device_key: key.to_string(),
+                    shared: member.is_some(),
+                    pending: member.is_some_and(|(exchanged, _)| !exchanged),
+                }
+            })
+            .collect();
+        shares.push(ProfileShareDto {
+            profile_id: profile.as_str().to_owned(),
+            space_id: space.map(|space| space.space_id.to_string()),
+            devices,
+        });
+    }
+    Ok(ProfileSharesDto { profiles: shares })
 }
 
 /// Le mode appairage pour le renderer.

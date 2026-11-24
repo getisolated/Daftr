@@ -3,6 +3,7 @@
 //! (`index.json`). Tous sont écrits de façon atomique et relus de façon tolérante.
 
 mod devices_json;
+mod inbox_json;
 mod index_json;
 mod permissions;
 #[cfg(test)]
@@ -12,10 +13,12 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use app::ports::collection_sync::{CollectionInbox, PendingCollection};
 use app::ports::trust::{DeviceSecret, TrustStore, TrustedDevice};
 use app::{AppError, AppResult};
 use domain::profile::ProfileId;
 use domain::sync::{DeviceKey, DeviceKind, SpaceId};
+use domain::uuid::Uuid;
 use platform::sync::lock;
 
 use crate::profile_directories::write_atomically;
@@ -25,6 +28,7 @@ pub const SYNC_FOLDER: &str = "sync";
 const DEVICE_KEY_FILE: &str = "device.key";
 const DEVICES_FILE: &str = "devices.json";
 const INDEX_FILE: &str = "index.json";
+const INBOX_FILE: &str = "collection-offers.json";
 /// Suffixe de la copie gardée d'un fichier illisible.
 const CORRUPTED_SUFFIX: &str = ".corrupted";
 /// Taille de la clé privée.
@@ -215,4 +219,82 @@ fn suffixed(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(suffix);
     PathBuf::from(name)
+}
+
+/// `collection-offers.json` : les collections proposées par un autre appareil et pas encore
+/// activées ici. Écriture atomique, lecture tolérante (un fichier illisible est mis de côté :
+/// le proposant renvoie ses offres tant qu'elles n'ont pas de réponse).
+pub struct InboxFile {
+    path: PathBuf,
+    /// Sérialise les lectures-écritures dans ce processus.
+    guard: Mutex<()>,
+}
+
+impl InboxFile {
+    /// Fichier dans `directory` (le dossier `sync/`, créé à la première écriture).
+    pub fn new(directory: &Path) -> Self {
+        Self {
+            path: directory.join(INBOX_FILE),
+            guard: Mutex::new(()),
+        }
+    }
+
+    fn read(&self) -> AppResult<Vec<PendingCollection>> {
+        let Some(text) = read_text(&self.path)? else {
+            return Ok(Vec::new());
+        };
+        let entries = inbox_json::from_text(&text);
+        if entries.is_none() {
+            tracing::error!("collection-offers.json illisible : copie gardée");
+            keep_corrupted_copy(&self.path);
+        }
+        Ok(entries.unwrap_or_default())
+    }
+
+    fn write(&self, entries: &[PendingCollection]) -> AppResult<()> {
+        if let Some(directory) = self.path.parent() {
+            std::fs::create_dir_all(directory).map_err(AppError::file_system)?;
+        }
+        let text = inbox_json::to_text(entries)?;
+        write_atomically(&self.path, text.as_bytes())
+    }
+}
+
+impl CollectionInbox for InboxFile {
+    fn pending(&self) -> AppResult<Vec<PendingCollection>> {
+        let _guard = lock(&self.guard);
+        self.read()
+    }
+
+    fn put(&self, entry: &PendingCollection) -> AppResult<()> {
+        let _guard = lock(&self.guard);
+        let mut entries = self.read()?;
+        entries
+            .retain(|known| known.device != entry.device || known.offer.share != entry.offer.share);
+        entries.push(entry.clone());
+        self.write(&entries)
+    }
+
+    fn remove(&self, device: &DeviceKey, share: &Uuid) -> AppResult<bool> {
+        let _guard = lock(&self.guard);
+        let mut entries = self.read()?;
+        let before = entries.len();
+        entries.retain(|known| known.device != *device || known.offer.share != *share);
+        if entries.len() == before {
+            return Ok(false);
+        }
+        self.write(&entries)?;
+        Ok(true)
+    }
+
+    fn remove_device(&self, device: &DeviceKey) -> AppResult<()> {
+        let _guard = lock(&self.guard);
+        let mut entries = self.read()?;
+        let before = entries.len();
+        entries.retain(|known| known.device != *device);
+        if entries.len() != before {
+            self.write(&entries)?;
+        }
+        Ok(())
+    }
 }

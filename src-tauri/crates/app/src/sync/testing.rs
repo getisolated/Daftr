@@ -4,10 +4,12 @@
 
 mod collections;
 mod disk;
+mod inbox;
 mod store;
 mod trust;
 
 pub use disk::MemoryDisk;
+pub use inbox::MemoryInbox;
 pub use store::MemorySyncStore;
 pub use trust::MemoryTrust;
 
@@ -18,12 +20,16 @@ use domain::sync::{DeviceKey, SpaceId};
 use platform::sync::lock;
 
 use crate::AppResult;
-use crate::ports::sync::{SyncEvent, SyncEvents, SyncProfiles, SyncStore, SyncedProfile};
+use crate::ports::sync::{
+    ProfileIcon, ProfileInfo, SyncEvent, SyncEvents, SyncProfiles, SyncStore, SyncedProfile,
+};
 
 /// Profils en mémoire, nommés `p1`, `p2`… dans l'ordre de création.
 pub struct MemoryProfiles {
     device: DeviceKey,
     profiles: Mutex<BTreeMap<String, Arc<MemorySyncStore>>>,
+    names: Mutex<BTreeMap<String, String>>,
+    icons: Mutex<BTreeMap<String, ProfileIcon>>,
 }
 
 impl MemoryProfiles {
@@ -32,6 +38,8 @@ impl MemoryProfiles {
         Self {
             device,
             profiles: Mutex::default(),
+            names: Mutex::default(),
+            icons: Mutex::default(),
         }
     }
 
@@ -45,6 +53,26 @@ impl MemoryProfiles {
         let store = Arc::new(MemorySyncStore::new(self.device));
         lock(&self.profiles).insert(profile.to_owned(), Arc::clone(&store));
         store
+    }
+
+    /// Donne un nom au profil.
+    pub fn set_name(&self, profile: &str, name: &str) {
+        lock(&self.names).insert(profile.to_owned(), name.to_owned());
+    }
+
+    /// Donne une icône au profil.
+    pub fn set_icon(&self, profile: &str, icon: ProfileIcon) {
+        lock(&self.icons).insert(profile.to_owned(), icon);
+    }
+
+    /// Le nom du profil, s'il en a un.
+    pub fn name(&self, profile: &str) -> Option<String> {
+        lock(&self.names).get(profile).cloned()
+    }
+
+    /// L'icône du profil, s'il en a une.
+    pub fn icon(&self, profile: &str) -> Option<ProfileIcon> {
+        lock(&self.icons).get(profile).cloned()
     }
 
     fn space_of(store: &MemorySyncStore) -> Option<SpaceId> {
@@ -75,10 +103,29 @@ impl SyncProfiles for MemoryProfiles {
         work(store.as_ref())
     }
 
-    fn create_profile(&self, _name: &str) -> AppResult<String> {
-        let name = format!("p{}", lock(&self.profiles).len() + 1);
-        self.add(&name);
-        Ok(name)
+    fn create_profile(&self, name: Option<&str>, icon: Option<&ProfileIcon>) -> AppResult<String> {
+        let profile = format!("p{}", lock(&self.profiles).len() + 1);
+        self.add(&profile);
+        self.set_name(&profile, name.unwrap_or("Default profile"));
+        if let Some(icon) = icon {
+            self.set_icon(&profile, icon.clone());
+        }
+        Ok(profile)
+    }
+
+    fn profiles(&self) -> AppResult<Vec<String>> {
+        Ok(lock(&self.profiles).keys().cloned().collect())
+    }
+
+    fn profile_info(&self, profile: &String) -> AppResult<ProfileInfo> {
+        Ok(ProfileInfo {
+            id: profile.clone(),
+            name: self.name(profile),
+        })
+    }
+
+    fn profile_icon(&self, profile: &String) -> AppResult<Option<ProfileIcon>> {
+        Ok(self.icon(profile))
     }
 
     fn synced_profiles(&self) -> AppResult<Vec<SyncedProfile<String>>> {

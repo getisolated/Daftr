@@ -4,11 +4,12 @@
 use std::path::{Path, PathBuf};
 
 use app::ports::sync::CollectionOffer;
-use domain::sync::{DeviceKey, DeviceName};
+use domain::profile::ProfileId;
+use domain::sync::DeviceKey;
 use domain::uuid::Uuid;
 
 use crate::dto::{CollectionOfferDto, LinkedDeviceDto};
-use crate::sync::{linked_device, parse_device_key};
+use crate::sync::parse_device_key;
 use crate::{IpcError, IpcResult};
 
 /// Appareils au plus dans une demande de partage.
@@ -53,23 +54,20 @@ pub fn parse_destination(text: &str) -> IpcResult<PathBuf> {
     }
 }
 
-/// Réponse à une collection proposée.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Comment activer une collection reçue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OfferMode {
     /// Recevoir dans un dossier vide ou à créer.
     Receive,
     /// Recevoir en fusionnant avec le contenu d'un dossier existant.
     Merge,
-    /// Refuser cette proposition.
-    Decline,
 }
 
-/// Mode envoyé par le renderer : `receive`, `merge` ou `decline`.
+/// Mode envoyé par le renderer : `receive` ou `merge`.
 pub fn parse_offer_mode(text: &str) -> IpcResult<OfferMode> {
     match text {
         "receive" => Ok(OfferMode::Receive),
         "merge" => Ok(OfferMode::Merge),
-        "decline" => Ok(OfferMode::Decline),
         _ => Err(IpcError::invalid_input("invalid offer mode")),
     }
 }
@@ -121,28 +119,29 @@ pub fn suggested_destination(received_folder: &str, name: &str) -> String {
         .into_owned()
 }
 
-/// Une proposition pour le renderer.
+/// Une entrée « à configurer » pour le renderer ; `synced_here` : le profil local déjà
+/// synchronisé avec le profil source.
 pub fn offer_dto(
     device: &DeviceKey,
-    device_name: &DeviceName,
-    profile_id: &str,
+    device_name: &str,
     offer: &CollectionOffer,
+    synced_here: Option<&ProfileId>,
     received_folder: &str,
 ) -> CollectionOfferDto {
     CollectionOfferDto {
-        device: linked_device(device, device_name),
-        profile_id: profile_id.to_owned(),
+        device: LinkedDeviceDto {
+            key: device.to_string(),
+            name: device_name.to_owned(),
+        },
         sync_id: offer.share.to_string(),
         name: offer.name.clone(),
         files: offer.files,
         bytes: offer.bytes,
+        source_profile_id: offer.source_profile_id.clone(),
+        source_profile_name: offer.source_profile_name.clone(),
+        source_profile_synced_here: synced_here.map(|profile| profile.as_str().to_owned()),
         suggested_destination: suggested_destination(received_folder, &offer.name),
     }
-}
-
-/// L'appareil d'une proposition, pour le renderer.
-pub fn offer_device(device: &DeviceKey, name: &DeviceName) -> LinkedDeviceDto {
-    linked_device(device, name)
 }
 
 #[cfg(test)]
@@ -179,11 +178,37 @@ mod tests {
     #[test]
     fn reads_the_offer_mode_and_the_conflict_choice() {
         assert_eq!(parse_offer_mode("merge").unwrap(), OfferMode::Merge);
-        assert_eq!(parse_offer_mode("decline").unwrap(), OfferMode::Decline);
+        assert!(parse_offer_mode("decline").is_err());
         assert!(parse_offer_mode("replace").is_err());
         assert_eq!(parse_conflict_keep("mine").unwrap(), ConflictKeep::Mine);
         assert_eq!(parse_conflict_keep("other").unwrap(), ConflictKeep::Other);
         assert!(parse_conflict_keep("both").is_err());
+    }
+
+    #[test]
+    fn an_entry_to_configure_carries_the_source_profile_and_the_preselected_target() {
+        let offer = CollectionOffer {
+            share: Uuid::from_random([4; 16]),
+            source_profile_id: "work".to_owned(),
+            source_profile_name: "Travail".to_owned(),
+            source_space: None,
+            name: "Docs".to_owned(),
+            files: 3,
+            bytes: 90,
+        };
+        let device = DeviceKey::from_bytes([1; 32]);
+        let local = ProfileId::parse("copie").unwrap();
+
+        let synced = offer_dto(&device, "Portable", &offer, Some(&local), "/recus");
+        let unsynced = offer_dto(&device, "Portable", &offer, None, "/recus");
+
+        assert_eq!(synced.source_profile_synced_here.as_deref(), Some("copie"));
+        assert_eq!(unsynced.source_profile_synced_here, None);
+        assert_eq!(synced.source_profile_id, "work");
+        assert_eq!(synced.source_profile_name, "Travail");
+        assert_eq!(synced.device.name, "Portable");
+        assert_eq!(synced.sync_id, offer.share.to_string());
+        assert!(synced.suggested_destination.ends_with("Docs"));
     }
 
     #[test]

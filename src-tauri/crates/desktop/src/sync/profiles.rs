@@ -8,12 +8,14 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use adapter_fs::{DATABASE_FILE, ProfileDirectories, SYNC_FOLDER, SpaceIndexFile};
-use adapter_sqlite::{SqliteStore, read_stored_sync};
+use adapter_sqlite::{SqliteStore, read_has_shares, read_stored_sync};
 use app::folders::FoldersService;
 use app::ports::ProfileFiles;
-use app::ports::sync::{SyncProfiles, SyncStore, SyncedProfile};
+use app::ports::collection_sync::CollectionSyncStore;
+use app::ports::sync::{ProfileIcon, ProfileInfo, SyncProfiles, SyncStore, SyncedProfile};
 use app::profiles::ProfilesService;
 use app::{AppResult, Refusal};
+use domain::i18n::{Language, MessageKey, message};
 use domain::profile::ProfileId;
 use domain::sync::{DeviceKey, DeviceName, SpaceId};
 use platform::sync::lock;
@@ -38,6 +40,8 @@ pub struct DesktopSyncProfiles {
     active: Mutex<Option<ActiveStore>>,
     index: SpaceIndex,
     hook: Arc<OnceLock<ChangeHook>>,
+    /// Langue de l'application : nom par défaut d'un profil cloné dont l'original n'a pas de nom.
+    language: Mutex<Language>,
 }
 
 impl DesktopSyncProfiles {
@@ -51,7 +55,13 @@ impl DesktopSyncProfiles {
             active: Mutex::new(None),
             index: SpaceIndex::load(file),
             hook: Arc::new(OnceLock::new()),
+            language: Mutex::new(domain::i18n::DEFAULT_LANGUAGE),
         }
+    }
+
+    /// Retient la langue de l'application (réglage).
+    pub fn set_language(&self, language: Language) {
+        *lock(&self.language) = language;
     }
 
     /// Branche le moteur sur les écritures locales (une seule fois, après sa création).
@@ -211,20 +221,74 @@ impl SyncProfiles for DesktopSyncProfiles {
         self.with_sqlite(profile, |store| work(store))
     }
 
-    /// Un nom refusé tombe sur un profil sans nom ; la base est créée avec son dossier par
-    /// défaut, comme depuis l'interface.
-    fn create_profile(&self, name: &str) -> AppResult<ProfileId> {
-        let profile = self.profiles.create(Some(name))?.id;
+    /// Le clone d'un profil partagé : `name` absent (profil par défaut sans nom) prend le nom par
+    /// défaut dans la langue de l'application ; un nom refusé, ou une icône refusée, laissent le
+    /// profil créé sans eux plutôt que d'empêcher la réception. La base est créée avec son
+    /// dossier par défaut, comme depuis l'interface.
+    fn create_profile(
+        &self,
+        name: Option<&str>,
+        icon: Option<&ProfileIcon>,
+    ) -> AppResult<ProfileId> {
+        let default_name = message(*lock(&self.language), MessageKey::SyncDefaultProfileName);
+        let profile = self.profiles.create(Some(name.unwrap_or(default_name)))?.id;
+        if let Some(icon) = icon
+            && let Err(error) = self.profiles.set_icon(&profile, &icon.bytes)
+        {
+            tracing::warn!(%error, profile = profile.as_str(), "icône du profil cloné refusée");
+        }
         let store = self.open_store(&profile)?;
         FoldersService::new(store).ensure_default()?;
         tracing::info!(
             profile = profile.as_str(),
-            "profil créé pour une synchronisation"
+            "profil cloné créé pour une synchronisation"
         );
         Ok(profile)
     }
 
     fn synced_profiles(&self) -> AppResult<Vec<SyncedProfile<ProfileId>>> {
         Ok(self.index.synced())
+    }
+
+    fn profiles(&self) -> AppResult<Vec<ProfileId>> {
+        Ok(self
+            .profiles
+            .registry()
+            .profiles()
+            .iter()
+            .map(|profile| profile.id.clone())
+            .collect())
+    }
+
+    fn share_profiles(&self) -> AppResult<Vec<ProfileId>> {
+        let active = lock(&self.active)
+            .as_ref()
+            .map(|active| (active.profile.clone(), Arc::clone(&active.store)));
+        let directories = self.directories();
+        let mut found = Vec::new();
+        for profile in self.profiles()? {
+            let has_shares = match &active {
+                Some((id, store)) if *id == profile => !store.shares()?.is_empty(),
+                _ => read_has_shares(&directories.directory(&profile).join(DATABASE_FILE))?,
+            };
+            if has_shares {
+                found.push(profile);
+            }
+        }
+        Ok(found)
+    }
+
+    fn profile_info(&self, profile: &ProfileId) -> AppResult<ProfileInfo> {
+        Ok(ProfileInfo {
+            id: profile.as_str().to_owned(),
+            name: self.profile_name(profile)?,
+        })
+    }
+
+    fn profile_icon(&self, profile: &ProfileId) -> AppResult<Option<ProfileIcon>> {
+        Ok(self
+            .profiles
+            .icon(profile)?
+            .map(|(format, bytes)| ProfileIcon { format, bytes }))
     }
 }

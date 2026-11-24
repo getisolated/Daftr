@@ -4,32 +4,23 @@
 
 use std::net::{IpAddr, SocketAddr};
 
-use app::ports::sync::SyncEvent;
+use app::ports::sync::{CollectionOffer, SyncEvent};
 use domain::profile::ProfileId;
 use domain::settings::{DEFAULT_SYNC_PORT, SYNC_MAX_PORT, SYNC_MIN_PORT};
-use domain::sync::{DeviceKey, DeviceName, PairingCode, SpaceId};
+use domain::sync::{DeviceKey, DeviceName, PairingCode};
 
-use crate::collection_sync::offer_dto;
 use crate::dto::{
-    CollectionOffersDto, CollectionProgressDto, InitialSyncDoneDto, LinkedDeviceDto,
-    NotesSyncedDto, OfferReceivedDto, ProfileOfferDto, SyncProgressDto, SyncStatusDto,
+    CollectionProgressDto, InitialSyncDoneDto, LinkedDeviceDto, NotesSyncedDto, ProfileReceivedDto,
+    SyncProgressDto, SyncStatusDto,
 };
-use crate::profiles::parse_id;
 use crate::{IpcError, IpcResult};
 
-/// Profils proposés au plus en une fois (garde-fou contre une demande démesurée).
-pub const MAX_PROFILES_PER_REQUEST: usize = 64;
 /// Longueur maximale d'une adresse saisie.
 const MAX_ADDRESS_LENGTH: usize = 64;
 
 /// Clé d'appareil envoyée par le renderer (64 chiffres hexadécimaux).
 pub fn parse_device_key(text: &str) -> IpcResult<DeviceKey> {
     DeviceKey::parse(text.trim()).ok_or_else(|| IpcError::invalid_input("invalid device key"))
-}
-
-/// Espace envoyé par le renderer (64 chiffres hexadécimaux).
-pub fn parse_space_id(text: &str) -> IpcResult<SpaceId> {
-    SpaceId::parse(text.trim()).ok_or_else(|| IpcError::invalid_input("invalid space id"))
 }
 
 /// Code d'appairage saisi : six chiffres, espaces ignorés.
@@ -67,21 +58,6 @@ pub fn parse_address(text: Option<&str>) -> IpcResult<Option<SocketAddr>> {
     Ok(Some(SocketAddr::new(ip, DEFAULT_SYNC_PORT)))
 }
 
-/// Profils cochés : au moins un, sans doublon, identifiants valides.
-pub fn parse_profiles(ids: &[String]) -> IpcResult<Vec<ProfileId>> {
-    if ids.is_empty() || ids.len() > MAX_PROFILES_PER_REQUEST {
-        return Err(IpcError::invalid_input("invalid profile selection"));
-    }
-    let mut profiles: Vec<ProfileId> = Vec::with_capacity(ids.len());
-    for id in ids {
-        let profile = parse_id(id)?;
-        if !profiles.contains(&profile) {
-            profiles.push(profile);
-        }
-    }
-    Ok(profiles)
-}
-
 /// Nom de l'appareil saisi : vide pour revenir au nom d'hôte, sinon un nom valide.
 pub fn parse_device_name(text: &str) -> IpcResult<String> {
     if text.trim().is_empty() {
@@ -100,27 +76,6 @@ pub fn parse_port(port: u32) -> IpcResult<u16> {
         .ok_or_else(|| IpcError::invalid_input("invalid port"))
 }
 
-/// Réponse de l'utilisateur à un profil proposé.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OfferAnswer {
-    /// Créer un nouveau profil avec le nom proposé.
-    NewProfile,
-    /// Fusionner avec ce profil local (non synchronisé).
-    Merge(ProfileId),
-    /// Ignorer.
-    Ignore,
-}
-
-/// Choix envoyé par le renderer : `new`, `merge` (avec `profile`) ou `ignore`.
-pub fn parse_offer_answer(choice: &str, profile: Option<&str>) -> IpcResult<OfferAnswer> {
-    match (choice, profile) {
-        ("new", None) => Ok(OfferAnswer::NewProfile),
-        ("ignore", None) => Ok(OfferAnswer::Ignore),
-        ("merge", Some(profile)) => Ok(OfferAnswer::Merge(parse_id(profile)?)),
-        _ => Err(IpcError::invalid_input("invalid offer answer")),
-    }
-}
-
 /// Un événement de la synchronisation prêt pour le renderer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncEventDto {
@@ -134,10 +89,20 @@ pub enum SyncEventDto {
     InitialSyncDone(InitialSyncDoneDto),
     /// `sync:device-linked`.
     DeviceLinked(LinkedDeviceDto),
-    /// `sync:offer-received`.
-    OfferReceived(OfferReceivedDto),
+    /// `sync:profile-received`.
+    ProfileReceived(ProfileReceivedDto),
+    /// Nouvelles collections reçues « à configurer » : le crate `desktop` complète chaque
+    /// proposition (profil source déjà synchronisé ici, destination proposée) et émet
     /// `sync:collection-offer`.
-    CollectionOffer(CollectionOffersDto),
+    CollectionOffered {
+        /// L'appareil qui propose.
+        device: DeviceKey,
+        /// Les nouvelles propositions.
+        offers: Vec<CollectionOffer>,
+    },
+    /// Des entrées « à configurer » ont disparu : le crate `desktop` relit la liste et émet
+    /// `sync:collection-offer`.
+    CollectionPendingChanged,
     /// `sync:collection-progress`.
     CollectionProgress(CollectionProgressDto),
     /// L'état d'un partage a changé : le crate `desktop` le relit et émet
@@ -152,13 +117,8 @@ pub enum SyncEventDto {
 }
 
 impl SyncEventDto {
-    /// L'événement du moteur ; `active` : le profil actif, pour marquer ses notes ;
-    /// `received_folder` : le dossier des collections reçues, pour la destination proposée.
-    pub fn from_event(
-        event: &SyncEvent<ProfileId>,
-        active: &ProfileId,
-        received_folder: &str,
-    ) -> Self {
+    /// L'événement du moteur ; `active` : le profil actif, pour marquer ses notes.
+    pub fn from_event(event: &SyncEvent<ProfileId>, active: &ProfileId) -> Self {
         match event {
             SyncEvent::NotesSynced {
                 profile,
@@ -188,27 +148,25 @@ impl SyncEventDto {
             SyncEvent::DeviceLinked { device, name } => {
                 Self::DeviceLinked(linked_device(device, name))
             }
-            SyncEvent::OfferReceived {
-                device,
+            SyncEvent::ProfileReceived {
+                profile,
                 name,
-                offers,
-            } => Self::OfferReceived(OfferReceivedDto {
-                device: linked_device(device, name),
-                offers: offers.iter().map(ProfileOfferDto::from).collect(),
+                device,
+                device_name,
+            } => Self::ProfileReceived(ProfileReceivedDto {
+                profile_id: profile.as_str().to_owned(),
+                name: name.clone(),
+                device: linked_device(device, device_name),
             }),
             SyncEvent::CollectionOfferReceived {
                 device,
-                name,
+                name: _,
                 offers,
-            } => Self::CollectionOffer(CollectionOffersDto {
-                device: linked_device(device, name),
-                offers: offers
-                    .iter()
-                    .map(|(profile, offer)| {
-                        offer_dto(device, name, profile.as_str(), offer, received_folder)
-                    })
-                    .collect(),
-            }),
+            } => Self::CollectionOffered {
+                device: *device,
+                offers: offers.clone(),
+            },
+            SyncEvent::CollectionPendingChanged => Self::CollectionPendingChanged,
             SyncEvent::CollectionProgress {
                 profile,
                 share,
@@ -240,18 +198,17 @@ pub fn linked_device(key: &DeviceKey, name: &DeviceName) -> LinkedDeviceDto {
 
 #[cfg(test)]
 mod tests {
-    use app::ports::sync::{ProfileOffer, SyncStatus};
+    use app::ports::sync::SyncStatus;
     use domain::uuid::Uuid;
 
     use super::*;
     use crate::dto::SyncStatusKind;
 
     #[test]
-    fn validates_keys_spaces_and_codes() {
+    fn validates_keys_and_codes() {
         let key = DeviceKey::from_bytes([1; 32]);
         assert_eq!(parse_device_key(&key.to_string()).unwrap(), key);
         assert!(parse_device_key("abc").is_err());
-        assert!(parse_space_id(&"z".repeat(64)).is_err());
         assert_eq!(parse_pairing_code("123 456").unwrap().as_str(), "123456");
         assert!(parse_pairing_code("12a456").is_err());
     }
@@ -268,17 +225,6 @@ mod tests {
     }
 
     #[test]
-    fn validates_the_profile_selection() {
-        let ids = ["default".to_owned(), "work".to_owned(), "work".to_owned()];
-        let profiles = parse_profiles(&ids).unwrap();
-        assert_eq!(profiles.len(), 2);
-        assert!(parse_profiles(&[]).is_err());
-        assert!(parse_profiles(&["../etc".to_owned()]).is_err());
-        let too_many = vec!["work".to_owned(); MAX_PROFILES_PER_REQUEST + 1];
-        assert!(parse_profiles(&too_many).is_err());
-    }
-
-    #[test]
     fn validates_the_device_settings() {
         assert_eq!(parse_device_name("  Laptop ").unwrap(), "Laptop");
         assert_eq!(parse_device_name("  ").unwrap(), "");
@@ -286,26 +232,6 @@ mod tests {
         assert_eq!(parse_port(48000).unwrap(), 48000);
         assert!(parse_port(80).is_err());
         assert!(parse_port(70000).is_err());
-    }
-
-    #[test]
-    fn reads_the_offer_answers() {
-        assert_eq!(
-            parse_offer_answer("new", None).unwrap(),
-            OfferAnswer::NewProfile
-        );
-        assert_eq!(
-            parse_offer_answer("ignore", None).unwrap(),
-            OfferAnswer::Ignore
-        );
-        let work = ProfileId::parse("work").unwrap();
-        assert_eq!(
-            parse_offer_answer("merge", Some("work")).unwrap(),
-            OfferAnswer::Merge(work)
-        );
-        assert!(parse_offer_answer("merge", None).is_err());
-        assert!(parse_offer_answer("new", Some("work")).is_err());
-        assert!(parse_offer_answer("other", None).is_err());
     }
 
     #[test]
@@ -318,7 +244,7 @@ mod tests {
             folders: true,
             from: Some(DeviceName::parse("Laptop").unwrap()),
         };
-        let SyncEventDto::NotesSynced(dto) = SyncEventDto::from_event(&synced, &work, "") else {
+        let SyncEventDto::NotesSynced(dto) = SyncEventDto::from_event(&synced, &work) else {
             panic!("événement inattendu");
         };
         assert!(dto.active && dto.folders);
@@ -329,25 +255,25 @@ mod tests {
             reason: "listen_failed".to_owned(),
         });
         let other = ProfileId::default_profile();
-        let SyncEventDto::Status(dto) = SyncEventDto::from_event(&status, &other, "") else {
+        let SyncEventDto::Status(dto) = SyncEventDto::from_event(&status, &other) else {
             panic!("événement inattendu");
         };
         assert_eq!(dto.state, SyncStatusKind::Error);
         assert_eq!(dto.reason.as_deref(), Some("listen_failed"));
 
-        let offer = SyncEvent::OfferReceived {
+        let received = SyncEvent::ProfileReceived {
+            profile: work.clone(),
+            name: "Travail".to_owned(),
             device: DeviceKey::from_bytes([2; 32]),
-            name: DeviceName::parse("Laptop").unwrap(),
-            offers: vec![ProfileOffer {
-                space_id: SpaceId::from_bytes([3; 32]),
-                name: "Travail".to_owned(),
-                note_count: 12,
-            }],
+            device_name: DeviceName::parse("Laptop").unwrap(),
         };
-        let SyncEventDto::OfferReceived(dto) = SyncEventDto::from_event(&offer, &other, "") else {
+        let SyncEventDto::ProfileReceived(dto) = SyncEventDto::from_event(&received, &other) else {
             panic!("événement inattendu");
         };
+        assert_eq!(
+            (dto.profile_id.as_str(), dto.name.as_str()),
+            ("work", "Travail")
+        );
         assert_eq!(dto.device.name, "Laptop");
-        assert_eq!(dto.offers[0].note_count, 12);
     }
 }

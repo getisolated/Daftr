@@ -3,13 +3,13 @@
 
 use std::time::Duration;
 
-use app::ports::sync::SyncEvent;
+use app::ports::sync::{SyncEvent, SyncProfiles};
 use domain::sync::{DeviceKey, DeviceKind, PairingCode};
 
-use super::support::{contents, device, device_of_kind, eventually, space, write_note};
-use crate::{
-    Error, Fingerprint, MAX_FAILURES, MemoryNetwork, OfferChoice, PairingState, PairingUri,
+use super::support::{
+    contents, device, device_of_kind, eventually, link, share, space, write_note,
 };
+use crate::{Error, Fingerprint, MAX_FAILURES, MemoryNetwork, PairingState, PairingUri};
 
 fn wrong(code: &PairingCode) -> PairingCode {
     let number: u32 = code.as_str().parse().unwrap();
@@ -24,11 +24,7 @@ async fn linked_devices_remember_the_kind_of_each_other() {
     let b = device_of_kind(&network, "Portable", DeviceKind::Laptop);
     a.create_space("travail", space(1));
 
-    let ticket = a
-        .engine
-        .start_pairing(vec!["travail".to_owned()])
-        .await
-        .unwrap();
+    let ticket = a.engine.start_pairing().await.unwrap();
     b.engine.pair_with_code(ticket.code, None).await.unwrap();
 
     let kind_of = |device: &super::support::Device, other: DeviceKey| {
@@ -45,18 +41,13 @@ async fn linked_devices_remember_the_kind_of_each_other() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn the_right_code_links_both_devices_and_syncs_right_after_acceptance() {
+async fn the_right_code_links_both_devices_without_sharing_any_profile() {
     let network = MemoryNetwork::new();
     let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
     let work = a.create_space("travail", space(1));
     write_note(&work, "compte rendu");
-    write_note(&work, "liste 🥚 été");
 
-    let ticket = a
-        .engine
-        .start_pairing(vec!["travail".to_owned()])
-        .await
-        .unwrap();
+    let ticket = a.engine.start_pairing().await.unwrap();
     let linked = b
         .engine
         .pair_with_code(ticket.code.clone(), None)
@@ -71,39 +62,138 @@ async fn the_right_code_links_both_devices_and_syncs_right_after_acceptance() {
     assert!(a.trusts(&b) && b.trusts(&a));
     assert_eq!(*a.engine.pairing().borrow(), PairingState::Inactive);
 
-    eventually("offre reçue", || {
+    // La confiance seule ne partage rien : ni offre, ni profil créé chez B
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(b.profiles.profiles().unwrap().is_empty());
+    assert!(!b.has_event(|event| matches!(event, SyncEvent::ProfileReceived { .. })));
+    // Les deux appareils restent à l'écoute de l'autre
+    assert!(a.engine.listening_port().is_some() && b.engine.listening_port().is_some());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn sharing_a_profile_clones_it_on_the_other_device_without_asking() {
+    let network = MemoryNetwork::new();
+    let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
+    let work = a.create_space("travail", space(1));
+    a.profiles.set_name("travail", "Travail");
+    a.profiles
+        .set_icon("travail", icon(b"\x89PNG\r\n\x1a\n-icone-"));
+    write_note(&work, "compte rendu");
+    write_note(&work, "liste 🥚 été");
+    let ticket = a.engine.start_pairing().await.unwrap();
+    b.engine.pair_with_code(ticket.code, None).await.unwrap();
+    eventually("liés", || a.trusts(&b) && b.trusts(&a)).await;
+
+    a.engine.offer("travail".to_owned(), b.key()).await.unwrap();
+
+    let a_key = a.key();
+    eventually("profil reçu", || {
         b.has_event(|event| {
-            matches!(event, SyncEvent::OfferReceived { offers, .. }
-                if offers.len() == 1
-                    && offers[0].name == "Profil travail"
-                    && offers[0].note_count == 2)
+            matches!(event, SyncEvent::ProfileReceived { name, device, .. }
+                if name == "Travail" && *device == a_key)
         })
     })
     .await;
-    b.engine
-        .answer_offer(a.key(), space(1), OfferChoice::NewProfile)
-        .await
-        .unwrap();
-
     eventually("synchronisation initiale", || {
         b.has_event(|event| matches!(event, SyncEvent::InitialSyncDone { .. }))
     })
     .await;
-    let joined = b.store("p1");
-    assert_eq!(contents(&joined), contents(&work));
-    assert!(b.has_event(|event| matches!(
-        event,
-        SyncEvent::Progress {
-            done: 3,
-            total: 3,
-            ..
-        }
-    )));
+    let cloned = b.profiles.profile_for(&space(1)).unwrap().unwrap();
+    assert_eq!(contents(&b.store(&cloned)), contents(&work));
+    assert_eq!(b.profiles.name(&cloned).as_deref(), Some("Travail"));
+    assert_eq!(
+        b.profiles.icon(&cloned).map(|icon| icon.bytes),
+        Some(b"\x89PNG\r\n\x1a\n-icone-".to_vec())
+    );
 
     // Ensuite, le temps réel : une modification de B arrive chez A
-    write_note(&joined, "écrit sur le portable");
-    b.engine.local_change(&"p1".to_owned());
+    write_note(&b.store(&cloned), "écrit sur le portable");
+    b.engine.local_change(&cloned);
     eventually("temps réel", || contents(&work).len() == 3).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_profile_without_a_name_arrives_with_the_default_name() {
+    let network = MemoryNetwork::new();
+    let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
+    a.create_space("default", space(1));
+    link(&a, &b);
+    a.engine.refresh().await.unwrap();
+    b.engine.refresh().await.unwrap();
+
+    a.engine.offer("default".to_owned(), b.key()).await.unwrap();
+
+    eventually("profil reçu", || {
+        b.has_event(|event| matches!(event, SyncEvent::ProfileReceived { .. }))
+    })
+    .await;
+    let cloned = b.profiles.profile_for(&space(1)).unwrap().unwrap();
+    // La doublure donne son nom par défaut à un profil sans nom
+    assert_eq!(b.profiles.name(&cloned).as_deref(), Some("Default profile"));
+    assert!(b.profiles.icon(&cloned).is_none());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_space_already_present_is_not_cloned_again() {
+    let network = MemoryNetwork::new();
+    let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
+    let work = a.create_space("travail", space(1));
+    write_note(&work, "une note");
+    share(&a, "travail", &b, "existant");
+    link(&a, &b);
+    a.engine.refresh().await.unwrap();
+    b.engine.refresh().await.unwrap();
+
+    a.engine.offer("travail".to_owned(), b.key()).await.unwrap();
+
+    eventually("synchronisé dans le profil existant", || {
+        contents(&b.store("existant")) == ["une note"]
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(b.profiles.profiles().unwrap(), ["existant"]);
+    assert!(!b.has_event(|event| matches!(event, SyncEvent::ProfileReceived { .. })));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn unsharing_a_profile_stops_the_exchange_and_sharing_again_resumes_it() {
+    let network = MemoryNetwork::new();
+    let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
+    let work = a.create_space("travail", space(1));
+    write_note(&work, "avant");
+    link(&a, &b);
+    a.engine.refresh().await.unwrap();
+    b.engine.refresh().await.unwrap();
+    a.engine.offer("travail".to_owned(), b.key()).await.unwrap();
+    eventually("profil cloné", || {
+        b.profiles.profile_for(&space(1)).unwrap().is_some()
+    })
+    .await;
+    let cloned = b.profiles.profile_for(&space(1)).unwrap().unwrap();
+    eventually("contenu reçu", || contents(&b.store(&cloned)) == ["avant"]).await;
+
+    a.engine
+        .stop_sharing("travail".to_owned(), b.key())
+        .await
+        .unwrap();
+    write_note(&work, "pendant");
+    a.engine.local_change(&"travail".to_owned());
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(contents(&b.store(&cloned)), ["avant"]);
+
+    a.engine.offer("travail".to_owned(), b.key()).await.unwrap();
+    eventually("échange repris dans le même profil", || {
+        contents(&b.store(&cloned)) == ["avant", "pendant"]
+    })
+    .await;
+    assert_eq!(b.profiles.profiles().unwrap(), [cloned]);
+}
+
+fn icon(bytes: &[u8]) -> app::ports::sync::ProfileIcon {
+    app::ports::sync::ProfileIcon {
+        format: domain::profile::IconFormat::Png,
+        bytes: bytes.to_vec(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -111,11 +201,7 @@ async fn a_wrong_code_is_refused_on_both_sides() {
     let network = MemoryNetwork::new();
     let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
     a.create_space("travail", space(1));
-    let ticket = a
-        .engine
-        .start_pairing(vec!["travail".to_owned()])
-        .await
-        .unwrap();
+    let ticket = a.engine.start_pairing().await.unwrap();
 
     let result = b
         .engine
@@ -141,8 +227,8 @@ async fn simultaneous_pairings_with_different_codes_reach_the_right_devices() {
     );
     a1.create_space("p", space(1));
     a2.create_space("p", space(2));
-    let ticket1 = a1.engine.start_pairing(vec!["p".to_owned()]).await.unwrap();
-    let ticket2 = a2.engine.start_pairing(vec!["p".to_owned()]).await.unwrap();
+    let ticket1 = a1.engine.start_pairing().await.unwrap();
+    let ticket2 = a2.engine.start_pairing().await.unwrap();
 
     let (linked1, linked2) = tokio::join!(
         b1.engine.pair_with_code(ticket1.code, None),
@@ -160,7 +246,7 @@ async fn ten_failures_renew_the_code() {
     let network = MemoryNetwork::new();
     let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
     a.create_space("p", space(1));
-    let first = a.engine.start_pairing(vec!["p".to_owned()]).await.unwrap();
+    let first = a.engine.start_pairing().await.unwrap();
     let pairing = a.engine.pairing();
 
     for _ in 0..MAX_FAILURES {
@@ -187,7 +273,7 @@ async fn an_expired_mode_is_no_longer_announced_and_refuses_pairing() {
     let network = MemoryNetwork::new();
     let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
     a.create_space("p", space(1));
-    let ticket = a.engine.start_pairing(vec!["p".to_owned()]).await.unwrap();
+    let ticket = a.engine.start_pairing().await.unwrap();
     let announced = a.discovery.announcement().unwrap();
     assert_eq!(announced.pairing.as_ref(), Some(&a.name));
 
@@ -210,7 +296,7 @@ async fn a_qr_code_with_another_fingerprint_is_refused() {
     let network = MemoryNetwork::new();
     let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
     a.create_space("p", space(1));
-    let ticket = a.engine.start_pairing(vec!["p".to_owned()]).await.unwrap();
+    let ticket = a.engine.start_pairing().await.unwrap();
 
     let forged = PairingUri {
         fingerprint: Fingerprint::of(&DeviceKey::from_bytes([9; 32])),

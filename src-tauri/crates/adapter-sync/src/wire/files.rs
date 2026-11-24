@@ -7,8 +7,13 @@
 use app::collection_sync::{FileEntry, FileHash, SyncPath};
 use serde::{Deserialize, Serialize};
 
-/// Bit de `Hello::features` : l'appareil comprend les messages de collections.
-pub(crate) const FEATURE_COLLECTIONS: u8 = 1;
+/// Bit de `Hello::features` : l'appareil comprend les messages de collections, rattachées à
+/// l'appareil et non plus à l'espace d'un profil. Le bit 0 de la première version, abandonnée
+/// avant toute publication, n'est plus annoncé : ses offres n'avaient pas le même format.
+pub(crate) const FEATURE_COLLECTIONS: u8 = 1 << 1;
+/// Bit de `Hello::features` : l'appareil comprend `ProfileInfo` (nom et icône d'un profil
+/// partagé, pour en créer le clone).
+pub(crate) const FEATURE_PROFILE_INFO: u8 = 1 << 2;
 
 /// Lignes de manifeste au plus par message.
 pub(crate) const MANIFEST_PART: usize = 500;
@@ -16,6 +21,10 @@ pub(crate) const MANIFEST_PART: usize = 500;
 pub(crate) const MAX_OFFERED: usize = 64;
 /// Longueur maximale du nom d'une collection proposée, en caractères.
 const MAX_NAME_CHARS: usize = 128;
+/// Longueur maximale d'un nom de profil reçu, en caractères.
+const MAX_PROFILE_NAME_CHARS: usize = domain::profile::MAX_PROFILE_NAME_LENGTH;
+/// Longueur maximale d'un identifiant de profil reçu, en caractères.
+const MAX_PROFILE_ID_CHARS: usize = domain::profile::MAX_PROFILE_ID_LENGTH;
 
 /// Un fichier dans un manifeste : le chemin et les empreintes en clair, validés à la réception.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,8 +42,12 @@ pub(crate) struct WireEntry {
 /// Une collection proposée.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct OfferedCollection {
-    /// Espace du profil qui porte la collection.
-    pub space: [u8; 32],
+    /// Espace du profil qui porte la collection, s'il est synchronisé avec le destinataire.
+    pub space: Option<[u8; 32]>,
+    /// Identifiant du profil qui porte la collection chez l'émetteur.
+    pub profile_id: String,
+    /// Nom de ce profil chez l'émetteur (vide : profil sans nom).
+    pub profile_name: String,
     /// Identifiant du partage.
     pub share: [u8; 16],
     /// Nom proposé.
@@ -43,6 +56,11 @@ pub(crate) struct OfferedCollection {
     pub files: u64,
     /// Volume des fichiers, en octets.
     pub bytes: u64,
+}
+
+fn clean(text: &str, max: usize) -> String {
+    let cleaned: String = text.chars().filter(|c| !c.is_control()).take(max).collect();
+    cleaned.trim().to_owned()
 }
 
 impl OfferedCollection {
@@ -55,6 +73,35 @@ impl OfferedCollection {
             .take(MAX_NAME_CHARS)
             .collect();
         name.trim().to_owned()
+    }
+
+    /// Le nom du profil d'origine reçu, assaini.
+    pub(crate) fn clean_profile_name(&self) -> String {
+        clean(&self.profile_name, MAX_PROFILE_NAME_CHARS)
+    }
+
+    /// L'identifiant du profil d'origine reçu, assaini : il n'est jamais utilisé comme chemin.
+    pub(crate) fn clean_profile_id(&self) -> String {
+        clean(&self.profile_id, MAX_PROFILE_ID_CHARS)
+    }
+}
+
+/// Nom et icône d'un profil partagé, envoyés par celui qui le partage avant son contenu.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct ProfileInfoEntry {
+    /// Espace du profil.
+    pub space: [u8; 32],
+    /// Nom du profil, absent pour un profil sans nom.
+    pub name: Option<String>,
+    /// Image de l'icône (PNG ou WebP), absente sans icône.
+    pub icon: Option<Vec<u8>>,
+}
+
+impl ProfileInfoEntry {
+    /// Le nom reçu, assaini ; `None` s'il est vide.
+    pub(crate) fn clean_name(&self) -> Option<String> {
+        let name = clean(self.name.as_deref()?, MAX_PROFILE_NAME_CHARS);
+        (!name.is_empty()).then_some(name)
     }
 }
 

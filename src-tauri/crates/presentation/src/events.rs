@@ -36,9 +36,11 @@ pub const SYNC_PROGRESS: &str = "sync:progress";
 pub const SYNC_INITIAL_DONE: &str = "sync:initial-done";
 /// Appareil lié (charge utile : `LinkedDeviceDto`).
 pub const SYNC_DEVICE_LINKED: &str = "sync:device-linked";
-/// Offre de profils reçue (charge utile : `OfferReceivedDto`).
-pub const SYNC_OFFER_RECEIVED: &str = "sync:offer-received";
-/// Collections proposées par un appareil (charge utile : `CollectionOffersDto`).
+/// Profil partagé par un appareil, accepté d'office : un clone est créé (charge utile :
+/// `ProfileReceivedDto`).
+pub const SYNC_PROFILE_RECEIVED: &str = "sync:profile-received";
+/// Collections reçues « à configurer » nouvelles ou retirées (charge utile :
+/// `CollectionOffersDto`).
 pub const SYNC_COLLECTION_OFFER: &str = "sync:collection-offer";
 /// Avancement d'un échange de fichiers (charge utile : `CollectionProgressDto`).
 pub const SYNC_COLLECTION_PROGRESS: &str = "sync:collection-progress";

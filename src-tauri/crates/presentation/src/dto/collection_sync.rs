@@ -132,29 +132,51 @@ pub struct CollectionShareDto {
     pub truncated: bool,
 }
 
-/// Collections partagées et propositions en attente (commande `collection_sync_state`).
+/// Une collection de dossier d'un profil, partagée ou non.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileCollectionDto {
+    /// Profil qui porte la collection.
+    pub profile_id: String,
+    /// Chemin de la collection sur cet appareil.
+    pub root: String,
+    /// Nom affiché.
+    pub name: String,
+    /// Identifiant du partage, absent tant qu'elle n'est partagée avec aucun appareil : ses
+    /// appareils sont dans `shares`.
+    pub sync_id: Option<String>,
+}
+
+/// Collections, partages et entrées « à configurer » (commande `collection_sync_state`). Avec
+/// un profil en paramètre, `collections` et `shares` se limitent à lui ; sans, ils couvrent
+/// tous les profils (actifs ou non). Les partages ne dépendent d'aucun profil partagé : un
+/// appareil de confiance quelconque en est un destinataire.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CollectionSyncStateDto {
-    /// Les collections partagées de tous les profils synchronisés.
+    /// Les collections de dossier des profils, pour la matrice collections × appareils.
+    pub collections: Vec<ProfileCollectionDto>,
+    /// Les collections partagées avec au moins un appareil, avec l'état de chacun (proposée,
+    /// activée).
     pub shares: Vec<CollectionShareDto>,
-    /// Les propositions qui attendent une réponse.
+    /// Les entrées « à configurer » : collections reçues, pas encore activées ici (tous
+    /// profils, indépendamment du filtre).
     pub offers: Vec<CollectionOfferDto>,
     /// Dossier où arrivent les collections reçues (le réglage, ou `Documents/Daftr`).
     pub received_folder: String,
 }
 
-/// Une collection proposée par un appareil.
+/// Une collection reçue d'un appareil et pas encore activée ici : une entrée « à configurer »,
+/// gardée au redémarrage. Rien n'est écrit sur le disque avant `collection_sync_activate`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CollectionOfferDto {
     /// L'appareil qui propose.
     pub device: LinkedDeviceDto,
-    /// Profil qui recevra la collection.
-    pub profile_id: String,
-    /// Identifiant du partage, à renvoyer dans la réponse.
+    /// Identifiant du partage, à renvoyer à l'activation ou au refus.
     pub sync_id: String,
     /// Nom proposé.
     pub name: String,
@@ -164,19 +186,29 @@ pub struct CollectionOfferDto {
     /// Volume des fichiers, en octets.
     #[ts(type = "number")]
     pub bytes: u64,
+    /// Identifiant du profil qui porte la collection chez l'émetteur.
+    pub source_profile_id: String,
+    /// Nom de ce profil chez l'émetteur (vide : profil sans nom).
+    pub source_profile_name: String,
+    /// Le profil local, déjà synchronisé avec le profil source : il reçoit la collection par
+    /// défaut. Absent sinon (l'utilisateur choisit le profil, dans la liste de ses profils).
+    pub source_profile_synced_here: Option<String>,
     /// Destination proposée : `<dossier des collections reçues>/<nom>`.
     pub suggested_destination: String,
 }
 
-/// Propositions reçues (événement `sync:collection-offer`).
+/// Entrées « à configurer » (événement `sync:collection-offer`) : à l'arrivée de nouvelles
+/// propositions, et quand certaines disparaissent (activées, ignorées, retirées par
+/// l'émetteur ou avec l'appareil).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CollectionOffersDto {
-    /// L'appareil qui propose.
-    pub device: LinkedDeviceDto,
-    /// Les collections proposées.
-    pub offers: Vec<CollectionOfferDto>,
+    /// Les propositions arrivées avec cet événement (vide quand des entrées disparaissent) :
+    /// de quoi afficher une notification.
+    pub added: Vec<CollectionOfferDto>,
+    /// Toutes les entrées en attente après cet événement.
+    pub pending: Vec<CollectionOfferDto>,
 }
 
 /// Avancement d'un échange de fichiers (événement `sync:collection-progress`).

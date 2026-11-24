@@ -1,5 +1,5 @@
 //! Collections partagées côté application : surveillance des dossiers, état pour l'interface,
-//! partage, réponse aux propositions, nouveau dossier, copies de conflit.
+//! partage par appareil, activation des collections reçues, nouveau dossier, copies de conflit.
 //!
 //! Les entrées sont déjà validées par `presentation::collection_sync`. Le moteur
 //! (`adapter-sync`) échange les fichiers ; ici on le prévient des changements du disque (un
@@ -11,12 +11,15 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use adapter_fs::{OnChange, ShareDisk, ShareWatcher};
-use adapter_sync::{CollectionAnswer, IncomingCollection};
 use app::collection_sync::{SyncPath, parse_conflict};
-use app::ports::collection_sync::{CollectionDisk, CollectionSyncStore, ShareRecord};
+use app::ports::CollectionStore;
+use app::ports::collection_sync::{
+    CollectionDisk, CollectionSyncStore, PendingCollection, ShareRecord,
+};
 use app::ports::sync::SyncProfiles;
 use app::ports::trust::TrustStore;
 use app::{AppResult, Refusal};
+use domain::collection::CollectionKind;
 use domain::profile::ProfileId;
 use domain::settings::AppSettings;
 use domain::sync::DeviceKey;
@@ -24,13 +27,13 @@ use domain::uuid::Uuid;
 use platform::sync::lock;
 use presentation::collection_sync::{ConflictKeep, OfferMode, offer_dto};
 use presentation::dto::{
-    CollectionConflictsDto, CollectionOfferDto, CollectionShareDto, CollectionStateEventDto,
-    CollectionSyncStateDto, FolderSummaryDto,
+    CollectionConflictsDto, CollectionOfferDto, CollectionOffersDto, CollectionShareDto,
+    CollectionStateEventDto, CollectionSyncStateDto, FolderSummaryDto, ProfileCollectionDto,
 };
 use presentation::{IpcError, IpcResult};
 
 use super::actions::blocking;
-use super::collection_dto::{ShareView, folder_summary, share_dto};
+use super::collection_dto::{ShareView, folder_summary, share_dto, short_key};
 use super::{SyncState, ipc_error};
 
 /// Ce que le watcher sait d'un dossier partagé : son profil et son partage.
@@ -74,12 +77,11 @@ impl SyncState {
         }
     }
 
-    /// Démarrage : surveille et parcourt les collections partagées de tous les profils
-    /// synchronisés.
+    /// Démarrage : surveille et parcourt les collections partagées de tous les profils (un
+    /// partage ne dépend pas de la synchronisation du profil).
     pub async fn start_collections(&self) {
-        let synced = self.profiles.synced_profiles().unwrap_or_default();
-        for synced in synced {
-            self.watch_profile(&synced.profile).await;
+        for profile in self.profiles.share_profiles().unwrap_or_default() {
+            self.watch_profile(&profile).await;
         }
     }
 
@@ -143,36 +145,119 @@ impl SyncState {
             .ok()
     }
 
-    /// Les partages de tous les profils synchronisés, les propositions en attente et le dossier
-    /// des collections reçues.
+    /// Les collections et partages (de `only` si un profil est donné, sinon de tous les profils,
+    /// actifs ou non), les entrées « à configurer » et le dossier des collections reçues.
     pub async fn collection_state(
         &self,
+        only: Option<ProfileId>,
         settings: &AppSettings,
     ) -> IpcResult<CollectionSyncStateDto> {
         let (names, my_name) = (self.device_names().await?, self.my_name(settings));
-        let mut shares = Vec::new();
-        for synced in self.profiles.synced_profiles()? {
-            let profile = synced.profile;
+        let profiles = match only {
+            Some(profile) => {
+                self.profiles.profile_name(&profile)?;
+                vec![profile]
+            }
+            None => self.profiles.profiles()?,
+        };
+        let (mut collections, mut shares) = (Vec::new(), Vec::new());
+        for profile in profiles {
             let id = profile.clone();
-            let records = self
-                .on_profiles(move |profiles| profiles.with_sqlite(&id, |store| store.shares()))
+            let (records, listed) = self
+                .on_profiles(move |profiles| {
+                    profiles.with_sqlite(&id, |store| Ok((store.shares()?, store.all()?)))
+                })
                 .await?;
+            for collection in listed
+                .into_iter()
+                .filter(|collection| collection.kind == CollectionKind::Folder)
+            {
+                let sync_id = records
+                    .iter()
+                    .find(|record| record.root == collection.path)
+                    .map(|record| record.sync_id.to_string());
+                collections.push(ProfileCollectionDto {
+                    profile_id: profile.as_str().to_owned(),
+                    root: collection.path,
+                    name: collection.display_name,
+                    sync_id,
+                });
+            }
             for record in records {
                 shares.push(self.share_dto_of(&profile, &record, &names, &my_name));
             }
         }
         let received = self.received_folder(settings);
-        let offers = self
-            .engine
-            .pending_collections()
-            .iter()
-            .map(|incoming| offer_of(incoming, &received))
-            .collect();
+        let offers = self.offer_dtos(&names, &received).await?;
         Ok(CollectionSyncStateDto {
+            collections,
             shares,
             offers,
             received_folder: received,
         })
+    }
+
+    /// Les entrées « à configurer » pour le renderer, avec le profil local déjà synchronisé
+    /// avec leur profil source.
+    async fn offer_dtos(
+        &self,
+        names: &HashMap<DeviceKey, String>,
+        received: &str,
+    ) -> IpcResult<Vec<CollectionOfferDto>> {
+        let pending = self.engine.pending_collections().await.map_err(ipc_error)?;
+        pending
+            .iter()
+            .map(|entry| self.offer_of(entry, names, received))
+            .collect()
+    }
+
+    fn offer_of(
+        &self,
+        entry: &PendingCollection,
+        names: &HashMap<DeviceKey, String>,
+        received: &str,
+    ) -> IpcResult<CollectionOfferDto> {
+        let synced_here = match entry.offer.source_space {
+            Some(space) => self.profiles.profile_for(&space)?,
+            None => None,
+        };
+        let name = names
+            .get(&entry.device)
+            .cloned()
+            .unwrap_or_else(|| short_key(&entry.device));
+        Ok(offer_dto(
+            &entry.device,
+            &name,
+            &entry.offer,
+            synced_here.as_ref(),
+            received,
+        ))
+    }
+
+    /// `sync:collection-offer` : les nouvelles propositions (`added`) et toutes celles qui
+    /// attendent. Les noms d'appareil et le dossier des collections reçues sont ceux de
+    /// maintenant.
+    pub async fn pending_event(
+        &self,
+        added: &[(DeviceKey, Uuid)],
+        settings: &AppSettings,
+    ) -> IpcResult<CollectionOffersDto> {
+        let names = self.device_names().await?;
+        let received = self.received_folder(settings);
+        let pending = self.offer_dtos(&names, &received).await?;
+        let added = added
+            .iter()
+            .filter_map(|added| {
+                pending
+                    .iter()
+                    .find(|offer| {
+                        offer.device.key == added.0.to_string()
+                            && offer.sync_id == added.1.to_string()
+                    })
+                    .cloned()
+            })
+            .collect();
+        Ok(CollectionOffersDto { added, pending })
     }
 
     fn share_dto_of(
@@ -264,7 +349,7 @@ impl SyncState {
     }
 
     /// « Synchroniser avec mes appareils » : propose la collection `root` de `profile` aux
-    /// appareils choisis, qui doivent partager le profil.
+    /// appareils de confiance choisis (ils n'ont pas besoin de partager le profil).
     pub async fn share_collection(
         &self,
         profile: ProfileId,
@@ -282,6 +367,27 @@ impl SyncState {
         Ok(self.share_dto_of(&profile, &record, &names, &my_name))
     }
 
+    /// Partage la collection `root` avec un seul appareil (`shared`), ou l'en retire. Rend le
+    /// partage tel qu'il est ensuite, `None` quand plus aucun appareil ne le partage.
+    pub async fn set_collection_device(
+        &self,
+        profile: ProfileId,
+        root: String,
+        device: DeviceKey,
+        shared: bool,
+        settings: &AppSettings,
+    ) -> IpcResult<Option<CollectionShareDto>> {
+        self.profiles.profile_name(&profile)?;
+        let record = self
+            .engine
+            .set_collection_device(profile.clone(), root, device, shared)
+            .await
+            .map_err(ipc_error)?;
+        self.watch_profile(&profile).await;
+        let (names, my_name) = (self.device_names().await?, self.my_name(settings));
+        Ok(record.map(|record| self.share_dto_of(&profile, &record, &names, &my_name)))
+    }
+
     /// « Arrêter de synchroniser cette collection » : les fichiers restent des deux côtés.
     pub async fn stop_collection(&self, profile: ProfileId, share: Uuid) -> IpcResult<()> {
         self.engine
@@ -293,38 +399,37 @@ impl SyncState {
         Ok(())
     }
 
-    /// Réponse à une collection proposée : rien n'est écrit avant l'acceptation. `merge` fusionne
-    /// avec un dossier qui contient déjà des fichiers ; refusé sinon.
-    pub async fn answer_collection(
+    /// Active une collection reçue dans `profile` (actif ou non) : rien n'est écrit avant. `merge`
+    /// fusionne avec un dossier qui contient déjà des fichiers ; refusé sinon.
+    pub async fn activate_collection(
         &self,
         device: DeviceKey,
         share: Uuid,
-        destination: Option<PathBuf>,
+        profile: ProfileId,
+        destination: PathBuf,
         mode: OfferMode,
     ) -> IpcResult<()> {
-        let incoming = self
-            .engine
-            .pending_collections()
-            .into_iter()
-            .find(|incoming| incoming.device == device && incoming.offer.share == share)
-            .ok_or_else(|| ipc_error(adapter_sync::Error::UnknownOffer))?;
-        let answer = match (mode, destination) {
-            (OfferMode::Decline, _) => CollectionAnswer::Decline,
-            (mode, Some(destination)) => CollectionAnswer::Accept {
-                destination,
-                merge: mode == OfferMode::Merge,
-            },
-            (_, None) => return Err(IpcError::invalid_input("missing destination folder")),
-        };
-        let accepted = matches!(answer, CollectionAnswer::Accept { .. });
+        self.profiles.profile_name(&profile)?;
         self.engine
-            .answer_collection(device, share, answer)
+            .activate_collection(
+                device,
+                share,
+                profile.clone(),
+                destination,
+                mode == OfferMode::Merge,
+            )
             .await
             .map_err(ipc_error)?;
-        if accepted {
-            self.watch_profile(&incoming.profile).await;
-        }
+        self.watch_profile(&profile).await;
         Ok(())
+    }
+
+    /// Ignore une collection reçue.
+    pub async fn ignore_collection(&self, device: DeviceKey, share: Uuid) -> IpcResult<()> {
+        self.engine
+            .ignore_collection(device, share)
+            .await
+            .map_err(ipc_error)
     }
 
     /// Le dossier d'une collection partagée a été relié à un autre emplacement (déjà enregistré
@@ -339,6 +444,15 @@ impl SyncState {
         .await?;
         self.watch_profile(profile).await;
         Ok(())
+    }
+
+    /// `root` est une collection du profil.
+    pub async fn has_collection(&self, profile: &ProfileId, root: String) -> IpcResult<bool> {
+        let id = profile.clone();
+        self.on_profiles(move |profiles| {
+            profiles.with_sqlite(&id, |store| Ok(store.get(&root)?.is_some()))
+        })
+        .await
     }
 
     /// Le partage de la collection `root`, s'il y en a un.
@@ -376,17 +490,6 @@ impl SyncState {
             .await
             .map_err(ipc_error)
     }
-}
-
-/// Une proposition en attente pour le renderer.
-fn offer_of(incoming: &IncomingCollection<ProfileId>, received: &str) -> CollectionOfferDto {
-    offer_dto(
-        &incoming.device,
-        &incoming.device_name,
-        incoming.profile.as_str(),
-        &incoming.offer,
-        received,
-    )
 }
 
 /// Ce qu'il faut faire d'une copie de conflit.

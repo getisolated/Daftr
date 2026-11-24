@@ -4,22 +4,22 @@
 //! (au démarrage de la session, puis à chaque changement de ses fichiers) et décide seul de ce
 //! qu'il doit recevoir ou supprimer ; les transferts sont dans [`super::transfer`].
 
+mod inbox;
+
 use std::collections::{HashSet, VecDeque};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use app::collection_sync::{FileEntry, Manifest, PlannedFile};
 use app::ports::collection_sync::{SharePeerState, ShareRecord};
-use app::ports::sync::{CollectionOffer, SyncEvent};
-use domain::sync::SpaceId;
+use app::ports::sync::SyncEvent;
 use domain::uuid::Uuid;
 
 use super::Session;
 use super::transfer::Step;
-use crate::engine::IncomingCollection;
 use crate::error::{Error, Result};
 use crate::files::{self, History, LocalSummary, Ports, Snapshot, now_nanos};
-use crate::stores::ProfileKey;
+use crate::stores::{ProfileKey, in_store};
 use crate::wire::{
     FEATURE_COLLECTIONS, MANIFEST_PART, MAX_OFFERED, Message, OfferedCollection, WireEntry,
     file_entry, wire_entry,
@@ -85,22 +85,24 @@ impl<P: ProfileKey> Session<P> {
     }
 
     /// Met la liste des partages actifs à jour : propose les nouveaux, démarre les acceptés,
-    /// abandonne ceux qui ne le sont plus (appareil retiré, profil non partagé, arrêt).
+    /// abandonne ceux qui ne le sont plus (appareil retiré, arrêt). Les partages dépendent de
+    /// la confiance de l'appareil, pas des profils qu'il partage.
     pub(super) async fn sync_collections(&mut self) -> Result<()> {
         if !self.collections_enabled() {
             return Ok(());
         }
+        self.send_pending_list().await?;
         let remote = self.remote;
         let shared = self.shares_with_remote().await?;
         let active: HashSet<Uuid> = shared
             .iter()
-            .filter(|(_, _, share)| share.is_active_with(&remote))
-            .map(|(_, _, share)| share.sync_id)
+            .filter(|(_, share)| share.is_active_with(&remote))
+            .map(|(_, share)| share.sync_id)
             .collect();
         self.shares.retain(|id, _| active.contains(id));
 
         let (mut offers, mut started) = (Vec::new(), Vec::new());
-        for (space, profile, share) in shared {
+        for (profile, share) in shared {
             let id = share.sync_id;
             match share.peer(&remote).map(|peer| peer.state) {
                 Some(SharePeerState::Active) if !self.shares.contains_key(&id) => {
@@ -109,50 +111,49 @@ impl<P: ProfileKey> Session<P> {
                     started.push(id);
                 }
                 Some(SharePeerState::Offered) if self.offered_collections.insert(id) => {
-                    offers.push((space, profile, share));
+                    offers.push((profile, share));
                 }
                 _ => {}
             }
         }
         self.send_collection_offers(offers).await?;
         for id in started {
+            // L'accord a pu se perdre (session remplacée) : le redire avant le premier manifeste
+            // évite que l'autre côté, qui croit encore le partage proposé, le retire
+            self.reply_collection(*id.as_bytes(), true).await?;
             self.send_manifest(id, true).await?;
         }
         Ok(())
     }
 
-    /// Les partages des profils communs où l'appareil distant figure (proposé ou actif).
-    async fn shares_with_remote(&self) -> Result<Vec<(SpaceId, P, ShareRecord)>> {
-        let mut found = Vec::new();
+    /// Les partages, de tous les profils, où l'appareil distant figure (proposé ou actif).
+    async fn shares_with_remote(&self) -> Result<Vec<(P, ShareRecord)>> {
         let remote = self.remote;
-        for space in self.common() {
-            let Some(profile) = self.common_profile(&space) else {
-                continue;
-            };
-            let shares = self.shared.stores.with(&profile, |store| store.shares());
-            for share in shares.await? {
-                if share.peer(&remote).is_some() {
-                    found.push((space, profile.clone(), share));
+        self.shared
+            .stores
+            .run(move |profiles| {
+                let mut found = Vec::new();
+                for profile in profiles.share_profiles()? {
+                    let shares = in_store(profiles, &profile, |store| store.shares())?;
+                    for share in shares {
+                        if share.peer(&remote).is_some() {
+                            found.push((profile.clone(), share));
+                        }
+                    }
                 }
-            }
-        }
-        Ok(found)
+                Ok(found)
+            })
+            .await
     }
 
     async fn find_share(&self, id: &Uuid) -> Result<Option<(P, ShareRecord)>> {
         let shared = self.shares_with_remote().await?;
-        Ok(shared
-            .into_iter()
-            .find(|(_, _, share)| share.sync_id == *id)
-            .map(|(_, profile, share)| (profile, share)))
+        Ok(shared.into_iter().find(|(_, share)| share.sync_id == *id))
     }
 
-    async fn send_collection_offers(
-        &mut self,
-        offers: Vec<(SpaceId, P, ShareRecord)>,
-    ) -> Result<()> {
+    async fn send_collection_offers(&mut self, offers: Vec<(P, ShareRecord)>) -> Result<()> {
         let mut entries = Vec::new();
-        for (space, profile, share) in offers.into_iter().take(MAX_OFFERED) {
+        for (profile, share) in offers.into_iter().take(MAX_OFFERED) {
             let root = PathBuf::from(&share.root);
             let counted = self
                 .shared
@@ -162,8 +163,19 @@ impl<P: ProfileKey> Session<P> {
                 self.offered_collections.remove(&share.sync_id);
                 continue;
             };
+            let source = profile.clone();
+            let info = self
+                .shared
+                .stores
+                .run(move |profiles| profiles.profile_info(&source))
+                .await?;
             entries.push(OfferedCollection {
-                space: *space.as_bytes(),
+                // Le profil source n'est désigné que s'il est synchronisé avec cet appareil
+                space: self
+                    .common_space_of(&profile)
+                    .map(|space| *space.as_bytes()),
+                profile_id: info.id,
+                profile_name: info.name.unwrap_or_default(),
                 share: *share.sync_id.as_bytes(),
                 name: share.name,
                 files,
@@ -176,61 +188,13 @@ impl<P: ProfileKey> Session<P> {
         self.send(&Message::CollectionOffer(entries)).await
     }
 
-    /// Collections proposées par l'appareil distant : proposées à l'utilisateur, rien n'est
-    /// écrit avant sa réponse. Une collection déjà acceptée (réponse perdue) l'est d'office.
-    pub(super) async fn on_collection_offer(
+    pub(in crate::session) async fn reply_collection(
         &mut self,
-        entries: Vec<OfferedCollection>,
+        share: [u8; 16],
+        accepted: bool,
     ) -> Result<()> {
-        if entries.len() > MAX_OFFERED {
-            return Err(Error::Malformed);
-        }
-        let Some(name) = self.remote_name.clone() else {
-            return Err(Error::Unexpected);
-        };
-        let known = self.shares_with_remote().await?;
-        let mut fresh = Vec::new();
-
-        for entry in entries {
-            let space = SpaceId::from_bytes(entry.space);
-            let share = Uuid::from_bytes(entry.share);
-            let Some(profile) = self.common_profile(&space) else {
-                continue;
-            };
-            let accepted = known
-                .iter()
-                .any(|(_, _, s)| s.sync_id == share && s.is_active_with(&self.remote));
-            if accepted {
-                self.send(&Message::CollectionReply {
-                    share: entry.share,
-                    accepted: true,
-                })
-                .await?;
-                continue;
-            }
-            fresh.push(IncomingCollection {
-                device: self.remote,
-                device_name: name.clone(),
-                profile,
-                offer: offer_of(&entry, space, share),
-            });
-        }
-        let offers: Vec<(P, CollectionOffer)> = fresh
-            .into_iter()
-            .filter_map(|incoming| {
-                let offer = (incoming.profile.clone(), incoming.offer.clone());
-                self.shared.receive_collection(incoming).then_some(offer)
-            })
-            .collect();
-        if !offers.is_empty() {
-            let device = self.remote;
-            self.shared.publish(SyncEvent::CollectionOfferReceived {
-                device,
-                name,
-                offers,
-            });
-        }
-        Ok(())
+        self.send(&Message::CollectionReply { share, accepted })
+            .await
     }
 
     /// Réponse de l'appareil distant à notre proposition.
@@ -257,11 +221,20 @@ impl<P: ProfileKey> Session<P> {
         self.sync_collections().await
     }
 
-    /// L'appareil distant arrête de partager la collection.
+    /// L'appareil distant arrête de partager la collection, ou ne propose plus celle que nous
+    /// n'avions pas encore activée.
     pub(super) async fn on_share_stop(&mut self, share: [u8; 16]) -> Result<()> {
         let id = Uuid::from_bytes(share);
         self.shares.remove(&id);
         self.offered_collections.remove(&id);
+        let remote = self.remote;
+        let removed = self
+            .shared
+            .with_inbox(move |inbox| inbox.remove(&remote, &id))
+            .await?;
+        if removed {
+            self.shared.publish(SyncEvent::CollectionPendingChanged);
+        }
         if let Some((profile, _)) = self.find_share(&id).await? {
             self.remove_peer(&profile, id).await?;
             self.shared.collection_changed(&profile, id);
@@ -384,6 +357,10 @@ impl<P: ProfileKey> Session<P> {
     ) -> Result<()> {
         let id = Uuid::from_bytes(share);
         if !self.shares.contains_key(&id) {
+            // Le partage a pu être activé depuis le début de la session
+            self.sync_collections().await?;
+        }
+        if !self.shares.contains_key(&id) {
             // L'autre appareil croit le partage actif : on lui dit qu'il ne l'est plus
             return self.send(&Message::ShareStop { share }).await;
         }
@@ -461,21 +438,6 @@ fn count_files(ports: &Ports<'_>, root: &Path) -> app::AppResult<Option<(u64, u6
     let scan = ports.disk.scan(root)?;
     let bytes = scan.files.iter().map(|file| file.stat.size).sum();
     Ok(Some((scan.files.len() as u64, bytes)))
-}
-
-fn offer_of(entry: &OfferedCollection, space: SpaceId, share: Uuid) -> CollectionOffer {
-    let name = entry.clean_name();
-    CollectionOffer {
-        share,
-        space_id: space,
-        name: if name.is_empty() {
-            "Collection".to_owned()
-        } else {
-            name
-        },
-        files: entry.files,
-        bytes: entry.bytes,
-    }
 }
 
 /// Empreinte de ce qu'un manifeste annonce des fichiers (pas des bases).

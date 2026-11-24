@@ -15,14 +15,16 @@ mod runtime;
 mod shared;
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use app::ports::collection_sync::CollectionDisk;
-use app::ports::collection_sync::ShareRecord;
+use app::ports::collection_sync::{
+    CollectionDisk, CollectionInbox, PendingCollection, ShareRecord,
+};
 use app::ports::sync::{SyncEvents, SyncStatus};
 use app::ports::trust::TrustStore;
-use domain::sync::{DeviceKey, DeviceKind, DeviceName, PairingCode, SpaceId};
+use domain::sync::{DeviceKey, DeviceKind, DeviceName, PairingCode};
 use domain::uuid::Uuid;
 use tokio::runtime::Handle;
 use tokio::sync::watch;
@@ -37,8 +39,7 @@ use crate::pairing::{LinkedDevice, PAIRING_DURATION, PairingState, PairingTicket
 use crate::stores::{ProfileKey, Profiles};
 
 pub(crate) use collection_state::PeerRuntime;
-pub use collection_state::{CollectionPeerStatus, CollectionStatus, IncomingCollection};
-pub use collections::CollectionAnswer;
+pub use collection_state::{CollectionPeerStatus, CollectionStatus};
 pub(crate) use links::schedule_retry;
 pub(crate) use runtime::request_refresh;
 pub(crate) use shared::{Command, Shared};
@@ -125,23 +126,14 @@ pub struct EngineDeps<P> {
     pub trust: Arc<dyn TrustStore>,
     /// Fichiers des collections partagées.
     pub files: Arc<dyn CollectionDisk>,
+    /// Propositions de collections reçues, en attente d'activation.
+    pub inbox: Arc<dyn CollectionInbox>,
     /// Découverte (mDNS).
     pub discovery: Arc<dyn Discovery>,
     /// Horloge.
     pub clock: Arc<dyn Clock>,
     /// Runtime tokio où tournent les tâches du moteur (celui de l'application).
     pub runtime: Handle,
-}
-
-/// Choix de l'utilisateur pour un profil proposé.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OfferChoice<P> {
-    /// Créer un nouveau profil, avec le nom proposé.
-    NewProfile,
-    /// Fusionner avec ce profil local (qui ne doit pas être déjà synchronisé).
-    Merge(P),
-    /// Ignorer l'offre.
-    Ignore,
 }
 
 /// Le moteur. Clonable : les clones partagent le même moteur.
@@ -202,10 +194,10 @@ impl<P: ProfileKey> Engine<P> {
         runtime::network_changed(&self.shared).await
     }
 
-    /// « Lier un appareil » : ouvre le mode appairage en proposant `profiles` (déjà
-    /// synchronisés) à l'appareil qui se liera.
-    pub async fn start_pairing(&self, profiles: Vec<P>) -> Result<PairingTicket> {
-        pairing::start(&self.shared, profiles).await
+    /// « Lier un appareil » : ouvre le mode appairage. L'appairage ne fait que créer la
+    /// confiance entre deux appareils : aucun profil n'est partagé, voir [`Engine::offer`].
+    pub async fn start_pairing(&self) -> Result<PairingTicket> {
+        pairing::start(&self.shared).await
     }
 
     /// Ferme le mode appairage.
@@ -233,21 +225,13 @@ impl<P: ProfileKey> Engine<P> {
         pairing::pair_with_qr(&self.shared, uri).await
     }
 
-    /// « Synchroniser avec… » : propose `profile` à un appareil de confiance, tout de suite
-    /// s'il est connecté, sinon dès qu'il apparaît.
+    /// Partage `profile` avec un appareil de confiance : l'appareil rejoint l'espace du profil
+    /// (qui doit être synchronisé) et la proposition part tout de suite s'il est connecté,
+    /// sinon dès qu'il apparaît (tant que le moteur tourne : elle n'est pas gardée au
+    /// redémarrage). Chez lui, le profil est accepté d'office : un nouveau profil, clone de
+    /// celui-ci, reçoit le contenu.
     pub async fn offer(&self, profile: P, device: DeviceKey) -> Result<()> {
         offers::offer(&self.shared, profile, device).await
-    }
-
-    /// Répond à une offre reçue ([`app::ports::sync::SyncEvent::OfferReceived`]) ; la
-    /// synchronisation initiale démarre aussitôt après l'acceptation.
-    pub async fn answer_offer(
-        &self,
-        device: DeviceKey,
-        space: SpaceId,
-        choice: OfferChoice<P>,
-    ) -> Result<()> {
-        offers::answer(&self.shared, device, space, choice).await
     }
 
     /// « Arrêter de synchroniser ce profil avec <appareil> ».
@@ -262,8 +246,9 @@ impl<P: ProfileKey> Engine<P> {
     }
 
     /// « Synchroniser avec mes appareils » : propose la collection `root` (déjà listée dans le
-    /// profil) à `devices`, qui doivent tous partager le profil. Rien n'est envoyé aux
-    /// appareils absents : la proposition part à leur connexion.
+    /// profil) à `devices`, des appareils de confiance quelconques (ils n'ont pas besoin de
+    /// partager le profil). Rien n'est envoyé aux appareils absents : la proposition part à leur
+    /// connexion.
     pub async fn share_collection(
         &self,
         profile: P,
@@ -273,25 +258,50 @@ impl<P: ProfileKey> Engine<P> {
         collections::share(&self.shared, profile, root, devices).await
     }
 
+    /// Partage la collection `root` avec un seul appareil de confiance (`shared`), ou retire
+    /// cet appareil du partage : les fichiers restent des deux côtés. Sans plus aucun appareil,
+    /// le partage disparaît.
+    pub async fn set_collection_device(
+        &self,
+        profile: P,
+        root: String,
+        device: DeviceKey,
+        shared: bool,
+    ) -> Result<Option<ShareRecord>> {
+        collections::set_device(&self.shared, profile, root, device, shared).await
+    }
+
     /// « Arrêter de synchroniser cette collection » : les fichiers restent des deux côtés.
     pub async fn stop_collection(&self, profile: P, share: Uuid) -> Result<()> {
         collections::stop(&self.shared, profile, share).await
     }
 
-    /// Répond à une collection proposée
-    /// ([`app::ports::sync::SyncEvent::CollectionOfferReceived`]).
-    pub async fn answer_collection(
+    /// Active une collection reçue ([`app::ports::sync::SyncEvent::CollectionOfferReceived`]) :
+    /// elle est ajoutée au profil local `profile` (actif ou non) sous `destination`, et les
+    /// fichiers commencent à s'échanger. Rien n'est écrit avant. Avec `merge`, un dossier qui
+    /// contient déjà des fichiers est accepté : les fichiers identiques sont gardés, les
+    /// absents copiés, et deux versions différentes d'un même fichier sont gardées toutes les
+    /// deux (copie de conflit). Sans `merge`, un dossier non vide est refusé.
+    pub async fn activate_collection(
         &self,
         device: DeviceKey,
         share: Uuid,
-        answer: CollectionAnswer,
+        profile: P,
+        destination: PathBuf,
+        merge: bool,
     ) -> Result<()> {
-        collections::answer(&self.shared, device, share, answer).await
+        collections::activate(&self.shared, device, share, profile, destination, merge).await
     }
 
-    /// Les collections proposées qui attendent une réponse.
-    pub fn pending_collections(&self) -> Vec<IncomingCollection<P>> {
-        self.shared.pending_collections()
+    /// Ignore une collection reçue : l'entrée disparaît, le refus part à l'appareil (tout de
+    /// suite s'il est connecté, sinon à sa prochaine connexion).
+    pub async fn ignore_collection(&self, device: DeviceKey, share: Uuid) -> Result<()> {
+        collections::ignore(&self.shared, device, share).await
+    }
+
+    /// Les collections reçues qui attendent d'être configurées (les ignorées en sont exclues).
+    pub async fn pending_collections(&self) -> Result<Vec<PendingCollection>> {
+        collections::pending(&self.shared).await
     }
 
     /// Des fichiers d'une collection partagée ont changé sur le disque (ou au démarrage) : le

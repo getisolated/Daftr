@@ -25,7 +25,9 @@ use crate::error::{Error, Result};
 use crate::noise::{Channel, ChannelReader, ChannelWriter};
 use crate::pairing::LinkedDevice;
 use crate::stores::{self, ProfileKey};
-use crate::wire::{self, FEATURE_COLLECTIONS, Hello, MAX_SPACES, Message, PROTOCOL_VERSION};
+use crate::wire::{
+    self, FEATURE_COLLECTIONS, FEATURE_PROFILE_INFO, Hello, MAX_SPACES, Message, PROTOCOL_VERSION,
+};
 
 use catchup::Round;
 use collections::ShareSession;
@@ -78,6 +80,7 @@ pub(crate) fn spawn<P: ProfileKey>(
         remote_features: 0,
         shares: HashMap::new(),
         offered_collections: HashSet::new(),
+        pending_sent: false,
     };
     shared.runtime.spawn(session.run(reader, receiver));
     true
@@ -110,13 +113,15 @@ struct Session<P: ProfileKey> {
     /// Espaces dont nous avons envoyé le contenu, en attente d'acquittement.
     snapshots_sent: HashSet<SpaceId>,
     /// Offres acceptées dont nous recevons le contenu.
-    accepted: HashMap<SpaceId, Incoming<P>>,
+    accepted: HashMap<SpaceId, Incoming>,
     /// Fonctionnalités annoncées par l'appareil distant.
     remote_features: u8,
     /// Collections partagées actives avec l'appareil distant.
     shares: HashMap<Uuid, ShareSession<P>>,
     /// Collections proposées dans cette session, en attente de réponse.
     offered_collections: HashSet<Uuid>,
+    /// La liste des collections reçues en attente a été envoyée dans cette session.
+    pending_sent: bool,
 }
 
 type Inbound = UnboundedReceiver<Result<Message>>;
@@ -183,7 +188,12 @@ impl<P: ProfileKey> Session<P> {
             Message::Ack { space, seq } => self.on_ack(space, seq).await,
             Message::Offer(entries) => self.on_offer(entries).await,
             Message::OfferReply { space, accepted } => self.on_offer_reply(space, accepted).await,
-            Message::Snapshot { space, total, docs } => self.on_snapshot(space, total, docs),
+            Message::Snapshot { space, docs, .. } => self.on_snapshot(space, docs),
+            Message::ProfileInfo(entry) => {
+                self.on_profile_info(entry);
+                Ok(())
+            }
+            Message::CollectionPending { shares } => self.on_collection_pending(shares).await,
             Message::SnapshotEnd { space, seq } => self.on_snapshot_end(space, seq).await,
             Message::CollectionOffer(entries) => self.on_collection_offer(entries).await,
             Message::CollectionReply { share, accepted } => {
@@ -234,8 +244,6 @@ impl<P: ProfileKey> Session<P> {
                 None => Ok(()),
             },
             Command::SendOffers => self.send_offers().await,
-            Command::AcceptOffer { space, profile } => self.accept_offer(space, profile).await,
-            Command::DeclineOffer { space } => self.reply_offer(space, false).await,
             Command::CollectionsChanged => self.sync_collections().await,
             Command::ShareChanged(share) => self.share_changed(share).await,
             Command::CollectionAnswer { share, accepted } => {
@@ -262,7 +270,7 @@ impl<P: ProfileKey> Session<P> {
             name: self.shared.state().device_name.as_str().to_owned(),
             spaces: spaces.keys().map(|space| *space.as_bytes()).collect(),
             kind: self.shared.config.device_kind,
-            features: FEATURE_COLLECTIONS,
+            features: FEATURE_COLLECTIONS | FEATURE_PROFILE_INFO,
         };
         self.send(&Message::Hello(hello)).await?;
 
@@ -316,17 +324,17 @@ impl<P: ProfileKey> Session<P> {
             device: self.remote,
             name: name.clone(),
         });
-        match linking.reply {
-            Some(reply) => {
-                // L'appelant a pu abandonner : l'appairage reste conclu
-                let _ = reply.send(LinkedDevice {
-                    key: self.remote,
-                    name,
-                });
-            }
-            // Côté qui affichait le code : le mode appairage est fini, l'écoute peut s'arrêter
-            None => crate::engine::request_refresh(&self.shared),
+        // Côté qui compose : l'appelant a pu abandonner, l'appairage reste conclu. Côté qui
+        // affichait le code, le mode appairage est déjà fini.
+        if let Some(reply) = linking.reply {
+            let _ = reply.send(LinkedDevice {
+                key: self.remote,
+                name,
+            });
         }
+        // Un appareil de confiance de plus : l'écoute reste ouverte pour ses offres, des
+        // deux côtés
+        crate::engine::request_refresh(&self.shared);
         Ok(())
     }
 

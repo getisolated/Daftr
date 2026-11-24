@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use app::ports::sync::{RemoteSnapshot, SyncEvent, SyncStore};
 use app::ports::trust::{TrustOrigin, TrustStore, TrustedDevice};
 use app::sync::testing::{
-    MemoryDisk, MemoryProfiles, MemorySyncStore, MemoryTrust, RecordedEvents,
+    MemoryDisk, MemoryInbox, MemoryProfiles, MemorySyncStore, MemoryTrust, RecordedEvents,
 };
 use app::sync::{NoteFields, StateVector};
 use domain::sync::{DeviceKey, DeviceKind, DeviceName, DocId, SpaceId};
@@ -63,6 +63,7 @@ pub(crate) struct Device {
     pub events: Arc<RecordedEvents>,
     pub trust: Arc<MemoryTrust>,
     pub disk: Arc<MemoryDisk>,
+    pub inbox: Arc<MemoryInbox>,
     pub discovery: Arc<MemoryDiscovery>,
     pub clock: Arc<ManualClock>,
 }
@@ -105,6 +106,7 @@ fn build_device(
     let events = Arc::new(RecordedEvents::default());
     let trust = Arc::new(MemoryTrust::default());
     let disk = Arc::new(MemoryDisk::default());
+    let inbox = Arc::new(MemoryInbox::default());
     trust.save_device_secret(identity.secret()).unwrap();
     let discovery = Arc::new(network.join());
     let clock = Arc::new(ManualClock::new());
@@ -122,6 +124,7 @@ fn build_device(
         events: Arc::clone(&events) as _,
         trust: Arc::clone(&trust) as _,
         files: Arc::clone(&disk) as _,
+        inbox: Arc::clone(&inbox) as _,
         discovery: Arc::clone(&discovery) as _,
         clock: Arc::clone(&clock) as _,
         runtime: tokio::runtime::Handle::current(),
@@ -134,6 +137,7 @@ fn build_device(
         events,
         trust,
         disk,
+        inbox,
         discovery,
         clock,
     }

@@ -252,3 +252,79 @@ fn the_restricted_device_secret_stays_readable() {
 
     assert_eq!(trust.device_secret().unwrap(), Some(secret));
 }
+
+fn pending(device: u8, share: u8, ignored: bool) -> PendingCollection {
+    PendingCollection {
+        device: DeviceKey::from_bytes([device; 32]),
+        offer: app::ports::sync::CollectionOffer {
+            share: domain::uuid::Uuid::from_random([share; 16]),
+            source_profile_id: "work".to_owned(),
+            source_profile_name: "Travail".to_owned(),
+            source_space: Some(SpaceId::from_bytes([3; 32])),
+            name: "Docs".to_owned(),
+            files: 12,
+            bytes: 4096,
+        },
+        ignored,
+    }
+}
+
+#[test]
+fn pending_collections_survive_a_restart() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    let inbox = InboxFile::new(&folder);
+    assert!(inbox.pending().unwrap().is_empty());
+
+    inbox.put(&pending(1, 1, false)).unwrap();
+    inbox.put(&pending(1, 2, true)).unwrap();
+    // Même appareil et même partage : l'entrée est remplacée
+    let mut newer = pending(1, 1, false);
+    newer.offer.files = 99;
+    inbox.put(&newer).unwrap();
+
+    let reopened = InboxFile::new(&folder).pending().unwrap();
+    assert_eq!(reopened.len(), 2);
+    let kept = reopened
+        .iter()
+        .find(|entry| !entry.ignored)
+        .expect("l'entrée non ignorée");
+    assert_eq!(kept.offer.files, 99);
+    assert_eq!(kept.offer.source_space, Some(SpaceId::from_bytes([3; 32])));
+    assert_eq!(kept.offer.source_profile_name, "Travail");
+    assert!(reopened.iter().any(|entry| entry.ignored));
+}
+
+#[test]
+fn pending_collections_are_removed_one_by_one_or_by_device() {
+    let directory = tempfile::tempdir().unwrap();
+    let inbox = InboxFile::new(&directory.path().join(SYNC_FOLDER));
+    for (device, share) in [(1, 1), (1, 2), (2, 3)] {
+        inbox.put(&pending(device, share, false)).unwrap();
+    }
+    let first = pending(1, 1, false);
+
+    assert!(inbox.remove(&first.device, &first.offer.share).unwrap());
+    assert!(!inbox.remove(&first.device, &first.offer.share).unwrap());
+    inbox.remove_device(&first.device).unwrap();
+
+    let left = inbox.pending().unwrap();
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].device, DeviceKey::from_bytes([2; 32]));
+}
+
+#[test]
+fn an_unreadable_inbox_is_kept_aside_and_reads_as_empty() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(SYNC_FOLDER);
+    std::fs::create_dir_all(&folder).unwrap();
+    let file = folder.join(INBOX_FILE);
+    std::fs::write(&file, "{ nope").unwrap();
+    let inbox = InboxFile::new(&folder);
+
+    assert!(inbox.pending().unwrap().is_empty());
+    assert!(suffixed(&file, CORRUPTED_SUFFIX).is_file());
+    // L'écriture suivante repart d'un fichier sain
+    inbox.put(&pending(1, 1, false)).unwrap();
+    assert_eq!(inbox.pending().unwrap().len(), 1);
+}

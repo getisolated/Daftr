@@ -3,7 +3,7 @@
 //! Les clés d'appareil et les espaces sont en hexadécimal (64 chiffres) ; les profils par
 //! leur identifiant local.
 
-use app::ports::sync::{ProfileOffer, SyncStatus};
+use app::ports::sync::SyncStatus;
 use app::ports::trust::{TrustOrigin, TrustedDevice};
 use domain::profile::ProfileId;
 use domain::sync::DeviceKind;
@@ -281,39 +281,55 @@ pub struct LinkedDeviceDto {
     pub name: String,
 }
 
-/// Un profil proposé par un appareil.
+/// Un profil partagé accepté d'office, clone du profil d'un autre appareil (événement
+/// `sync:profile-received`). L'interface affiche « Profil “X” reçu depuis A » avec un bouton
+/// pour basculer dessus.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub struct ProfileOfferDto {
-    /// Espace proposé (à renvoyer dans la réponse).
-    pub space_id: String,
-    /// Nom proposé.
+pub struct ProfileReceivedDto {
+    /// Le profil créé ici.
+    pub profile_id: String,
+    /// Son nom (celui du profil d'origine, ou le nom par défaut de l'application).
     pub name: String,
-    /// Nombre de notes.
-    #[ts(type = "number")]
-    pub note_count: u64,
+    /// L'appareil qui l'a partagé.
+    pub device: LinkedDeviceDto,
 }
 
-impl From<&ProfileOffer> for ProfileOfferDto {
-    fn from(offer: &ProfileOffer) -> Self {
-        Self {
-            space_id: offer.space_id.to_string(),
-            name: offer.name.clone(),
-            note_count: offer.note_count,
-        }
-    }
-}
-
-/// Offre de profils reçue (événement `sync:offer-received`).
+/// Un appareil de confiance, vu depuis le partage d'un profil.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub struct OfferReceivedDto {
-    /// L'appareil qui propose.
-    pub device: LinkedDeviceDto,
-    /// Les profils proposés : répondre à chacun par `sync_answer_offer`.
-    pub offers: Vec<ProfileOfferDto>,
+pub struct ProfileShareDeviceDto {
+    /// Clé de l'appareil.
+    pub device_key: String,
+    /// Le profil est partagé avec lui (case cochée).
+    pub shared: bool,
+    /// Partagé, mais l'appareil n'a encore rien reçu (absent, ou proposition perdue au
+    /// redémarrage : décocher puis recocher la renvoie).
+    pub pending: bool,
+}
+
+/// Le partage d'un profil avec chaque appareil de confiance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileShareDto {
+    /// Profil local.
+    pub profile_id: String,
+    /// Son espace de synchronisation, absent tant qu'il n'est partagé avec personne.
+    pub space_id: Option<String>,
+    /// Un état par appareil de confiance non révoqué.
+    pub devices: Vec<ProfileShareDeviceDto>,
+}
+
+/// Le partage de chaque profil avec chaque appareil de confiance (matrice profils × appareils).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileSharesDto {
+    /// Tous les profils de l'installation.
+    pub profiles: Vec<ProfileShareDto>,
 }
 
 /// Notes modifiées par un autre appareil (événement `sync:notes-synced`).

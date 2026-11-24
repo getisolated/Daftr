@@ -1,5 +1,5 @@
 //! État des collections partagées tenu par le moteur : résumé du dossier, avancement de
-//! chaque appareil, propositions reçues en attente de réponse.
+//! chaque appareil.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,8 +7,8 @@ use std::sync::Arc;
 use app::AppResult;
 use app::collection_sync::Ignored;
 use app::ports::collection_sync::CollectionDisk;
-use app::ports::sync::{CollectionOffer, SyncEvent};
-use domain::sync::{DeviceKey, DeviceName};
+use app::ports::sync::SyncEvent;
+use domain::sync::DeviceKey;
 use domain::uuid::Uuid;
 
 use super::Shared;
@@ -33,19 +33,6 @@ pub(crate) struct ShareRuntime {
     pub summary: LocalSummary,
     /// Avancement par appareil.
     pub peers: HashMap<DeviceKey, PeerRuntime>,
-}
-
-/// Une proposition reçue, en attente de la réponse de l'utilisateur.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IncomingCollection<P> {
-    /// L'appareil qui propose.
-    pub device: DeviceKey,
-    /// Son nom.
-    pub device_name: DeviceName,
-    /// Le profil local qui recevra la collection.
-    pub profile: P,
-    /// La proposition.
-    pub offer: CollectionOffer,
 }
 
 /// État d'un partage, tel que l'interface le demande.
@@ -148,30 +135,6 @@ impl<P: ProfileKey> Shared<P> {
                 peer.syncing = false;
             }
         }
-    }
-
-    /// Une proposition de collection reçue ; `false` si elle l'était déjà.
-    pub(crate) fn receive_collection(&self, incoming: IncomingCollection<P>) -> bool {
-        let key = (incoming.device, incoming.offer.share);
-        let mut state = self.state();
-        if state.incoming_collections.contains_key(&key) {
-            return false;
-        }
-        state.incoming_collections.insert(key, incoming);
-        true
-    }
-
-    /// Les propositions de collections en attente.
-    pub(crate) fn pending_collections(&self) -> Vec<IncomingCollection<P>> {
-        let state = self.state();
-        let mut pending: Vec<_> = state.incoming_collections.values().cloned().collect();
-        pending.sort_by_key(|incoming| (incoming.device, incoming.offer.share));
-        pending
-    }
-
-    /// Oublie une proposition (traitée).
-    pub(crate) fn forget_collection(&self, device: &DeviceKey, share: &Uuid) {
-        self.state().incoming_collections.remove(&(*device, *share));
     }
 
     /// L'état d'un partage.

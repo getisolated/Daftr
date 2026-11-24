@@ -5,14 +5,13 @@ use std::sync::Arc;
 
 use adapter_fs::DATABASE_FILE;
 use adapter_sqlite::SqliteStore;
+use app::AppError;
 use app::ports::sync::{SyncProfiles, SyncStore};
 use app::ports::{FolderStore, NoteStore};
-use app::{AppError, SyncError};
+use domain::i18n::Language;
 use domain::note::NewNote;
 use domain::profile::ProfileId;
-use domain::sync::{DeviceKey, DeviceName, SpaceId};
-use presentation::error::IpcErrorCode;
-use presentation::sync::OfferAnswer;
+use domain::sync::DeviceName;
 
 use super::installation::Installation;
 
@@ -135,7 +134,11 @@ async fn the_space_index_follows_the_bases_and_is_rebuilt() {
 async fn a_profile_created_for_an_offer_has_its_base_and_default_folder() {
     let install = Installation::new("A");
 
-    let created = install.sync.profiles.create_profile("Travail").unwrap();
+    let created = install
+        .sync
+        .profiles
+        .create_profile(Some("Travail"), None)
+        .unwrap();
 
     let profile = install.profiles.get(&created).unwrap();
     assert_eq!(profile.name.as_deref(), Some("Travail"));
@@ -162,32 +165,75 @@ async fn every_base_is_opened_with_the_device_key() {
 }
 
 #[tokio::test]
-async fn a_new_profile_is_refused_for_a_space_already_here() {
+async fn a_clone_without_a_name_takes_the_default_name_in_the_app_language() {
     let install = Installation::new("A");
+    install.sync.profiles.set_language(Language::En);
+
+    let created = install.sync.profiles.create_profile(None, None).unwrap();
+
+    let name = install.profiles.get(&created).unwrap().name;
+    assert_eq!(name.as_deref(), Some("Default profile"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn profile_shares_list_every_profile_and_trusted_device() {
+    let (a, b) = (Installation::new("A"), Installation::new("B"));
     let default = ProfileId::default_profile();
-    let space = install
+    a.activate(&default);
+    b.activate(&default);
+    let work = a.create_profile("Travail");
+    for install in [&a, &b] {
+        install.sync.start(&install.settings).await;
+    }
+    super::end_to_end::pair_only(&a, &b).await;
+    let b_key = b.sync.device_key().to_string();
+    let settings = a.settings.current();
+
+    let none = a.sync.profile_shares().await.unwrap();
+    assert_eq!(none.profiles.len(), 2);
+    for row in &none.profiles {
+        assert!(row.space_id.is_none());
+        assert_eq!(row.devices.len(), 1);
+        assert!(!row.devices[0].shared);
+        assert_eq!(row.devices[0].device_key, b_key);
+    }
+
+    let shared = a
         .sync
-        .profiles
-        .ensure_space(&default, "Notes", &device_name())
+        .set_profile_shared(work.clone(), b.sync.device_key(), true, &settings)
+        .await
         .unwrap();
-    let device = DeviceKey::from_bytes([9; 32]);
+    let row = shared
+        .profiles
+        .iter()
+        .find(|row| row.profile_id == work.as_str())
+        .unwrap();
+    assert!(row.space_id.is_some() && row.devices[0].shared);
+    let other = shared
+        .profiles
+        .iter()
+        .find(|row| row.profile_id == default.as_str())
+        .unwrap();
+    assert!(!other.devices[0].shared);
 
-    let error = install
+    let unshared = a
         .sync
-        .answer_offer(device, space, OfferAnswer::NewProfile)
+        .set_profile_shared(work.clone(), b.sync.device_key(), false, &settings)
         .await
-        .unwrap_err();
-
-    assert_eq!(error.code, IpcErrorCode::Refused);
-    let already = AppError::from(SyncError::AlreadySynced).to_string();
-    assert_eq!(error.message, already);
-    let unknown = SpaceId::from_bytes([8; 32]);
-    let missing = install
+        .unwrap();
+    let row = unshared
+        .profiles
+        .iter()
+        .find(|row| row.profile_id == work.as_str())
+        .unwrap();
+    assert!(!row.devices[0].shared);
+    // Un profil jamais partagé n'a rien à arrêter
+    let nothing = a
         .sync
-        .answer_offer(device, unknown, OfferAnswer::NewProfile)
+        .set_profile_shared(default, b.sync.device_key(), false, &settings)
         .await
-        .unwrap_err();
-    assert_eq!(missing.message, "unknown_offer");
+        .unwrap();
+    assert!(nothing.profiles.iter().all(|row| !row.devices[0].shared));
 }
 
 /// Rétrocompatibilité : la base d'avant les profils (`daftr.db` à la racine des données)

@@ -200,3 +200,29 @@ pub trait CollectionDisk: Send + Sync {
     /// Envoie un fichier à la corbeille du système.
     fn trash(&self, root: &Path, path: &SyncPath) -> AppResult<()>;
 }
+
+/// Une collection proposée par un appareil et pas encore activée ici : une entrée « à
+/// configurer ». Elle est gardée hors des bases de profil (aucun profil n'est encore choisi) et
+/// survit à un redémarrage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingCollection {
+    /// L'appareil qui propose.
+    pub device: DeviceKey,
+    /// La proposition.
+    pub offer: crate::ports::sync::CollectionOffer,
+    /// L'utilisateur a ignoré la proposition : elle n'est plus affichée, et le refus part à
+    /// l'appareil dès qu'il est joignable.
+    pub ignored: bool,
+}
+
+/// Propositions de collections en attente (`<données>/sync/collection-offers.json`).
+pub trait CollectionInbox: Send + Sync {
+    /// Toutes les entrées, ignorées comprises.
+    fn pending(&self) -> AppResult<Vec<PendingCollection>>;
+    /// Ajoute l'entrée, ou remplace celle de même appareil et même partage.
+    fn put(&self, entry: &PendingCollection) -> AppResult<()>;
+    /// Retire l'entrée ; `true` si elle existait.
+    fn remove(&self, device: &DeviceKey, share: &Uuid) -> AppResult<bool>;
+    /// Retire toutes les entrées d'un appareil.
+    fn remove_device(&self, device: &DeviceKey) -> AppResult<()>;
+}

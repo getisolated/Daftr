@@ -37,6 +37,34 @@ pub fn read_stored_sync(path: &Path) -> AppResult<Option<StoredSync>> {
     }))
 }
 
+/// La base `path` a au moins un partage de collection, en lecture seule (sans migration ni
+/// écriture : aucun verrou pris sur une base que le profil actif ou le moteur écrivent) ;
+/// `false` si la base n'existe pas ou n'a pas encore la table des partages.
+pub fn read_has_shares(path: &Path) -> AppResult<bool> {
+    if !path.is_file() {
+        return Ok(false);
+    }
+    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+    let connection = Connection::open_with_flags(path, flags).map_err(storage)?;
+    let table = concat!(
+        "SELECT EXISTS (SELECT 1 FROM sqlite_master ",
+        "WHERE type = 'table' AND name = 'collection_shares')"
+    );
+    let exists: bool = connection
+        .query_row(table, [], |row| row.get(0))
+        .map_err(storage)?;
+    if !exists {
+        return Ok(false);
+    }
+    connection
+        .query_row(
+            "SELECT EXISTS (SELECT 1 FROM collection_shares)",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(storage)
+}
+
 fn has_sync_state(connection: &Connection) -> rusqlite::Result<bool> {
     connection.query_row(
         "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_state')",
@@ -61,6 +89,37 @@ mod tests {
         assert!(!path.exists(), "la lecture ne crée pas la base");
         drop(SqliteStore::open(&path).unwrap());
         assert_eq!(read_stored_sync(&path).unwrap(), None);
+    }
+
+    #[test]
+    fn shares_are_detected_without_opening_the_store() {
+        use app::ports::CollectionStore;
+        use app::ports::collection_sync::CollectionSyncStore;
+        use domain::collection::CollectionKind;
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("daftr.db");
+        assert!(!read_has_shares(&path).unwrap());
+        assert!(!path.exists(), "la lecture ne crée pas la base");
+
+        let store = SqliteStore::open(&path).unwrap();
+        assert!(!read_has_shares(&path).unwrap());
+        let root = "/docs";
+        store.add(root, CollectionKind::Folder, "Docs").unwrap();
+        let device = DeviceKey::from_bytes([1; 32]);
+        let id = domain::uuid::Uuid::from_random([5; 16]);
+        store.create_share(root, &id, &[device]).unwrap();
+
+        assert!(read_has_shares(&path).unwrap());
+        store.stop_share(&id).unwrap();
+        assert!(!read_has_shares(&path).unwrap());
+        // Une base d'avant les partages n'a pas la table : pas de partage, sans migration
+        let legacy = directory.path().join("legacy.db");
+        Connection::open(&legacy)
+            .unwrap()
+            .execute_batch("CREATE TABLE notes (id INTEGER PRIMARY KEY)")
+            .unwrap();
+        assert!(!read_has_shares(&legacy).unwrap());
     }
 
     #[test]
