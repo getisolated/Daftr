@@ -15,11 +15,14 @@ export class ProfilesService {
 
   private readonly _profiles = signal<Profile[]>([]);
   private readonly _activeId = signal<string>(DEFAULT_PROFILE_ID);
+  /** Counts the asks to show "Devices and sync" of the active profile (the switcher owns the dialog). */
+  private readonly _devicesRequests = signal(0);
   /** Object URLs of the icons, by profile id. */
   private readonly _icons = signal<ReadonlyMap<string, string>>(new Map());
 
   readonly profiles = this._profiles.asReadonly();
   readonly activeId = this._activeId.asReadonly();
+  readonly devicesRequests = this._devicesRequests.asReadonly();
   readonly active = computed<Profile | null>(() => this._profiles().find(profile => profile.id === this._activeId()) ?? null);
   /** Profiles the active one can switch or transfer to. */
   readonly others = computed<Profile[]>(() => this._profiles().filter(profile => profile.id !== this._activeId()));
@@ -35,6 +38,11 @@ export class ProfilesService {
     this._profiles.set(state.profiles);
     this._activeId.set(state.activeId);
     await this.loadIcons(state.profiles);
+  }
+
+  /** Asks for the settings of the active profile, on "Devices and sync" ("link a device first"). */
+  requestDevices(): void {
+    this._devicesRequests.update(count => count + 1);
   }
 
   /** URL of the icon of a profile, `null` without one (the avatar shows its initial). */

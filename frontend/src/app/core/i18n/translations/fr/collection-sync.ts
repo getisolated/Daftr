@@ -79,7 +79,6 @@ export const FR_COLLECTION_SYNC: Record<keyof typeof EN_COLLECTION_SYNC, string>
   'csync.settings.receivedFolder.title': 'Dossier des collections reçues',
   'csync.settings.receivedFolder.description': 'Où arrivent par défaut les collections proposées par vos autres appareils : un dossier par collection. Propre à cet ordinateur, jamais synchronisé. Vide : Documents/Daftr.',
   'csync.settings.browse': 'Parcourir…',
-  'csync.settings.reset': 'Par défaut',
 
   // Conflits
   'csync.conflict.bannerMine': 'Modifié sur les deux appareils : cette copie garde votre version, l’original contient l’autre.',
@@ -95,5 +94,6 @@ export const FR_COLLECTION_SYNC: Record<keyof typeof EN_COLLECTION_SYNC, string>
   'csync.compare.loading': 'Lecture des fichiers…',
   'csync.compare.failed': 'Les fichiers n’ont pas pu être lus.',
   'csync.compare.mine': 'votre version',
+  'csync.compare.otherVersion': 'l’autre version',
   'csync.compare.theirs': 'version de {device}',
 };

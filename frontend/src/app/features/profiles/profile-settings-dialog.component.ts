@@ -32,6 +32,8 @@ export class ProfileSettingsDialogComponent implements OnDestroy {
   /** The profile to edit; `null` to create one. */
   readonly profile = input<Profile | null>(null);
   readonly currentIconUrl = input<string | null>(null);
+  /** Opens on "Devices and sync" instead of the main view. */
+  readonly openDevices = input(false);
   readonly closed = output<void>();
   /** Asked to delete the edited profile; the owner runs the confirmation. */
   readonly deleteRequested = output<void>();
@@ -46,7 +48,7 @@ export class ProfileSettingsDialogComponent implements OnDestroy {
   protected readonly removePassword = signal(false);
   protected readonly passwordOpen = signal(false);
   /** "Devices and sync" replaces the content; its actions apply at once, without Save. */
-  protected readonly devicesOpen = signal(false);
+  protected readonly devicesOpen = linkedSignal(() => this.openDevices());
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
 

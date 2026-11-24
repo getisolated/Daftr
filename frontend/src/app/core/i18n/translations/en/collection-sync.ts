@@ -77,7 +77,6 @@ export const EN_COLLECTION_SYNC = {
   'csync.settings.receivedFolder.title': 'Received Collections Folder',
   'csync.settings.receivedFolder.description': 'Where the collections proposed by your other devices arrive by default: one folder per collection. Specific to this computer, never synced. Empty: Documents/Daftr.',
   'csync.settings.browse': 'Browse…',
-  'csync.settings.reset': 'Default',
 
   // Conflicts
   'csync.conflict.bannerMine': 'Edited on both devices: this copy keeps your version, the original holds the other one.',
@@ -93,5 +92,6 @@ export const EN_COLLECTION_SYNC = {
   'csync.compare.loading': 'Reading the files…',
   'csync.compare.failed': 'The files could not be read.',
   'csync.compare.mine': 'your version',
+  'csync.compare.otherVersion': 'the other version',
   'csync.compare.theirs': 'version of {device}',
 } as const;

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Profile, ProfileSwitcherDialog } from '../../core/models/profile.model';
 import { ProfileTransferService } from '../../core/services/profile-transfer.service';
@@ -53,6 +53,24 @@ export class ProfileSwitcherComponent implements OnDestroy {
   protected readonly deleteActions = computed<ConfirmDialogAction[]>(() => [
     { id: 'delete', label: this.i18n.t('profiles.delete.confirm'), danger: true },
   ]);
+
+  constructor() {
+    // "Link a device first" of the collection sharing: the settings of the active profile, on its devices. Only the asks
+    // made after this component exists count: the sidebar (and this item) is rebuilt when zen mode toggles
+    let handled = this.profiles.devicesRequests();
+
+    effect(() => {
+      const requests = this.profiles.devicesRequests();
+
+      if (requests > handled) {
+        handled = requests;
+        untracked(() => {
+          this.closeMenu(false);
+          this.openDialog({ kind: 'settings', profile: this.profiles.active(), devices: true });
+        });
+      }
+    });
+  }
 
   ngOnDestroy(): void {
     this.hover.cancel();

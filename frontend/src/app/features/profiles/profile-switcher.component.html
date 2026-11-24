@@ -36,6 +36,7 @@
   @if (current.kind === 'settings') {
     <app-profile-settings-dialog
       [profile]="current.profile"
+      [openDevices]="current.devices ?? false"
       [currentIconUrl]="current.profile ? profiles.iconUrl(current.profile.id) : null"
       (deleteRequested)="current.profile && onRemove(current.profile)"
       (closed)="closeDialog()"
