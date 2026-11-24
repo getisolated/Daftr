@@ -379,7 +379,32 @@ La pastille (`CollectionShareStatusKind`) est calculée côté backend, dans l'o
 - Un dossier vidé d'un coup (disque ou partage réseau démonté, dossier de montage vide) est lu comme des suppressions et part à la corbeille chez l'autre appareil (récupérable). Un dossier qui n'existe plus n'envoie rien et ne supprime rien (`missingFolder`).
 - Une base ou un accusé perdu n'a jamais d'effet destructeur : au pire une copie de conflit en trop.
 - Les fichiers ouverts en écriture exclusive par un autre programme (renommage refusé) sont repris au prochain manifeste.
-- **Non vérifié** : deux PC réels, la corbeille de Windows et de macOS par `ShareDisk::trash` (testée par le moteur sur un disque en mémoire seulement), la surveillance du système sur de gros dépôts (checkout git, 20 000 fichiers), les liens symboliques sous Windows (testés sous Unix seulement), les dossiers réseau et OneDrive, l'interface (aucun écran n'est livré).
+- **Non vérifié** : deux PC réels, la corbeille de Windows et de macOS par `ShareDisk::trash` (testée par le moteur sur un disque en mémoire seulement), la surveillance du système sur de gros dépôts (checkout git, 20 000 fichiers), les liens symboliques sous Windows (testés sous Unix seulement), les dossiers réseau et OneDrive, l'interface (voir §12.8 : les écrans sont livrés, mais jamais lancés dans l'application réelle).
+
+### 12.8 Interface des collections partagées (renderer)
+
+L'état vient de `CollectionSyncService` (`core/services/collection-sync.service.ts`), qui lit `collection_sync_state` au démarrage et suit les quatre événements `sync:collection-*`. Les règles pures (pastille et infobulle, tri des propositions, fusion des événements dans l'état, copie de conflit d'un fichier, mode de réponse selon le dossier, tailles et durées) sont dans `core/utils/collection-sync.util.ts` ; la comparaison ligne à ligne dans `core/utils/line-diff.util.ts`. Tests : `tests/collection-sync-util.test.ts`, `tests/line-diff.test.ts`.
+
+- **Menu d'une collection** (barre latérale) : « Synchroniser avec mes appareils… » (ouvre l'assistant), ou « Arrêter de synchroniser cette collection » (confirmation) quand elle est partagée ; « Relier à un autre dossier… » (`collection_sync_relink`) remplace « Localiser sur le disque » pour une collection partagée dont le dossier manque.
+- **Assistant** (`collection-share-dialog`) : appareils qui partagent le profil actif en cases à cocher (tous cochés), résumé (`collection_sync_summary` : nombre, volume, fichiers de plus de 10 Mio ou écartés, parcours tronqué), avertissement git, et « Liez d'abord un appareil » avec un bouton qui ouvre « Appareils et synchronisations » du profil actif (`ProfilesService.requestDevices`, relayé par le sélecteur de profil). Ouvert depuis la vue du profil, il demande d'abord la collection (les dossiers pas encore partagés).
+- **Proposition reçue** : un toast (« Voir ») par événement contenant des propositions pas encore annoncées, puis la fenêtre (`collection-offer-dialog`) : destination pré-remplie, « Modifier… » (dialogue natif), avertissement « dossier existant (N .md) » avec « Fusionner » présélectionné ou « Choisir un autre dossier » (ouvre le dialogue). Accepter envoie `merge` si le dossier existe et n'est pas vide, `receive` sinon ; Ignorer envoie `decline` ; **Plus tard** ferme la fenêtre, la proposition reste dans `offers`.
+- **Propositions en attente** (« Plus tard », ou relues après un redémarrage) : une ligne « N collections proposées · Répondre » en tête de la section Collections de la barre latérale, et la liste « Collections proposées » de la vue du profil.
+- **Pastille** sur la ligne d'une collection partagée, avant le « N » existant : ⟳ à jour (infobulle « Synchronisée avec X, il y a 2 min »), ⟳ animé avec « 37 / 142 » en cours, ⚠ conflits, ⏸ « En attente de X », ✕ « Dossier introuvable », horloge « Proposée à X ». Un clic relie le dossier s'il manque, sinon ouvre la vue « Appareils et synchronisations ».
+- **Vue du profil** : section « Collections partagées » (état, appareils, « Relier… » si le dossier manque, « Arrêter » avec confirmation, « Ajouter une collection » pour le profil actif seulement).
+- **Réglage** : « Dossier des collections reçues » (chemin + « Parcourir… ») dans Réglages → Synchronisation ; `SettingsDto.receivedCollectionsFolder` est repris dans `settings.model.ts`. La réinitialisation générique du réglage vide le chemin.
+- **Conflits** : ⚠ sur la copie dans l'arbre (et sur les dossiers qui en contiennent) ; au-dessus de l'éditeur, un bandeau « Garder ma version » / « Garder l'autre » / « Comparer » (`collection_conflict_resolve`, puis l'onglet de la copie se ferme) ; « Comparer » affiche l'original et la copie côte à côte, lignes différentes surlignées.
+- Retirer un appareil ou arrêter un profil (`sync_remove_device`, `sync_stop_sharing`) relit l'état des collections (`SyncService.membershipChanges`).
+
+Écarts par rapport à [collections.md](collections.md) :
+
+- **Une commande Rust ajoutée** : `collection_sync_pick_folder` (dialogue natif de dossier, `None` si annulé). Le renderer n'avait aucun moyen d'ouvrir un sélecteur de dossier hors des commandes de collections (« Modifier… », « Parcourir… »).
+- Le dossier choisi par « Modifier… » est le dossier de destination lui-même, pas un parent : ce qu'on voit est ce qui est écrit.
+- Un clic sur la pastille ouvre la vue « Appareils et synchronisations » du profil (qui ouvre aussi le mode d'appairage) : il n'y a pas d'écran de détail propre à une collection.
+- « Comparer » est une comparaison ligne à ligne côte à côte (`line-diff.util.ts`, table limitée à 4 millions de cellules, au-delà le bloc différent est montré d'un seul tenant) ; `text-diff.util.ts` calcule un changement minimal pour l'éditeur, il ne convient pas à l'affichage.
+- Le bandeau de conflit n'est pas dans l'aperçu à part : il est au-dessus de l'éditeur et de l'aperçu (les deux modes de la même vue).
+- Pas de test de composant (le projet n'en a pas) : seules les règles pures sont testées.
+
+**Non vérifié** : tous les écrans ci-dessus n'ont jamais été lancés dans l'application réelle (build, lint et tests vitest seulement) : mise en page des pastilles et du dialogue, dialogue natif de dossier, ordre des dialogues au-dessus de la fenêtre des réglages du profil, Échap quand plusieurs fenêtres sont ouvertes, événements de progression réels.
 
 ## 13. Phases ultérieures
 

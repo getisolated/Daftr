@@ -120,8 +120,8 @@ Paramètres → Synchronisation → **« Dossier des collections reçues »** : 
 | 1 | Cœur pur (domain/app) : calcul de diff entre manifestes, décision envoyer / recevoir / conflit / suppression, noms de copies de conflit, validation des chemins. | Tests unitaires et `proptest` (convergence, jamais de perte). | ✅ |
 | 2 | Protocole et moteur : messages, transfert par morceaux, écriture atomique, corbeille, anti-boucle, reprise après coupure. | Tests d'intégration deux moteurs en mémoire. | ✅ |
 | 3 | Intégration desktop : watcher → moteur, offres de collection, commandes IPC, événements de progression. | Tests de commandes ; recette sur deux dossiers locaux. | ✅ |
-| 4 | Interface : menu contextuel, assistant, fenêtre de proposition, pastilles, section dans le popup profil, réglage de la racine. | Tests vitest des utilitaires ; recette visuelle. | ☐ |
-| 5 | Conflits : badge, bandeau d'actions, « Comparer », états « introuvable » / « en attente ». | Tests vitest ; recette. | ☐ |
+| 4 | Interface : menu contextuel, assistant, fenêtre de proposition, pastilles, section dans le popup profil, réglage de la racine. | Tests vitest des utilitaires ; recette visuelle. | ✅ |
+| 5 | Conflits : badge, bandeau d'actions, « Comparer », états « introuvable » / « en attente ». | Tests vitest ; recette. | ✅ |
 | 6 | Documentation (plan.md, README) et recette sur deux PC réels. | — | ☐ |
 
 Tout va dans la branche `NF/feat/sync-lan-261123`, PR #90 vers `recipe`.
