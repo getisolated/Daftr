@@ -79,6 +79,7 @@ import { remoteTransaction } from '../../shared/codemirror/remote-changes';
 import { SyncService } from '../../core/services/sync.service';
 import { NotesSynced } from '../../core/models/sync.model';
 import { remoteChangeLabel, remoteDeletionLabel } from '../../core/utils/sync.util';
+import { CollectionConflictBannerComponent } from '../sync/collection-conflict-banner.component';
 
 /** The multi-cursor commands of the search keymap are rebindable shortcuts (see buildShortcutsKeymap): their defaults would stay bound. */
 const MULTI_CURSOR_COMMANDS = new Set<Command>([selectNextOccurrence, selectSelectionMatches]);
@@ -105,12 +106,13 @@ const REMOTE_CHANGE_BADGE_MS = 8000;
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
+  imports: [CollectionConflictBannerComponent, ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class.zen]': 'layout.zenMode()',
   },
   template: `
+    <app-collection-conflict-banner [file]="activeFile()" />
     @if (fileBanner(); as banner) {
       <div class="file-banner" role="alert" [class.error]="banner.kind !== 'conflict'">
         @if (banner.kind === 'conflict') {
@@ -261,6 +263,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly layout = inject(LayoutService);
 
   readonly activeNote = signal<Note | null>(null);
+  /** The collection file open, `null` for a note (the conflict banner looks at it). */
+  protected readonly activeFile = computed(() => this.fileDocs.refFor(this.activeNote()?.id ?? null));
   readonly headings = signal<OutlineHeading[]>([]);
   readonly activeHeading = signal(-1);
   /** Problem with the collection file being edited: changed on disk meanwhile, or unreadable. */
