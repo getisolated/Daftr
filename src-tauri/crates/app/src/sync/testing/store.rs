@@ -7,6 +7,8 @@ use domain::sync::{DeviceKey, DeviceName, DocId, SpaceId};
 use domain::uuid::Uuid;
 use platform::sync::lock;
 
+use super::collections::MemoryCollections;
+
 use crate::ports::sync::{
     Applied, ChangedDoc, PeerState, ProfileOffer, RemoteSnapshot, RemoteUpdate, SyncStore,
 };
@@ -20,6 +22,7 @@ use crate::{AppResult, SyncError};
 pub struct MemorySyncStore {
     device: DeviceKey,
     state: Mutex<State>,
+    pub(super) collections: Mutex<MemoryCollections>,
 }
 
 #[derive(Default)]
@@ -55,6 +58,7 @@ impl MemorySyncStore {
         Self {
             device,
             state: Mutex::default(),
+            collections: Mutex::default(),
         }
     }
 

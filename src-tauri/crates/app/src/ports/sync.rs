@@ -8,6 +8,7 @@ use domain::sync::{DeviceKey, DeviceName, DocId, SpaceId};
 use domain::uuid::Uuid;
 
 use crate::AppResult;
+use crate::ports::collection_sync::CollectionSyncStore;
 use crate::sync::{ProjectedDevice, StateVector, Update};
 
 /// Un document modifié depuis un curseur.
@@ -69,7 +70,7 @@ pub struct RemoteSnapshot {
 ///
 /// Chaque écriture de blob, locale ou distante, reçoit un nouveau `seq` (compteur local
 /// monotone) : c'est ce qui permet la propagation transitive A → B → C.
-pub trait SyncStore: Send + Sync {
+pub trait SyncStore: CollectionSyncStore + Send + Sync {
     /// L'espace du profil, `None` s'il n'est pas synchronisé.
     fn space_id(&self) -> AppResult<Option<SpaceId>>;
     /// Documents écrits après `seq`, par `seq` croissant, le document `space` en premier.

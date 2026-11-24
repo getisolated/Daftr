@@ -365,5 +365,6 @@ fn migrates_a_database_of_the_first_versions() {
     assert_eq!(notes(&store).search("\"quick\"*").unwrap().len(), 1);
 }
 
+mod collection_sync;
 mod migration;
 mod soft_delete;

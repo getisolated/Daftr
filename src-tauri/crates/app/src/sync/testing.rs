@@ -2,9 +2,12 @@
 //! ce crate et des autres (feature `testing`) : un profil = un [`MemorySyncStore`], qui tient
 //! ses documents en blobs comme l'adaptateur SQLite et projette à la lecture.
 
+mod collections;
+mod disk;
 mod store;
 mod trust;
 
+pub use disk::MemoryDisk;
 pub use store::MemorySyncStore;
 pub use trust::MemoryTrust;
 

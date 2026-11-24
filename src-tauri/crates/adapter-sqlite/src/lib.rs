@@ -4,6 +4,7 @@
 //! Même schéma que la version Electron : une base existante est reprise telle quelle, ses
 //! migrations sont idempotentes.
 
+mod collection_sync;
 mod collections;
 mod folders;
 mod import;

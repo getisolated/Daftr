@@ -55,6 +55,15 @@ pub enum Refusal {
     /// Icône refusée (format autre que PNG ou WebP, ou trop lourde).
     #[error("Invalid icon")]
     InvalidIcon,
+    /// Le dossier est déjà partagé (sous un autre identifiant).
+    #[error("Collection already shared")]
+    CollectionAlreadyShared,
+    /// Le dossier de destination contient déjà des fichiers et la fusion n'est pas demandée.
+    #[error("Destination folder is not empty")]
+    DestinationNotEmpty,
+    /// Le partage de collection est inconnu, ou l'appareil n'en fait pas partie.
+    #[error("Unknown collection share")]
+    UnknownShare,
 }
 
 /// Erreur d'un cas d'usage.

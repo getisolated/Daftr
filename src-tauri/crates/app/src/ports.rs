@@ -2,6 +2,7 @@
 //!
 //! Les implémentations sont synchrones et partagées entre threads (`Send + Sync`).
 
+pub mod collection_sync;
 mod profiles;
 pub mod sync;
 pub mod trust;

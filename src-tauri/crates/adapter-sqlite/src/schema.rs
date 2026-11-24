@@ -80,6 +80,9 @@ pub(crate) fn migrate(connection: &mut Connection, path: Option<&Path>) -> AppRe
     connection
         .execute_batch(COLLECTIONS_TABLE)
         .map_err(AppError::storage)?;
+    connection
+        .execute_batch(crate::collection_sync::TABLES)
+        .map_err(AppError::storage)?;
     add_color_columns(connection).map_err(AppError::storage)?;
     rename_quick_note_tag(connection).map_err(AppError::storage)?;
     sync_columns::add_sync_columns(connection, path)
