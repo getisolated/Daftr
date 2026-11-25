@@ -84,6 +84,7 @@ export const EN_SYNC = {
   'sync.toast.initialDone': 'Initial sync of “{profile}” done.',
   'sync.toast.deviceRemoved': '“{name}” removed you from its devices: synchronization with this device is stopped',
   'sync.toast.profileReceived': 'Profile “{name}” received from {device}',
+  'sync.toast.profileMerged': 'Profile “{name}” merged with the one of {device}',
   'sync.toast.switch': 'Switch',
   'sync.toast.switchFailed': 'The profile could not be opened.',
   'sync.toast.dismiss': 'Dismiss',

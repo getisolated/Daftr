@@ -224,11 +224,15 @@ export class SyncService implements OnDestroy {
     await Promise.all([this.refresh(), this.reloadDevices(), this.loadProfileShares()]);
   }
 
-  /** A profile shared by another device arrived as a clone: the toast offers to switch to it. */
+  /** A profile shared by another device arrived as a clone (or merged into the default one): the toast offers to switch to it. */
   private async onProfileReceived(event: ProfileReceived): Promise<void> {
     await Promise.all([this.profiles.load(), this.loadProfileShares()]);
 
-    this.toasts.show(this.i18n.t('sync.toast.profileReceived', { name: event.name, device: event.device.name }), {
+    // A merge keeps the local default profile, which may have no name of its own
+    const name = event.name || this.i18n.t('profiles.defaultName');
+    const key = event.merged ? 'sync.toast.profileMerged' : 'sync.toast.profileReceived';
+
+    this.toasts.show(this.i18n.t(key, { name, device: event.device.name }), {
       label: this.i18n.t('sync.toast.switch'),
       run: () => void this.switchToReceived(event.profileId),
     });

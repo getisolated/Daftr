@@ -246,6 +246,17 @@ impl SyncProfiles for DesktopSyncProfiles {
         Ok(profile)
     }
 
+    fn default_profile_to_merge(&self) -> AppResult<Option<ProfileId>> {
+        let default = ProfileId::default_profile();
+        let exists = self
+            .profiles
+            .registry()
+            .profiles()
+            .iter()
+            .any(|profile| profile.id == default);
+        Ok((exists && self.index.space_of(&default).is_none()).then_some(default))
+    }
+
     fn synced_profiles(&self) -> AppResult<Vec<SyncedProfile<ProfileId>>> {
         Ok(self.index.synced())
     }
@@ -282,6 +293,7 @@ impl SyncProfiles for DesktopSyncProfiles {
         Ok(ProfileInfo {
             id: profile.as_str().to_owned(),
             name: self.profile_name(profile)?,
+            is_default: profile.is_default(),
         })
     }
 

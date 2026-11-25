@@ -158,10 +158,12 @@ impl SyncEventDto {
                 name,
                 device,
                 device_name,
+                merged,
             } => Self::ProfileReceived(ProfileReceivedDto {
                 profile_id: profile.as_str().to_owned(),
                 name: name.clone(),
                 device: linked_device(device, device_name),
+                merged: *merged,
             }),
             SyncEvent::CollectionOfferReceived {
                 device,
@@ -271,6 +273,7 @@ mod tests {
             name: "Travail".to_owned(),
             device: DeviceKey::from_bytes([2; 32]),
             device_name: DeviceName::parse("Laptop").unwrap(),
+            merged: true,
         };
         let SyncEventDto::ProfileReceived(dto) = SyncEventDto::from_event(&received, &other) else {
             panic!("événement inattendu");
@@ -280,5 +283,6 @@ mod tests {
             ("work", "Travail")
         );
         assert_eq!(dto.device.name, "Laptop");
+        assert!(dto.merged);
     }
 }

@@ -18,4 +18,9 @@ name: string,
 /**
  * L'appareil qui l'a partagé.
  */
-device: LinkedDeviceDto, };
+device: LinkedDeviceDto, 
+/**
+ * Le profil par défaut de l'autre appareil a été fusionné avec le profil par défaut d'ici
+ * (aucun profil créé) : `profile_id` est alors le profil existant.
+ */
+merged: boolean, };

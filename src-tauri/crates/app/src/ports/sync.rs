@@ -125,6 +125,8 @@ pub struct ProfileInfo {
     /// Nom choisi, `None` pour un profil sans nom (le profil par défaut d'une installation
     /// neuve).
     pub name: Option<String>,
+    /// C'est le profil par défaut de l'installation (le même sur toutes les installations).
+    pub is_default: bool,
 }
 
 /// L'icône d'un profil.
@@ -158,6 +160,10 @@ pub trait SyncProfiles: Send + Sync {
         name: Option<&str>,
         icon: Option<&ProfileIcon>,
     ) -> AppResult<Self::Profile>;
+    /// Le profil par défaut de cette installation, s'il existe encore et n'est pas
+    /// synchronisé : un profil par défaut partagé par un autre appareil le rejoint au lieu de
+    /// créer un clone.
+    fn default_profile_to_merge(&self) -> AppResult<Option<Self::Profile>>;
     /// Les profils synchronisés, actifs ou non.
     fn synced_profiles(&self) -> AppResult<Vec<SyncedProfile<Self::Profile>>>;
     /// Tous les profils de l'installation, synchronisés ou non.
@@ -276,7 +282,7 @@ pub enum SyncEvent<P> {
     /// Un profil partagé par un appareil a été accepté d'office : un nouveau profil local en
     /// est le clone, la synchronisation initiale démarre.
     ProfileReceived {
-        /// Le profil créé.
+        /// Le profil créé, ou le profil par défaut existant quand `merged`.
         profile: P,
         /// Son nom (celui du profil d'origine, ou le nom par défaut).
         name: String,
@@ -284,6 +290,9 @@ pub enum SyncEvent<P> {
         device: DeviceKey,
         /// Son nom.
         device_name: DeviceName,
+        /// Le profil par défaut de l'appareil a été fusionné avec celui d'ici (aucun profil
+        /// créé).
+        merged: bool,
     },
     /// Un appareil propose des collections : rien n'est écrit avant l'activation. Toutes les
     /// entrées en attente sont relisibles par la commande d'état.

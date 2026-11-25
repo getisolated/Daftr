@@ -5,7 +5,10 @@
 //! session.
 
 use app::collection_sync::{FileEntry, FileHash, SyncPath};
-use serde::{Deserialize, Serialize};
+use std::fmt;
+
+use serde::de::{self, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// Bit de `Hello::features` : l'appareil comprend les messages de collections, rattachées à
 /// l'appareil et non plus à l'espace d'un profil. Le bit 0 de la première version, abandonnée
@@ -90,7 +93,11 @@ impl OfferedCollection {
 }
 
 /// Nom et icône d'un profil partagé, envoyés par celui qui le partage avant son contenu.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Le dernier champ, `is_default`, est lu de façon tolérante (comme celui de `Hello`) : une
+/// version antérieure ignore l'octet en trop, et un message sans lui se lit « pas le profil
+/// par défaut ».
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct ProfileInfoEntry {
     /// Espace du profil.
     pub space: [u8; 32],
@@ -98,6 +105,48 @@ pub(crate) struct ProfileInfoEntry {
     pub name: Option<String>,
     /// Image de l'icône (PNG ou WebP), absente sans icône.
     pub icon: Option<Vec<u8>>,
+    /// Le profil partagé est le profil par défaut de l'émetteur : le destinataire le fusionne
+    /// avec le sien au lieu d'en créer un clone.
+    pub is_default: bool,
+}
+
+/// Champs de [`ProfileInfoEntry`].
+const PROFILE_INFO_FIELDS: usize = 4;
+
+impl<'de> Deserialize<'de> for ProfileInfoEntry {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_tuple(PROFILE_INFO_FIELDS, ProfileInfoVisitor)
+    }
+}
+
+struct ProfileInfoVisitor;
+
+impl<'de> Visitor<'de> for ProfileInfoVisitor {
+    type Value = ProfileInfoEntry;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProfileInfo")
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<ProfileInfoEntry, A::Error> {
+        let space = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+        let name = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+        let icon = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+        // Fin du message atteinte : `ProfileInfo` d'une version antérieure
+        let is_default = seq.next_element::<bool>().ok().flatten().unwrap_or(false);
+        Ok(ProfileInfoEntry {
+            space,
+            name,
+            icon,
+            is_default,
+        })
+    }
 }
 
 impl ProfileInfoEntry {

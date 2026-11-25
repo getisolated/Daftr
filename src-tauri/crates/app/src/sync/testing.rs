@@ -24,6 +24,9 @@ use crate::ports::sync::{
     ProfileIcon, ProfileInfo, SyncEvent, SyncEvents, SyncProfiles, SyncStore, SyncedProfile,
 };
 
+/// Nom du profil par défaut de la doublure.
+pub const DEFAULT_PROFILE: &str = "default";
+
 /// Profils en mémoire, nommés `p1`, `p2`… dans l'ordre de création.
 pub struct MemoryProfiles {
     device: DeviceKey,
@@ -113,6 +116,13 @@ impl SyncProfiles for MemoryProfiles {
         Ok(profile)
     }
 
+    fn default_profile_to_merge(&self) -> AppResult<Option<String>> {
+        Ok(self
+            .store(DEFAULT_PROFILE)
+            .filter(|store| Self::space_of(store).is_none())
+            .map(|_| DEFAULT_PROFILE.to_owned()))
+    }
+
     fn profiles(&self) -> AppResult<Vec<String>> {
         Ok(lock(&self.profiles).keys().cloned().collect())
     }
@@ -121,6 +131,7 @@ impl SyncProfiles for MemoryProfiles {
         Ok(ProfileInfo {
             id: profile.clone(),
             name: self.name(profile),
+            is_default: profile == DEFAULT_PROFILE,
         })
     }
 
