@@ -6,7 +6,7 @@
 use app::notes::tags;
 use app::ports::NoteStore;
 use app::{AppError, AppResult};
-use domain::note::{NewNote, Note, NoteChanges};
+use domain::note::{NewNote, Note, NoteChanges, NoteFilter, NoteHead, Page};
 use rusqlite::types::Value;
 use rusqlite::{OptionalExtension, Transaction, params, params_from_iter};
 
@@ -37,6 +37,22 @@ const BY_TAG: &str = select_notes!(
 );
 const INSERT: &str = "INSERT INTO notes (uuid, title, content, tags, folder_id, folder_uuid) \
                       VALUES (?1, ?2, ?3, ?4, ?5, (SELECT uuid FROM folders WHERE id = ?5))";
+const SEARCH_PAGE: &str = select_notes!(
+    "JOIN notes_fts ON notes.id = notes_fts.rowid \
+     WHERE notes_fts MATCH ? AND notes.deleted_at IS NULL ORDER BY rank LIMIT ?"
+);
+const SEARCH_COUNT: &str = "SELECT COUNT(*) FROM notes \
+                            JOIN notes_fts ON notes.id = notes_fts.rowid \
+                            WHERE notes_fts MATCH ? AND notes.deleted_at IS NULL";
+/// Dans `HEADS` et `HEADS_COUNT`, `?1` (dossier) et `?2` (motif de tag) à `NULL` ne filtrent pas.
+const HEADS: &str = "SELECT id, title, tags, folder_id, updated_at FROM notes \
+                     WHERE deleted_at IS NULL \
+                     AND (?1 IS NULL OR folder_id = ?1) \
+                     AND (?2 IS NULL OR tags LIKE ?2 ESCAPE '\\') \
+                     ORDER BY updated_at DESC LIMIT ?3";
+const HEADS_COUNT: &str = "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL \
+                           AND (?1 IS NULL OR folder_id = ?1) \
+                           AND (?2 IS NULL OR tags LIKE ?2 ESCAPE '\\')";
 /// Une note qui change de dossier perd sa position : elle est listée après les positionnées.
 const SET_FOLDER: &str = "UPDATE notes SET folder_id = ?1, \
                           folder_uuid = (SELECT uuid FROM folders WHERE id = ?1), \
@@ -168,6 +184,51 @@ impl NoteStore for SqliteStore {
         let columns = statement.query_map([], |row| row.get(0)).map_err(storage)?;
         columns.collect::<rusqlite::Result<_>>().map_err(storage)
     }
+
+    fn heads(&self, filter: &NoteFilter, limit: usize) -> AppResult<Page<NoteHead>> {
+        let connection = self.connection();
+        let selection = params![filter.folder_id, filter.tag_pattern];
+
+        let total: i64 = connection
+            .prepare_cached(HEADS_COUNT)
+            .and_then(|mut count| count.query_row(selection, |row| row.get(0)))
+            .map_err(storage)?;
+        let mut statement = connection.prepare_cached(HEADS).map_err(storage)?;
+        let heads = statement
+            .query_map(
+                params![filter.folder_id, filter.tag_pattern, sql_limit(limit)],
+                rows::note_head,
+            )
+            .map_err(storage)?;
+
+        Ok(Page {
+            total: usize::try_from(total).unwrap_or_default(),
+            items: heads.collect::<rusqlite::Result<_>>().map_err(storage)?,
+        })
+    }
+
+    fn search_page(&self, fts_query: &str, limit: usize) -> AppResult<Page<Note>> {
+        let connection = self.connection();
+
+        let total: i64 = connection
+            .prepare_cached(SEARCH_COUNT)
+            .and_then(|mut count| count.query_row([fts_query], |row| row.get(0)))
+            .map_err(storage)?;
+        let mut statement = connection.prepare_cached(SEARCH_PAGE).map_err(storage)?;
+        let notes = statement
+            .query_map(params![fts_query, sql_limit(limit)], rows::note)
+            .map_err(storage)?;
+
+        Ok(Page {
+            total: usize::try_from(total).unwrap_or_default(),
+            items: notes.collect::<rusqlite::Result<_>>().map_err(storage)?,
+        })
+    }
+}
+
+/// Une limite de nombre de lignes telle que SQLite la comprend.
+fn sql_limit(limit: usize) -> i64 {
+    i64::try_from(limit).unwrap_or(i64::MAX)
 }
 
 impl SqliteStore {

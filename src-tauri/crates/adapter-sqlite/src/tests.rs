@@ -1,7 +1,7 @@
 use app::ports::{CollectionStore, FolderStore, NoteStore};
 use domain::collection::CollectionKind;
 use domain::folder::FolderDeleteMode;
-use domain::note::{NewNote, Note, NoteChanges};
+use domain::note::{NewNote, Note, NoteChanges, NoteFilter};
 use rusqlite::Connection;
 
 use super::SqliteStore;
@@ -152,6 +152,63 @@ fn finds_notes_by_tag_pattern() {
 
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].title, "A");
+}
+
+#[test]
+fn pages_note_heads_with_the_total_of_the_selection() {
+    let store = store();
+    let folder = add_folder(&store, "Work", None);
+    let inside = add_note(&store, "Inside", Some(folder));
+    add_note(&store, "Loose", None);
+    add_note(&store, "Other", Some(folder));
+
+    let everything = notes(&store).heads(&NoteFilter::default(), 2).unwrap();
+    let in_folder = NoteFilter {
+        folder_id: Some(folder),
+        tag_pattern: None,
+    };
+    let in_work = notes(&store).heads(&in_folder, 10).unwrap();
+
+    assert_eq!((everything.total, everything.items.len()), (3, 2));
+    assert_eq!((in_work.total, in_work.items.len()), (2, 2));
+    assert!(in_work.items.iter().any(|head| head.id == inside));
+}
+
+#[test]
+fn pages_note_heads_by_tag() {
+    let store = store();
+    let tagged = NewNote {
+        tags: vec!["x".into()],
+        ..new_note("Tagged", "", None)
+    };
+    let tagged = notes(&store).insert(&tagged).unwrap().id;
+    add_note(&store, "Plain", None);
+    let filter = NoteFilter {
+        folder_id: None,
+        tag_pattern: Some("%\"x\"%".into()),
+    };
+
+    let page = notes(&store).heads(&filter, 10).unwrap();
+
+    assert_eq!(page.total, 1);
+    assert_eq!(page.items[0].id, tagged);
+}
+
+#[test]
+fn pages_search_results_with_the_total_of_the_matches() {
+    let store = store();
+    notes(&store)
+        .insert(&new_note("A", "common word", None))
+        .unwrap();
+    notes(&store)
+        .insert(&new_note("B", "common thing", None))
+        .unwrap();
+    notes(&store).insert(&new_note("C", "else", None)).unwrap();
+
+    let page = notes(&store).search_page("\"common\"*", 1).unwrap();
+
+    assert_eq!((page.total, page.items.len()), (2, 1));
+    assert!(!page.items[0].content.is_empty());
 }
 
 #[test]

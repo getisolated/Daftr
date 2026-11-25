@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use domain::collection::{Collection, CollectionKind};
 use domain::folder::{Folder, FolderDeleteMode};
-use domain::note::{NewNote, Note, NoteChanges};
+use domain::note::{NewNote, Note, NoteChanges, NoteFilter, NoteHead, Page};
 use domain::settings::{AppSettings, RawSettings};
 use domain::uuid::Uuid;
 use platform::sync::lock;
@@ -250,6 +250,22 @@ impl NoteStore for MemoryNotes {
             .iter()
             .map(|note| note.tags.clone())
             .collect())
+    }
+
+    fn heads(&self, filter: &NoteFilter, limit: usize) -> AppResult<Page<NoteHead>> {
+        self.record(format!("heads {filter:?} {limit}"));
+        Ok(Page {
+            total: 0,
+            items: Vec::new(),
+        })
+    }
+
+    fn search_page(&self, fts_query: &str, limit: usize) -> AppResult<Page<Note>> {
+        self.record(format!("search_page {fts_query} {limit}"));
+        Ok(Page {
+            total: 0,
+            items: Vec::new(),
+        })
     }
 }
 

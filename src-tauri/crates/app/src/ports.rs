@@ -13,7 +13,7 @@ use std::path::Path;
 
 use domain::collection::{Collection, CollectionKind};
 use domain::folder::{Folder, FolderDeleteMode};
-use domain::note::{NewNote, Note, NoteChanges};
+use domain::note::{NewNote, Note, NoteChanges, NoteFilter, NoteHead, Page};
 use domain::settings::{AppSettings, RawSettings};
 
 use crate::AppResult;
@@ -50,6 +50,11 @@ pub trait NoteStore: Send + Sync {
     fn by_tag(&self, like_pattern: &str) -> AppResult<Vec<Note>>;
     /// La colonne JSON des tags de chaque note.
     fn tag_columns(&self) -> AppResult<Vec<String>>;
+    /// Les `limit` premières notes sélectionnées, les plus récemment modifiées d'abord, sans
+    /// lire leur contenu.
+    fn heads(&self, filter: &NoteFilter, limit: usize) -> AppResult<Page<NoteHead>>;
+    /// Les `limit` premières notes qui répondent à la requête FTS5, par pertinence.
+    fn search_page(&self, fts_query: &str, limit: usize) -> AppResult<Page<Note>>;
 }
 
 /// Stockage des dossiers.

@@ -310,7 +310,9 @@ async fn serves_the_tools_to_an_authenticated_client() {
         [
             "append_to_note",
             "create_note",
+            "edit_note",
             "get_note",
+            "get_notes",
             "list_folders",
             "list_notes",
             "list_tags",

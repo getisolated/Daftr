@@ -7,6 +7,8 @@ use domain::sync::{DeviceKey, DeviceName};
 
 use super::*;
 
+mod edit;
+
 /// Base en mémoire avec le dossier par défaut (Inbox).
 fn services() -> McpServices {
     let store = Arc::new(SqliteStore::open_in_memory().unwrap());
@@ -31,6 +33,15 @@ fn create(services: &McpServices, content: &str, tags: &[&str]) -> i64 {
         tags: Some(tags.iter().map(|tag| (*tag).to_owned()).collect()),
     };
     create_note(services, args).unwrap()["id"].as_i64().unwrap()
+}
+
+fn whole(id: i64) -> GetNoteArgs {
+    GetNoteArgs {
+        id,
+        section: None,
+        from_line: None,
+        to_line: None,
+    }
 }
 
 fn ids(listed: &Value) -> Vec<i64> {
@@ -73,7 +84,7 @@ fn puts_an_explicit_title_on_the_first_line() {
     let id = create_note(&services, args).unwrap()["id"]
         .as_i64()
         .unwrap();
-    let note = get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap();
+    let note = get_note(&services, &KnownContents::default(), whole(id)).unwrap();
 
     assert_eq!(note["title"], "Groceries");
     assert_eq!(note["content"], "# Groceries\n\n- bread");
@@ -102,13 +113,8 @@ fn reads_a_whole_note_or_explains_it_is_missing() {
     let services = services();
     let id = create(&services, "Title\nbody", &["a"]);
 
-    let note = get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap();
-    let missing = get_note(
-        &services,
-        &KnownContents::default(),
-        GetNoteArgs { id: 999 },
-    )
-    .unwrap_err();
+    let note = get_note(&services, &KnownContents::default(), whole(id)).unwrap();
+    let missing = get_note(&services, &KnownContents::default(), whole(999)).unwrap_err();
 
     assert_eq!(note["content"], "Title\nbody");
     assert_eq!(note["tags"], json!(["a"]));
@@ -129,7 +135,7 @@ fn replaces_the_content_and_the_title() {
 
     assert_eq!(updated["title"], "New");
     assert_eq!(
-        get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap()["content"],
+        get_note(&services, &KnownContents::default(), whole(id)).unwrap()["content"],
         "# New\nother"
     );
     let missing = UpdateNoteArgs {
@@ -151,7 +157,7 @@ fn appends_after_a_blank_line() {
     append_to_note(&services, &KnownContents::default(), args).unwrap();
 
     assert_eq!(
-        get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap()["content"],
+        get_note(&services, &KnownContents::default(), whole(id)).unwrap()["content"],
         "Log\n- one\n\n- two"
     );
     let blank = AppendToNoteArgs {
@@ -197,7 +203,7 @@ un
 deux",
         &[],
     );
-    get_note(&services, &known, GetNoteArgs { id }).unwrap();
+    get_note(&services, &known, whole(id)).unwrap();
     edit_elsewhere(
         &services,
         id,
@@ -216,7 +222,7 @@ deux"
     };
     update_note(&services, &known, args).unwrap();
 
-    let stored = get_note(&services, &known, GetNoteArgs { id }).unwrap();
+    let stored = get_note(&services, &known, whole(id)).unwrap();
     assert_eq!(
         stored["content"],
         "# Plan revu
@@ -250,7 +256,7 @@ deux",
     };
     update_note(&services, &KnownContents::default(), args).unwrap();
 
-    let stored = get_note(&services, &KnownContents::default(), GetNoteArgs { id }).unwrap();
+    let stored = get_note(&services, &KnownContents::default(), whole(id)).unwrap();
     assert_eq!(stored["content"], "# Autre");
 }
 
@@ -377,12 +383,7 @@ fn bounds_the_limits() {
 fn writes_links_to_notes_with_their_uuid() {
     let services = services();
     let target = create(&services, "Target", &[]);
-    let uuid = get_note(
-        &services,
-        &KnownContents::default(),
-        GetNoteArgs { id: target },
-    )
-    .unwrap()["uuid"]
+    let uuid = get_note(&services, &KnownContents::default(), whole(target)).unwrap()["uuid"]
         .as_str()
         .unwrap()
         .to_owned();
@@ -395,12 +396,7 @@ fn writes_links_to_notes_with_their_uuid() {
     append_to_note(&services, &KnownContents::default(), appended).unwrap();
 
     assert_eq!(
-        get_note(
-            &services,
-            &KnownContents::default(),
-            GetNoteArgs { id: source }
-        )
-        .unwrap()["content"],
+        get_note(&services, &KnownContents::default(), whole(source)).unwrap()["content"],
         format!("Source\n[t](note://{uuid})\n\nagain note://{uuid} and note://999")
     );
 }

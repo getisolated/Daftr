@@ -180,7 +180,7 @@ Firewall:
    - **Other clients** (Cursor…): a Streamable HTTP server at the same URL with the header `Authorization: Bearer <token>`.
 3. Ask away: *"Summarize my notes tagged meeting"*, *"Add today's decisions to my Project X note"*.
 
-Tools: `list_folders`, `list_notes`, `search_notes`, `get_note`, `list_tags`, `create_note` (into Inbox by default), `update_note`, `append_to_note`. There is no delete tool, and collections (folders of markdown files) are not exposed. **Regenerate** the token to disconnect every configured client. Daftr must be running for the AI to reach your notes.
+Tools: `list_folders`, `list_notes`, `search_notes`, `get_note` (whole, or one section / range of lines), `get_notes` (several at once), `list_tags`, `create_note` (into Inbox by default), `edit_note` (replace an exact passage), `update_note` (replace the whole note), `append_to_note`. There is no delete tool, and collections (folders of markdown files) are not exposed. **Regenerate** the token to disconnect every configured client. Daftr must be running for the AI to reach your notes.
 
 ## Upgrading from Everything Note
 
