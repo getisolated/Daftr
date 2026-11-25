@@ -120,11 +120,15 @@ Cocher un profil pour un appareil (`sync_set_profile_shared(profileId, deviceKey
 3. A envoie `Offer` tout de suite si l'appareil est connecté, sinon dès son apparition (l'offre en attente n'est **pas** gardée au redémarrage de A ; décocher puis recocher la renvoie) ;
 4. **B accepte d'office** : il répond `OfferReply { accepted: true }`, sauf s'il a déjà un profil pour cet espace (un profil par espace et par appareil : refus, rien d'autre ne se passe) ;
 5. A envoie `ProfileInfo` (nom courant du profil et image de l'icône, voir « Nom et icône du clone »), puis le `Snapshot`, puis `SnapshotEnd` ;
-6. à `SnapshotEnd`, B **crée un nouveau profil** (jamais de fusion), lui fait rejoindre l'espace (`adopt_space`), émet `sync:profile-received` et acquitte ; le rattrapage normal part dans les deux sens (synchronisation initiale).
+6. à `SnapshotEnd`, B **crée un nouveau profil** (clone), sauf pour le profil par défaut (voir « Profil par défaut »), lui fait rejoindre l'espace (`adopt_space`), émet `sync:profile-received` et acquitte ; le rattrapage normal part dans les deux sens (synchronisation initiale).
 
 Le profil n'est créé qu'à la fin du contenu : une réception interrompue ne laisse aucun profil vide, et A, qui garde son offre tant que B n'annonce pas l'espace, recommence à la reconnexion. Décocher (`false`) retire l'appareil de l'espace (« Arrêter de synchroniser ce profil avec X ») : ce que B a déjà copié lui reste, et recocher le réadmet dans le même profil.
 
 **Nom et icône du clone.** Ni le nom ni l'icône ne sont dans le document d'espace (le nom de l'espace est figé à sa création). Le message `ProfileInfo` (indice 22, voir ci-dessous) porte le nom courant du profil (absent pour un profil sans nom : le profil par défaut) et les octets de l'icône (PNG ou WebP, 512 Kio au plus, revalidés par B). Un profil sans nom arrive sous le nom par défaut de la langue de B (« Profil par défaut » / « Default profile », clé `SyncDefaultProfileName`). Le mot de passe maître n'est **pas** transmis : le clone n'en a pas. Une icône refusée laisse le clone sans icône sans bloquer la réception. Face à une version qui n'annonce pas le bit `FEATURE_PROFILE_INFO`, rien n'est envoyé et le clone prend le nom de l'offre (celui de l'espace), sans icône.
+
+**Profil par défaut.** Le profil par défaut (identifiant `default`) est techniquement le même sur toutes les installations : le cloner donnerait deux profils par défaut. `ProfileInfo` porte donc un dernier champ `is_default` (« le profil partagé est le profil par défaut de l'émetteur », issu de `ProfileInfo::is_default` du port). À `SnapshotEnd`, si `is_default` est vrai **et** que B possède encore son profil par défaut **sans espace** (`SyncProfiles::default_profile_to_merge`), B ne crée rien : son profil par défaut rejoint l'espace par `adopt_space` (dossiers de même chemin unifiés, dossier par défaut, notes identiques dédoublonnées, notes propres des deux côtés conservées). Le nom, l'icône et le mot de passe maître de B ne changent pas (un profil protégé est fusionné aussi). `sync:profile-received` porte alors `merged: true` (toast « Profil “X” fusionné avec celui de Y »). Sinon (profil partagé non par défaut, profil par défaut de B supprimé ou déjà dans un autre espace), le comportement est celui du clone. Limite : si les deux appareils s'offrent leur profil par défaut en même temps, chacun a déjà son propre espace et un doublon peut encore apparaître.
+
+Compatibilité : `PROTOCOL_VERSION` reste 1. `is_default` est un octet final lu de façon tolérante (comme `Hello::features`) : une version antérieure l'ignore, et un `ProfileInfo` sans lui se lit `is_default = false` (clone, comportement d'avant).
 
 ### Session `Sync`
 
@@ -178,7 +182,7 @@ Le profil n'est créé qu'à la fin du contenu : une réception interrompue ne l
 
 Erreurs : `IpcError` de code `sync`, message = clé stable (`wrong_code`, `not_pairing`, `no_pairing_device`, `unreachable`, `timeout`, `not_local`, `listen_failed`, `discovery_failed`, `untrusted`, `unknown_offer`, `paused`, `fingerprint_mismatch`, `invalid_qr`, `protocol_version`, `protocol_failed`, `stopped`), traduite par le front.
 
-Événements : `sync:status`, `sync:notes-synced` (avec `notes:changed` pour le profil actif), `sync:progress`, `sync:initial-done`, `sync:device-linked`, `sync:device-removed` (`DeviceRemovedDto` : `device`), `sync:profile-received` (`ProfileReceivedDto` : `profileId`, `name`, `device`), `sync:pairing`. `sync:offer-received` est supprimé : un profil proposé est accepté d'office.
+Événements : `sync:status`, `sync:notes-synced` (avec `notes:changed` pour le profil actif), `sync:progress`, `sync:initial-done`, `sync:device-linked`, `sync:device-removed` (`DeviceRemovedDto` : `device`), `sync:profile-received` (`ProfileReceivedDto` : `profileId`, `name`, `device`, `merged`), `sync:pairing`. `sync:offer-received` est supprimé : un profil proposé est accepté d'office.
 
 Réglages de l'appareil (`settings.json`, appliqués à chaud) : `syncDeviceName` (vide = nom d'hôte), `syncPort` (47820, de 1024 à 65535), `syncPaused`. Le front passe par `settings_set`.
 
@@ -366,7 +370,7 @@ Messages ajoutés en fin d'énumération (indices figés 14 à 24) :
 | 19 | `FileUnavailable { share, path, hash }` | La version demandée n'existe plus. |
 | 20 | `FileAck { share, path, hash? }` | « J'ai maintenant cette version » (ou plus de fichier) : l'émetteur retient sa base. |
 | 21 | `ShareStop { share }` | Arrêt du partage, ou retrait de l'appareil. |
-| 22 | `ProfileInfo { space, name?, icon? }` | Nom et icône d'un profil partagé, avant son `Snapshot` (§4). Gardé par le bit 2. |
+| 22 | `ProfileInfo { space, name?, icon?, is_default }` | Nom et icône d'un profil partagé, avant son `Snapshot` (§4). Gardé par le bit 2. |
 | 23 | `CollectionPending { shares }` | Les entrées « à configurer » reçues de l'émetteur, envoyées une fois par session : il répond `ShareStop` pour celles qu'il ne partage plus (retirées pendant l'absence du destinataire). |
 | 24 | `Removed` | Sans charge : « je vous ai retiré de mes appareils ». Gardé par le bit 3 (sauf la réponse d'un appareil retiré à un `Open`, avant tout `Hello`). Voir « Révocations ». |
 
