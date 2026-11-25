@@ -4,6 +4,9 @@ import { ThemeChoice, ThemeId } from './theme.model';
 
 export type ShortcutMode = 'overlay' | 'app';
 
+/** How the preview reads the line breaks of the source: 'markdown' = blank line or two trailing spaces, 'text' = every line break. */
+export type LineBreaks = 'markdown' | 'text';
+
 /** See preferredDarkTheme / preferredLightTheme for what 'system' resolves to. */
 export type ThemePreference = ThemeChoice;
 
@@ -45,6 +48,8 @@ export interface AppSettings {
   wordWrap: boolean;
   /** true: the note always ends with an empty line, added automatically. */
   trailingLine: boolean;
+  /** 'markdown': a line break of the source needs a blank line or two trailing spaces to show in the preview. 'text': every line break shows, like in a plain text editor. */
+  lineBreaks: LineBreaks;
   /** true: the h1/h2/h3 outline is shown on the right of the open note. */
   showOutline: boolean;
   /** true: the path of the note (notes or collection, folders, file) is shown above it. */
@@ -105,6 +110,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showLineNumbers: false,
   wordWrap: true,
   trailingLine: false,
+  lineBreaks: 'markdown',
   showOutline: false,
   showBreadcrumbs: true,
   hideScrollbar: false,

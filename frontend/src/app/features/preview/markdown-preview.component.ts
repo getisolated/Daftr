@@ -12,6 +12,7 @@ import { findActiveHeading, headingBlockIndexes } from '../../core/utils/outline
 import { ImageResolver, createMarkdownRenderer, renderMarkdown } from '../../shared/markdown/markdown-renderer';
 import { highlightCodeBlocks, renderMermaidBlocks } from '../../shared/markdown/preview-enhancers';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { ThemeService } from '../../core/services/theme.service';
 
 /** Space kept above the block a scroll sync brings to the top. */
@@ -41,6 +42,7 @@ export class MarkdownPreviewComponent {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly theme = inject(ThemeService);
   private readonly i18n = inject(I18nService);
+  private readonly settingsService = inject(SettingsService);
 
   readonly content = input('');
   /** Whether a link target exists (same rule as the editor): broken local links are drawn in red. */
@@ -72,7 +74,7 @@ export class MarkdownPreviewComponent {
   /** Frame in which the chapter is looked up: at most once per frame, however many scroll events. */
   private headingFrame: number | null = null;
 
-  private readonly renderer = computed(() => createMarkdownRenderer({ linkStatus: this.linkStatus(), t: this.i18n.t }));
+  private readonly renderer = computed(() => createMarkdownRenderer({ linkStatus: this.linkStatus(), t: this.i18n.t, lineBreaks: this.settingsService.settings().lineBreaks }));
 
   /** Sanitized by DOMPurify in renderMarkdown, so Angular's own (stricter) sanitizer must not strip the classes and inputs. */
   protected readonly html = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.renderer(), this.content(), this.resolveImage() ?? undefined)));

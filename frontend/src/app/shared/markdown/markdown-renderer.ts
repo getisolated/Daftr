@@ -4,6 +4,7 @@ import footnote from 'markdown-it-footnote';
 import DOMPurify from 'dompurify';
 import { LinkStatus } from '../../core/utils/note-paths.util';
 import { createHeadingSlugger } from '../../core/utils/heading-anchor.util';
+import { LineBreaks } from '../../core/models/settings.model';
 import { Translator } from '../../core/i18n/translate';
 import { TranslationKey } from '../../core/i18n/translations';
 
@@ -13,6 +14,8 @@ export interface MarkdownRenderContext {
   linkStatus: (target: string) => LinkStatus;
   /** Texts generated in the page (alert titles, tooltips), in the language of the app. */
   t: Translator;
+  /** 'text': every line break of the source shows (plain text editor); 'markdown': blank line or two trailing spaces. */
+  lineBreaks: LineBreaks;
 }
 
 type AlertType = 'note' | 'tip' | 'important' | 'warning' | 'caution';
@@ -206,7 +209,7 @@ function mermaidFences(md: MarkdownIt): void {
 
 /** A configured markdown-it: GFM-like (tables, strikethrough, autolinks, task lists, footnotes, alerts). */
 export function createMarkdownRenderer(context: MarkdownRenderContext): MarkdownIt {
-  const md = createMarkdownIt({ html: true, linkify: true, breaks: false });
+  const md = createMarkdownIt({ html: true, linkify: true, breaks: context.lineBreaks === 'text' });
 
   md.use(footnote as unknown as (md: MarkdownIt) => void);
   md.use(sourceLines);

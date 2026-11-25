@@ -91,6 +91,10 @@ wordWrap: boolean,
  */
 trailingLine: boolean, 
 /**
+ * Retours à la ligne de l'aperçu.
+ */
+lineBreaks: 'markdown' | 'text', 
+/**
  * Plan de la note.
  */
 showOutline: boolean, 
