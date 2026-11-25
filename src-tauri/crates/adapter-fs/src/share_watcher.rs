@@ -8,11 +8,12 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::OsStr;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
+use notify::event::{EventKind, ModifyKind};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 
 /// Délai après le dernier événement d'un dossier avant de le signaler.
@@ -110,8 +111,12 @@ impl Worker {
         self.unwatch(&root);
         let commands = self.commands.clone();
         let owner = root.clone();
+        // Le système peut citer la racine sous son nom canonique (`/var` devient `/private/var`)
+        let roots: Vec<PathBuf> = std::iter::once(PathBuf::from(&root))
+            .chain(std::fs::canonicalize(&root))
+            .collect();
         let handler = move |event: notify::Result<notify::Event>| {
-            let relevant = event.is_ok_and(|event| event.paths.iter().any(|p| is_relevant(p)));
+            let relevant = event.is_ok_and(|event| concerns_files(&event, &roots));
             if relevant {
                 // Le thread s'arrête avant ses surveillances : un envoi perdu n'a plus d'objet
                 drop(commands.send(Command::Event(owner.clone())));
@@ -148,6 +153,20 @@ impl Worker {
             (self.on_change)(&root);
         }
     }
+}
+
+/// L'événement touche des fichiers à synchroniser. Le dossier surveillé lui-même ne compte
+/// pas quand son contenu change (macOS le signale à chaque écriture, même d'un fichier ignoré),
+/// sauf s'il est supprimé ou renommé : le moteur doit alors le déclarer introuvable.
+fn concerns_files(event: &notify::Event, roots: &[PathBuf]) -> bool {
+    let root_gone = matches!(
+        event.kind,
+        EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(_))
+    );
+    event.paths.iter().any(|path| {
+        let is_root = roots.iter().any(|root| root == path);
+        is_relevant(path) && (!is_root || root_gone)
+    })
 }
 
 /// Un chemin dont le changement peut toucher la synchronisation : un `.md`, ou un dossier
@@ -194,6 +213,36 @@ mod tests {
             std::thread::sleep(Duration::from_millis(25));
         }
         false
+    }
+
+    fn event(kind: EventKind, path: &str) -> notify::Event {
+        notify::Event::new(kind).add_path(PathBuf::from(path))
+    }
+
+    #[test]
+    fn the_watched_folder_itself_is_reported_only_when_it_disappears() {
+        use notify::event::{CreateKind, MetadataKind, RemoveKind, RenameMode};
+
+        let roots = [PathBuf::from("/data/notes")];
+        let touched = event(
+            EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any)),
+            "/data/notes",
+        );
+        let removed = event(EventKind::Remove(RemoveKind::Folder), "/data/notes");
+        let renamed = event(
+            EventKind::Modify(ModifyKind::Name(RenameMode::Any)),
+            "/data/notes",
+        );
+        let file = event(EventKind::Create(CreateKind::File), "/data/notes/a.md");
+        let sub_folder = event(EventKind::Create(CreateKind::Folder), "/data/notes/sub");
+        let image = event(EventKind::Create(CreateKind::File), "/data/notes/a.png");
+
+        assert!(!concerns_files(&touched, &roots));
+        assert!(concerns_files(&removed, &roots));
+        assert!(concerns_files(&renamed, &roots));
+        assert!(concerns_files(&file, &roots));
+        assert!(concerns_files(&sub_folder, &roots));
+        assert!(!concerns_files(&image, &roots));
     }
 
     #[test]
