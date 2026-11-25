@@ -95,8 +95,8 @@ mod tests {
         assert_eq!(work.password_hash, None);
         assert_eq!(
             registry.profiles().len(),
-            2,
-            "le profil par défaut est ajouté"
+            1,
+            "le profil par défaut n'est pas ajouté tant qu'il y a un autre profil"
         );
         assert_eq!(registry.last_active().as_str(), "work");
     }

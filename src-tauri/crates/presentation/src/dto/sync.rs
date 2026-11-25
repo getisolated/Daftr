@@ -304,6 +304,9 @@ pub struct ProfileReceivedDto {
     pub name: String,
     /// L'appareil qui l'a partagé.
     pub device: LinkedDeviceDto,
+    /// Le profil par défaut de l'autre appareil a été fusionné avec le profil par défaut d'ici
+    /// (aucun profil créé) : `profile_id` est alors le profil existant.
+    pub merged: bool,
 }
 
 /// Un appareil de confiance, vu depuis le partage d'un profil.

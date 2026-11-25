@@ -3,7 +3,8 @@
 //! envoie alors le nom et l'icône (`ProfileInfo`), ajoute l'appareil à l'espace et envoie tout
 //! le contenu (`Snapshot`, `SnapshotEnd`) ; l'autre crée un NOUVEAU profil, clone du profil
 //! d'origine, qui rejoint l'espace (`adopt_space`), acquitte, puis le rattrapage normal part
-//! dans les deux sens.
+//! dans les deux sens. Exception : le profil par défaut (`ProfileInfo::is_default`) est le
+//! même partout ; s'il existe ici sans espace, c'est lui qui rejoint l'espace, sans clone.
 //!
 //! Le profil n'est créé qu'à la fin du contenu : une réception interrompue ne laisse aucun
 //! profil vide, et le proposant, qui garde son offre tant que l'espace n'est pas annoncé,
@@ -162,19 +163,20 @@ impl<P: ProfileKey> Session<P> {
             .shared
             .stores
             .run(move |profiles| {
-                let name = profiles.profile_info(&source)?.name;
+                let info = profiles.profile_info(&source)?;
                 let icon = profiles.profile_icon(&source).unwrap_or_else(|error| {
                     tracing::warn!(%error, "icône du profil illisible : non envoyée");
                     None
                 });
-                Ok((name, icon))
+                Ok((info, icon))
             })
             .await?;
-        let (name, icon) = info;
+        let (info, icon) = info;
         let entry = ProfileInfoEntry {
             space: *space.as_bytes(),
-            name,
+            name: info.name,
             icon: icon.map(|icon| icon.bytes),
+            is_default: info.is_default,
         };
         self.send(&Message::ProfileInfo(entry)).await
     }
@@ -258,6 +260,7 @@ impl<P: ProfileKey> Session<P> {
             space: incoming.space.ok_or(Error::Malformed)?,
             notes: incoming.notes,
         };
+        let shared_default = incoming.info.as_ref().is_some_and(|info| info.is_default);
         let (name, icon) = clone_identity(incoming.info.as_ref(), incoming.offer_name);
 
         let created = self
@@ -268,12 +271,18 @@ impl<P: ProfileKey> Session<P> {
                 if profiles.profile_for(&space_id)?.is_some() {
                     return Ok(None);
                 }
+                // Le profil par défaut est le même sur toutes les installations : il rejoint
+                // l'espace tel quel (nom, icône et mot de passe d'ici inchangés)
+                if shared_default && let Some(profile) = profiles.default_profile_to_merge()? {
+                    let shown = profiles.profile_info(&profile)?.name;
+                    return Ok(Some((profile, shown, true)));
+                }
                 let profile = profiles.create_profile(name.as_deref(), icon.as_ref())?;
                 let shown = profiles.profile_info(&profile)?.name;
-                Ok(Some((profile, shown)))
+                Ok(Some((profile, shown, false)))
             })
             .await?;
-        let Some((profile, shown)) = created else {
+        let Some((profile, shown, merged)) = created else {
             return Ok(());
         };
         let applied = self
@@ -295,6 +304,7 @@ impl<P: ProfileKey> Session<P> {
                 name: shown.unwrap_or_default(),
                 device: self.remote,
                 device_name,
+                merged,
             });
         }
 

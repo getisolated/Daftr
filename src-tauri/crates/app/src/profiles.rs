@@ -171,19 +171,16 @@ impl ProfilesService {
         self.change(id, |profile| profile.password_hash = hash)
     }
 
-    /// Supprime un profil : ses données partent à la corbeille ; un profil protégé demande son
-    /// mot de passe. Le profil par défaut ne disparaît pas du registre : il repart vide, sans
-    /// nom, icône ni mot de passe. Fermer le profil actif avant revient à l'appelant.
+    /// Supprime un profil, le profil par défaut compris : ses données partent à la corbeille ;
+    /// un profil protégé demande son mot de passe. Supprimer le seul profil en laisse un par
+    /// défaut, vierge (sans nom, icône ni mot de passe) : il y en a toujours au moins un.
+    /// Fermer le profil actif avant revient à l'appelant.
     pub fn delete(&self, id: &ProfileId, password: Option<&str>) -> AppResult<()> {
         self.check_password(id, password)?;
 
         self.ports.files.trash_directory(id)?;
         self.update(|registry| {
-            if id.is_default() {
-                registry.upsert(Profile::new(id.clone()));
-            } else {
-                registry.remove(id);
-            }
+            registry.remove(id);
             Ok(())
         })
     }

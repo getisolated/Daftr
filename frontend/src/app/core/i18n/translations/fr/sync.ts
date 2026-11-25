@@ -86,6 +86,7 @@ export const FR_SYNC: Record<keyof typeof EN_SYNC, string> = {
   'sync.toast.initialDone': 'Synchronisation initiale de « {profile} » terminée.',
   'sync.toast.deviceRemoved': '« {name} » vous a retiré de ses appareils : la synchronisation avec cet appareil est arrêtée',
   'sync.toast.profileReceived': 'Profil « {name} » reçu depuis {device}',
+  'sync.toast.profileMerged': 'Profil « {name} » fusionné avec celui de {device}',
   'sync.toast.switch': 'Basculer',
   'sync.toast.switchFailed': 'Le profil n’a pas pu être ouvert.',
   'sync.toast.dismiss': 'Fermer',

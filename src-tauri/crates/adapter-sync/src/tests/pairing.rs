@@ -7,7 +7,7 @@ use app::ports::sync::{SyncEvent, SyncProfiles};
 use domain::sync::{DeviceKey, DeviceKind, PairingCode};
 
 use super::support::{
-    contents, device, device_of_kind, eventually, link, share, space, write_note,
+    Device, contents, device, device_of_kind, eventually, link, share, space, write_note,
 };
 use crate::{Error, Fingerprint, MAX_FAILURES, MemoryNetwork, PairingState, PairingUri};
 
@@ -131,6 +131,130 @@ async fn a_profile_without_a_name_arrives_with_the_default_name() {
     // La doublure donne son nom par défaut à un profil sans nom
     assert_eq!(b.profiles.name(&cloned).as_deref(), Some("Default profile"));
     assert!(b.profiles.icon(&cloned).is_none());
+}
+
+/// Deux appareils liés (`setup` prépare les profils de `b`), `a` offre son profil `profile`
+/// (un espace, deux notes) à `b`.
+async fn offer_with_b_default(
+    setup: impl FnOnce(&Device, &Device),
+    profile: &str,
+) -> (Device, Device) {
+    let network = MemoryNetwork::new();
+    let (a, b) = (device(&network, "Bureau"), device(&network, "Portable"));
+    let shared = a.create_space(profile, space(1));
+    write_note(&shared, "commune");
+    write_note(&shared, "venue de A");
+    setup(&a, &b);
+    link(&a, &b);
+    a.engine.refresh().await.unwrap();
+    b.engine.refresh().await.unwrap();
+    a.engine.offer(profile.to_owned(), b.key()).await.unwrap();
+    (a, b)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_shared_default_profile_merges_into_the_default_profile_of_the_receiver() {
+    let (a, b) = offer_with_b_default(
+        |_, b| {
+            let own = b.profiles.add("default");
+            b.profiles.set_name("default", "Mon profil");
+            write_note(&own, "commune");
+            write_note(&own, "venue de B");
+        },
+        "default",
+    )
+    .await;
+
+    eventually("profil fusionné", || {
+        b.has_event(|event| matches!(event, SyncEvent::ProfileReceived { merged: true, .. }))
+    })
+    .await;
+    eventually("notes de A chez B", || {
+        contents(&b.store("default")) == ["commune", "venue de A", "venue de B"]
+    })
+    .await;
+    // Aucun clone, le nom d'ici est gardé, les deux ont le même espace
+    assert_eq!(b.profiles.profiles().unwrap(), ["default"]);
+    assert_eq!(b.profiles.name("default").as_deref(), Some("Mon profil"));
+    assert_eq!(
+        b.profiles.profile_for(&space(1)).unwrap().as_deref(),
+        Some("default")
+    );
+    eventually("notes de B chez A", || {
+        contents(&a.store("default")) == ["commune", "venue de A", "venue de B"]
+    })
+    .await;
+    assert_eq!(a.profiles.profiles().unwrap(), ["default"]);
+
+    // Les modifications passent dans les deux sens
+    write_note(&b.store("default"), "écrite chez B");
+    b.engine.local_change(&"default".to_owned());
+    eventually("B vers A", || contents(&a.store("default")).len() == 4).await;
+    write_note(&a.store("default"), "écrite chez A");
+    a.engine.local_change(&"default".to_owned());
+    eventually("A vers B", || contents(&b.store("default")).len() == 5).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_shared_profile_that_is_not_the_default_is_still_cloned() {
+    let (_a, b) = offer_with_b_default(
+        |_, b| {
+            let own = b.profiles.add("default");
+            write_note(&own, "venue de B");
+        },
+        "travail",
+    )
+    .await;
+
+    eventually("profil reçu", || {
+        b.has_event(|event| matches!(event, SyncEvent::ProfileReceived { merged: false, .. }))
+    })
+    .await;
+    let cloned = b.profiles.profile_for(&space(1)).unwrap().unwrap();
+    assert_ne!(cloned, "default");
+    assert_eq!(b.profiles.profiles().unwrap().len(), 2);
+    assert_eq!(contents(&b.store("default")), ["venue de B"]);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_default_profile_already_synchronized_elsewhere_is_not_merged() {
+    let (_a, b) = offer_with_b_default(
+        |_, b| {
+            b.create_space("default", space(9));
+        },
+        "default",
+    )
+    .await;
+
+    eventually("clone reçu", || {
+        b.has_event(|event| matches!(event, SyncEvent::ProfileReceived { merged: false, .. }))
+    })
+    .await;
+    let cloned = b.profiles.profile_for(&space(1)).unwrap().unwrap();
+    assert_ne!(cloned, "default");
+    assert_eq!(
+        b.profiles.profile_for(&space(9)).unwrap().as_deref(),
+        Some("default")
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_shared_default_profile_is_cloned_when_the_receiver_has_no_default() {
+    let (_a, b) = offer_with_b_default(
+        |_, b| {
+            b.profiles.add("autre");
+        },
+        "default",
+    )
+    .await;
+
+    eventually("clone reçu", || {
+        b.has_event(|event| matches!(event, SyncEvent::ProfileReceived { merged: false, .. }))
+    })
+    .await;
+    let cloned = b.profiles.profile_for(&space(1)).unwrap().unwrap();
+    assert_ne!(cloned, "default");
+    assert_eq!(b.profiles.profiles().unwrap().len(), 2);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
