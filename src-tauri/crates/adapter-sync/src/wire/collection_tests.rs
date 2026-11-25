@@ -127,6 +127,7 @@ fn collection_messages_round_trip_with_frozen_indexes() {
             space: [1; 32],
             name: Some("Travail".to_owned()),
             icon: Some(vec![1, 2, 3]),
+            is_default: true,
         }),
         Message::CollectionPending {
             shares: vec![share],
@@ -193,4 +194,63 @@ fn the_collections_bit_is_not_the_one_of_the_first_unreleased_version() {
     // Le bit 0 annonçait des offres liées à l'espace d'un profil, au format abandonné
     assert_eq!(FEATURE_COLLECTIONS & 1, 0);
     assert_eq!(FEATURE_PROFILE_INFO & (FEATURE_COLLECTIONS | 1), 0);
+}
+
+/// `ProfileInfo` tel que l'écrivait la version sans profil par défaut.
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct OldProfileInfo {
+    space: [u8; 32],
+    name: Option<String>,
+    icon: Option<Vec<u8>>,
+}
+
+/// Indice de la variante `ProfileInfo` dans [`Message`].
+const PROFILE_INFO_VARIANT: u8 = 22;
+
+#[test]
+fn profile_info_round_trips_with_the_default_flag() {
+    for is_default in [true, false] {
+        let entry = ProfileInfoEntry {
+            space: [1; 32],
+            name: None,
+            icon: None,
+            is_default,
+        };
+        let bytes = Message::ProfileInfo(entry.clone()).encode().unwrap();
+        assert_eq!(bytes[0], PROFILE_INFO_VARIANT);
+        assert_eq!(
+            Message::decode(&bytes).unwrap(),
+            Message::ProfileInfo(entry)
+        );
+    }
+}
+
+#[test]
+fn a_profile_info_without_the_default_flag_reads_as_not_default() {
+    let before = OldProfileInfo {
+        space: [1; 32],
+        name: Some("Travail".to_owned()),
+        icon: None,
+    };
+    let mut bytes = vec![PROFILE_INFO_VARIANT];
+    bytes.extend(postcard::to_allocvec(&before).unwrap());
+
+    let Message::ProfileInfo(entry) = Message::decode(&bytes).unwrap() else {
+        panic!("ProfileInfo attendu");
+    };
+    assert_eq!(entry.name.as_deref(), Some("Travail"));
+    assert!(!entry.is_default);
+}
+
+#[test]
+fn an_older_build_still_reads_the_profile_info_with_the_flag() {
+    let entry = ProfileInfoEntry {
+        space: [1; 32],
+        name: Some("Travail".to_owned()),
+        icon: None,
+        is_default: true,
+    };
+    let bytes = Message::ProfileInfo(entry).encode().unwrap();
+    let before: OldProfileInfo = postcard::from_bytes(&bytes[1..]).unwrap();
+    assert_eq!(before.name.as_deref(), Some("Travail"));
 }
