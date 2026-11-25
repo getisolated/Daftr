@@ -5,7 +5,7 @@ pub mod tags;
 use std::sync::Arc;
 
 use domain::color::normalize_color;
-use domain::note::{NewNote, Note, NoteChanges};
+use domain::note::{NewNote, Note, NoteChanges, NoteFilter, NoteHead, Page};
 use domain::search::{fts_prefix_query, tag_like_pattern};
 
 use crate::AppResult;
@@ -82,6 +82,12 @@ impl NotesService {
         self.notes.delete(id)
     }
 
+    /// Rétablit une note supprimée et la rend, `None` si elle n'existe pas.
+    pub fn restore(&self, id: i64) -> AppResult<Option<Note>> {
+        self.notes.restore(id)?;
+        self.notes.by_id(id)
+    }
+
     /// Colore des notes ; une couleur invalide les décolore.
     pub fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {
         if ids.is_empty() {
@@ -95,6 +101,30 @@ impl NotesService {
         match fts_prefix_query(query) {
             Some(fts_query) => self.notes.search(&fts_query),
             None => self.notes.all(),
+        }
+    }
+
+    /// Les `limit` premières notes d'un dossier et/ou portant un tag, les plus récemment
+    /// modifiées d'abord, sans leur contenu.
+    pub fn heads(
+        &self,
+        folder_id: Option<i64>,
+        tag: Option<&str>,
+        limit: usize,
+    ) -> AppResult<Page<NoteHead>> {
+        let filter = NoteFilter {
+            folder_id,
+            tag_pattern: tag.map(tag_like_pattern),
+        };
+        self.notes.heads(&filter, limit)
+    }
+
+    /// Les `limit` premières notes trouvées, avec leur contenu ; une recherche vide rend
+    /// les plus récentes.
+    pub fn search_page(&self, query: &str, limit: usize) -> AppResult<Page<Note>> {
+        match fts_prefix_query(query) {
+            Some(fts_query) => self.notes.search_page(&fts_query, limit),
+            None => self.most_recent(limit),
         }
     }
 
@@ -114,6 +144,15 @@ impl NotesService {
         tags.sort();
         tags.dedup();
         Ok(tags)
+    }
+
+    fn most_recent(&self, limit: usize) -> AppResult<Page<Note>> {
+        let notes = self.notes.all()?;
+
+        Ok(Page {
+            total: notes.len(),
+            items: notes.into_iter().take(limit).collect(),
+        })
     }
 
     fn existing_folder(&self, folder_id: Option<i64>) -> AppResult<Option<i64>> {

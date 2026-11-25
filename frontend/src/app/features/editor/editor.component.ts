@@ -1,6 +1,6 @@
 import {
   Component, OnDestroy, OnChanges, Input, SimpleChanges,
-  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, computed, effect, untracked
+  ElementRef, ViewChild, inject, ChangeDetectionStrategy, signal, computed, effect, untracked, afterRenderEffect, viewChild
 } from '@angular/core';
 
 
@@ -22,23 +22,24 @@ import { noteTimestamps, noteTimestampsTheme, setTimestampBlocks, timestampBlock
 import { QuickNoteHandlers, editingQuickNote, quickNotesEditing } from '../../shared/codemirror/quick-notes-editing';
 import { draftBlocks, toggleDraft } from '../../shared/codemirror/draft-blocks';
 import { ContextMenuComponent, ContextMenuEntry } from '../../shared/context-menu/context-menu.component';
-import { OutlineHeading, extractHeadings, findActiveHeading, findHeadingByAnchor } from '../../shared/codemirror/outline';
+import { OutlineHeading, extractHeadings, findHeadingByAnchor } from '../../shared/codemirror/outline';
+import { findActiveHeading, revealScrollTop } from '../../core/utils/outline-tracking.util';
 import { linkAnchor } from '../../core/utils/heading-anchor.util';
 import { cursorResync } from '../../shared/codemirror/cursor-resync';
 import { linkNavigation } from '../../shared/codemirror/link-navigation';
 import { noteLinkCompletion } from '../../shared/codemirror/note-link-completion';
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
-import { LinkStatus, createLinkResolver, linkStatus } from '../../core/utils/note-paths.util';
-import { externallyChangedContent } from '../../core/utils/external-change.util';
-import { EditorViewMode, NoteViewState, PreviewScrollRequest } from '../../core/models/editor.model';
+import { LinkStatus, createLinkResolver, createNoteUrlResolver, linkStatus, parseNoteUrl } from '../../core/utils/note-paths.util';
+import { EditorViewMode, NoteViewState, PreviewScrollRequest, RemoteDeletion } from '../../core/models/editor.model';
 import { MarkdownPreviewComponent } from '../preview/markdown-preview.component';
 import { TranslationKey } from '../../core/i18n/translations';
 import { NoteExportService } from '../../core/services/note-export.service';
+import { PendingSavesService } from '../../core/services/pending-saves.service';
 import { noteExportMenu } from '../../core/utils/export-menu.util';
 import { FoldersService } from '../../core/services/folders.service';
 import { AppSettings, QUICK_NOTE_TAG } from '../../core/models/settings.model';
 import { slashCommandExtensions, slashPlaceholder } from '../../shared/codemirror/slash-commands';
-import { indentListItems, outdentListItems } from '../../shared/codemirror/list-indent';
+import { indentListItems, orderedListRenumbering, outdentListItems } from '../../shared/codemirror/list-indent';
 import { insertLink, wrapRanges } from '../../shared/codemirror/formatting-commands';
 import { hiddenScrollbar } from '../../shared/codemirror/hidden-scrollbar';
 import {
@@ -74,6 +75,11 @@ import { FindPanelComponent } from '../find/find-panel.component';
 import { PreviewFind } from '../../core/models/find.model';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { translatorFacet } from '../../shared/codemirror/translator';
+import { remoteTransaction } from '../../shared/codemirror/remote-changes';
+import { SyncService } from '../../core/services/sync.service';
+import { NotesSynced } from '../../core/models/sync.model';
+import { remoteChangeLabel, remoteDeletionLabel } from '../../core/utils/sync.util';
+import { CollectionConflictBannerComponent } from '../sync/collection-conflict-banner.component';
 
 /** The multi-cursor commands of the search keymap are rebindable shortcuts (see buildShortcutsKeymap): their defaults would stay bound. */
 const MULTI_CURSOR_COMMANDS = new Set<Command>([selectNextOccurrence, selectSelectionMatches]);
@@ -91,15 +97,22 @@ const CARRIED_ANCHOR_MS = 3000;
 /** Delay before the preview follows the text being typed. */
 const PREVIEW_REFRESH_MS = 150;
 
+/** Delay before an edit is saved. */
+const SAVE_DEBOUNCE_MS = 1000;
+
+/** How long "Changed on <device>" stays after the open note received changes from another device. */
+const REMOTE_CHANGE_BADGE_MS = 8000;
+
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
+  imports: [CollectionConflictBannerComponent, ContextMenuComponent, FindPanelComponent, MarkdownPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class.zen]': 'layout.zenMode()',
   },
   template: `
+    <app-collection-conflict-banner [file]="activeFile()" />
     @if (fileBanner(); as banner) {
       <div class="file-banner" role="alert" [class.error]="banner.kind !== 'conflict'">
         @if (banner.kind === 'conflict') {
@@ -111,6 +124,15 @@ const PREVIEW_REFRESH_MS = 150;
           <button type="button" (click)="fileBanner.set(null)">{{ i18n.t('editor.fileBanner.dismiss') }}</button>
         }
       </div>
+    }
+    @if (remoteDeletion(); as deletion) {
+      <div class="file-banner error" role="alert">
+        <span>{{ deletionLabel(deletion) }}</span>
+        <button type="button" (click)="restoreNote()">{{ i18n.t('sync.editor.restore') }}</button>
+      </div>
+      @if (restoreError(); as message) {
+        <div class="file-banner error" role="alert"><span>{{ message }}</span></div>
+      }
     }
     @if (breadcrumbs().length > 0) {
       <nav class="breadcrumbs" [attr.aria-label]="i18n.t('editor.breadcrumbs.label')">
@@ -126,6 +148,9 @@ const PREVIEW_REFRESH_MS = 150;
     }
     <div class="editor-wrapper" [attr.data-view-mode]="viewMode()">
       @if (activeNote()) {
+        @if (remoteChange(); as change) {
+          <div class="remote-change" role="status">{{ change }}</div>
+        }
         <div class="view-modes" role="group" [attr.aria-label]="i18n.t('editor.viewMode.label')">
           @for (mode of viewModes; track mode.id) {
             <button
@@ -158,8 +183,10 @@ const PREVIEW_REFRESH_MS = 150;
               [resolveImage]="imageResolver()"
               [scrollRequest]="previewScroll()"
               [find]="previewFind()"
+              [headingLines]="previewHeadingLines()"
               (linkClicked)="followLink($event)"
               (scrolledToLine)="syncEditorToLine($event)"
+              (activeHeadingChange)="followPreviewHeading($event)"
             />
           }
         }
@@ -167,7 +194,7 @@ const PREVIEW_REFRESH_MS = 150;
         @if (find.isOpen()) {
           <app-find-panel />
         } @else if (outlineShown()) {
-          <nav class="toc" [attr.aria-label]="i18n.t('editor.toc.label')">
+          <nav #toc class="toc" [attr.aria-label]="i18n.t('editor.toc.label')">
             @for (heading of headings(); track heading.from; let i = $index) {
               <button
                 type="button"
@@ -218,6 +245,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   @Input() noteId: number | null = null;
   @ViewChild('editorHost') editorHost!: ElementRef<HTMLElement>;
   @ViewChild(MarkdownPreviewComponent) preview?: MarkdownPreviewComponent;
+  private readonly toc = viewChild<ElementRef<HTMLElement>>('toc');
 
   private notes = inject(NotesService);
   private linkRename = inject(LinkRenameService);
@@ -235,16 +263,45 @@ export class EditorComponent implements OnDestroy, OnChanges {
   protected readonly layout = inject(LayoutService);
 
   readonly activeNote = signal<Note | null>(null);
+  /** The collection file open, `null` for a note (the conflict banner looks at it). */
+  protected readonly activeFile = computed(() => this.fileDocs.refFor(this.activeNote()?.id ?? null));
   readonly headings = signal<OutlineHeading[]>([]);
   readonly activeHeading = signal(-1);
   /** Problem with the collection file being edited: changed on disk meanwhile, or unreadable. */
   protected readonly fileBanner = signal<{ kind: 'conflict' | 'unreadable' | 'unsaved'; path: string; error: string } | null>(null);
   /** Last text written to (or read from) the disk for the open file: its own change events are not reloads. */
   private fileContentOnDisk: string | null = null;
+  private readonly sync = inject(SyncService);
+  /** "Changed on <device>": the open note just received changes from another device. */
+  protected readonly remoteChange = signal<string | null>(null);
+  private remoteChangeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The open note was deleted on another device: read-only, with "Restore". */
+  protected readonly remoteDeletion = signal<RemoteDeletion | null>(null);
+  protected readonly restoreError = signal<string | null>(null);
+  /** Notes of the open tabs deleted on another device, shown again (read-only) when their tab comes back. */
+  private readonly remoteDeletions = new Map<number, RemoteDeletion>();
+  private readonly unsubscribeNotesSynced = this.sync.onNotesSynced(event => { void this.onNotesSynced(event); });
+  /** Saves started so far: a read overtaken by a save is left to the save's answer, which is newer. */
+  private saveCount = 0;
+  private savesInFlight = 0;
+  /** The writes, one at a time and in order: each save is built on the previous one. */
+  private writeQueue: Promise<unknown> = Promise.resolve();
+  /** The open note changed while a save was in flight: read again once the saves are answered. */
+  private refreshPending = false;
+  /** A profile switch reloads the window: the edit still waiting for its debounce is written first. */
+  private readonly unregisterPendingSave = inject(PendingSavesService).register(() => this.flushPendingSave());
 
   /** The quick notes are a list of short notes: an outline of their headings would mean nothing. Never in zen mode. */
   protected readonly outlineShown = computed(() =>
     this.settingsService.settings().showOutline && !this.layout.zenMode() && this.headings().length > 0 && this.activeNote()?.id !== QUICK_NOTES_TAB_ID
+  );
+
+  /**
+   * Source lines of the headings whose chapter the preview follows: shown alone only. Side by side, the editor leads the
+   * outline (exact heading positions, and the preview follows its scroll anyway): a single source, no back and forth.
+   */
+  protected readonly previewHeadingLines = computed(() =>
+    this.viewMode() === 'preview' ? this.headings().map(heading => heading.line) : []
   );
 
   /** Source, preview, or both side by side. Remembered by each tab; a newly opened note takes the mode of the last note shown. */
@@ -322,8 +379,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     const notes = this.notes.notes();
     const resolve = createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders());
-    const ids = new Set(notes.map(n => n.id));
-    return target => linkStatus(target, resolve, id => ids.has(id));
+    const findNote = createNoteUrlResolver(notes);
+    return target => linkStatus(target, resolve, url => findNote(url) !== null);
   });
   readonly ctxMenu = signal<{ items: ContextMenuEntry[]; x: number; y: number } | null>(null);
 
@@ -335,6 +392,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private readonly scrollbarCompartment = new Compartment();
   private readonly trailingLineCompartment = new Compartment();
   private readonly linkStatusCompartment = new Compartment();
+  private readonly remoteReadOnlyCompartment = new Compartment();
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
   /** Ctrl+D / Ctrl+Shift+L options, kept from one note to the next. */
@@ -346,6 +404,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   constructor() {
+    // A long outline scrolls along with the reading
+    afterRenderEffect(() => {
+      const index = this.activeHeading();
+      const toc = this.toc()?.nativeElement;
+      if (toc) this.revealActiveHeading(toc, index);
+    });
+
     // Full preview: the formatting bar has nothing to act on
     effect(() => this.formattingBar.setPreviewOnly(this.viewMode() === 'preview'));
     // The quick notes document follows new notes sent from the overlay while it is open
@@ -416,7 +481,12 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
 
     if (mode !== 'preview') {
-      setTimeout(() => this.editorView?.focus(), 0);
+      setTimeout(() => {
+        if (!this.editorView) return;
+        // Shown again, the editor leads the outline
+        this.refreshActiveHeading(this.editorView);
+        this.editorView.focus();
+      }, 0);
     }
   }
 
@@ -481,6 +551,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   ngOnDestroy(): void {
+    this.unregisterPendingSave();
+    this.unsubscribeNotesSynced();
+    if (this.remoteChangeTimer) clearTimeout(this.remoteChangeTimer);
     this.editorView?.destroy();
     if (this.saveDebounce) clearTimeout(this.saveDebounce);
     if (this.previewDebounce) clearTimeout(this.previewDebounce);
@@ -513,11 +586,17 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     try {
       const file = this.fileDocs.refFor(id);
+      const deletion = this.remoteDeletions.get(id) ?? null;
       this.fileBanner.set(null);
+      this.hideRemoteChange();
+      this.remoteDeletion.set(deletion);
+      this.restoreError.set(null);
       let note: Note | null;
 
       if (id === QUICK_NOTES_TAB_ID) {
         note = this.buildQuickNotesDocument();
+      } else if (deletion) {
+        note = deletion.note;
       } else if (file) {
         note = await this.buildFileDocument(id, file);
       } else {
@@ -553,6 +632,11 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     for (const noteId of this.viewStates.keys()) {
       if (!this.tabs.isOpen(noteId)) this.viewStates.delete(noteId);
+    }
+
+    // A note deleted on another device whose tab was closed is gone for good here
+    for (const noteId of this.remoteDeletions.keys()) {
+      if (!this.tabs.isOpen(noteId)) this.remoteDeletions.delete(noteId);
     }
 
     if (!view || id === undefined) {
@@ -640,23 +724,17 @@ export class EditorComponent implements OnDestroy, OnChanges {
         this.refreshOutline(update.view);
       }
       if (update.docChanged && !this.isUpdatingFromModel) {
-        const content = update.state.doc.toString();
         const note = this.activeNote();
         // The quick notes are saved one by one, by their own edit (see quickNoteHandlers)
         if (!note || note.id === QUICK_NOTES_TAB_ID) return;
 
         // A note is titled by its first line; a file keeps its file name
         if (!this.fileDocs.isFileDoc(note.id)) {
-          const title = this.notes.extractTitle(content);
+          const title = this.notes.extractTitle(update.state.doc.toString());
           this.tabs.updateTitle(note.id, title);
         }
         this.tabs.markDirty(note.id, true);
-
-        // Debounce auto-save (1s)
-        if (this.saveDebounce) clearTimeout(this.saveDebounce);
-        this.saveDebounce = setTimeout(() => {
-          this.saveNote(note.id, content);
-        }, 1000);
+        this.scheduleSave(note.id);
       }
     });
 
@@ -728,6 +806,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
         base: markdownLanguage,
         codeLanguages: languages,
       }),
+      // Deleting an item of a numbered list renumbers the items below it (Enter already does when inserting one)
+      orderedListRenumbering,
       editorHighlight,
       daftrTheme,
       // Colors follow the CSS variables; only CodeMirror's own light/dark base styles (search panel, tooltips…) need swapping
@@ -803,6 +883,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         },
       }),
       this.linkStatusCompartment.of(linkStatusFacet.of(this.linkStatusOf())),
+      this.remoteReadOnlyCompartment.of(this.buildRemoteReadOnly()),
       // The quick notes are edited one at a time, from their hover actions: no drafts, no "/" hint, no context menu
       ...(readOnly
         ? [noteTimestamps, noteTimestampsTheme, quickNotesEditing(this.quickNoteHandlers())]
@@ -815,8 +896,9 @@ export class EditorComponent implements OnDestroy, OnChanges {
       parent: this.editorHost.nativeElement,
     });
 
-    this.formattingBar.attach(this.editorView, readOnly);
-    this.find.attach(this.editorView, readOnly);
+    const locked = readOnly || this.remoteDeletion() !== null;
+    this.formattingBar.attach(this.editorView, locked);
+    this.find.attach(this.editorView, locked);
     this.refreshOutline(this.editorView);
 
     if (readOnly) {
@@ -857,10 +939,35 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private refreshActiveHeading(view: EditorView): void {
+    // Hidden behind the preview, the editor has no scroll: the preview tells the chapter (see followPreviewHeading)
+    if (this.viewMode() === 'preview') return;
+
     const scroller = view.scrollDOM;
     const tops = this.headings().map(h => this.headingTop(view, h));
     const atBottom = scroller.scrollTop > 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
     this.activeHeading.set(findActiveHeading(tops, scroller.scrollTop, atBottom));
+  }
+
+  /** Chapter being read in the preview shown alone. */
+  protected followPreviewHeading(index: number): void {
+    if (this.viewMode() === 'preview') this.activeHeading.set(index);
+  }
+
+  /** Brings the outline entry of the chapter being read into view, scrolling the outline only. */
+  private revealActiveHeading(toc: HTMLElement, index: number): void {
+    const item = toc.children.item(index);
+    if (!item) return;
+
+    // The padding is kept clear (the view-mode buttons are over the top of the outline)
+    const style = getComputedStyle(toc);
+    const origin = toc.getBoundingClientRect().top - toc.scrollTop;
+    const rect = item.getBoundingClientRect();
+    const view = {
+      top: toc.scrollTop + parseFloat(style.paddingTop),
+      bottom: toc.scrollTop + toc.clientHeight - parseFloat(style.paddingBottom),
+    };
+    const top = revealScrollTop(toc.scrollTop, view, { top: rect.top - origin, bottom: rect.bottom - origin });
+    if (top !== toc.scrollTop) toc.scrollTop = top;
   }
 
   protected goToHeading(heading: OutlineHeading): void {
@@ -888,7 +995,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private buildQuickNotesDocument(): Note {
     const now = new Date().toISOString();
     return {
-      id: QUICK_NOTES_TAB_ID, title: QUICK_NOTES_TITLE, content: this.notes.quickNotesDocument(),
+      id: QUICK_NOTES_TAB_ID, uuid: '', title: QUICK_NOTES_TITLE, content: this.notes.quickNotesDocument(),
       tags: [], folderId: null, sortOrder: null, color: null, createdAt: now, updatedAt: now,
     };
   }
@@ -909,7 +1016,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   private quickNoteHandlers(): QuickNoteHandlers {
     return {
-      save: (id, text) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text) }); },
+      save: (id, text, base) => { void this.notes.update(id, { content: text, title: this.notes.extractTitle(text), base }); },
       remove: id => { void this.notes.delete(id); },
       copy: text => { void navigator.clipboard.writeText(text); },
       convert: id => this.convertQuickNote(id),
@@ -1017,7 +1124,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
     return settings.hideScrollbar ? hiddenScrollbar : [];
   }
 
-  /** Ctrl+click on a link (or a click in the preview): a note (by `note://id` or by path) opens in a tab, a web address in the browser. */
+  /** Ctrl+click on a link (or a click in the preview): a note (by `note://` or by path) opens in a tab, a web address in the browser. */
   protected followLink(target: string): void {
     const anchor = linkAnchor(target);
 
@@ -1046,18 +1153,23 @@ export class EditorComponent implements OnDestroy, OnChanges {
       return;
     }
 
-    const noteUrl = /^note:\/\/(?<id>\d+)$/.exec(target.trim());
+    const noteUrl = parseNoteUrl(target);
     const notes = this.notes.notes();
-    let noteId: number | null = noteUrl?.groups?.['id'] ? Number(noteUrl.groups['id']) : null;
 
-    if (noteId === null && /^https?:\/\//i.test(target.trim())) {
+    if (noteUrl === null && /^https?:\/\//i.test(target.trim())) {
       void this.bridge.openExternal(target.trim());
       return;
     }
 
-    noteId ??= createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders())(target);
+    let note: Note | null | undefined;
 
-    const note = notes.find(n => n.id === noteId);
+    if (noteUrl === null) {
+      const noteId = createLinkResolver(notes.filter(n => !n.tags.includes(QUICK_NOTE_TAG)), this.folders.folders())(target);
+      note = notes.find(n => n.id === noteId);
+    }
+    else {
+      note = createNoteUrlResolver(notes)(noteUrl);
+    }
 
     if (note) {
       this.tabs.openNote(note.id, note.title);
@@ -1149,7 +1261,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
         run: (view) => {
           const note = this.activeNote();
           if (!note) return true;
-          if (this.saveDebounce) clearTimeout(this.saveDebounce);
+          this.cancelPendingSave();
           formatTableAtCursor(view);
           this.saveNote(note.id, view.state.doc.toString());
           return true;
@@ -1187,7 +1299,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private async saveNote(id: number, content: string): Promise<void> {
-    if (id === QUICK_NOTES_TAB_ID) return;
+    // A note deleted on another device takes no more edits until restored
+    if (id === QUICK_NOTES_TAB_ID || this.remoteDeletions.has(id)) return;
     const file = this.fileDocs.refFor(id);
 
     if (file) {
@@ -1195,10 +1308,18 @@ export class EditorComponent implements OnDestroy, OnChanges {
       return;
     }
 
+    const title = this.notes.extractTitle(content);
+    const previousTitle = this.notes.notes().find(n => n.id === id)?.title;
+    const open = this.activeNote();
+    // Built on the text loaded, saved or merged last: the backend keeps what changed since (another device's edit)
+    const base = open?.id === id ? open.content : undefined;
+    const save = ++this.saveCount;
+    // The next save is built on this one
+    this.activeNote.update(n => (n?.id === id ? { ...n, title, content } : n));
+    this.savesInFlight++;
+
     try {
-      const title = this.notes.extractTitle(content);
-      const previousTitle = this.notes.notes().find(n => n.id === id)?.title;
-      await this.notes.update(id, { content, title });
+      const stored = await this.queueWrite(() => this.notes.update(id, { content, title, base }));
 
       if (previousTitle !== undefined && previousTitle !== title) {
         this.linkRename.notifyTitleChanged(id, previousTitle);
@@ -1206,10 +1327,28 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
       this.tabs.markDirty(id, false);
       this.tabs.updateTitle(id, title);
-      this.activeNote.update(n => n ? { ...n, title, content } : n);
+
+      // The stored text has the changes made elsewhere meanwhile; after a newer save, its answer brings them
+      if (stored && save === this.saveCount) {
+        this.mergeStoredNote(stored);
+      }
     } catch (err) {
       console.error('[Editor] Failed to save note:', err);
+
+      // Not written: the next save is built on the text stored before
+      if (save === this.saveCount && base !== undefined) {
+        this.activeNote.update(n => (n?.id === id && n.content === content ? { ...n, content: base } : n));
+      }
+    } finally {
+      this.savesInFlight--;
+      this.refreshAfterSaves();
     }
+  }
+
+  private queueWrite<T>(write: () => Promise<T>): Promise<T> {
+    const written = this.writeQueue.then(write);
+    this.writeQueue = written.catch(() => undefined);
+    return written;
   }
 
   /** A collection file shown as a note; unreadable (moved, deleted), it opens empty with a banner. */
@@ -1224,7 +1363,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.fileBanner.set({ kind: 'unreadable', path: file.path, error: '' });
     }
 
-    return { id, title: baseName(file.path), content, tags: [], folderId: null, sortOrder: null, color: null, createdAt: '', updatedAt: '' };
+    return { id, uuid: '', title: baseName(file.path), content, tags: [], folderId: null, sortOrder: null, color: null, createdAt: '', updatedAt: '' };
   }
 
   private async saveFile(id: number, file: CollectionFileRef, content: string): Promise<void> {
@@ -1239,28 +1378,248 @@ export class EditorComponent implements OnDestroy, OnChanges {
     }
   }
 
-  /** Reloads the open note from the stored list when it changed elsewhere and the editor holds no unsaved edit. */
+  /** The open note changed outside the editor (an AI through the MCP server, another device): its changes are merged in. */
   private onExternalNoteChange(notes: readonly Note[]): void {
     const open = this.activeNote();
-    const view = this.editorView;
 
-    if (!open || !view || open.id === QUICK_NOTES_TAB_ID || this.fileDocs.isFileDoc(open.id)) {
+    if (!open || open.id === QUICK_NOTES_TAB_ID || this.fileDocs.isFileDoc(open.id)) {
       return;
     }
 
     const stored = notes.find(n => n.id === open.id);
-    const dirty = this.tabs.tabs().find(tab => tab.noteId === open.id)?.isDirty ?? false;
-    const content = externallyChangedContent(open.content, stored?.content, view.state.doc.toString(), dirty);
 
-    if (content === null || !stored) {
+    // The list may have been read before one of our saves landed: the note is read again rather than trusted
+    if (stored && stored.content !== open.content) {
+      void this.refreshOpenNote();
+    }
+  }
+
+  /** Reads the open note again and merges it; while a save is in flight, once it is answered. */
+  private async refreshOpenNote(): Promise<void> {
+    const open = this.activeNote();
+
+    if (!open || open.id === QUICK_NOTES_TAB_ID || this.fileDocs.isFileDoc(open.id)) {
       return;
     }
 
-    this.isUpdatingFromModel = true;
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
-    this.isUpdatingFromModel = false;
+    const save = this.saveCount;
+    const busy = this.savesInFlight > 0;
+    const stored = busy ? null : await this.bridge.getNoteById(open.id);
+    this.mergeReadNote(stored, save, busy);
+  }
+
+  /**
+   * Merges the open note read when `save` saves had started (`busy`: one was in flight). A read that a save may have
+   * overtaken is dropped: a save started during the read answers with a newer text, and one in flight before it may
+   * have been written before the change, hence a new read once the saves are answered.
+   */
+  private mergeReadNote(stored: Note | null, save: number, busy: boolean): void {
+    if (busy) {
+      this.refreshPending = true;
+      this.refreshAfterSaves();
+    }
+    else if (stored && save === this.saveCount) {
+      this.mergeStoredNote(stored);
+    }
+  }
+
+  private refreshAfterSaves(): void {
+    if (this.savesInFlight === 0 && this.refreshPending) {
+      this.refreshPending = false;
+      void this.refreshOpenNote();
+    }
+  }
+
+  /**
+   * Brings the stored version of the open note into the editor as a minimal transaction (cursors and selections
+   * mapped, outside the undo history), rebased over the edits not saved yet: those are kept, then saved over it.
+   */
+  private mergeStoredNote(stored: Note): void {
+    const open = this.activeNote();
+    const view = this.editorView;
+
+    // Nothing new since loaded, saved or merged
+    if (!open || !view || open.id !== stored.id || stored.content === open.content) {
+      return;
+    }
+
+    const spec = remoteTransaction(view.state, open.content, stored.content);
+
+    if (spec) {
+      this.isUpdatingFromModel = true;
+      view.dispatch(spec);
+      this.isUpdatingFromModel = false;
+    }
+
+    const merged = view.state.doc.toString();
     this.activeNote.set(stored);
-    this.tabs.updateTitle(stored.id, stored.title);
+    this.tabs.updateTitle(stored.id, this.notes.extractTitle(merged));
+
+    if (merged === stored.content) {
+      this.cancelPendingSave();
+      this.tabs.markDirty(stored.id, false);
+    }
+    else {
+      this.tabs.markDirty(stored.id, true);
+      this.scheduleSave(stored.id);
+    }
+  }
+
+  /** Saves the open note after the debounce, with the text it has then (a merged change included). */
+  private scheduleSave(id: number): void {
+    this.cancelPendingSave();
+    this.saveDebounce = setTimeout(() => {
+      this.saveDebounce = null;
+      const view = this.editorView;
+
+      if (view && this.activeNote()?.id === id) {
+        void this.saveNote(id, view.state.doc.toString());
+      }
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  private cancelPendingSave(): void {
+    if (this.saveDebounce) {
+      clearTimeout(this.saveDebounce);
+      this.saveDebounce = null;
+    }
+  }
+
+  /**
+   * Notes changed by another device. In the open tabs of the active profile: the open note gets the changes (and
+   * "Changed on <device>"), a note deleted there turns read-only with "Restore". The lists reload by `notes:changed`.
+   */
+  private async onNotesSynced(event: NotesSynced): Promise<void> {
+    if (!event.active || event.uuids.length === 0) {
+      return;
+    }
+
+    const changed = new Set(event.uuids);
+    // Read before the lists reload: a deleted note leaves them
+    const touched = this.notes.notes().filter(note => changed.has(note.uuid) && this.tabs.isOpen(note.id));
+
+    for (const known of touched) {
+      const save = this.saveCount;
+      const busy = this.savesInFlight > 0;
+      const stored = await this.bridge.getNoteById(known.id);
+      const isOpen = this.activeNote()?.id === known.id;
+
+      if (stored === null) {
+        this.markRemotelyDeleted(isOpen ? this.shownNote() ?? known : known, event.deviceName);
+      }
+      else if (isOpen) {
+        this.mergeReadNote(stored, save, busy);
+        this.showRemoteChange(event.deviceName);
+      }
+      else {
+        this.tabs.updateTitle(stored.id, stored.title);
+      }
+    }
+  }
+
+  /** The open note with the text the editor shows (unsaved edits included). */
+  private shownNote(): Note | null {
+    const open = this.activeNote();
+    const view = this.editorView;
+
+    return open && view ? { ...open, content: view.state.doc.toString() } : open;
+  }
+
+  private markRemotelyDeleted(note: Note, deviceName: string | null): void {
+    const deletion: RemoteDeletion = { note, deviceName };
+    this.remoteDeletions.set(note.id, deletion);
+
+    if (this.activeNote()?.id !== note.id) {
+      return;
+    }
+
+    // The edits not saved yet stay shown, and come back with "Restore"
+    this.cancelPendingSave();
+    this.hideRemoteChange();
+    this.remoteDeletion.set(deletion);
+    this.applyRemoteReadOnly();
+  }
+
+  /** "Restore" on a note deleted on another device: it comes back here, and everywhere with the next sync. */
+  protected async restoreNote(): Promise<void> {
+    const deletion = this.remoteDeletion();
+
+    if (!deletion) {
+      return;
+    }
+
+    const id = deletion.note.id;
+    this.restoreError.set(null);
+
+    try {
+      const restored = await this.bridge.restoreNote(id);
+      this.remoteDeletions.delete(id);
+
+      if (this.activeNote()?.id === id) {
+        this.remoteDeletion.set(null);
+        this.applyRemoteReadOnly();
+      }
+
+      if (restored) {
+        // Known as stored before the lists reload: what the editor shows (edits not saved when the note was deleted)
+        // is then saved over it, never replaced by it
+        this.activeNote.update(open => (open?.id === id ? { ...open, content: restored.content } : open));
+        this.saveShownIfChanged(restored);
+      }
+
+      await this.notes.loadAll();
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.restoreError.set(this.i18n.t('sync.editor.restoreFailed', { message }));
+    }
+  }
+
+  /** The editor shows another text than the stored one: saved after the usual debounce. */
+  private saveShownIfChanged(stored: Note): void {
+    const view = this.editorView;
+
+    if (view && this.activeNote()?.id === stored.id && view.state.doc.toString() !== stored.content) {
+      this.tabs.markDirty(stored.id, true);
+      this.scheduleSave(stored.id);
+    }
+  }
+
+  protected deletionLabel(deletion: RemoteDeletion): string {
+    return remoteDeletionLabel(deletion.deviceName, this.i18n.language());
+  }
+
+  private showRemoteChange(deviceName: string | null): void {
+    this.hideRemoteChange();
+    this.remoteChange.set(remoteChangeLabel(deviceName, this.i18n.language()));
+    this.remoteChangeTimer = setTimeout(() => this.hideRemoteChange(), REMOTE_CHANGE_BADGE_MS);
+  }
+
+  private hideRemoteChange(): void {
+    if (this.remoteChangeTimer) {
+      clearTimeout(this.remoteChangeTimer);
+      this.remoteChangeTimer = null;
+    }
+
+    this.remoteChange.set(null);
+  }
+
+  /** Read-only while the open note is deleted on another device. */
+  private buildRemoteReadOnly(): Extension {
+    return this.remoteDeletion() ? EditorState.readOnly.of(true) : [];
+  }
+
+  private applyRemoteReadOnly(): void {
+    const view = this.editorView;
+
+    if (!view) {
+      return;
+    }
+
+    view.dispatch({ effects: this.remoteReadOnlyCompartment.reconfigure(this.buildRemoteReadOnly()) });
+    const locked = this.remoteDeletion() !== null;
+    this.formattingBar.attach(view, locked);
+    this.find.attach(view, locked);
   }
 
   /** The open file changed on disk: reloaded when it holds no unsaved edit, otherwise the user chooses. */

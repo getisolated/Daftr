@@ -170,6 +170,13 @@
   text-align: center;
 }
 
+// Hovering or focusing a folder swaps its note count for the "+" creating a note inside it
+.row.folder:hover,
+.row.folder:focus-within {
+  .count { display: none; }
+  app-row-add-button { display: flex; }
+}
+
 .chevron,
 .chevron-space {
   flex-shrink: 0;

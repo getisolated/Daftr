@@ -8,7 +8,9 @@ mod raw;
 mod sanitize;
 mod theme;
 
-pub use options::{FormattingBarMode, FormattingBarPosition, FormattingBarStyle, ShortcutMode};
+pub use options::{
+    FormattingBarMode, FormattingBarPosition, FormattingBarStyle, LineBreaks, ShortcutMode,
+};
 pub use raw::{RawPosition, RawSettings};
 pub use sanitize::sanitize_settings;
 pub use theme::{ThemeId, ThemeKind, ThemePreference};
@@ -33,6 +35,14 @@ pub const MCP_MIN_PORT: u16 = 1024;
 pub const MCP_MAX_PORT: u16 = 65535;
 /// Longueur du jeton du serveur MCP : 32 octets aléatoires en hexadécimal minuscule.
 pub const MCP_TOKEN_LENGTH: usize = 64;
+/// Longueur maximale (en octets) du dossier des collections reçues.
+pub const MAX_RECEIVED_FOLDER_BYTES: usize = 1024;
+/// Port par défaut de la synchronisation entre appareils.
+pub const DEFAULT_SYNC_PORT: u16 = 47_820;
+/// Plus petit port accepté pour la synchronisation (hors des ports réservés au système).
+pub const SYNC_MIN_PORT: u16 = 1024;
+/// Plus grand port accepté pour la synchronisation.
+pub const SYNC_MAX_PORT: u16 = 65535;
 
 /// Réglages complets et valides.
 #[derive(Debug, Clone, PartialEq)]
@@ -83,6 +93,8 @@ pub struct AppSettings {
     pub word_wrap: bool,
     /// La note finit toujours par une ligne vide.
     pub trailing_line: bool,
+    /// Retours à la ligne de l'aperçu : norme markdown ou texte brut.
+    pub line_breaks: LineBreaks,
     /// Plan h1/h2/h3 à droite de la note.
     pub show_outline: bool,
     /// Fil d'Ariane (collection ou notes, dossiers, fichier) en haut de la note.
@@ -106,6 +118,16 @@ pub struct AppSettings {
     /// Jeton exigé par le serveur MCP (`Authorization: Bearer …`) ; vide tant que le
     /// serveur n'a jamais été activé. Seul le processus principal le génère.
     pub mcp_token: String,
+    /// Nom de cet appareil pour la synchronisation ; vide : le nom d'hôte (résolu au lancement,
+    /// hors du domaine). Sinon un [`crate::sync::DeviceName`] valide.
+    pub sync_device_name: String,
+    /// Port d'écoute TCP de la synchronisation, toutes interfaces du réseau local.
+    pub sync_port: u16,
+    /// Pause globale de la synchronisation : ni écoute, ni annonce, ni connexion.
+    pub sync_paused: bool,
+    /// Dossier où arrivent les collections reçues d'un autre appareil (par appareil, jamais
+    /// synchronisé) ; vide : `Documents/Daftr`, résolu hors du domaine. Sinon un chemin absolu.
+    pub received_collections_folder: String,
 }
 
 impl AppSettings {
@@ -153,6 +175,7 @@ impl Default for AppSettings {
             show_line_numbers: false,
             word_wrap: true,
             trailing_line: false,
+            line_breaks: LineBreaks::Markdown,
             show_outline: false,
             show_breadcrumbs: true,
             hide_scrollbar: false,
@@ -164,6 +187,10 @@ impl Default for AppSettings {
             mcp_enabled: false,
             mcp_port: DEFAULT_MCP_PORT,
             mcp_token: String::new(),
+            sync_device_name: String::new(),
+            sync_port: DEFAULT_SYNC_PORT,
+            sync_paused: false,
+            received_collections_folder: String::new(),
         }
     }
 }

@@ -244,3 +244,28 @@ fn a_new_physical_key_is_a_shortcut_change() {
 
     assert!(change.shortcut_changed());
 }
+
+#[test]
+fn reports_a_change_of_the_sync_settings_only() {
+    let (_, service) = service(None);
+
+    let paused = service.commit(AppSettings {
+        sync_paused: true,
+        ..AppSettings::default()
+    });
+    let other = service.commit(AppSettings {
+        sync_paused: true,
+        word_wrap: false,
+        ..AppSettings::default()
+    });
+    let renamed = service.commit(AppSettings {
+        sync_paused: true,
+        word_wrap: false,
+        sync_device_name: "Laptop".to_owned(),
+        ..AppSettings::default()
+    });
+
+    assert!(paused.sync_changed());
+    assert!(!other.sync_changed());
+    assert!(renamed.sync_changed());
+}

@@ -37,6 +37,7 @@ pub fn raw_from_json(value: &Value) -> RawSettings {
         show_line_numbers: flag("showLineNumbers"),
         word_wrap: flag("wordWrap"),
         trailing_line: flag("trailingLine"),
+        line_breaks: text("lineBreaks"),
         show_outline: flag("showOutline"),
         show_breadcrumbs: flag("showBreadcrumbs"),
         hide_scrollbar: flag("hideScrollbar"),
@@ -50,6 +51,10 @@ pub fn raw_from_json(value: &Value) -> RawSettings {
         mcp_enabled: flag("mcpEnabled"),
         mcp_port: number("mcpPort"),
         mcp_token: text("mcpToken"),
+        sync_device_name: text("syncDeviceName"),
+        sync_port: number("syncPort"),
+        sync_paused: flag("syncPaused"),
+        received_collections_folder: text("receivedCollectionsFolder"),
     }
 }
 
@@ -106,6 +111,7 @@ pub fn settings_to_json(settings: &AppSettings) -> Value {
         "showLineNumbers": settings.show_line_numbers,
         "wordWrap": settings.word_wrap,
         "trailingLine": settings.trailing_line,
+        "lineBreaks": settings.line_breaks.as_str(),
         "showOutline": settings.show_outline,
         "showBreadcrumbs": settings.show_breadcrumbs,
         "hideScrollbar": settings.hide_scrollbar,
@@ -117,6 +123,10 @@ pub fn settings_to_json(settings: &AppSettings) -> Value {
         "mcpEnabled": settings.mcp_enabled,
         "mcpPort": settings.mcp_port,
         "mcpToken": settings.mcp_token,
+        "syncDeviceName": settings.sync_device_name,
+        "syncPort": settings.sync_port,
+        "syncPaused": settings.sync_paused,
+        "receivedCollectionsFolder": settings.received_collections_folder,
     })
 }
 
@@ -139,11 +149,16 @@ mod tests {
             overlay_position: Some(domain::overlay::Position { x: -10, y: 20 }),
             global_shortcut_physical_key: Some("Digit1".to_owned()),
             word_wrap: false,
+            line_breaks: domain::settings::LineBreaks::Text,
             zen_always_on_top: true,
             show_menu_bar_icon: false,
             mcp_enabled: true,
             mcp_port: 40000,
             mcp_token: "f".repeat(domain::settings::MCP_TOKEN_LENGTH),
+            sync_device_name: "Laptop".to_owned(),
+            sync_port: 48000,
+            sync_paused: true,
+            received_collections_folder: std::env::temp_dir().to_string_lossy().into_owned(),
             ..AppSettings::default()
         };
 

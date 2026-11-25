@@ -1,0 +1,86 @@
+<button
+  #trigger
+  class="profile-btn"
+  type="button"
+  aria-haspopup="menu"
+  [class.open]="menuPosition() !== null"
+  [attr.aria-expanded]="menuPosition() !== null"
+  [title]="i18n.t('profiles.switcher.label', { name: activeName() })"
+  (click)="onTriggerClick($event)"
+  (keydown.arrowRight)="openMenu(true)"
+  (mouseenter)="hover.enter()"
+  (mouseleave)="hover.leave()"
+>
+  <app-profile-avatar [name]="profiles.active()?.name ?? null" [iconUrl]="profiles.iconUrl(profiles.activeId())" [size]="18" />
+  <span class="profile-name">{{ activeName() }}</span>
+  @if (collectionSync.pendingCount() > 0) {
+    <span class="pending-dot" role="img" [attr.aria-label]="i18n.plural('csync.pending', collectionSync.pendingCount())"></span>
+  }
+  <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="9 6 15 12 9 18"/>
+  </svg>
+</button>
+
+@if (menuPosition(); as position) {
+  <app-profile-menu
+    [style.left.px]="position.left"
+    [style.bottom.px]="position.bottom"
+    [style.--profile-menu-width.px]="menuWidth"
+    [focusFirst]="focusMenu()"
+    (mouseenter)="hover.enter()"
+    (mouseleave)="hover.leave()"
+    (picked)="onPicked($event)"
+    (created)="onCreate()"
+    (configured)="onConfigure()"
+    (synced)="onSync()"
+  />
+}
+
+@if (dialog(); as current) {
+  @if (current.kind === 'settings') {
+    <app-profile-settings-dialog
+      [profile]="current.profile"
+      [currentIconUrl]="current.profile ? profiles.iconUrl(current.profile.id) : null"
+      (deleteRequested)="current.profile && onRemove(current.profile)"
+      (closed)="closeDialog()"
+    />
+  } @else if (current.kind === 'password') {
+    <app-password-prompt
+      [title]="current.purpose === 'switch' ? i18n.t('profiles.prompt.title', { name: label(current.profile) }) : i18n.t('profiles.delete.title', { name: label(current.profile) })"
+      [message]="current.purpose === 'switch' ? i18n.t('profiles.prompt.message') : deleteMessage(current.profile, 'profiles.delete.protectedMessage')"
+      [confirmLabel]="current.purpose === 'switch' ? i18n.t('profiles.prompt.open') : i18n.t('profiles.delete.confirm')"
+      [danger]="current.purpose === 'delete'"
+      [busy]="busy()"
+      [error]="dialogError()"
+      (submitted)="onPassword($event)"
+      (closed)="closeDialog()"
+    />
+  } @else {
+    <app-confirm-dialog
+      [title]="i18n.t('profiles.delete.title', { name: label(current.profile) })"
+      [message]="deleteMessage(current.profile, 'profiles.delete.message')"
+      [actions]="deleteActions()"
+      (chosen)="onDeleteConfirmed($event)"
+    />
+  }
+}
+
+@if (!dialog() && dialogError(); as message) {
+  <app-confirm-dialog
+    [title]="activeName()"
+    [message]="message"
+    [actions]="[]"
+    [cancelLabel]="i18n.t('common.close')"
+    (chosen)="dialogError.set(null)"
+  />
+}
+
+@if (transfer.failure(); as message) {
+  <app-confirm-dialog
+    [title]="i18n.t('profiles.transfer.failedTitle')"
+    [message]="message"
+    [actions]="[]"
+    [cancelLabel]="i18n.t('common.close')"
+    (chosen)="transfer.dismissFailure()"
+  />
+}

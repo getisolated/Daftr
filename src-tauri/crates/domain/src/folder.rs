@@ -1,5 +1,7 @@
 //! Dossiers de notes (arborescence de la sidebar).
 
+use crate::uuid::Uuid;
+
 /// Longueur maximale d'un nom de dossier, en caractères.
 pub const MAX_FOLDER_NAME_LENGTH: usize = 100;
 
@@ -11,6 +13,8 @@ pub const DEFAULT_FOLDER_NAME: &str = "Inbox";
 pub struct Folder {
     /// Identifiant attribué par la base.
     pub id: i64,
+    /// Identifiant stable, le même sur tous les appareils.
+    pub uuid: Uuid,
     /// Nom affiché.
     pub name: String,
     /// Dossier parent, `None` à la racine.

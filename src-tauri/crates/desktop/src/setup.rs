@@ -1,72 +1,109 @@
-//! Démarrage : stockages, services, fenêtres, tray, raccourci, mises à jour.
+//! Démarrage : stockages, services, synchronisation, fenêtres, tray, raccourci, mises à jour.
 
 use std::path::Path;
 use std::sync::Arc;
 
-use adapter_fs::{CollectionsWatcher, DiskExportWriter, DiskFiles, SettingsFile};
+use adapter_fs::{
+    DiskExportWriter, ProfileDirectories, ProfileRegistryFile, SettingsFile, ShareDisk,
+};
 use adapter_mcp::RandomSecrets;
+use adapter_password::Argon2Hasher;
 use adapter_print::WebviewPdfRenderer;
-use adapter_sqlite::SqliteStore;
+use adapter_sync::{AddrPolicy, EngineConfig, MdnsDiscovery};
 use anyhow::Context;
-use app::collections::{CollectionPorts, CollectionsService};
 use app::export::ExportService;
-use app::folders::FoldersService;
-use app::notes::NotesService;
+use app::profiles::{ProfilePorts, ProfilesService};
 use app::settings::SettingsService;
+use domain::sync::{DeviceKind, DeviceName};
 use presentation::Services;
-use tauri::{App, AppHandle, Manager};
+use presentation::data::ActiveData;
+use tauri::{App, AppHandle, Manager, async_runtime};
 
-use crate::events::WindowSink;
 use crate::state::{DesktopState, desktop};
+use crate::sync::{SyncSetup, SyncState, WindowSyncEvents, default_device_name};
 use crate::windows::{main_window, overlay};
-use crate::{data_dir, mcp, shortcut, startup, tray, updater};
+use crate::{data_dir, mcp, profiles, shortcut, startup, tray, updater};
+
+/// Sous-dossier des Documents où arrivent par défaut les collections reçues.
+const RECEIVED_FOLDER_NAME: &str = "Daftr";
+
+/// Registre des profils, à la racine des données.
+const PROFILES_FILE: &str = "profiles.json";
 
 /// Prépare l'application ; une erreur ici empêche le lancement (base illisible…).
 pub fn run(app: &mut App) -> anyhow::Result<()> {
     let handle = app.handle().clone();
-    let services = build_services(&handle, &data_dir::resolve(&handle)?)?;
+    let directory = data_dir::resolve(&handle)?;
+    let services = build_services(&handle, &directory);
+    let sync = build_sync(&handle, &directory, &services)?;
 
-    services
-        .folders
-        .ensure_default()
-        .context("dossier par défaut")?;
-    app.manage(DesktopState::new(services));
+    app.manage(DesktopState::new(services, sync));
+    profiles::open_last_active(&handle).context("ouverture du profil")?;
 
     start_windows(&handle)?;
     start_background(&handle);
     Ok(())
 }
 
-fn build_services(app: &AppHandle, directory: &Path) -> anyhow::Result<Services> {
-    let store = Arc::new(
-        SqliteStore::open(&directory.join(data_dir::DATABASE_FILE))
-            .context("ouverture de la base")?,
-    );
+/// Services communs à tous les profils ; les données du profil actif sont ouvertes ensuite.
+fn build_services(app: &AppHandle, directory: &Path) -> Services {
     let settings = SettingsService::new(
         Arc::new(SettingsFile::new(directory.join("settings.json"))),
         Arc::new(RandomSecrets),
     );
-    let loaded = settings.load(sys_locale::get_locale().as_deref());
+    settings.load(sys_locale::get_locale().as_deref());
 
-    let sink = Arc::new(WindowSink::new(app.clone()));
-    let watcher = CollectionsWatcher::start(sink, loaded.collections_exclude)
-        .context("surveillance des collections")?;
-    let collections = CollectionsService::new(CollectionPorts {
-        store: store.clone(),
-        files: Arc::new(DiskFiles),
-        watcher: Arc::new(watcher),
+    let profiles = ProfilesService::new(ProfilePorts {
+        registry: Arc::new(ProfileRegistryFile::new(directory.join(PROFILES_FILE))),
+        files: Arc::new(ProfileDirectories::new(directory.to_path_buf())),
+        hasher: Arc::new(Argon2Hasher),
+        secrets: Arc::new(RandomSecrets),
     });
+    profiles.load();
 
-    Ok(Services {
-        notes: Arc::new(NotesService::new(store.clone(), store.clone())),
-        folders: Arc::new(FoldersService::new(store)),
-        collections,
+    Services {
+        data: ActiveData::default(),
+        profiles: Arc::new(profiles),
         settings,
         export: ExportService::new(
             Arc::new(DiskExportWriter),
             Arc::new(WebviewPdfRenderer::new(app.clone())),
         ),
-    })
+    }
+}
+
+/// Le moteur de synchronisation, arrêté : l'identité de l'appareil est chargée (créée au
+/// premier lancement) car toute base de profil s'ouvre avec sa clé.
+fn build_sync(app: &AppHandle, directory: &Path, services: &Services) -> anyhow::Result<SyncState> {
+    let settings = services.settings.current();
+    let host_name = default_device_name(settings.language).context("nom de l'appareil")?;
+    let device_name =
+        DeviceName::parse(&settings.sync_device_name).unwrap_or_else(|| host_name.clone());
+    let config = EngineConfig {
+        port: settings.sync_port,
+        device_kind: DeviceKind::from_battery(platform::power::battery_presence()),
+        ..EngineConfig::new(device_name)
+    };
+
+    let setup = SyncSetup {
+        root: directory.to_path_buf(),
+        profiles: Arc::clone(&services.profiles),
+        events: Arc::new(WindowSyncEvents::new(app.clone())),
+        discovery: Arc::new(MdnsDiscovery::new(AddrPolicy::Lan)),
+        files: Arc::new(ShareDisk::new(settings.collections_exclude.clone())),
+        default_received_folder: documents_folder(app, directory).join(RECEIVED_FOLDER_NAME),
+        config,
+        host_name,
+        runtime: async_runtime::handle().inner().clone(),
+    };
+    SyncState::new(setup).context("synchronisation")
+}
+
+/// Le dossier Documents de l'utilisateur ; à défaut, le dossier des données.
+fn documents_folder(app: &AppHandle, fallback: &Path) -> std::path::PathBuf {
+    app.path()
+        .document_dir()
+        .unwrap_or_else(|_| fallback.to_path_buf())
 }
 
 fn start_windows(app: &AppHandle) -> anyhow::Result<()> {
@@ -93,4 +130,5 @@ fn start_background(app: &AppHandle) {
     }
     updater::start(app);
     mcp::sync(app);
+    crate::sync::start(app);
 }

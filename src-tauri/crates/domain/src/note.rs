@@ -1,10 +1,16 @@
 //! Notes stockées dans la base.
 
+pub mod edit;
+
+use crate::uuid::Uuid;
+
 /// Une note telle que stockée.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note {
     /// Identifiant attribué par la base.
     pub id: i64,
+    /// Identifiant stable, le même sur tous les appareils (liens `note://<uuid>`).
+    pub uuid: Uuid,
     /// Titre (première ligne, extraite par le renderer).
     pub title: String,
     /// Texte markdown complet.
@@ -21,6 +27,39 @@ pub struct Note {
     pub created_at: String,
     /// Date de dernière modification du contenu, même format.
     pub updated_at: String,
+}
+
+/// Une note sans son contenu : de quoi la lister sans lire son texte en base.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteHead {
+    /// Identifiant attribué par la base.
+    pub id: i64,
+    /// Titre.
+    pub title: String,
+    /// Tags encodés en tableau JSON, tels que stockés.
+    pub tags: String,
+    /// Dossier de la note, `None` à la racine.
+    pub folder_id: Option<i64>,
+    /// Date de dernière modification du contenu (`YYYY-MM-DD HH:MM:SS`, UTC).
+    pub updated_at: String,
+}
+
+/// Critères de sélection des notes ; sans critère, toutes les notes.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct NoteFilter {
+    /// Seulement les notes de ce dossier.
+    pub folder_id: Option<i64>,
+    /// Seulement les notes dont les tags correspondent à ce motif `LIKE` (échappement `\`).
+    pub tag_pattern: Option<String>,
+}
+
+/// Les premiers éléments d'une sélection, avec le nombre total d'éléments sélectionnés.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Page<T> {
+    /// Nombre d'éléments de toute la sélection.
+    pub total: usize,
+    /// Les premiers éléments, dans l'ordre de la sélection.
+    pub items: Vec<T>,
 }
 
 /// Une note à créer.
@@ -45,6 +84,11 @@ pub struct NoteChanges {
     pub content: Option<String>,
     /// Nouveaux tags, déjà encodés en tableau JSON.
     pub tags: Option<String>,
+    /// Le contenu sur lequel `content` a été construit (dernier contenu lu ou enregistré par
+    /// l'éditeur). Dans un profil synchronisé, ce qui a changé depuis cette base (modification
+    /// d'un autre appareil) est gardé : `content` est rejoué par-dessus. `None` : `content`
+    /// remplace le contenu actuel.
+    pub base: Option<String>,
 }
 
 impl NoteChanges {

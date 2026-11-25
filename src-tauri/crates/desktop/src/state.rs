@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::mcp::McpState;
 use crate::shortcut::ShortcutState;
+use crate::sync::SyncState;
 use crate::updater::UpdateState;
 use crate::windows::overlay::OverlayState;
 
@@ -26,11 +27,13 @@ pub struct DesktopState {
     pub updates: UpdateState,
     /// Serveur MCP.
     pub mcp: McpState,
+    /// Synchronisation entre appareils.
+    pub sync: SyncState,
 }
 
 impl DesktopState {
     /// État initial.
-    pub fn new(services: Services) -> Self {
+    pub fn new(services: Services, sync: SyncState) -> Self {
         Self {
             services,
             quitting: AtomicBool::new(false),
@@ -39,6 +42,7 @@ impl DesktopState {
             shortcut: ShortcutState::default(),
             updates: UpdateState::default(),
             mcp: McpState::default(),
+            sync,
         }
     }
 

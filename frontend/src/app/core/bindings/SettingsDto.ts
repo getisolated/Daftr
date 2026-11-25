@@ -91,6 +91,10 @@ wordWrap: boolean,
  */
 trailingLine: boolean, 
 /**
+ * Retours à la ligne de l'aperçu.
+ */
+lineBreaks: 'markdown' | 'text', 
+/**
  * Plan de la note.
  */
 showOutline: boolean, 
@@ -134,4 +138,20 @@ mcpPort: number,
  * Jeton du serveur MCP (généré par le processus principal), vide s'il n'a jamais été
  * activé.
  */
-mcpToken: string, };
+mcpToken: string, 
+/**
+ * Nom de cet appareil pour la synchronisation, vide pour le nom d'hôte.
+ */
+syncDeviceName: string, 
+/**
+ * Port d'écoute de la synchronisation.
+ */
+syncPort: number, 
+/**
+ * Synchronisation en pause.
+ */
+syncPaused: boolean, 
+/**
+ * Dossier des collections reçues, vide pour `Documents/Daftr`.
+ */
+receivedCollectionsFolder: string, };

@@ -66,6 +66,22 @@ fn falls_back_on_invalid_formatting_bar_preferences() {
 }
 
 #[test]
+fn keeps_a_valid_line_breaks_strategy_and_falls_back_on_the_current_one() {
+    let with = |value: &str| {
+        sanitize(RawSettings {
+            line_breaks: text(value),
+            ..RawSettings::default()
+        })
+        .line_breaks
+    };
+
+    assert_eq!(AppSettings::default().line_breaks, LineBreaks::Markdown);
+    assert_eq!(with("text"), LineBreaks::Text);
+    assert_eq!(with("markdown"), LineBreaks::Markdown);
+    assert_eq!(with("auto"), LineBreaks::Markdown);
+}
+
+#[test]
 fn keeps_a_valid_theme_and_falls_back_to_the_current_one() {
     let theme = |value: &str, base: &AppSettings| {
         let raw = RawSettings {
@@ -495,4 +511,82 @@ fn merges_the_mcp_settings_of_a_patch() {
     assert!(merged.mcp_enabled);
     assert_eq!(merged.mcp_port, 40000);
     assert!(merged.mcp_token.is_empty());
+}
+
+#[test]
+fn synchronizes_on_the_default_port_with_the_host_name_and_no_pause() {
+    let defaults = AppSettings::default();
+    assert!(defaults.sync_device_name.is_empty());
+    assert_eq!(defaults.sync_port, DEFAULT_SYNC_PORT);
+    assert!(!defaults.sync_paused);
+}
+
+#[test]
+fn keeps_only_a_valid_device_name() {
+    let base = AppSettings {
+        sync_device_name: "Desktop".to_owned(),
+        ..AppSettings::default()
+    };
+    let name = |value: &str| {
+        let raw = RawSettings {
+            sync_device_name: text(value),
+            ..RawSettings::default()
+        };
+        sanitize_settings(&raw, &base).sync_device_name
+    };
+
+    assert_eq!(name("  Laptop "), "Laptop");
+    assert_eq!(name("   "), "", "vide : retour au nom d'hôte");
+    assert_eq!(name("PC\u{7}"), "Desktop");
+    assert_eq!(name(&"x".repeat(65)), "Desktop");
+}
+
+#[test]
+fn bounds_the_sync_port_and_reads_the_pause() {
+    let sync = |port: f64| {
+        sanitize(RawSettings {
+            sync_port: Some(port),
+            sync_paused: Some(true),
+            ..RawSettings::default()
+        })
+    };
+
+    assert_eq!(sync(48000.0).sync_port, 48000);
+    assert_eq!(sync(80.0).sync_port, SYNC_MIN_PORT);
+    assert_eq!(sync(1e9).sync_port, SYNC_MAX_PORT);
+    assert_eq!(sync(f64::NAN).sync_port, DEFAULT_SYNC_PORT);
+    assert!(sync(48000.0).sync_paused);
+}
+
+#[test]
+fn keeps_an_absolute_received_folder_only() {
+    let base = AppSettings {
+        received_collections_folder: absolute("keep"),
+        ..AppSettings::default()
+    };
+    let folder = |value: &str| {
+        let raw = RawSettings {
+            received_collections_folder: Some(value.to_owned()),
+            ..RawSettings::default()
+        };
+        sanitize_settings(&raw, &base).received_collections_folder
+    };
+
+    assert_eq!(folder(&absolute("new")), absolute("new"));
+    assert_eq!(folder("  "), "");
+    assert_eq!(folder("relative/folder"), absolute("keep"));
+    assert_eq!(folder(&format!("{} ", absolute("nul"))), absolute("keep"));
+    assert_eq!(folder(&absolute(&"x".repeat(2000))), absolute("keep"));
+    assert!(
+        AppSettings::default()
+            .received_collections_folder
+            .is_empty()
+    );
+}
+
+fn absolute(name: &str) -> String {
+    std::env::temp_dir()
+        .join(name)
+        .to_string_lossy()
+        .into_owned()
 }

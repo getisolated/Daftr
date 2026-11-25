@@ -72,6 +72,9 @@ pub struct SettingsDto {
     pub word_wrap: bool,
     /// Ligne vide finale.
     pub trailing_line: bool,
+    /// Retours à la ligne de l'aperçu.
+    #[ts(type = "'markdown' | 'text'")]
+    pub line_breaks: &'static str,
     /// Plan de la note.
     pub show_outline: bool,
     /// Fil d'Ariane en haut de la note.
@@ -95,6 +98,14 @@ pub struct SettingsDto {
     /// Jeton du serveur MCP (généré par le processus principal), vide s'il n'a jamais été
     /// activé.
     pub mcp_token: String,
+    /// Nom de cet appareil pour la synchronisation, vide pour le nom d'hôte.
+    pub sync_device_name: String,
+    /// Port d'écoute de la synchronisation.
+    pub sync_port: u16,
+    /// Synchronisation en pause.
+    pub sync_paused: bool,
+    /// Dossier des collections reçues, vide pour `Documents/Daftr`.
+    pub received_collections_folder: String,
 }
 
 impl From<&AppSettings> for SettingsDto {
@@ -121,6 +132,7 @@ impl From<&AppSettings> for SettingsDto {
             show_line_numbers: settings.show_line_numbers,
             word_wrap: settings.word_wrap,
             trailing_line: settings.trailing_line,
+            line_breaks: settings.line_breaks.as_str(),
             show_outline: settings.show_outline,
             show_breadcrumbs: settings.show_breadcrumbs,
             hide_scrollbar: settings.hide_scrollbar,
@@ -134,6 +146,10 @@ impl From<&AppSettings> for SettingsDto {
             mcp_enabled: settings.mcp_enabled,
             mcp_port: settings.mcp_port,
             mcp_token: settings.mcp_token.clone(),
+            sync_device_name: settings.sync_device_name.clone(),
+            sync_port: settings.sync_port,
+            sync_paused: settings.sync_paused,
+            received_collections_folder: settings.received_collections_folder.clone(),
         }
     }
 }

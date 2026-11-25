@@ -10,12 +10,12 @@ use crate::state::desktop;
 
 #[tauri::command]
 pub async fn notes_get_all(app: AppHandle) -> IpcResult<Vec<NoteDto>> {
-    notes::all(&desktop(&app).services.notes)
+    notes::all(&desktop(&app).services.data.get()?.notes)
 }
 
 #[tauri::command]
 pub async fn notes_get_by_id(app: AppHandle, id: i64) -> IpcResult<Option<NoteDto>> {
-    notes::by_id(&desktop(&app).services.notes, id)
+    notes::by_id(&desktop(&app).services.data.get()?.notes, id)
 }
 
 /// Crée une note ; l'autre fenêtre (overlay ↔ principale) relit sa liste.
@@ -29,7 +29,7 @@ pub async fn notes_create(
     folder_id: Option<i64>,
 ) -> IpcResult<NoteDto> {
     let created = notes::create(
-        &desktop(&app).services.notes,
+        &desktop(&app).services.data.get()?.notes,
         title,
         content,
         tags,
@@ -45,7 +45,7 @@ pub async fn notes_update(
     id: i64,
     data: NoteChangesDto,
 ) -> IpcResult<Option<NoteDto>> {
-    notes::update(&desktop(&app).services.notes, id, data)
+    notes::update(&desktop(&app).services.data.get()?.notes, id, data)
 }
 
 #[tauri::command]
@@ -54,7 +54,7 @@ pub async fn notes_move(
     id: i64,
     folder_id: Option<i64>,
 ) -> IpcResult<Option<NoteDto>> {
-    notes::move_to(&desktop(&app).services.notes, id, folder_id)
+    notes::move_to(&desktop(&app).services.data.get()?.notes, id, folder_id)
 }
 
 #[tauri::command]
@@ -64,12 +64,23 @@ pub async fn notes_place(
     folder_id: Option<i64>,
     ordered_ids: Vec<i64>,
 ) -> IpcResult<Option<NoteDto>> {
-    notes::place(&desktop(&app).services.notes, id, folder_id, &ordered_ids)
+    notes::place(
+        &desktop(&app).services.data.get()?.notes,
+        id,
+        folder_id,
+        &ordered_ids,
+    )
 }
 
 #[tauri::command]
 pub async fn notes_delete(app: AppHandle, id: i64) -> IpcResult<bool> {
-    notes::delete(&desktop(&app).services.notes, id)
+    notes::delete(&desktop(&app).services.data.get()?.notes, id)
+}
+
+/// Rétablit une note supprimée ; la note, `None` si elle n'existe pas.
+#[tauri::command]
+pub async fn notes_restore(app: AppHandle, id: i64) -> IpcResult<Option<NoteDto>> {
+    notes::restore(&desktop(&app).services.data.get()?.notes, id)
 }
 
 #[tauri::command]
@@ -78,20 +89,24 @@ pub async fn notes_set_color(
     ids: Vec<i64>,
     color: Option<String>,
 ) -> IpcResult<bool> {
-    notes::set_color(&desktop(&app).services.notes, &ids, color.as_deref())
+    notes::set_color(
+        &desktop(&app).services.data.get()?.notes,
+        &ids,
+        color.as_deref(),
+    )
 }
 
 #[tauri::command]
 pub async fn notes_search(app: AppHandle, query: String) -> IpcResult<Vec<NoteDto>> {
-    notes::search(&desktop(&app).services.notes, &query)
+    notes::search(&desktop(&app).services.data.get()?.notes, &query)
 }
 
 #[tauri::command]
 pub async fn notes_by_tag(app: AppHandle, tag: String) -> IpcResult<Vec<NoteDto>> {
-    notes::by_tag(&desktop(&app).services.notes, &tag)
+    notes::by_tag(&desktop(&app).services.data.get()?.notes, &tag)
 }
 
 #[tauri::command]
 pub async fn notes_all_tags(app: AppHandle) -> IpcResult<Vec<String>> {
-    notes::all_tags(&desktop(&app).services.notes)
+    notes::all_tags(&desktop(&app).services.data.get()?.notes)
 }

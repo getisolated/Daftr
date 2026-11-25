@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { baseName, collectionLinkStatus, flattenFiles, folderPage, indexCollection, labelCollections, movedPath, parentPath, resolveRelativeLink, resolveRelativePath } from '../src/app/core/utils/collection.util';
+import { CollectionState, CollectionStatus } from '../src/app/core/models/collection.model';
+import { baseName, canCreateFileIn, collectionLinkStatus, flattenFiles, folderPage, indexCollection, labelCollections, movedPath, parentPath, resolveRelativeLink, resolveRelativePath } from '../src/app/core/utils/collection.util';
 
 const collection = (path: string, displayName = baseName(path)) => ({ path, kind: 'folder' as const, displayName, sortOrder: 0 });
 
@@ -27,6 +28,29 @@ describe('labelCollections', () => {
 
   it('compares the display names, which the user may change', () => {
     expect(labelCollections([collection('C:\\a\\docs', 'Front'), collection('C:\\b\\docs', 'Back')]).map(l => l.hint)).toEqual([null, null]);
+  });
+});
+
+describe('canCreateFileIn', () => {
+  const state = (kind: 'folder' | 'file', status: CollectionStatus): CollectionState => ({
+    collection: { ...collection('C:\\a\\docs'), kind },
+    status,
+    tree: [],
+    error: null,
+    truncated: false,
+    label: 'docs',
+    hint: null,
+  });
+
+  it('accepts a folder collection, loaded or not', () => {
+    expect(canCreateFileIn(state('folder', 'ready'))).toBe(true);
+    expect(canCreateFileIn(state('folder', 'unloaded'))).toBe(true);
+    expect(canCreateFileIn(state('folder', 'loading'))).toBe(true);
+  });
+
+  it('refuses a folder missing from the disk and a file collection', () => {
+    expect(canCreateFileIn(state('folder', 'error'))).toBe(false);
+    expect(canCreateFileIn(state('file', 'ready'))).toBe(false);
   });
 });
 

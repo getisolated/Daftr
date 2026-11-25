@@ -4,13 +4,16 @@
 //! les fenêtres (les dialogues bloquants en dépendent).
 
 mod clipboard;
+mod collection_sync;
 mod collections;
 mod export;
 mod folders;
 mod mcp;
 mod notes;
+mod profiles;
 mod settings;
 mod shell;
+mod sync;
 mod updates;
 
 use tauri::ipc::Invoke;
@@ -25,6 +28,7 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         notes::notes_move,
         notes::notes_place,
         notes::notes_delete,
+        notes::notes_restore,
         notes::notes_set_color,
         notes::notes_search,
         notes::notes_by_tag,
@@ -53,6 +57,28 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         collections::collections_search,
         collections::collections_cancel_search,
         collections::collections_graph,
+        collection_sync::collection_sync_state,
+        collection_sync::collection_sync_summary,
+        collection_sync::collection_sync_inspect_folder,
+        collection_sync::collection_sync_share,
+        collection_sync::collection_sync_stop,
+        collection_sync::collection_sync_set_device,
+        collection_sync::collection_sync_activate,
+        collection_sync::collection_sync_ignore,
+        collection_sync::collection_sync_relink,
+        collection_sync::collection_sync_pick_folder,
+        collection_sync::collection_conflict_resolve,
+        profiles::profiles_state,
+        profiles::profiles_unlock,
+        profiles::profiles_switch,
+        profiles::profiles_create,
+        profiles::profiles_rename,
+        profiles::profiles_set_icon,
+        profiles::profiles_remove_icon,
+        profiles::profiles_icon,
+        profiles::profiles_set_password,
+        profiles::profiles_delete,
+        profiles::profiles_transfer,
         settings::settings_get,
         settings::settings_set,
         settings::overlay_hide,
@@ -63,5 +89,18 @@ pub fn handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         updates::update_apply,
         shell::shell_open_external,
         clipboard::clipboard_read_text,
+        sync::sync_state,
+        sync::sync_devices,
+        sync::sync_profile,
+        sync::sync_start_pairing,
+        sync::sync_stop_pairing,
+        sync::sync_pair,
+        sync::sync_profile_shares,
+        sync::sync_set_profile_shared,
+        sync::sync_remove_device,
+        sync::sync_now,
+        sync::sync_set_paused,
+        sync::sync_set_device_name,
+        sync::sync_set_port,
     ]
 }

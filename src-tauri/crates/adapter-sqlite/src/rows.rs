@@ -2,7 +2,8 @@
 
 use domain::collection::{Collection, CollectionKind};
 use domain::folder::Folder;
-use domain::note::Note;
+use domain::note::{Note, NoteHead};
+use domain::uuid::Uuid;
 use rusqlite::Row;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
 
@@ -10,6 +11,7 @@ use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
 pub(crate) fn note(row: &Row<'_>) -> rusqlite::Result<Note> {
     Ok(Note {
         id: row.get("id")?,
+        uuid: row.get::<_, StoredUuid>("uuid")?.0,
         title: row.get("title")?,
         content: row.get("content")?,
         tags: row.get("tags")?,
@@ -25,10 +27,24 @@ pub(crate) fn note(row: &Row<'_>) -> rusqlite::Result<Note> {
     })
 }
 
+/// Les colonnes de `HEADS` : une note sans son contenu.
+pub(crate) fn note_head(row: &Row<'_>) -> rusqlite::Result<NoteHead> {
+    Ok(NoteHead {
+        id: row.get("id")?,
+        title: row.get("title")?,
+        tags: row.get("tags")?,
+        folder_id: row.get("folder_id")?,
+        updated_at: row
+            .get::<_, Option<String>>("updated_at")?
+            .unwrap_or_default(),
+    })
+}
+
 /// Une ligne de `folders`.
 pub(crate) fn folder(row: &Row<'_>) -> rusqlite::Result<Folder> {
     Ok(Folder {
         id: row.get("id")?,
+        uuid: row.get::<_, StoredUuid>("uuid")?.0,
         name: row.get("name")?,
         parent_id: row.get("parent_id")?,
         is_default: row.get::<_, i64>("is_default")? == 1,
@@ -61,6 +77,18 @@ impl FromSql for StoredKind {
         let text = value.as_str()?;
         CollectionKind::parse(text)
             .map(StoredKind)
+            .ok_or(FromSqlError::InvalidType)
+    }
+}
+
+/// Colonne `uuid` (forme canonique, écrite par ce crate ou validée à la projection).
+pub(crate) struct StoredUuid(pub(crate) Uuid);
+
+impl FromSql for StoredUuid {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        let text = value.as_str()?;
+        Uuid::parse(text)
+            .map(StoredUuid)
             .ok_or(FromSqlError::InvalidType)
     }
 }

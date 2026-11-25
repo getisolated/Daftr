@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { I18nService } from '../i18n/i18n.service';
+import { SettingsService } from './settings.service';
 import { noteDisplayTitle } from '../utils/note-title.util';
 import { Note, QUICK_NOTES_TAB_ID } from '../models/note.model';
 import { SidebarDragItem } from '../models/folder.model';
@@ -21,6 +22,7 @@ export class NoteExportService {
   private readonly folders = inject(FoldersService);
   private readonly bridge = inject(DesktopBridgeService);
   private readonly i18n = inject(I18nService);
+  private readonly settingsService = inject(SettingsService);
 
   /** PDF entries are offered only where the system can print them (see `isPdfExportAvailable`). */
   readonly pdfAvailable = isPdfExportAvailable(inject(PlatformService).platform);
@@ -135,7 +137,7 @@ export class NoteExportService {
       import('../../shared/markdown/preview-enhancers'),
     ]);
     const container = document.createElement('div');
-    container.innerHTML = renderMarkdown(createMarkdownRenderer({ linkStatus: () => 'note', t: this.i18n.t }), note.content);
+    container.innerHTML = renderMarkdown(createMarkdownRenderer({ linkStatus: () => 'note', t: this.i18n.t, lineBreaks: this.settingsService.settings().lineBreaks }), note.content);
 
     // Mermaid only draws diagrams attached to the document: the page is built off screen
     container.style.cssText = 'position: fixed; top: 0; left: -10000px; width: 860px; visibility: hidden; pointer-events: none;';

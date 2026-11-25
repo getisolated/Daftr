@@ -66,6 +66,8 @@ pub struct RawSettings {
     pub word_wrap: Option<bool>,
     /// Voir [`AppSettings::trailing_line`].
     pub trailing_line: Option<bool>,
+    /// Voir [`AppSettings::line_breaks`].
+    pub line_breaks: Option<String>,
     /// Voir [`AppSettings::show_outline`].
     pub show_outline: Option<bool>,
     /// Voir [`AppSettings::show_breadcrumbs`].
@@ -89,6 +91,14 @@ pub struct RawSettings {
     pub mcp_port: Option<f64>,
     /// Voir [`AppSettings::mcp_token`].
     pub mcp_token: Option<String>,
+    /// Voir [`AppSettings::sync_device_name`].
+    pub sync_device_name: Option<String>,
+    /// Voir [`AppSettings::sync_port`].
+    pub sync_port: Option<f64>,
+    /// Voir [`AppSettings::sync_paused`].
+    pub sync_paused: Option<bool>,
+    /// Voir [`AppSettings::received_collections_folder`].
+    pub received_collections_folder: Option<String>,
 }
 
 impl RawSettings {
@@ -116,6 +126,7 @@ impl RawSettings {
             show_line_numbers: Some(settings.show_line_numbers),
             word_wrap: Some(settings.word_wrap),
             trailing_line: Some(settings.trailing_line),
+            line_breaks: Some(settings.line_breaks.as_str().to_owned()),
             show_outline: Some(settings.show_outline),
             show_breadcrumbs: Some(settings.show_breadcrumbs),
             hide_scrollbar: Some(settings.hide_scrollbar),
@@ -134,6 +145,10 @@ impl RawSettings {
             mcp_enabled: Some(settings.mcp_enabled),
             mcp_port: Some(f64::from(settings.mcp_port)),
             mcp_token: Some(settings.mcp_token.clone()),
+            sync_device_name: Some(settings.sync_device_name.clone()),
+            sync_port: Some(f64::from(settings.sync_port)),
+            sync_paused: Some(settings.sync_paused),
+            received_collections_folder: Some(settings.received_collections_folder.clone()),
         }
     }
 
@@ -173,6 +188,7 @@ impl RawSettings {
             show_line_numbers: patch.show_line_numbers.or(self.show_line_numbers),
             word_wrap: patch.word_wrap.or(self.word_wrap),
             trailing_line: patch.trailing_line.or(self.trailing_line),
+            line_breaks: patch.line_breaks.or(self.line_breaks),
             show_outline: patch.show_outline.or(self.show_outline),
             show_breadcrumbs: patch.show_breadcrumbs.or(self.show_breadcrumbs),
             hide_scrollbar: patch.hide_scrollbar.or(self.hide_scrollbar),
@@ -184,6 +200,12 @@ impl RawSettings {
             mcp_enabled: patch.mcp_enabled.or(self.mcp_enabled),
             mcp_port: patch.mcp_port.or(self.mcp_port),
             mcp_token: patch.mcp_token.or(self.mcp_token),
+            sync_device_name: patch.sync_device_name.or(self.sync_device_name),
+            sync_port: patch.sync_port.or(self.sync_port),
+            sync_paused: patch.sync_paused.or(self.sync_paused),
+            received_collections_folder: patch
+                .received_collections_folder
+                .or(self.received_collections_folder),
         }
     }
 }

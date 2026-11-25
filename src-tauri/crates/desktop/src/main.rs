@@ -13,11 +13,13 @@ mod mcp;
 #[cfg(target_os = "macos")]
 mod menu;
 mod open_args;
+mod profiles;
 mod settings_effects;
 mod setup;
 mod shortcut;
 mod startup;
 mod state;
+mod sync;
 mod tray;
 mod updater;
 mod windows;

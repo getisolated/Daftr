@@ -7,7 +7,8 @@
 //! `http://localhost` est refusé (protection contre le DNS rebinding), comme un en-tête
 //! `Host` autre qu'une adresse locale.
 //!
-//! Les outils passent par les services du crate `app` partagés avec l'application ; après
+//! Les outils passent par les services du crate `app` partagés avec l'application (ceux du
+//! profil actif, relus à chaque appel ; aucun tant qu'il est verrouillé) ; après
 //! chaque écriture, le rappel fourni au démarrage prévient les fenêtres. Pas d'outil de
 //! suppression, et les collections (fichiers sur le disque) restent hors de portée.
 
@@ -19,4 +20,4 @@ mod tools;
 
 pub use secrets::RandomSecrets;
 pub use server::{ChangeListener, MCP_PATH, McpConfig, McpServer, McpServerHandle, McpStartError};
-pub use tools::McpServices;
+pub use tools::{McpServices, McpServicesSource};

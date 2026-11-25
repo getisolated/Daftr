@@ -11,7 +11,7 @@ const DATA_FOLDER: &str = "daftr";
 /// champ `name` du `package.json` d'alors. Il est repris au premier lancement.
 const LEGACY_DATA_FOLDER: &str = "everything-note";
 /// Fichier de la base SQLite.
-pub const DATABASE_FILE: &str = "daftr.db";
+pub const DATABASE_FILE: &str = adapter_fs::DATABASE_FILE;
 /// Nom de la base dans le dossier « Everything Note ».
 const LEGACY_DATABASE_FILE: &str = "evnote.db";
 

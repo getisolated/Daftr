@@ -67,6 +67,11 @@ pub fn delete(notes: &NotesService, id: i64) -> IpcResult<bool> {
     Ok(true)
 }
 
+/// Rétablit une note supprimée (« Restaurer » d'une note supprimée sur un autre appareil).
+pub fn restore(notes: &NotesService, id: i64) -> IpcResult<Option<NoteDto>> {
+    Ok(notes.restore(id)?.map(NoteDto::from))
+}
+
 /// Colore des notes.
 pub fn set_color(notes: &NotesService, ids: &[i64], color: Option<&str>) -> IpcResult<bool> {
     notes.set_color(ids, color)?;

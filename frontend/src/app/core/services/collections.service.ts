@@ -136,10 +136,20 @@ export class CollectionsService {
     const row = await this.bridge.relocate(root);
 
     if (row) {
-      this.fileDocs.idsUnder(root).forEach(id => this.tabs.closeByNoteId(id));
-      await this.reload();
-      await this.load(row.path);
+      await this.reopen(root, row.path);
     }
+  }
+
+  /** The collection `root` now lives at `path` (relinked): its open tabs close, and the new folder is read. */
+  async reopen(root: string, path: string): Promise<void> {
+    this.closeFileTabs({ root, path: '' });
+    await this.reload();
+    await this.load(path);
+  }
+
+  /** Closes the tabs of a file (or of what a folder holds). */
+  closeFileTabs(ref: CollectionFileRef): void {
+    this.fileDocs.idsUnder(ref.root, ref.path).forEach(id => this.tabs.closeByNoteId(id));
   }
 
   /** Asks the sidebar to expand the folder (and its parents) and to scroll to it. */
@@ -182,7 +192,7 @@ export class CollectionsService {
   /** To the recycle bin; the open tabs of what it held are closed. */
   async trash(ref: CollectionFileRef): Promise<void> {
     await this.bridge.trash(ref);
-    this.fileDocs.idsUnder(ref.root, ref.path).forEach(id => this.tabs.closeByNoteId(id));
+    this.closeFileTabs(ref);
   }
 
   /** Searches the files of every collection; hits arrive as the worker reads them. Returns a cancel function. */

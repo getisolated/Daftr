@@ -15,7 +15,7 @@ import { graphGroups } from '../utils/graph-groups.util';
 import { collectSubtreeIds } from '../utils/folder-tree.util';
 import { Folder } from '../models/folder.model';
 
-/** Links between notes (`note://id`): who points at the active note, and the whole graph. */
+/** Links between notes (`note://<uuid>`, older `note://<id>`, paths): who points at the active note, and the whole graph. */
 @Injectable({ providedIn: 'root' })
 export class BacklinksService {
   private notes = inject(NotesService);

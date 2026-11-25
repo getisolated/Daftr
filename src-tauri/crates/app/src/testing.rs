@@ -6,8 +6,9 @@ use std::sync::Mutex;
 
 use domain::collection::{Collection, CollectionKind};
 use domain::folder::{Folder, FolderDeleteMode};
-use domain::note::{NewNote, Note, NoteChanges};
+use domain::note::{NewNote, Note, NoteChanges, NoteFilter, NoteHead, Page};
 use domain::settings::{AppSettings, RawSettings};
+use domain::uuid::Uuid;
 use platform::sync::lock;
 
 use crate::ports::{
@@ -16,10 +17,18 @@ use crate::ports::{
 };
 use crate::{AppError, AppResult};
 
+/// Uuid de test dérivé de l'identifiant local.
+pub fn test_uuid(id: i64) -> Uuid {
+    let mut bytes = [0_u8; 16];
+    bytes[8..].copy_from_slice(&id.to_be_bytes());
+    Uuid::from_bytes(bytes)
+}
+
 /// Un dossier de test.
 pub fn folder(id: i64, parent_id: Option<i64>, is_default: bool) -> Folder {
     Folder {
         id,
+        uuid: test_uuid(id),
         name: format!("folder {id}"),
         parent_id,
         is_default,
@@ -159,6 +168,7 @@ impl MemoryNotes {
 pub fn note(id: i64, folder_id: Option<i64>, tags: &str) -> Note {
     Note {
         id,
+        uuid: test_uuid(id),
         title: format!("note {id}"),
         content: String::new(),
         tags: tags.to_owned(),
@@ -215,6 +225,11 @@ impl NoteStore for MemoryNotes {
         Ok(())
     }
 
+    fn restore(&self, id: i64) -> AppResult<bool> {
+        self.record(format!("restore {id}"));
+        Ok(false)
+    }
+
     fn set_color(&self, ids: &[i64], color: Option<&str>) -> AppResult<()> {
         self.record(format!("set_color {ids:?} {color:?}"));
         Ok(())
@@ -235,6 +250,22 @@ impl NoteStore for MemoryNotes {
             .iter()
             .map(|note| note.tags.clone())
             .collect())
+    }
+
+    fn heads(&self, filter: &NoteFilter, limit: usize) -> AppResult<Page<NoteHead>> {
+        self.record(format!("heads {filter:?} {limit}"));
+        Ok(Page {
+            total: 0,
+            items: Vec::new(),
+        })
+    }
+
+    fn search_page(&self, fts_query: &str, limit: usize) -> AppResult<Page<Note>> {
+        self.record(format!("search_page {fts_query} {limit}"));
+        Ok(Page {
+            total: 0,
+            items: Vec::new(),
+        })
     }
 }
 

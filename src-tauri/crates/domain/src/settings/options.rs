@@ -43,3 +43,13 @@ text_enum! {
         Right => "right",
     }
 }
+
+text_enum! {
+    /// Stratégie de détection des retours à la ligne dans l'aperçu markdown.
+    pub enum LineBreaks {
+        /// Norme markdown : une ligne vide, ou deux espaces en fin de ligne, pour un retour à la ligne.
+        Markdown => "markdown",
+        /// Texte brut : chaque retour à la ligne de la source en est un dans l'aperçu.
+        Text => "text",
+    }
+}
