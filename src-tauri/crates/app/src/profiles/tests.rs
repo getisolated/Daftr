@@ -340,7 +340,33 @@ fn refuses_an_overlong_password() {
 }
 
 #[test]
-fn deleting_the_default_profile_resets_it_instead_of_removing_it() {
+fn deleting_the_default_profile_removes_it_when_another_profile_remains() {
+    let fixture = fixture();
+    let work = fixture.service.create(Some("Work")).unwrap();
+
+    fixture.service.delete(&default_id(), None).unwrap();
+
+    assert!(fixture.files.calls().contains(&"trash default".to_owned()));
+    let registry = fixture.service.registry();
+    assert_eq!(registry.profiles(), [work.clone()]);
+    assert_eq!(registry.last_active(), &work.id);
+}
+
+#[test]
+fn deleting_the_last_remaining_profile_leaves_a_blank_default_one() {
+    let fixture = fixture();
+    let work = fixture.service.create(Some("Work")).unwrap();
+    fixture.service.delete(&default_id(), None).unwrap();
+
+    fixture.service.delete(&work.id, None).unwrap();
+
+    let registry = fixture.service.registry();
+    assert_eq!(registry.profiles(), [Profile::new(default_id())]);
+    assert!(registry.last_active().is_default());
+}
+
+#[test]
+fn deleting_the_only_default_profile_resets_it() {
     let fixture = fixture();
     fixture
         .service

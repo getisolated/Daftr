@@ -88,7 +88,8 @@ pub fn delete_profile(
 
 /// Supprime un profil. S'il est actif, un autre le remplace d'abord : celui qui s'ouvre
 /// directement de préférence, sinon un protégé (qui reste verrouillé jusqu'à son mot de
-/// passe). Le profil par défaut, seul, repart vide et se rouvre aussitôt.
+/// passe). Le seul profil disparaît aussi : un profil par défaut vierge le remplace et
+/// s'ouvre aussitôt. Le profil par défaut se supprime comme les autres tant qu'il en reste un.
 fn delete_profile_data(
     app: &AppHandle,
     sender: &str,
@@ -112,7 +113,8 @@ fn delete_profile_data(
 }
 
 /// Supprime le seul profil, actif : sa base est fermée avant de partir à la corbeille, puis
-/// rouverte (vide si la suppression a réussi).
+/// le profil par défaut vierge qui le remplace est ouvert (ou le même profil, si la
+/// suppression a échoué).
 fn delete_only_profile(
     app: &AppHandle,
     sender: &str,
@@ -123,13 +125,13 @@ fn delete_only_profile(
     drop(set_active(app, id, None));
 
     let deleted = services.profiles.delete(id, password);
-    // Après un échec, le profil garde son mot de passe
-    let reopened = activate(
-        app,
-        sender,
-        id,
-        deleted.as_ref().map_or(password, |()| None),
-    );
+    // Après un échec, le profil garde son mot de passe ; après un succès, le registre a
+    // un nouveau profil par défaut, sans mot de passe
+    let (reopen, reopen_password) = match &deleted {
+        Ok(()) => (services.profiles.registry().last_active().clone(), None),
+        Err(_) => (id.clone(), password),
+    };
+    let reopened = activate(app, sender, &reopen, reopen_password);
 
     deleted.and(reopened)
 }
