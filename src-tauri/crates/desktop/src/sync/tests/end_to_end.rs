@@ -105,10 +105,11 @@ async fn paired_devices_sync_at_once_then_relay_changes() {
     let b_profile = link_by_code(&a, &shared, &b).await;
     assert_eq!(b.contents(&b_profile), ["Courses\n- pain"]);
     assert_ne!(b_profile, b_other);
-    // Le profil par défaut de A n'a pas de nom : le clone prend le nom par défaut de B (français)
-    let cloned = b.profiles.get(&b_profile).unwrap();
-    assert_eq!(cloned.name.as_deref(), Some("Profil par défaut"));
-    assert!(!cloned.is_protected());
+    // Le profil par défaut de A est fusionné avec celui de B, qui garde son nom (aucun clone)
+    assert!(b_profile.is_default());
+    let merged = b.profiles.get(&b_profile).unwrap();
+    assert_eq!(merged.name, None);
+    assert!(!merged.is_protected());
 
     a_store
         .update(note.id, &edit("Courses\n- pain\n- lait"))
