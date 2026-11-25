@@ -348,7 +348,7 @@ fn deleting_the_default_profile_removes_it_when_another_profile_remains() {
 
     assert!(fixture.files.calls().contains(&"trash default".to_owned()));
     let registry = fixture.service.registry();
-    assert_eq!(registry.profiles(), [work.clone()]);
+    assert_eq!(registry.profiles(), std::slice::from_ref(&work));
     assert_eq!(registry.last_active(), &work.id);
 }
 
